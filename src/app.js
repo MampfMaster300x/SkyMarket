@@ -51,7 +51,7 @@ const modeLabel = (a) => (a.owned ? 'Eigentum' : a.flex ? 'Flex-Leasing' : 'Leas
 const cpi = () => W.macro.cpi;
 const tl = (id) => (P.AIRCRAFT_TYPES[id] ? P.AIRCRAFT_TYPES[id].label : id);
 /** Klickbarer Mustername: öffnet das Datenblatt. */
-const tlx = (id) => `<button type="button" class="acl" data-acinfo="${id}" title="Datenblatt ${esc(tl(id))}">${esc(tl(id))}</button>`;
+const tlx = (id) => `<span class="acl" role="button" tabindex="0" data-acinfo="${id}" title="Datenblatt ${esc(tl(id))}">${esc(tl(id))}</span>`;   // span statt button: steht auch in Knöpfen
 const acName = (id) => (W.playerId && id.startsWith(W.playerId + '-') ? (W.player.code || 'SM') + id.slice(W.playerId.length) : id);
 const LEVEL = ['', 'Junior', 'Senior', 'Experte', 'Spitzenklasse'];
 const byRegion = (codes) => SM.REGION_ORDER.map((r) => [r, codes.filter((c) => P.AIRPORTS[c].region === r).sort((x, y) => apName(x).localeCompare(apName(y), 'de'))]).filter(([, l]) => l.length);
@@ -303,6 +303,7 @@ function renderAirports() {
       if (shown) break;
     }
   }
+  html += distLabelHtml();
   $('#gApts').innerHTML = html;
   ui.viewDirty = false;
 }
@@ -338,8 +339,21 @@ function renderMapRoutes(force = false) {
 }
 function renderDraft() {
   const p = ui.planner, g = $('#gDraft');
+  ui.viewDirty = true;
   if (!p || !p.dest || ui.tab !== 'plan') { g.innerHTML = ''; return; }
   g.innerHTML = `<path class="rt draft" d="${lineD(gcLine(p.base, p.dest))}"/>`;
+}
+/** Distanz-Schild mitten auf der geplanten bzw. aufgeklappten Strecke. */
+function distLabelHtml() {
+  let a = null, b = null, type = 'A20N';
+  if (ui.planner && ui.planner.dest && ui.tab === 'plan') { a = ui.planner.base; b = ui.planner.dest; type = ui.planner.type; }
+  else if (ui.expanded && ui.tab === 'routes') { const r = W.player.routes.find((x) => x.id === ui.expanded); if (r) { a = r.base; b = r.dest; type = r.type_id; } }
+  if (!a || !b || !P.AIRPORTS[a] || !P.AIRPORTS[b]) return '';
+  const pts = gcLine(a, b), m = pts[Math.floor(pts.length / 2)];
+  const x = m[0] * view.k + view.tx, y = m[1] * view.k + view.ty;
+  const txt = `${n0(SM.gcDistanceKm(a, b))} km · ${n1(SM.blockHours(a, b, type))} h`;
+  const w = txt.length * 7 + 16;
+  return `<g class="dlbl" transform="translate(${x.toFixed(1)},${(y - 14).toFixed(1)})"><rect x="${(-w / 2).toFixed(1)}" y="-10" width="${w.toFixed(1)}" height="20" rx="10"/><text text-anchor="middle" y="4">${txt}</text></g>`;
 }
 function renderLegend() {
   const n = W.list.filter((al) => al.archetype && al.status !== 'insolvent').length;
@@ -638,7 +652,7 @@ function renderTabs() {
 function setTab(t) {
   t = TAB_ALIAS[t] || t;
   if (!VIEWS[t]) t = 'cockpit';
-  ui.tab = t; ui.confirm = null;
+  ui.tab = t; ui.confirm = null; ui.viewDirty = true;
   ui.lastSub = ui.lastSub || {};
   ui.lastSub[sectionOf(t).key] = t;
   if (t === 'news') ui.newsSeen = W.news.length + W.player.events.length;
@@ -866,7 +880,7 @@ VIEWS.cockpit = function viewCockpit() {
   if (routes.length) {
     const rows = routes.map((r, i) => ({ r, s: st30[i] })).sort((a, b) => b.s.db2 / Math.max(b.s.n, 1) - a.s.db2 / Math.max(a.s.n, 1));
     html += `<div class="stack"><h2 class="sec">Strecken nach Beitrag <small>Ø 30 Tage</small></h2><div class="tw"><table class="t"><thead><tr><th>Strecke</th><th class="r">Auslastung</th><th class="r">Ø Tarif</th><th class="r">DB2/Tag</th></tr></thead><tbody>
-      ${rows.map(({ r, s }) => `<tr><td><a href="#" data-act="openroute" data-id="${r.id}">${r.base}–${r.dest}</a> <span class="muted small">${r.freq}x ${tlx(r.type_id)}</span></td><td class="r">${s.n ? pct(s.lf) : '–'}</td><td class="r">${s.n ? eur(s.avgFare) : '–'}</td><td class="r ${s.db2 < 0 ? 'neg' : 'pos'}">${s.n ? eur(s.db2 / s.n, { plus: true }) : 'neu'}</td></tr>`).join('')}
+      ${rows.map(({ r, s }) => `<tr><td><a href="#" data-act="openroute" data-id="${r.id}">${r.base}–${r.dest}</a> <span class="muted small">${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${r.freq}x ${tlx(r.type_id)}</span></td><td class="r">${s.n ? pct(s.lf) : '–'}</td><td class="r">${s.n ? eur(s.avgFare) : '–'}</td><td class="r ${s.db2 < 0 ? 'neg' : 'pos'}">${s.n ? eur(s.db2 / s.n, { plus: true }) : 'neu'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   }
   const news = mergedNews().slice(0, 5);
@@ -929,7 +943,7 @@ function routeItem(r) {
   const waiting = W.day < r.opened_day ? `startet ${dateShort(r.opened_day)}` : r.partial ? `Teilbetrieb: fliegt an ${pct(r.partial)} der Tage` : (r.flyingToday || 0) < r.freq ? `${r.flyingToday || 0} von ${r.freq} Umläufen haben ein Flugzeug` : null;
   const lfo = SM.routeLf(r, 7, 'out'), lfi = SM.routeLf(r, 7, 'in');
   let html = `<div class="ritem${open ? ' open' : ''}"><button class="rhead" data-act="toggle" data-id="${r.id}" aria-expanded="${open}">
-    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${r.freq}x täglich · ${tlx(r.type_id)} · ${svcLabel(r.service)} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}</div></div>
+    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${r.freq}x täglich · ${tlx(r.type_id)} · ${svcLabel(r.service)} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}</div></div>
     <div class="rdb ${s30.db2 < 0 ? 'neg' : 'pos'}">${s30.n ? eur(s30.db2 / s30.n, { plus: true }) : '–'}<small>DB2 pro Tag</small></div>
     <div class="lfrow"><span>hin</span><div class="bar"><i class="me" style="width:${(lfo * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfo) : '–'}</span></div>
     <div class="lfrow"><span>zurück</span><div class="bar"><i class="me" style="width:${(lfi * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfi) : '–'}</span></div>
@@ -1003,12 +1017,12 @@ function viewPlanner() {
   const types = Object.keys(P.AIRCRAFT_TYPES);
   const st = pl.stations[p.dest];
   return `<div class="card pad stack" id="planner">
-    <div class="spread"><h2 class="sec">Neue Strecke ab ${base}</h2><button class="btn small" data-act="closeplan">Verwerfen</button></div>
+    <div class="spread"><h2 class="sec">Neue Strecke ${base}–${p.dest} <small>${n0(SM.gcDistanceKm(base, p.dest))} km · ${n1(SM.blockHours(base, p.dest, p.type))} h Flugzeit</small></h2><button class="btn small" data-act="closeplan">Verwerfen</button></div>
     <p class="small muted">Tipp: Ein Flughafen auf der Karte setzt das Ziel.</p>
     <div class="grid2">
       ${pl.bases.length > 1 ? `<label class="f"><span>Basis</span><select id="pl-base">${pl.bases.map((b) => `<option value="${b}" ${b === base ? 'selected' : ''}>${b} · ${apName(b)}</option>`).join('')}</select></label>` : ''}
       <label class="f"><span>Ziel</span><select id="pl-dest">${byRegion(dests).map(([rg, l]) => `<optgroup label="${esc(rg)}">${l.map((c) => `<option value="${c}" ${c === p.dest ? 'selected' : ''}>${esc(apName(c))} ${c} (${n0(SM.gcDistanceKm(base, c))} km)</option>`).join('')}</optgroup>`).join('')}</select></label>
-      <label class="f"><span>Flugzeugtyp <button type="button" class="acl small" data-acinfo="${p.type}">Datenblatt</button></span><select id="pl-type">${(() => {
+      <label class="f"><span>Flugzeugtyp <span class="acl small" role="button" tabindex="0" data-acinfo="${p.type}">Datenblatt</span></span><select id="pl-type">${(() => {
         const opt = (t, ownTxt) => { const ok = SM.rangeOk(base, p.dest, t); return `<option value="${t}" ${t === p.type ? 'selected' : ''} ${ok ? '' : 'disabled'} ${ownTxt ? 'class="own"' : ''}>${ownTxt ? '★ ' : ''}${t} · ${P.AIRCRAFT_TYPES[t].label}${ownTxt}${ok ? '' : ' · Reichweite zu kurz'}</option>`; };
         const own = types.filter((t) => pl.fleet.some((a) => a.type_id === t)), rest = types.filter((t) => !own.includes(t));
         const ownTxt = (t) => { const here = pl.fleet.filter((a) => a.type_id === t && a.base === base).length, all = pl.fleet.filter((a) => a.type_id === t).length; return ` · ${here ? `${here} an ${base}` : ''}${all > here ? `${here ? ', ' : ''}${all - here} anderswo` : ''}`; };
@@ -2837,7 +2851,7 @@ function onPaneClick(e) {
     case 'suggest': suggestPrice(); break;
     case 'openroute-new': openNewRoute(); break;
     case 'quicklease': { const t = b.dataset.type; const res = doAction({ type: 'acquire', typeId: t, mode: 'lease', base: b.dataset.base }); if (res.ok) toast(`${tl(t)} geleast. Lieferung in ${P.LEASE_DELIVERY_DAYS} Tagen.`); renderHeader(); updateForecast(); break; }
-    case 'toggle': ui.expanded = ui.expanded === b.dataset.id ? null : b.dataset.id; ui.confirm = null; renderPane(true); renderMapRoutes(true); break;
+    case 'toggle': ui.expanded = ui.expanded === b.dataset.id ? null : b.dataset.id; ui.confirm = null; ui.viewDirty = true; renderPane(true); renderMapRoutes(true); break;
     case 'openroute': ui.expanded = b.dataset.id; setTab('routes'); renderMapRoutes(true); break;
     case 'applyroute': applyRoute(b.dataset.id); break;
     case 'askclose': ui.confirm = 'close:' + b.dataset.id; renderPane(true); break;
@@ -3491,6 +3505,7 @@ function boot(hotData) {
   $('#userMenu').addEventListener('click', (e) => { const b = e.target.closest('[data-um]'); if (b) onUserMenu(b.dataset.um); });
   document.addEventListener('click', (e) => { if (!e.target.closest('#userMenu')) $('#userMenu').hidden = true; });
   document.addEventListener('click', (e) => { const b = e.target.closest('[data-acinfo]'); if (!b) return; e.preventDefault(); e.stopPropagation(); showAcInfo(b.dataset.acinfo); }, true);
+  document.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const b = e.target.closest && e.target.closest('[data-acinfo]'); if (!b) return; e.preventDefault(); e.stopPropagation(); showAcInfo(b.dataset.acinfo); }, true);
   $('#aptCard').addEventListener('click', (e) => {
     const sel = e.target.closest('[data-aptsel]'); if (sel) { e.preventDefault(); selectAirport(sel.dataset.aptsel); return; }
     const b = e.target.closest('[data-apc]'); if (!b) return;
