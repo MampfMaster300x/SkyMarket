@@ -18,7 +18,7 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
     - wirkt auf Angriffe, Preiskämpfe, Abwerben, Planungsgenauigkeit und Kosten der KI.
   - **Strecke in einem Schritt:** Die Planung enthält ein „Startpaket“.
     - Fehlt ein Flugzeug, wird es geleast oder gebraucht übernommen.
-    - Fehlendes Personal wird gleich mit eingestellt.
+    - Fehlendes Personal wird nur auf Wunsch mit eingestellt (Häkchen, standardmäßig aus).
     - Der Einsatz wird automatisch geplant.
     - Nach einem Kauf unter Beschaffung bietet das Spiel „Strecke dafür planen“ an.
   - **Dashboard** (Karte → Dashboard), alles auf einen Blick: Ergebnis, Kontostand, Auslastung, Pünktlichkeit, Profitabilität und Auslastung je Strecke, Ergebnis je Monat, Personal gegen Bedarf, Flotte (Nutzung, Ungenutzte, Wartung) sowie Markt und Risiko.

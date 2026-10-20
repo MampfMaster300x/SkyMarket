@@ -5118,14 +5118,14 @@ function kitHtml(p, x) {
   const sparePil = pilRow ? pilRow.have + pilRow.pipe - pilRow.need : 0, spareCab = cabRow.have + cabRow.pipe - cabRow.need;
   const misPil = Math.max(0, Math.ceil(needPil * 1.1 - sparePil)), misCab = Math.max(0, Math.ceil(needCab * 1.1 - spareCab)), misTech = n ? Math.ceil(P.STAFF.techPerAc * n) : 0;
   const staffShort = misPil + misCab + misTech > 0;
-  if (p.hire === undefined) p.hire = true;
+  if (p.hire === undefined) p.hire = false;   // Personal nur auf Wunsch mit einstellen
   ui.plannerKit = { n, staffShort };
   const row = (ok, title, body) => `<div class="kit-row ${ok ? 'ok' : 'todo'}"><span class="kit-ic">${ok ? '✓' : '!'}</span><div><b>${title}</b>${body ? `<div class="small muted">${body}</div>` : ''}</div></div>`;
   return `<div class="kit card pad stack"><div class="spread"><b>Startpaket</b><span class="small muted">alles mit einem Klick</span></div>
     ${n ? row(false, `Flugzeug: ${x.acNeed}`, `<div class="kit-opts">${opts.map(([v, l, d]) => `<label class="chk"><input type="radio" name="pl-acq" id="pl-acq-${v.replace(':', '-')}" value="${v}" ${p.acq === v ? 'checked' : ''}> <span><b>${esc(l)}</b><br><span class="muted">${esc(d)}</span></span></label>`).join('')}</div>${auctionOnly ? '<span class="small muted">Dieses Muster gibt es im ersten Jahr nur per Auktion.</span>' : !leaseOk && stock < n ? '<span class="small muted">Beim Leasinggeber derzeit nicht genug auf Lager.</span>' : ''}`)
       : row(true, x.kLong ? `Flugzeuge: ${x.kLong * p.freq} fliegen die Langstrecke im Wechsel` : `Flugzeug: passt auf ${x.free.length === 1 ? 'Ihr Flugzeug' : 'Ihre Flotte'}`, `${n1(x.rotH * p.freq)} h von ${n0(x.wnd)} h Betriebsfenster – wird automatisch eingeplant`)}
     ${staffShort ? row(false, `Personal: es fehlen etwa ${[misPil ? `${misPil} ${SM.roleLabel('pilot', t.group)}` : '', misCab ? `${misCab} Flugbegleiterinnen` : '', misTech ? `${misTech} Techniker` : ''].filter(Boolean).join(', ')}`,
-      `<label class="chk"><input type="checkbox" id="pl-hire" ${p.hire ? 'checked' : ''}> <span>Gleich mit einstellen (Bedarf plus 10 % Reserve). Bis sie anfangen, fliegt Agenturpersonal.</span></label>`)
+      `<label class="chk"><input type="checkbox" id="pl-hire" ${p.hire ? 'checked' : ''}> <span>Auf Wunsch gleich mit einstellen (Bedarf plus 10 % Reserve). Sonst selbst unter <b>Unternehmen → Personal</b> – bis dahin fliegt teures Agenturpersonal.</span></label>`)
       : row(true, 'Personal: reicht', 'Crews und Technik sind vorhanden.')}
     ${row(true, 'Einsatz: automatisch', 'Der Einsatzplan teilt Flugzeuge selbst zu. Unter Flotte → Einsatzplan können Sie später feste Umläufe vorgeben – nötig ist das nicht.')}
   </div>`;
@@ -6918,7 +6918,7 @@ const GUIDE = [
   { t: 'Die ersten zehn Minuten', html: () => `
     <ol class="glist-num">
       <li><b>Strecke planen:</b> <b>Strecken → Planung</b> oder einen Flughafen auf der Karte antippen. Die Prognose zeigt Passagiere, Umsatz und den Streckenbeitrag (DB2) – „So rechnet die Prognose“ erklärt jede Zahl.</li>
-      <li><b>Startpaket:</b> Fehlt ein Flugzeug oder Personal, schlägt die Planung beides vor: Flugzeug leasen oder gebraucht übernehmen, Crews gleich mit einstellen. Ein Klick auf „Strecke eröffnen“ erledigt alles, der Einsatz wird automatisch geplant.</li>
+      <li><b>Startpaket:</b> Fehlt ein Flugzeug, schlägt die Planung vor, es gleich mit zu leasen oder gebraucht zu übernehmen; der Einsatz wird automatisch geplant. Personal stellen Sie selbst unter Unternehmen → Personal ein – oder setzen im Startpaket das Häkchen.</li>
       <li><b>Zeit laufen lassen</b> und unter <b>Karte → Dashboard</b> sehen, was verdient, was voll ist und wo Personal fehlt. Ihre Assistenz meldet sich, wenn etwas ansteht.</li>
     </ol>
     <p class="small muted">Gute erste Ziele ab Hamburg: Paris, Barcelona, Wien, Rom, London – jeweils einmal täglich.</p>` },
