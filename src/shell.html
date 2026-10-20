@@ -69,14 +69,15 @@ header.top { display: flex; align-items: stretch; gap: 0; min-height: 60px; back
 .logo .wm { display: grid; line-height: 1.05; }
 .logo .wm b { font: 800 19px/1 var(--f-body); letter-spacing: .14em; }
 .logo .wm span { font-size: 10.5px; color: var(--bar-ink-2); letter-spacing: .06em; margin-top: 3px; }
-nav.main { display: flex; align-items: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+nav.main { display: flex; align-items: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; height: 48px; flex: none;
+  background: linear-gradient(180deg, var(--bar-2), var(--bar)); border-radius: var(--r-lg); border: 1px solid rgba(120,160,230,.14); box-shadow: var(--shadow); padding: 0 4px; }
 nav.main::-webkit-scrollbar { display: none; }
-nav.main button { border: 0; background: transparent; color: var(--bar-ink-2); display: flex; align-items: center; gap: 8px; padding: 0 16px; font: 500 13.5px var(--f-body); white-space: nowrap; position: relative; }
+nav.main button { flex: 1 1 auto; justify-content: center; border: 0; background: transparent; color: var(--bar-ink-2); display: flex; align-items: center; gap: 7px; padding: 0 10px; font: 500 13.5px var(--f-body); white-space: nowrap; position: relative; }
 nav.main button:hover { color: var(--bar-ink); background: rgba(255,255,255,.04); }
 nav.main button[aria-selected="true"] { color: #fff; background: linear-gradient(180deg, color-mix(in srgb, var(--sc) 30%, transparent), color-mix(in srgb, var(--sc) 8%, transparent)); }
 nav.main button[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--sc); }
 nav.main button .ic { color: var(--sc); }
-nav.main .dot { position: absolute; top: 12px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: #fb7185; }
+nav.main .dot { position: absolute; top: 8px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #fb7185; }
 .topright { margin-left: auto; display: flex; align-items: center; gap: 14px; padding-left: 14px; }
 .date { text-align: right; line-height: 1.15; }
 .date b { display: block; font: 600 13px var(--f-body); }
@@ -98,7 +99,15 @@ nav.main .dot { position: absolute; top: 12px; right: 8px; width: 7px; height: 7
 .usermenu button:hover { background: var(--panel-2); }
 .usermenu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
 
-main.body { display: grid; grid-template-columns: 300px minmax(0, 1fr) 480px; gap: 12px; padding: 12px; min-height: 0; }
+main.body { display: grid; grid-template-columns: 300px minmax(0, 1fr) var(--rw, 520px); gap: 12px; padding: 12px; min-height: 0; }
+.rcol { position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; container-type: inline-size; }
+.rcol > .side { flex: 1 1 auto; }
+.resizer { position: absolute; left: -12px; top: 0; bottom: 0; width: 12px; cursor: col-resize; z-index: 5; touch-action: none; }
+.resizer::after { content: ""; position: absolute; left: 4px; top: 50%; width: 4px; height: 44px; margin-top: -22px; border-radius: 3px; background: var(--line-2, var(--line)); opacity: .7; transition: opacity .15s, background .15s; }
+.resizer:hover::after, .resizer.drag::after, .resizer:focus-visible::after { opacity: 1; background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing #map { pointer-events: none; }
+@container (max-width: 600px) { nav.main button span.lbl { display: none; } nav.main button[aria-selected="true"] span.lbl { display: inline; } }
 .card2 { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
 #sidebar { display: grid; gap: 12px; align-content: start; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
 .alcard { padding: 14px; display: flex; gap: 12px; align-items: center; }
@@ -146,11 +155,9 @@ nav.tabs .dot { position: absolute; top: 1px; right: 1px; width: 7px; height: 7p
 .only-narrow { display: none; }
 
 @media (max-width: 1280px) {
-  main.body { grid-template-columns: minmax(0, 1fr) 460px; }
+  main.body { grid-template-columns: minmax(0, 1fr) var(--rw, 480px); }
   #sidebar { display: none; }
   .only-narrow { display: grid; }
-  nav.main button span.lbl { display: none; }
-  nav.main button[aria-selected="true"] span.lbl { display: inline; }
 }
 @media (max-width: 900px) {
   body { overflow: auto; }
@@ -159,10 +166,9 @@ nav.tabs .dot { position: absolute; top: 1px; right: 1px; width: 7px; height: 7p
   .logo { padding-right: 10px; }
   .logo .wm span { display: none; }
   .topright { gap: 8px; }
-  nav.main { order: 3; width: 100%; margin: 6px -14px 0; padding: 0 8px; }
-  nav.main button { padding: 10px 12px; }
-  nav.main button span.lbl { display: inline; }
   main.body { grid-template-columns: 1fr; padding: 8px; }
+  .resizer { display: none; }
+  nav.main { position: sticky; top: 0; z-index: 4; }
   .mapwrap { height: 48vh; min-height: 300px; }
   .pane { overflow: visible; }
   .side { overflow: visible; }
@@ -291,10 +297,10 @@ p { margin: 0; }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .tile { background: var(--panel-2); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
-.tile span { font-size: 11px; color: var(--ink-3); }
+.tile > span { font-size: 11px; color: var(--ink-3); }
 .tile b { font: 500 15px/1.25 var(--f-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .tile em { font-style: normal; font-size: 11px; color: var(--ink-3); }
-.pos { color: var(--good); } .neg { color: var(--crit); } .warnc { color: var(--warn); }
+.pos, .tile .pos { color: var(--good); } .neg, .tile .neg { color: var(--crit); } .warnc { color: var(--warn); }
 .btn { border: 1px solid var(--line-2); background: transparent; border-radius: 999px; padding: 7px 14px; font-weight: 500; font-size: 12.5px; }
 .btn:hover { border-color: var(--ink-3); background: var(--panel-2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
@@ -523,8 +529,6 @@ input[type="color"] { width: 42px; height: 30px; border: 1px solid var(--line-2)
 .chat-in { border-top: 1px solid var(--line); padding: 10px; display: grid; gap: 6px; }
 .chat-in input[type="text"] { flex: 1; }
 /* Tag und Nacht */
-.night { fill: rgba(1, 5, 18, .38); stroke: none; pointer-events: none; }
-:root[data-theme="light"] .night { fill: rgba(16, 32, 70, .12); }
 body, .card2, .side, .mapwrap, .pane { transition: background-color .8s ease, color .8s ease, border-color .8s ease; }
 
 /* Härtere Welt */
@@ -549,7 +553,6 @@ body, .card2, .side, .mapwrap, .pane { transition: background-color .8s ease, co
       </svg>
       <div class="wm"><b>SKYMARKET</b><span>Build · Connect · Grow</span></div>
     </div>
-    <nav class="main" id="nav" role="tablist" aria-label="Bereiche"></nav>
     <div class="topright">
       <div class="date" id="date">–</div>
       <div class="speed" role="group" aria-label="Spielgeschwindigkeit">
@@ -583,11 +586,15 @@ body, .card2, .side, .mapwrap, .pane { transition: background-color .8s ease, co
       <div class="activebox" id="activeBox"></div>
       <div class="daybar"><div id="daybar"></div></div>
     </div>
-    <aside class="side" id="side" data-sec="karte">
-      <div class="sechead" id="secHead"></div>
-      <nav class="tabs" role="tablist" id="tabs"></nav>
-      <div class="pane" id="pane"></div>
-    </aside>
+    <div class="rcol" id="rcol">
+      <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Breite des Bereichs ändern" title="Ziehen, um die Breite zu ändern · Doppelklick: Standardbreite" tabindex="0"></div>
+      <nav class="main" id="nav" role="tablist" aria-label="Bereiche"></nav>
+      <aside class="side" id="side" data-sec="karte">
+        <div class="sechead" id="secHead"></div>
+        <nav class="tabs" role="tablist" id="tabs"></nav>
+        <div class="pane" id="pane"></div>
+      </aside>
+    </div>
   </main>
 </div>
 <div class="modal" id="modal" hidden></div>

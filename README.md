@@ -37,10 +37,11 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Gebrauchtmarkt mit verborgenem Zustand:** Verbrauchte Maschinen verhalten sich wie deutlich ältere (mehr Kerosin, Wartung, Ausfälle). Ohne Gutachter sehen Sie nur Alter und Preis, mit einer Technik-Fachkraft ab Senior eine grobe Schätzung.
   - Länder ohne Nachfrage werden auf der Karte **ausgegraut**.
   - „Flugbegleiterinnen“ statt „Flugbegleiter“.
+  - **Bedienung:** Die Bereichsleiste (Karte, Flotte, Strecken, Finanzen, Markt, Unternehmen) sitzt direkt über dem rechten Block. Der Block lässt sich an seinem linken Rand breiter oder schmaler ziehen; Doppelklick stellt die Standardbreite wieder her. Die Breite merkt sich der Browser.
 - **Neu in 0.8:**
   - **Chat** im Mehrspieler: an alle oder privat an eine Airline (Sprechblasen-Symbol oben, Zähler für Ungelesenes). Gespeichert in einem eigenen Blob je Spiel (letzte 300 Nachrichten).
   - **Logo gestalten** (Unternehmen → Profil & Logo): Form, Symbol und zwei Farben, aus Vorlagen oder frei. Erscheint in Seitenleiste, Menü, Handel, Mitspielerliste und auf dem Leitwerk.
-  - **Design-Schalter** oben (Automatisch, Dunkel, Hell). Automatisch folgt bei langen Spieltagen (Echtzeit, 1 Std., 10 Min.) der Tageszeit, sonst dunkel. Die Karte zeigt die Tag-Nacht-Grenze.
+  - **Design-Schalter** oben (Automatisch, Dunkel, Hell). Automatisch folgt bei langen Spieltagen (Echtzeit, 1 Std., 10 Min.) der Tageszeit, sonst dunkel.
   - **Basen schließen** (Unternehmen → Stationen): Strecken ab dort werden eingestellt, Flugzeuge an eine andere Basis verlegt.
   - **Fehlerbehebung Langstrecke:** Dauert ein Umlauf länger als das Betriebsfenster (z. B. BCN–LAS, 27,6 h), braucht der tägliche Flug zwei Flugzeuge. Mit nur einem fliegt die Strecke jetzt im Teilbetrieb jeden zweiten Tag statt gar nicht; Planung, Strecke und Assistenz erklären das.
 - **Einsatzplan** (Flotte → Einsatzplan): Flugzeuge automatisch einsetzen, festen Strecken zuweisen oder als Reserve vorhalten. Grenzen: gleiche Basis, gleicher Typ wie die Strecke, höchstens 17 Stunden am Tag, nicht mehr Umläufe als die Frequenz; Langstrecke belegt ein Flugzeug ganz. Strecken lassen sich auf einen anderen Flugzeugtyp umstellen (Umflottung).

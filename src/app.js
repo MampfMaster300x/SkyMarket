@@ -24,6 +24,8 @@ function eur(x, opts = {}) {
 }
 const pct = (x, d = 0) => (x === null || !isFinite(x) ? '–' : `${(d ? NF1 : NF0).format(x * 100)} %`);
 const n0 = (x) => NF0.format(x);
+/** Gewinn grün, Verlust rot, null neutral. */
+const sgn = (x) => (x > 0 ? 'pos' : x < 0 ? 'neg' : '');
 const n1 = (x) => NF1.format(x);
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const MONTHS_L = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -220,10 +222,11 @@ function initMap() {
   const svg = $('#map');
   svg.setAttribute('preserveAspectRatio', 'none');
   svg.innerHTML = `<rect x="0" y="0" width="100%" height="100%" fill="var(--sea)"/>
-    <g id="gWorld"><path class="land" d="${MAP.land}"/><g id="gGrey"></g><path class="borders" d="${MAP.borders}"/><g id="gNight"></g><g id="gRoutes"></g><g id="gDraft"></g><g id="gTrails"></g></g>
+    <g id="gWorld"><path class="land" d="${MAP.land}"/><g id="gGrey"></g><path class="borders" d="${MAP.borders}"/><g id="gRoutes"></g><g id="gDraft"></g><g id="gTrails"></g></g>
     <g id="gApts"></g><g id="gPlanes"></g>`;
   const a = mapArea(); view.w = a.w; view.h = a.h; svg.setAttribute('viewBox', `0 0 ${a.w} ${a.h}`);
   window.addEventListener('resize', fitMap);
+  if (window.ResizeObserver) new ResizeObserver(() => fitMap()).observe($('#mapwrap'));
   // Zoom und Verschieben (Maus, Rad, Touch mit zwei Fingern)
   const ptrs = new Map(); let drag = null, pinch = null;
   const local = (e) => { const r = svg.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
@@ -488,7 +491,7 @@ function renderPlanes() {
   $('#daybar').style.width = `${(ui.t * 100).toFixed(2)}%`;
   const now = performance.now();
   if (ui.sel && (!renderPlanes.last || now - renderPlanes.last > 250)) { renderPlanes.last = now; renderPlaneCard(); }
-  if (!renderPlanes.lastBox || now - renderPlanes.lastBox > 700) { renderPlanes.lastBox = now; renderActiveBox(); const c = $('#clock'); if (c) c.textContent = clockText(); applyTheme(); renderNight(); }
+  if (!renderPlanes.lastBox || now - renderPlanes.lastBox > 700) { renderPlanes.lastBox = now; renderActiveBox(); const c = $('#clock'); if (c) c.textContent = clockText(); applyTheme(); }
 }
 const hhmm = (hrs) => { const m = Math.round(hrs * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 function flightNo(al, r, dir) {
@@ -613,7 +616,7 @@ function tabDots() {
 }
 function renderNav() {
   const dots = tabDots(), cur = sectionOf(ui.tab);
-  $('#nav').innerHTML = SECTIONS.map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join('');
+  $('#nav').innerHTML = SECTIONS.map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" title="${s.label}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join('');
   const bell = $('#bell .dot'); if (bell) bell.hidden = !dots.news;
 }
 function renderTabs() {
@@ -689,7 +692,7 @@ function renderSidebar() {
     <div class="card2 alcard"><button class="albadge" data-act="tab" data-tab="profile" title="Logo gestalten">${logoSvg(pl, 46)}</button><div style="min-width:0"><b>${esc(pl.name)}</b><span>${pl.stage().label} · Basis ${pl.bases.join(', ')}${ui.mp ? ' · ' + esc(ui.mp.name) : ''}</span></div></div>
     <div class="card2 kpilist">
       <div><span>Kontostand</span><b class="${bs.cash < 0 ? 'neg' : ''}">${eur(bs.cash)}</b>${kpiDelta(trendPct(bs.cash, cashPrev))}</div>
-      <div><span>Tagesergebnis</span><b class="${(pl.ledger.lastDay || 0) < 0 ? 'neg' : ''}">${eur(pl.ledger.lastDay || 0, { plus: true })}</b><em></em></div>
+      <div><span>Tagesergebnis</span><b class="${sgn(pl.ledger.lastDay || 0)}">${eur(pl.ledger.lastDay || 0, { plus: true })}</b><em></em></div>
       <div><span>Auslastung 7 Tage</span><b>${lf === null ? '–' : pct(lf)}</b>${lf !== null && lfPrev ? kpiDelta(lf - lfPrev) : '<em></em>'}</div>
       <div><span>Pünktlichkeit</span><b>${otp === null ? '–' : pct(otp)}</b><em></em></div>
       <div><span>Eigenkapital · Rating</span><b>${eur(bs.equity)}</b><em class="up" style="color:var(--ink-2)">${pl.rating}</em></div>
@@ -997,7 +1000,7 @@ function updateForecast() {
       <div><span>DB1 pro Tag</span><b class="${r.db1 < 0 ? 'neg' : 'pos'}">${eur(r.db1, { plus: true })}</b><em>nach direkten Kosten inkl. Crew</em></div>
       <div><span>DB2 pro Tag</span><b class="${r.db2 < 0 ? 'neg' : 'pos'}">${eur(r.db2, { plus: true })}</b><em>Spanne ${eur(lo.db2, { plus: true })} bis ${eur(hi.db2, { plus: true })}</em></div>
     </div>
-    <p class="small ink2">Jahresmittel bei ausgereifter Strecke, mit Ihren Kosten: Crew zu Ihren Gehältern, Terminal, Slots, Marke ${n0(pl.brand * 100)}. Im ${MONTHS_L[m]}: DB2 ${eur(cur.db2, { plus: true })} pro Tag bei ${pct(cur.lf)} Auslastung. ${study && study.done ? `<b>Marktstudie liegt vor</b> (${esc(study.by)}): Nachfrage ${pct(study.est - 1, 0).replace(/^(?!-)/, '+')} gegenüber Modell, Unsicherheit ±${pct(study.err)}.` : `Ohne Marktstudie liegt die echte Nachfrage bis zu ±${pct(band)} daneben.`}</p>
+    <p class="small ink2">Jahresmittel bei ausgereifter Strecke, mit Ihren Kosten: Crew zu Ihren Gehältern, Terminal, Slots, Marke ${n0(pl.brand * 100)}. Im ${MONTHS_L[m]}: DB2 <b class="${sgn(cur.db2)}">${eur(cur.db2, { plus: true })}</b> pro Tag bei ${pct(cur.lf)} Auslastung. ${study && study.done ? `<b>Marktstudie liegt vor</b> (${esc(study.by)}): Nachfrage ${pct(study.est - 1, 0).replace(/^(?!-)/, '+')} gegenüber Modell, Unsicherheit ±${pct(study.err)}.` : `Ohne Marktstudie liegt die echte Nachfrage bis zu ±${pct(band)} daneben.`}</p>
     ${acNeed ? `<div class="callout warn">${acNeed} <button class="btn small" data-act="quicklease" data-type="${p.type}" data-base="${base}">${tl(p.type)} leasen (${eur(P.LEASE_DEPOSIT_MONTHS * t.lease_month)} Kaution)</button></div>` : `<div class="callout good">${kLong ? `Passt: ${kLong * p.freq} Flugzeuge fliegen die Langstrecke im Wechsel (Umlauf ${n1(rotH)} h).` : `Passt auf ${free.length === 1 ? 'Ihr Flugzeug' : 'Ihre Flotte'}: ${n1(rotH * p.freq)} h von ${n0(wnd)} h Betriebsfenster pro Flugzeug.`}</div>`}
     ${!slotOk ? `<div class="callout crit">Keine Slots: ${[base, p.dest].filter((x) => W.slotsFree(x) < p.freq).map((x) => `${x} hat nur ${Math.max(0, W.slotsFree(x))} freie`).join(', ')}. Neue Slots kommen zum Sommer- und Winterflugplan (April, Oktober).</div>` : ''}
     ${(sparePil < needPil || spareCab < needCab) ? `<div class="callout warn">Personal reicht nicht: Diese Strecke braucht etwa ${n0(Math.ceil(needPil))} ${SM.roleLabel('pilot', t.group)} und ${n0(Math.ceil(needCab))} Flugbegleiterinnen. Frei sind ${n0(Math.max(0, sparePil))} und ${n0(Math.max(0, spareCab))}. Ohne Einstellung fliegt Agenturpersonal zum 1,6-fachen Satz.</div>` : ''}
@@ -1299,13 +1302,13 @@ VIEWS.finance = function viewFinance() {
   const pl = W.player, bs = SM.balanceSheet(pl), L = pl.ledger;
   const cur = pnlCol(L.month), prev = L.months.length ? pnlCol(L.months.at(-1).acc) : null, tot = pnlCol(L.pnl);
   const pm = dateParts(W.day).m;
-  const cell = (col, k) => { if (!col) return '<td class="r muted">–</td>'; const x = k === 'ebit' ? col.ebit : k === 'net' ? col.net : col.v(k); return `<td class="r">${x === 0 ? '<span class="muted">0</span>' : eur(x)}</td>`; };
+  const cell = (col, k) => { if (!col) return '<td class="r muted">–</td>'; const x = k === 'ebit' ? col.ebit : k === 'net' ? col.net : col.v(k); return `<td class="r ${['ebit', 'net'].includes(k) ? sgn(x) : ''}">${x === 0 ? '<span class="muted">0</span>' : eur(x)}</td>`; };
   const used = new Set(PNL_ROWS.filter(([k]) => k !== 'grp' && !['ebit', 'net'].includes(k) && (L.pnl[k] || L.month[k])).map(([k]) => k));
   let html = `<h2 class="sec">Ergebnis und Bilanz <small>EBIT-Marge seit Start ${tot.rev ? pct(tot.ebit / tot.rev, 1) : '–'}</small></h2>`;
   html += `<div class="tiles">
     <div class="tile"><span>Kontostand</span><b class="${bs.cash < 0 ? 'neg' : ''}">${eur(bs.cash)}</b><em>verfügbares Geld</em></div>
     <div class="tile"><span>Kreditlinie</span><b>${eur(pl.creditUsed)}</b><em>von ${eur(pl.creditLimit(W.macro.bank ?? 1))}, ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins</em></div>
-    <div class="tile"><span>Ergebnis gestern</span><b class="${(L.lastDay || 0) < 0 ? 'neg' : 'pos'}">${eur(L.lastDay || 0, { plus: true })}</b><em>${MONTHS[pm]} bisher ${eur(cur.net, { plus: true })}</em></div>
+    <div class="tile"><span>Ergebnis gestern</span><b class="${sgn(L.lastDay || 0)}">${eur(L.lastDay || 0, { plus: true })}</b><em>${MONTHS[pm]} bisher <span class="${sgn(cur.net)}">${eur(cur.net, { plus: true })}</span></em></div>
   </div>
   <div class="stack"><h2 class="sec">Kontostand <small>letzte ${Math.min(L.cashHist.length, 365)} Tage</small></h2>${sparkline(L.cashHist.slice(-365))}</div>`;
   html += `<div class="stack"><h2 class="sec">Gewinn- und Verlustrechnung <small>Ergebnis ist nicht Kontostand</small></h2><div class="tw"><table class="t"><thead><tr><th></th><th class="r">${MONTHS[pm]} (lfd.)</th><th class="r">Vormonat</th><th class="r">seit Start</th></tr></thead><tbody>
@@ -1388,7 +1391,7 @@ VIEWS.rivals = function viewRivals() {
   });
   const pl = W.player;
   html += `<div class="stack"><h2 class="sec">Airlines im Markt <small>Marge der letzten drei Monate</small></h2><div class="tw"><table class="t"><thead><tr><th>Airline</th><th>Modell</th><th>Basen</th><th class="r">Flotte</th><th class="r">Strecken</th><th class="r">Marge</th><th></th></tr></thead><tbody>
-    ${rows.map(({ al, margin }) => `<tr><td><span class="lgi">${logoSvg(al, 18)}</span> ${esc(al.name)}${al.status !== 'active' ? ` <span class="chip crit">${al.status === 'insolvent' ? 'insolvent' : 'Restrukturierung'}</span>` : ''}</td><td>${al.archetype ? P.AI_ARCHETYPES[al.archetype].label : al.id === W.playerId ? 'Sie' : 'Mitspieler'}</td><td>${al.bases.join(', ')}</td><td class="r">${al.fleet.length}</td><td class="r">${al.activeRoutes().length}</td><td class="r ${margin !== null && margin < 0 ? 'neg' : ''}">${margin === null ? '–' : pct(margin, 1)}</td><td class="r">${al.id !== W.playerId && al.status !== 'insolvent' ? `<button class="btn small" data-act="dealwith" data-al="${al.id}">Handeln</button>` : ''}</td></tr>`).join('')}
+    ${rows.map(({ al, margin }) => `<tr><td><span class="lgi">${logoSvg(al, 18)}</span> ${esc(al.name)}${al.status !== 'active' ? ` <span class="chip crit">${al.status === 'insolvent' ? 'insolvent' : 'Restrukturierung'}</span>` : ''}</td><td>${al.archetype ? P.AI_ARCHETYPES[al.archetype].label : al.id === W.playerId ? 'Sie' : 'Mitspieler'}</td><td>${al.bases.join(', ')}</td><td class="r">${al.fleet.length}</td><td class="r">${al.activeRoutes().length}</td><td class="r ${margin !== null ? sgn(margin) : ''}">${margin === null ? '–' : pct(margin, 1)}</td><td class="r">${al.id !== W.playerId && al.status !== 'insolvent' ? `<button class="btn small" data-act="dealwith" data-al="${al.id}">Handeln</button>` : ''}</td></tr>`).join('')}
   </tbody></table></div></div>`;
   const overlap = [];
   const mine = new Set(pl.activeRoutes().map((r) => SM.pairKey(r.base, r.dest)));
@@ -1676,25 +1679,6 @@ function cycleTheme() {
   try { localStorage.setItem('skymarket-theme', next); } catch (e) { /* egal */ }
   applyTheme(); toast(`Design: ${THEME_LABEL[next]}${next === 'auto' ? ' – folgt bei langen Spieltagen der Tageszeit' : ''}`);
 }
-/** Tag-Nacht-Grenze auf der Karte: Spieluhr = Ortszeit an Ihrer Heimatbasis. */
-function renderNight() {
-  const g = $('#gNight'); if (!g || !W) return;
-  const key = Math.round(ui.t * 288) + ':' + W.day;
-  if (renderNight.key === key) return; renderNight.key = key;
-  const baseLon = P.AIRPORTS[W.player.bases[0]].lon, utcH = ui.t * 24 - baseLon / 15;
-  const subLon = ((12 - utcH) * 15 + 540) % 360 - 180;
-  const doy = ((W.day % 365) + 365) % 365;
-  let decl = 23.44 * Math.sin(2 * Math.PI * (284 + doy) / 365);
-  if (Math.abs(decl) < 0.6) decl = decl < 0 ? -0.6 : 0.6;
-  const td = Math.tan(decl * RAD), pts = [];
-  for (let lon = -180; lon <= 180; lon += 3) {
-    const lat = Math.atan(-Math.cos((lon - subLon) * RAD) / td) / RAD;
-    pts.push(proj(Math.max(-84, Math.min(84, lat)), lon));
-  }
-  const poleY = proj(decl > 0 ? -84 : 84, 0)[1];
-  const d = `M${pts[0][0].toFixed(1)},${poleY.toFixed(1)}` + pts.map(([x, y]) => `L${x.toFixed(1)},${y.toFixed(1)}`).join('') + `L${pts.at(-1)[0].toFixed(1)},${poleY.toFixed(1)}Z`;
-  g.innerHTML = `<path class="night" d="${d}"/>`;
-}
 
 // ---------- Härtere Welt: Auktionen, Arbeitsmarkt, Akademien, Abwerben, Meilensteine, Weltlage ----------
 const ROLE_OPTS = () => SM.STAFF_GROUPS.map((g) => [`pilot:${g}`, `Piloten ${P.TYPE_GROUPS[g]}`]).concat([['cabin', 'Flugbegleiterinnen'], ['tech', 'Techniker']]);
@@ -1823,6 +1807,31 @@ function renderGrey(dead) {
     const a = SM.AP_CODES.find((x) => P.AIRPORTS[x].country === c), [x, y] = pt(a);
     return `<circle class="greyc" cx="${x}" cy="${y}" r="6"/>`;
   }).join('');
+}
+
+// ---------- Rechter Bereich: Breite ziehbar ----------
+const RW_DEFAULT = 520;
+function setPaneWidth(px, save = true) {
+  const main = document.querySelector('main.body'); if (!main) return;
+  const sideOn = getComputedStyle($('#sidebar')).display !== 'none';
+  const max = Math.max(380, main.clientWidth - 24 - (sideOn ? 312 : 0) - 320);   // Karte behält mindestens 320 px
+  const w = Math.round(Math.max(380, Math.min(max, px)));
+  main.style.setProperty('--rw', w + 'px');
+  if (save) { try { localStorage.setItem('skymarket-rw', String(w)); } catch (e) { /* egal */ } }
+  return w;
+}
+function initResizer() {
+  const h = $('#resizer'); if (!h) return;
+  let saved = null; try { saved = Number(localStorage.getItem('skymarket-rw')) || null; } catch (e) { /* egal */ }
+  if (saved) setPaneWidth(saved, false);
+  let drag = null;
+  h.addEventListener('pointerdown', (e) => { e.preventDefault(); h.setPointerCapture(e.pointerId); drag = { x: e.clientX, w: $('#rcol').getBoundingClientRect().width }; h.classList.add('drag'); document.body.classList.add('resizing'); });
+  h.addEventListener('pointermove', (e) => { if (drag) setPaneWidth(drag.w + (drag.x - e.clientX), false); });
+  const end = () => { if (!drag) return; drag = null; h.classList.remove('drag'); document.body.classList.remove('resizing'); setPaneWidth($('#rcol').getBoundingClientRect().width); };
+  h.addEventListener('pointerup', end); h.addEventListener('pointercancel', end);
+  h.addEventListener('dblclick', () => setPaneWidth(RW_DEFAULT));
+  h.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setPaneWidth($('#rcol').getBoundingClientRect().width + (e.key === 'ArrowLeft' ? 40 : -40)); } });
+  window.addEventListener('resize', () => { const cur = $('#rcol').getBoundingClientRect().width; if (cur) setPaneWidth(cur, false); });
 }
 
 // ---------- Zustand gebrauchter Flugzeuge ----------
@@ -2302,9 +2311,9 @@ function assistantAfterDays(prev) {
     const best = routes.map((r, i) => ({ r, d: s[i].db2 / Math.max(1, s[i].n) })).sort((x, y) => y.d - x.d)[0];
     const tip = { fin: c.net < 0 ? 'Wir verbrennen Geld – ich würde die schwächste Strecke hart prüfen.' : 'Solide. Ein Teil des Gewinns gehört als Reserve aufs Konto.',
       ops: `Pünktlichkeit ${playerOtp() === null ? '–' : pct(playerOtp())}, Stimmung ${pct(pl.staff.morale)}.`,
-      net: best ? `Stärkste Strecke: ${best.r.base}–${best.r.dest} mit ${eur(best.d, { plus: true })} pro Tag.` : 'Zeit für die erste Strecke!',
+      net: best ? `Stärkste Strecke: ${best.r.base}–${best.r.dest} mit <span class="${sgn(best.d)}">${eur(best.d, { plus: true })}</span> pro Tag.` : 'Zeit für die erste Strecke!',
       strat: `Marke ${n0(pl.brand * 100)}/100, Rating ${pl.rating}.` }[p.focus];
-    bubble(c.net < 0 ? 'warn' : 'good', `<b>${MONTHS_L[lm.label.m]}:</b> Ergebnis ${eur(c.net, { plus: true })}, Umsatz ${eur(c.rev)}, Auslastung ${seats ? pct(pax / seats) : '–'}, Kontostand ${eur(pl.ledger.cash / 100)}. ${tip}`,
+    bubble(c.net < 0 ? 'warn' : 'good', `<b>${MONTHS_L[lm.label.m]}:</b> Ergebnis <span class="${sgn(c.net)}">${eur(c.net, { plus: true })}</span>, Umsatz ${eur(c.rev)}, Auslastung ${seats ? pct(pax / seats) : '–'}, Kontostand ${eur(pl.ledger.cash / 100)}. ${tip}`,
       { title: 'Monatsbericht', noPre: true, btn: '<button class="btn small" data-act="tab" data-tab="finance">Finanzen</button>' });
   }
 }
@@ -2970,6 +2979,7 @@ function boot(hotData) {
   $('#sidebar').addEventListener('click', onPaneClick);
   $('#bubble').addEventListener('click', onBubbleClick);
   $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
+  initResizer();
   $('#nav').addEventListener('click', (e) => {
     const b = e.target.closest('[data-sec]'); if (!b) return;
     const sec = SECTIONS.find((x) => x.key === b.dataset.sec);
