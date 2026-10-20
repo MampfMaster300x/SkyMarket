@@ -170,11 +170,15 @@ const SM = (() => {
     OWN_HANDLING_DAY: 2400, OWN_HANDLING_SHARE: 0.35, HANGAR_MONTH: 60000, HANGAR_MAINT: 0.94, HANGAR_CHECK_DAYS: 3,
     STAFF: {
       pilotSalary: { ATR: 10500, DH8: 11000, EJET: 12500, A220: 13500, A32F: 14500, B737: 14500, A330: 17000, A350: 18000, B787: 17500, B777: 18000 }, cabinSalary: 4600, techSalary: 6200,
-      // Crew je Flugzeug: ein Crew-Satz (je Sitzplatz im Cockpit/je Kabinenposition 4 Köpfe für Schichten und freie Tage)
-      // deckt bis 12 Blockstunden am Tag. Mehr Strecken auf demselben Flugzeug brauchen keine zusätzliche Crew.
-      crewPerSeat: 4, crewSetBh: 12, pilotH: 3, cabinH: 3, techPerAc: 3.5, techMaintShare: 0.12,
+      // Crew nach Blockstunden: Ein Pilot / eine Flugbegleiterin fliegt im Schnitt 3 Blockstunden am Tag
+      // (Ruhezeiten, freie Tage, Urlaub, Krankheit – rund 1.100 im Jahr). Je Flugzeug mindestens eine volle Besetzung,
+      // Piloten einer Musterfamilie und die Kabine werden über die ganze Flotte gemeinsam eingeplant.
+      pilotH: 3, cabinH: 3, techPerAc: 3.5, techMaintShare: 0.12,
       recruit: { pilot: 9000, cabin: 1500, tech: 3500 }, lead: { pilot: 35, cabin: 12, tech: 21 },
-      maxHire: { pilot: 24, cabin: 90, tech: 30 }, trainDays: 45, trainCost: 28000,
+      // Arbeitsmarkt je Monat: Obergrenze je Airline und gemeinsamer Bestand (Grundstock plus je menschlicher Airline)
+      maxHire: { pilot: 120, cabin: 400, tech: 120 }, marketPool: { pilot: 400, cabin: 1500, tech: 500 }, marketPerAirline: { pilot: 60, cabin: 220, tech: 70 },
+      // Gründungsphase: In den ersten Tagen liegen Bewerbungen schon vor – Einstellungen starten schnell
+      foundingDays: 60, foundingLead: 10, trainDays: 45, trainCost: 28000,
       agency: 1.6, overtime: 1.5, overtimeMax: 0.10, perDiem: 9, severanceMonths: 3, attrition: 0.01,
     },
     EXPERT_ROLES: {
@@ -455,6 +459,8 @@ const SM = (() => {
   /** Anteil Flugzeugtage: Umläufe länger als das Betriebsfenster binden ganze Flugzeuge. */
   const acShareOf = (typeId, h, freq) => { const w = winOf(typeId); return freq * (h > w ? Math.ceil(h / w) : h / w); };
   const pilotsFor = (bhLeg) => (bhLeg > 13 ? 4 : bhLeg > 9 ? 3 : 2);
+  /** Köpfe für ein Flugzeug mit bh Blockstunden am Tag (Bruchteile; flottenweit aufgerundet). */
+  const crewFor = (seats, cabin, bh) => ({ pil: Math.max(seats, seats * bh / P.STAFF.pilotH), cab: Math.max(cabin, cabin * bh / P.STAFF.cabinH) });
   const routeKmOk = (o, d) => gcDistanceKm(o, d) >= P.MIN_ROUTE_KM;
   const rangeOk = (o, d, typeId) => gcDistanceKm(o, d) * P.ROUTE_DETOUR <= P.AIRCRAFT_TYPES[typeId].range_km;
   function cargoDemand(o, d, econ = 1) { const A = ap(o), B = ap(d); return P.CARGO.k * Math.sqrt(A.pop * B.pop) * A.biz * B.biz * econ; }
@@ -800,7 +806,10 @@ const SM = (() => {
       for (const g of STAFF_GROUPS) s += st.pil[g] * S.pilotSalary[g];
       return s * st.pay * cpi;
     }
-    /** Crew-Bedarf je Flugzeug aus dem Einsatzplan: ein Crew-Satz je angefangene 12 Blockstunden am Tag. */
+    /**
+     * Crew-Bedarf aus dem Einsatzplan, nach Blockstunden: je Flugzeug Cockpitplätze × Blockstunden ÷ 3 (mindestens
+     * eine Besetzung), Kabine ebenso. Piloten je Musterfamilie und Kabine werden flottenweit zusammengezählt und aufgerundet.
+     */
     crewNeed(day, routes = null, horizon = 0) {
       const S = P.STAFF, need = { pil: zeroGroups(), cab: 0, perAc: {} };
       const { assign } = this.plan(day, routes || this.activeRoutes().filter((r) => r.opened_day <= day + horizon), horizon);
@@ -809,11 +818,12 @@ const SM = (() => {
         for (const [r, , share] of assign[a.id] || []) { const leg = blockHours(r.base, r.dest, r.type_id); bh += leg * 2 * (share ?? 1); seats = Math.max(seats, pilotsFor(leg)); }
         if (a.acmi && a.acmi.start <= day + horizon && a.acmi.end > day) { bh = Math.max(bh, 8); seats = Math.max(seats, 2); }
         if (bh <= 0) continue;
-        const t = P.AIRCRAFT_TYPES[a.type_id], sets = Math.max(1, Math.ceil(bh / S.crewSetBh - 1e-6));
-        const pil = sets * seats * S.crewPerSeat, cab = sets * t.cabin * S.crewPerSeat;
-        need.pil[t.group] += pil; need.cab += cab;
-        need.perAc[a.id] = { group: t.group, bh, sets, pil, cab };
+        const t = P.AIRCRAFT_TYPES[a.type_id], c = crewFor(seats, t.cabin, bh);
+        need.pil[t.group] += c.pil; need.cab += c.cab;
+        need.perAc[a.id] = { group: t.group, bh, seats, pil: c.pil, cab: c.cab };
       }
+      for (const g of STAFF_GROUPS) need.pil[g] = Math.ceil(need.pil[g] - 1e-6);
+      need.cab = Math.ceil(need.cab - 1e-6);
       return need;
     }
     staffNeedPlanned() {
@@ -926,7 +936,8 @@ const SM = (() => {
   function laborPool(w, role) {
     const tight = role === 'pilot' ? w.macro.laborTight : 1 + (w.macro.laborTight - 1) * 0.4, month = Math.floor(w.day / 30);
     const used = w.labor && w.labor.m === month ? w.labor[role] || 0 : 0;
-    return { pool: Math.floor(P.STAFF.maxHire[role] * (1 + 0.5 * Math.min(12, Math.max(0, w.humans.length - 1))) * 1.2 / tight), used };
+    const S = P.STAFF;
+    return { pool: Math.floor((S.marketPool[role] + S.marketPerAirline[role] * Math.max(1, w.humans.length)) / tight), used };
   }
   /** Wie viele Flugzeuge eines Typs Leasinggeber auf Lager haben (gemeinsam für alle Airlines). */
   function stockCap(typeId) { const t = P.AIRCRAFT_TYPES[typeId]; if (['A20N', 'B38M', 'A21N'].includes(typeId)) return 10; return t.ill.kind === 'wide' ? 3 : 5; }
@@ -1126,7 +1137,7 @@ const SM = (() => {
       M.cpi *= 1 + 0.022 / 12;
       // Arbeitsmarkt: Einstellungen aller Airlines verknappen Personal und treiben die Löhne
       const L = this.labor || { pilot: 0, cabin: 0, tech: 0, aiAc: 0 };
-      M.laborTight = Math.min(3, 1 + (M.laborTight - 1) * 0.8 + L.pilot / 90 + (L.aiAc || 0) * 0.012);
+      M.laborTight = Math.min(3, 1 + (M.laborTight - 1) * 0.8 + 0.8 * L.pilot / (P.STAFF.marketPool.pilot + P.STAFF.marketPerAirline.pilot * Math.max(1, this.humans.length)) + (L.aiAc || 0) * 0.004);
       M.wage = (M.wage || 1) * (1 + 0.001 + 0.006 * (M.laborTight - 1));
       { let se = 0, n = 0; for (const c of COUNTRIES) { se += M.econ[c]; n++; } const avg = se / Math.max(1, n);
         const crisis = this.events.some((e) => (e.type === 'health' || (e.type === 'recession' && e.countries.length > 10)) && e.start <= day && e.end > day);
@@ -1378,7 +1389,7 @@ const SM = (() => {
     staffCoverage(al) {
       const S = P.STAFF, st = al.staff, cpi = this.macro.cpi;
       const sick = this.events.some((e) => e.type === 'sickness' && e.airline === al.id && e.start <= this.day && e.end > this.day) ? 0.88 : 1;
-      // Köpfe je Flugzeug im heutigen Einsatz (Crew-Sätze), nicht je Blockstunde
+      // Köpfe für den heutigen Einsatz nach Blockstunden je Flugzeug, flottenweit aufgerundet
       const cn = al.crewNeed(this.day), need = { pil: cn.pil, cab: cn.cab, perAc: cn.perAc };
       const techNeed = al.fleet.filter((a) => a.delivery_day <= this.day).length * S.techPerAc;
       const cov = { pil: {}, cab: 1, tech: techNeed ? Math.min(1, st.tech / techNeed) : 1, extraCost: 0, agencyH: 0, overtimeH: 0, cancel: { ...zeroGroups(), cab: 0 }, need, techNeed };
@@ -1958,7 +1969,8 @@ const SM = (() => {
       const S = P.STAFF, st = al.staff;
       const hrF = lv3([1, 0.75, 0.6, 0.5], al.skill('hr'));
       const tight = role === 'pilot' ? this.macro.laborTight : 1 + (this.macro.laborTight - 1) * 0.4;
-      const lead = Math.round(S.lead[role] * hrF * tight);
+      const founding = this.day - (al.joinedDay || 0) < S.foundingDays;
+      const lead = founding ? Math.min(S.foundingLead, Math.round(S.lead[role] * hrF * tight)) : Math.round(S.lead[role] * hrF * tight);
       if (!(count > 0)) return { ok: false, msg: 'Bitte eine Anzahl angeben.' };
       const month = Math.floor(this.day / 30);
       const inPipe = st.pipeline.filter((p) => p.kind === 'hire' && p.role === role && p.month === month).reduce((s, p) => s + p.count, 0);
@@ -3290,7 +3302,7 @@ const SM = (() => {
   return {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk,
-    evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
+    evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };

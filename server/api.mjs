@@ -343,7 +343,7 @@ export async function handle(req, { store }) {
         const now = Date.now();
         return json({ id, name: meta.name, code: meta.code, invite: meta.invite, max: meta.max, locked: !!meta.pw,
           main: !!meta.main, me: { airlineId: me.airlineId, host: canControl(meta, user), admin: isAdmin(user) },
-          players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000 })) });
+          players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null })) });
       }
       if (op === 'state' && method === 'GET') {
         if (url.searchParams.get('ping')) {

@@ -40,10 +40,11 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Datenblatt je Flugzeugmuster:** Jeder Mustername (Flotte, Beschaffung, Gebrauchtmarkt, Auktionen, Strecken, Flugzeugkarte, Planung) lässt sich anklicken. Das Datenblatt zeigt Sitzplätze, Reichweite, Geschwindigkeit, Crew, Verbrauch, Kosten und die größten erreichbaren Märkte mit Distanz und Blockzeit.
   - **Flughafen-Karte:** Ein Klick auf einen Flughafen zeigt direkt auf der Karte das Reisepotenzial zur eigenen Basis (beide Richtungen, Mix, Saison), Distanz, Bahn, Konkurrenz und die größten Märkte ab dort. Daraus geht es direkt in die Planung.
   - **Flugdistanz überall:** Die Planung, die Streckenliste und die Übersicht zeigen Distanz und Flugzeit. Auf der Karte trägt die geplante bzw. aufgeklappte Strecke ein Schild mit km und Stunden.
-  - **Crew je Flugzeug statt je Strecke:**
-    - Jedes Flugzeug im Einsatz braucht einen Crew-Satz: je Cockpitplatz 4 Piloten der Familie, je Kabinenposition 4 Flugbegleiterinnen (Schichten, freie Tage). Beim A320neo sind das 8 Piloten und 16 Flugbegleiterinnen.
-    - Ein Crew-Satz reicht für bis zu 12 Blockstunden am Tag. Weitere Strecken auf demselben Flugzeug brauchen keine zusätzliche Crew.
-    - Die Planung zeigt nur noch, ob ein Flugzeug eine (neue) Crew braucht.
+  - **Crew nach Auslastung statt je Strecke (ab 0.11 nach Blockstunden):**
+    - Ein Pilot oder eine Flugbegleiterin fliegt im Schnitt 3 Blockstunden am Tag (Ruhezeiten, freie Tage, Urlaub, Krankheit – rund 1.100 im Jahr; die EU erlaubt höchstens 900, das Spiel rechnet also großzügig).
+    - Bedarf je Flugzeug = Cockpitplätze × Blockstunden ÷ 3, Kabine ebenso, mindestens eine volle Besetzung. A320 mit 5 h am Tag: rund 4 Piloten und 7 Flugbegleiterinnen; mit 10 h: 7 und 14; mit 12 h: 8 und 16.
+    - Piloten einer Musterfamilie und die Kabine teilen sich die ganze Flotte; aufgerundet wird erst in der Summe. Zwei A320 mit je 5 h brauchen zusammen 7 Piloten statt 8.
+    - Die Planung zeigt nur den Mehrbedarf, den eine neue Strecke tatsächlich auslöst.
     - Unter Personal steht eine Übersicht „Crew je Flugzeug“.
   - **Fachkräfte geprüft:** Alle Wirkungen sind nachgemessen. Die Finanzfachkraft erhöht die Kreditlinie jetzt wirklich um +25 / +50 / +100 %. Der Text zum Revenue Management wurde berichtigt.
   - **Leistung:** Der Spieltag rechnet etwa 30 % schneller, die Rechenspitze am Monatsende ist halbiert.
@@ -53,6 +54,8 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Aggressive Konkurrenz:** KI-Airlines greifen profitable Strecken von Spielenden mit mehr Frequenz und Kampfpreisen an. Pleite gegangene Airlines werden durch Neugründungen ersetzt.
   - **Geteilte, begrenzte Märkte:**
     - Arbeitsmarkt je Monat für alle zusammen. Viel Einstellen verknappt ihn, Löhne steigen.
+    - Ab 0.11 deutlich größer: Grundstock 400 Piloten, 1.500 Flugbegleiterinnen, 500 Techniker pro Monat, plus 60 / 220 / 70 je menschlicher Airline; je Airline höchstens 120 / 400 / 120 pro Monat. Nur ein ausgerufener Pilotenmangel oder massives Einstellen vieler Airlines verknappt ihn spürbar.
+    - **Gründungsphase:** In den ersten 60 Tagen einer Airline fangen neue Leute nach höchstens 10 Tagen an (sonst 35 Tage bei Piloten). So ist Personal am Anfang kein Engpass.
     - Leasinggeber mit begrenztem Bestand je Typ. Ausverkauft heißt: kein Leasing. Viele Bestellungen verlängern die Lieferzeit.
     - Kerosin: Große Absicherungen treiben Termin- und Tagespreis für alle.
   - **Auktionen:** frühe Lieferpositionen per verdecktem Gebot. Neue Muster (A321XLR, 777-9) gibt es im ersten Jahr nur dort.
@@ -174,6 +177,13 @@ Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, ink
 - **Angelegt wird sie automatisch** beim ersten Aufruf der Lobby. Löscht ein Admin sie, entsteht beim nächsten Aufruf eine frische Hauptwelt.
 - **Täglich vorbeischauen:** Wer nach drei oder mehr Spieltagen zurückkommt, bekommt einen **Tagesbericht**: Kontostand und Ergebnis im Zeitraum, Passagiere, Flotte, Pünktlichkeit, Liquidität, die wichtigsten Warnungen, offene Entscheidungen und Handelsangebote sowie den Rat der Assistenz. Das gilt auch für private Runden und das Offline-Spiel.
 - Neu: Tempostufe **„Dauerspiel (1 Tag = 30 Min.)“**, auch für private Runden wählbar (dort jetzt die Vorgabe).
+
+## Mitspielende im Überblick
+
+- **Markt → Mitspielende** (nur online): je Airline eine Karte mit Spielername, Airline und Kürzel, online bzw. „zuletzt vor …“ sowie drei Kennzahlen – **Eigenkapital** (mit Entwicklung seit Start), **Ergebnis der letzten 30 Tage** (mit Marge) und **Auslastung** (mit Passagieren pro Tag). Darunter Flotte, Strecken, Basis, Pünktlichkeit und die Knöpfe „Handel“ und „Nachricht“.
+- Sortierbar nach Eigenkapital, Ergebnis, Auslastung oder Passagieren; ab neun Airlines mit Suche nach Airline oder Name, in der Hauptwelt zunächst die ersten 24.
+- Die Übersicht (Karte → Übersicht) zeigt dieselben drei Kennzahlen kompakt für bis zu acht Airlines, auf dem Handy mit kurzen Zahlen (z. B. „14,8 Mio.“).
+- Handy: Oben steht jetzt das Datum statt „Tag 8“; der Spieltag steht im Tooltip und auf großen Bildschirmen weiter unter der Uhr.
 
 ## Neustart nach der Pleite
 
