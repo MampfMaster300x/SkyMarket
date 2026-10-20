@@ -179,7 +179,7 @@ const SM = (() => {
       analyst: { label: 'Marktanalyse', salary: [7000, 11000, 17000], max: 2,
         effect: ['Marktstudien möglich, Prognoseband ±18 %', 'Marktstudien, Prognoseband ±12 %', 'Marktstudien, Prognoseband ±8 %'] },
       revenue: { label: 'Revenue Management', salary: [8000, 13000, 21000], max: 1,
-        effect: ['Flex-Tarife: Geschäftsreisende zahlen +8 %', 'Flex-Tarife +15 %, Preisautomatik reagiert auf abgewiesene Nachfrage', 'Flex-Tarife +22 %, Preisautomatik reagiert auf abgewiesene Nachfrage'] },
+        effect: ['Flex-Tarife: Geschäftsreisende zahlen +8 %', 'Flex-Tarife: Geschäftsreisende zahlen +15 %', 'Flex-Tarife: Geschäftsreisende zahlen +22 %'] },
       procurement: { label: 'Einkauf', salary: [7500, 12000, 18000], max: 1,
         effect: ['Kerosin −2 %, Abfertigung und Mieten −3 %, Hedging günstiger', 'Kerosin −4 %, Abfertigung und Mieten −6 %', 'Kerosin −6 %, Abfertigung und Mieten −9 %'] },
       ops: { label: 'Operations (OCC)', salary: [8000, 13000, 20000], max: 1,
@@ -194,7 +194,7 @@ const SM = (() => {
         effect: ['Neue Strecken in 24 statt 30 Tagen bekannt, Werbung +30 % wirksamer', '20 Tage, Werbung +60 % wirksamer', '16 Tage, Werbung doppelt so wirksam'] },
       // Einzigartiger Top-Berater: wirkt in allen Bereichen über Expertenniveau. Es gibt ihn nur einmal pro Welt.
       consultant: { label: 'Top-Beratung', salary: [260000, 260000, 260000, 260000], max: 1, unique: true, signOn: 450000,
-        effect: ['', '', '', 'Wirkt in allen acht Bereichen über Expertenniveau: Pünktlichkeit +11 Pkt., Defekte −65 %, Kreditlinie ×2, Flex-Tarife +29 %, Kerosin −8 %, Werbung 2,4-fach, Streikrisiko −80 %, Prognose ±4 %'] },
+        effect: ['', '', '', 'Wirkt in allen acht Bereichen über Expertenniveau: Pünktlichkeit +11 Pkt., Defekte −65 %, Kreditlinie ×2,5, Flex-Tarife +29 %, Kerosin −8 %, Werbung 2,4-fach, Streikrisiko −80 %, Prognose ±4 %'] },
       // Zweiter Einzelberater: etwas schwächer, deutlich günstiger, Spezialist für ältere Flugzeuge.
       fleetadvisor: { label: 'Flotten- und Gebrauchtberatung', salary: [85000, 85000, 85000], max: 1, unique: true, signOn: 120000,
         effect: ['', '', 'Wirkt in allen acht Bereichen auf Expertenniveau. Spezialgebiet Flugzeuge ab 8 Jahren: erkennt den echten Zustand und Marktwert jedes Gebrauchtangebots, verhandelt Gebrauchtkauf und -leasing 10 % günstiger, verkauft eigene ältere Flugzeuge zum vollen Buchwert und bewertet sie im Handel besser'] },
@@ -273,14 +273,16 @@ const SM = (() => {
   // ===========================================================================
   const ap = (c) => P.AIRPORTS[c];
   const apx = (c) => P.AIRPORT_X[c];
-  const _dist = {};
+  const _dist = {};   // verschachtelter Cache ohne String-Schlüssel (heißer Pfad)
   function gcDistanceKm(a, b) {
-    const k = pairKey(a, b);
-    if (_dist[k] !== undefined) return _dist[k];
+    const ra = _dist[a] || (_dist[a] = {});
+    const c = ra[b]; if (c !== undefined) return c;
     const A = ap(a), B = ap(b), R = 6371, rad = Math.PI / 180;
     const p1 = A.lat * rad, p2 = B.lat * rad, dp = p2 - p1, dl = (B.lon - A.lon) * rad;
     const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
-    return (_dist[k] = 2 * R * Math.asin(Math.sqrt(h)));
+    const v = 2 * R * Math.asin(Math.sqrt(h));
+    ra[b] = v; (_dist[b] || (_dist[b] = {}))[a] = v;
+    return v;
   }
   function blockHours(o, d, typeId) {
     const t = P.AIRCRAFT_TYPES[typeId];
@@ -294,7 +296,8 @@ const SM = (() => {
     const ta = blockHours(o, d, 'A20N') + P.ACCESS_TIME_AIR_H;
     return P.RAIL_SHARE_MAX / (1 + Math.exp(P.RAIL_SHARE_SLOPE * (tr - ta)));
   }
-  const accessibility = (o, d) => 1 - railShare(o, d);
+  const _acc = {};
+  const accessibility = (o, d) => { const r = _acc[o] || (_acc[o] = {}); const v = r[d]; return v !== undefined ? v : (r[d] = 1 - railShare(o, d)); };
   function tripGeneration(o, d) {
     const A = ap(o), B = ap(d);
     const dist = Math.max(gcDistanceKm(o, d), P.GRAVITY_MIN_DIST_KM) / 1000;
@@ -375,32 +378,43 @@ const SM = (() => {
     return { probs: ws.map((w) => pAir * w / sw), pOut: 1 - pAir };
   }
   function allocate(o, d, pot, offers, cpi = 1, maxIter = 6) {
-    const booked = {}, remCap = {};
-    for (const of of offers) { booked[of.key] = { leisure: 0, business: 0, vfr: 0 }; remCap[of.key] = capacity(of); }
-    let open = offers.slice(), toAssign = { ...pot }, outside = 0, lost = 0;
+    // Heißer Pfad: Index-Arrays statt Objekte, Nutzen je Angebot und Segment nur einmal.
+    const n = offers.length, mu = P.NEST_MU, SEG = P.SEGMENTS, NS = SEG.length;
+    const U = [], booked = [], want = [];
+    for (let s = 0; s < NS; s++) { const u = new Float64Array(n); for (let i = 0; i < n; i++) u[i] = utility(o, d, SEG[s], offers[i], cpi) / mu; U.push(u); booked.push(new Float64Array(n)); want.push(new Float64Array(n)); }
+    const remCap = new Float64Array(n), ramp = new Float64Array(n), ws = new Float64Array(n);
+    for (let i = 0; i < n; i++) { remCap[i] = capacity(offers[i]); ramp[i] = offers[i].ramp; }
+    let open = []; for (let i = 0; i < n; i++) open.push(i);
+    const toAssign = SEG.map((s) => pot[s]);
+    let outside = 0, lost = 0;
     const unconstrained = {};
     for (let it = 0; it < maxIter; it++) {
-      const tot = toAssign.leisure + toAssign.business + toAssign.vfr;
+      let tot = 0; for (let s = 0; s < NS; s++) tot += toAssign[s];
       if (!open.length || tot < 1e-9) break;
-      const want = {};
-      for (const of of open) want[of.key] = {};
-      for (const s of P.SEGMENTS) {
-        const q = toAssign[s];
-        const { probs, pOut } = choiceProbs(o, d, s, open, cpi);
-        open.forEach((of, i) => { want[of.key][s] = q * probs[i]; });
-        if (it === 0) outside += q * pOut; else lost += q * pOut;
+      for (let s = 0; s < NS; s++) {
+        const q = toAssign[s], u = U[s], wa = want[s];
+        let m = -Infinity; for (const i of open) if (u[i] > m) m = u[i];
+        let sw = 0; for (const i of open) { ws[i] = ramp[i] * Math.exp(u[i] - m); sw += ws[i]; }
+        const iv = mu * (m + Math.log(sw)), asc = P.CHOICE[SEG[s]].asc_out, mm = Math.max(iv, asc);
+        const pAir = Math.exp(iv - mm) / (Math.exp(iv - mm) + Math.exp(asc - mm));
+        for (const i of open) wa[i] = q * (pAir * ws[i] / sw);
+        if (it === 0) outside += q * (1 - pAir); else lost += q * (1 - pAir);
       }
-      if (it === 0) for (const k in want) unconstrained[k] = want[k].leisure + want[k].business + want[k].vfr;
-      const next = { leisure: 0, business: 0, vfr: 0 }, still = [];
-      for (const of of open) {
-        const w = want[of.key], t = w.leisure + w.business + w.vfr, cap = remCap[of.key];
-        if (t <= cap) { for (const s of P.SEGMENTS) booked[of.key][s] += w[s]; remCap[of.key] -= t; still.push(of); }
-        else { const share = t > 0 ? cap / t : 0; for (const s of P.SEGMENTS) { booked[of.key][s] += w[s] * share; next[s] += w[s] * (1 - share); } remCap[of.key] = 0; }
+      if (it === 0) for (const i of open) { let t = 0; for (let s = 0; s < NS; s++) t += want[s][i]; unconstrained[offers[i].key] = t; }
+      const next = new Array(NS).fill(0), still = [];
+      for (const i of open) {
+        let t = 0; for (let s = 0; s < NS; s++) t += want[s][i];
+        const cap = remCap[i];
+        if (t <= cap) { for (let s = 0; s < NS; s++) booked[s][i] += want[s][i]; remCap[i] -= t; still.push(i); }
+        else { const share = t > 0 ? cap / t : 0; for (let s = 0; s < NS; s++) { booked[s][i] += want[s][i] * share; next[s] += want[s][i] * (1 - share); } remCap[i] = 0; }
       }
-      open = still; toAssign = next;
+      open = still; for (let s = 0; s < NS; s++) toAssign[s] = next[s];
     }
-    lost += toAssign.leisure + toAssign.business + toAssign.vfr;
-    return { unconstrained, booked, lost, outside, potential: pot.leisure + pot.business + pot.vfr };
+    for (let s = 0; s < NS; s++) lost += toAssign[s];
+    const bk = {};
+    for (let i = 0; i < n; i++) { const b = {}; for (let s = 0; s < NS; s++) b[SEG[s]] = booked[s][i]; bk[offers[i].key] = b; }
+    let potential = 0; for (const s of SEG) potential += pot[s];
+    return { unconstrained, booked: bk, lost, outside, potential };
   }
   function eu261(km) { for (const [lim, amt] of P.EU261_COMP) if (km <= lim) return amt; return 600; }
   const COST_KEYS = ['fuel', 'crew', 'maintenance', 'navigation', 'landing', 'handling', 'pax_fees', 'pax_service', 'distribution'];
@@ -611,8 +625,8 @@ const SM = (() => {
       // Spieler: kleine Grundlinie nach Rating, dazu ein Anteil am Umsatz der letzten drei Monate; die Bankenstimmung schwankt mit der Konjunktur
       const ms = this.ledger.months.slice(-3);
       const rev = ms.length ? ms.reduce((s, m) => s + ((m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0) + (m.acc.rev_cargo || 0) + (m.acc.rev_acmi || 0)) / 100, 0) / ms.length : 0;
-      const f = this.ratingInfo().line * lv3([1, 1.2, 1.4, 1.7], this.skill('finance'));
-      return Math.max(0, (P.CREDIT_LINE_BASE * 0.4 * f + 0.35 * rev * f / 1.4 + P.CREDIT_LINE_ASSET_SHARE * owned) * bank);
+      const f = this.ratingInfo().line, fin = lv3([1, 1.25, 1.5, 2], this.skill('finance'));   // Finanzfachkraft: +25 / +50 / +100 % auf die ganze Linie
+      return Math.max(0, (P.CREDIT_LINE_BASE * 0.4 * f + 0.35 * rev * f / 1.4 + P.CREDIT_LINE_ASSET_SHARE * owned) * fin * bank);
     }
     creditRate(baseRate, bank = 1) { return baseRate + (this.isPlayer ? this.ratingInfo().spread - lv3([0, 0.005, 0.01, 0.015], this.skill('finance')) + (1 - bank) * 0.03 : 0.025) + 0.02; }
 
@@ -1164,6 +1178,8 @@ const SM = (() => {
       if (fm[d]) c.landing *= fm[d];
       if (fm[o]) { c.pax_fees *= fm[o]; c.handling *= 1 + (fm[o] - 1) * 0.5; }
       if (!al.isPlayer || forecast) c.crew *= this.macro.wage || 1;
+      if (!al.isPlayer) { const cf = rivalsOf(this).cost; for (const k of ['fuel', 'maintenance', 'handling', 'crew']) if (c[k]) c[k] *= cf; }
+      if (al.isPlayer && forecast) c._crewSal = (pilotsFor(c._bh) * al.staffHourly('pilot', t.group) + t.cabin * al.staffHourly('cabin')) * c._bh * cpi * (this.macro.wage || 1);
       return c;
     }
     // Kooperationen (Codeshare auf einer Strecke, Allianz im ganzen Netz)
@@ -1189,13 +1205,21 @@ const SM = (() => {
       const dayFixed = t.value_eur * P.INSURANCE[al.insurance].rate / 365 + P.OVERHEAD_PER_AIRCRAFT_DAY * this.macro.cpi + t.lease_month * (P.EURUSD / this.macro.eurusd) * 12 / 365
         + P.STAFF.techPerAc * P.STAFF.techSalary * (al.staff ? al.staff.pay : 1) * this.macro.cpi / 30.4;
       let slotFee = 0; for (const x of [spec.base, spec.dest]) slotFee += apx(x).slotFee * spec.freq * this.macro.cpi;
-      return evaluateRoute(spec, co, ci, {
+      let crewSal = 0;
+      const res = evaluateRoute(spec, co, ci, {
         month: opts.month ?? null, nDraws: opts.nDraws ?? 4, seed: opts.seed ?? 7, fuelPrice: this.fuelPrice, cpi: this.macro.cpi,
         demandScale: (opts.demandScale ?? 1) * trend, segScale: { out: this.segScale(spec.base, spec.dest), in: this.segScale(spec.dest, spec.base) },
         offerExtra: { out: { ...this.offerExtra(al, spec.base, spec.dest), }, in: { ...this.offerExtra(al, spec.dest, spec.base) } },
-        costFn: (o, d, pax, fareRev) => this.costsFor(al, { ...r, base: spec.base, dest: spec.dest }, o, d, pax, fareRev, true),
+        costFn: (o, d, pax, fareRev) => { const c = this.costsFor(al, { ...r, base: spec.base, dest: spec.dest }, o, d, pax, fareRev, true); crewSal += (c._crewSal || 0) * spec.freq; return c; },
         rotH, dayFixed, extraDaily: slotFee + (opts.extraDaily || 0),
       });
+      // Aufschlüsselung, damit die Prognose mit der Streckenliste vergleichbar ist
+      const genericAc = aircraftDayFixedGeneric(spec.type_id) * res.aircraftShare;
+      res.crewSalary = crewSal; res.slotFee = slotFee; res.stationDaily = opts.extraDaily || 0;
+      res.acFull = res.aircraftTimeCost - slotFee - (opts.extraDaily || 0); res.acGeneric = genericAc;
+      res.db1List = res.db1 + crewSal;                 // wie in der Streckenliste: Crew nur mit Spesen
+      res.db2List = res.db1List - genericAc;           // Flugzeugzeit zur Standardrate
+      return res;
     }
 
     // Angebot
@@ -1315,6 +1339,7 @@ const SM = (() => {
           for (const k of keys) h[k] = k === 'block_h' ? r1(st[k] || 0) : Math.round(st[k] || 0);
           r.pushHist(h);
           al.paxTotal = (al.paxTotal || 0) + (st.pax || 0);
+          if (al.isPlayer) { const t = al._today || (al._today = { pax: 0, seats: 0, rev: 0, cost: 0, flights: 0, late: 0, canc: 0 }); t.pax += h.pax; t.seats += h.seats; t.rev += h.rev; t.cost += h.cost; t.flights += h.flights; t.late += h.late || 0; t.canc += h.cancelled; }
         }
       }
       for (const al of this.list) {
@@ -1322,6 +1347,12 @@ const SM = (() => {
         this.dailyFixed(al);
         this.liquidity(al);
         al.ledger.closeDay();
+        if (al.isPlayer) {
+          // Tagesreihe für das Dashboard (90 Tage)
+          const t = al._today || { pax: 0, seats: 0, rev: 0, cost: 0, flights: 0, late: 0, canc: 0 }; al._today = null;
+          al.dayHist = al.dayHist || []; al.dayHist.push({ d: day, net: Math.round(al.ledger.lastDay || 0), pax: t.pax, seats: t.seats, rev: Math.round(t.rev), db1: Math.round(t.rev - t.cost), fl: t.flights, late: t.late, canc: t.canc });
+          if (al.dayHist.length > 90) al.dayHist.shift();
+        }
       }
       if (dow === 6) for (const al of this.list) if (al.status !== 'insolvent') this.weeklyPricing(al);
       if (day % 30 === 15) for (const al of this.list) if (al.archetype && al.status === 'active') aiAttack(this, al);
@@ -1618,7 +1649,7 @@ const SM = (() => {
           // Gegen menschliche Airlines wird gekämpft: Preis unter den Menschen (Premium bleibt knapp darüber)
           let floorF = 1;
           const hum = this.competitorOffers(al.id, o, d).filter((x) => this.airlines[x.airline] && this.airlines[x.airline].isPlayer);
-          if (hum.length) { const hf = Math.min(...hum.map((x) => x.fare)); f = Math.min(f, hf * (1 - fight)); floorF = al.ledger.cash / 100 > 20e6 ? 0.85 : 0.95; }
+          if (hum.length) { const hf = Math.min(...hum.map((x) => x.fare)); f = Math.min(f, hf * (1 - fight * rivalsOf(this).fight)); floorF = al.ledger.cash / 100 > 20e6 ? 0.85 : 0.95; }
           nw.push(Math.min(Math.max(f, priceFloor(o, d, r, this) * floorF), 2.5 * refPrice(o, d, this.macro.cpi)));
         }
         r.setFares(this.day, nw[0], nw[1]);
@@ -2181,7 +2212,7 @@ const SM = (() => {
   }
   /** Konkurrenz reagiert auf Menschen: profitable Strecken werden angegriffen, umkämpfte Strecken zugeballert. */
   function aiAttack(w, al) {
-    const day = w.day, r = w.rng, aggr = (DIFFICULTY[w.difficulty] || DIFFICULTY.normal).aggr, cfg = al.cfg;
+    const day = w.day, r = w.rng, aggr = aggrOf(w), cfg = al.cfg;
     const zeal = { lcc: 1.25, premium: 1.0, leisure: 0.7, regional: 0.6 }[al.archetype] || 1;
     let best = null;
     for (const h of w.humans) {
@@ -2234,7 +2265,7 @@ const SM = (() => {
   }
   /** KI-Airlines werben Personal und Fachkräfte bei Menschen ab, die unter Marktniveau zahlen oder schlechte Stimmung haben. */
   function aiPoachHumans(w) {
-    const r = w.rng, day = w.day, M = w.macro, aggr = (DIFFICULTY[w.difficulty] || DIFFICULTY.normal).aggr;
+    const r = w.rng, day = w.day, M = w.macro, aggr = aggrOf(w);
     for (const h of w.humans) {
       if (h.status === 'insolvent' || !h.staff) continue;
       const st = h.staff, grudge = w.list.reduce((s, a) => s + ((a.grudge && a.grudge[h.id]) || 0), 0);
@@ -2272,7 +2303,7 @@ const SM = (() => {
   /** Neue Airlines drängen in den Markt, wenn andere aufgeben. */
   /** KI-Airlines buhlen um Tim Kaminski – und lassen ihn nach einer Weile wieder ziehen. */
   function aiStar(w) {
-    const r = w.rng, day = w.day, aggr = (DIFFICULTY[w.difficulty] || DIFFICULTY.normal).aggr || 1;
+    const r = w.rng, day = w.day, aggr = aggrOf(w);
     for (const S of P.STAR_CONSULTANTS) {
       const holder = w.starHolder(S.id);
       if (holder) {
@@ -2346,15 +2377,22 @@ const SM = (() => {
     const served = new Set(al.activeRoutes().flatMap((r) => [r.base + r.dest, r.dest + r.base]));
     const monthEval = al.archetype === 'leisure' ? (monthOf(day) + 1) % 12 : null;
     let best = null;
+    // Zweistufig: erst alle Kandidaten mit 1x täglich, dann nur die besten vier mit mehr Frequenz (spart ~60 % Rechenzeit)
+    const first = [];
     for (const base of al.bases) for (const dest of aiCandidates(al, base, served, 10)) {
       if (barred(w, al.id, base, dest)) continue;
       for (const typeId of cfg.pref_types) {
-        if (!rangeOk(base, dest, typeId)) continue;
-        for (const freq of [1, 2, 3]) {
-          if (!w.slotsOkFor(al, base, dest, freq)) continue;
-          const x = aiSpec(w, al, base, dest, typeId, freq), res = aiEval(w, al, x, monthEval, 3);
-          if (res.margin >= cfg.min_margin + 0.05 && res.db2 > 0 && (!best || res.db2 > best[0])) best = [res.db2, x.spec];
-        }
+        if (!rangeOk(base, dest, typeId) || !w.slotsOkFor(al, base, dest, 1)) continue;
+        const x = aiSpec(w, al, base, dest, typeId, 1), res = aiEval(w, al, x, monthEval, 3);
+        first.push([res.db2, base, dest, typeId]);
+        if (res.margin >= cfg.min_margin + 0.05 && res.db2 > 0 && (!best || res.db2 > best[0])) best = [res.db2, x.spec];
+      }
+    }
+    for (const [, base, dest, typeId] of first.sort((a, b) => b[0] - a[0]).slice(0, 4)) {
+      for (const freq of [2, 3]) {
+        if (!w.slotsOkFor(al, base, dest, freq)) continue;
+        const x = aiSpec(w, al, base, dest, typeId, freq), res = aiEval(w, al, x, monthEval, 3);
+        if (res.margin >= cfg.min_margin + 0.05 && res.db2 > 0 && (!best || res.db2 > best[0])) best = [res.db2, x.spec];
       }
     }
     if (best) {
@@ -2398,6 +2436,21 @@ const SM = (() => {
   };
   const AI_COLORS = { AUR: 1, KES: 2, REG: 3, SOL: 4, ALB: 5, LUM: 6, GLF: 7, ATC: 8, LIB: 9, SKR: 10, MRD: 11, DRG: 12, AND: 13, IND: 14,
     SAV: 15, CAP: 16, ATS: 17, NIL: 18, SAH: 19, BOS: 20, CEL: 21, MES: 22, NOR: 23, QMR: 24 };
+  /** Stärke der KI-Konkurrenz – unabhängig von der Schwierigkeit (Startkapital, Schocks). */
+  const RIVALS = {
+    easy: { label: 'Einfach', desc: 'zurückhaltend, schätzt Märkte ungenau, kämpft selten um Preise', aggr: 0.5, sigma: 0.25, fight: 0.5, cost: 1.06 },
+    normal: { label: 'Mittel', desc: 'greift profitable Strecken an, wirbt ab, solide Preispolitik', aggr: 1.0, sigma: 0.12, fight: 1.0, cost: 1.0 },
+    hard: { label: 'Stark', desc: 'aggressiv, präzise Planung, harte Preiskämpfe, schlanke Kosten', aggr: 1.6, sigma: 0.06, fight: 1.4, cost: 0.95 },
+  };
+  const rivalsOf = (w) => RIVALS[w.rivals] || RIVALS.normal;
+  /** Aggressivität der KI: Konkurrenz-Einstellung, sonst wie früher aus der Schwierigkeit. */
+  const aggrOf = (w) => (w.rivals ? rivalsOf(w).aggr : (DIFFICULTY[w.difficulty] || DIFFICULTY.normal).aggr || 1);
+  function setRivals(w, key) {
+    if (!RIVALS[key]) return false;
+    w.rivals = key;
+    for (const al of w.list) if (al.archetype) al.sigma = RIVALS[key].sigma;
+    return true;
+  }
   const DIFFICULTY = {
     easy: { label: 'Zugänglich', equity: 25e6, aiSigma: 0.25, events: 0.9, cycle: 0.05, aggr: 0.6 },
     normal: { label: 'Realistisch', equity: 16e6, aiSigma: 0.12, events: 1.35, cycle: 0.08, aggr: 1.0 },
@@ -2420,12 +2473,13 @@ const SM = (() => {
     al.events = [];
     return al;
   }
-  function newWorld({ difficulty = 'normal', seed = (Date.now() >>> 0) } = {}) {
+  function newWorld({ difficulty = 'normal', rivals = null, seed = (Date.now() >>> 0) } = {}) {
     const w = new World(seed);
     const diff = DIFFICULTY[difficulty] || DIFFICULTY.normal;
     w.eventMult = diff.events; w.difficulty = difficulty;
+    w.rivals = RIVALS[rivals] ? rivals : ({ easy: 'easy', normal: 'normal', hard: 'hard' }[difficulty] || 'normal');
     w.macro.cycle = { phase: w.rng.range(0, 6.283), period: w.rng.int(40, 70), amp: diff.cycle };
-    for (const [id, setup] of Object.entries(AI_SETUP)) bootstrapAi(w, id, setup, diff.aiSigma);
+    for (const [id, setup] of Object.entries(AI_SETUP)) bootstrapAi(w, id, setup, RIVALS[w.rivals].sigma);
     w.initSlots();
     w.refreshOffers();
     return w;
@@ -2435,15 +2489,16 @@ const SM = (() => {
   const SLOT_HOLD_DAYS = 180;
   const SPEEDS = {
     p: { label: 'Pause', short: 'Pause', ms: 0, slow: false },
-    rt: { label: 'Echtzeit (1 Tag = 24 Std.)', short: 'Echtzeit', ms: 86400000, slow: true },
     h1: { label: 'Langzeit (1 Tag = 1 Std.)', short: '1 Std./Tag', ms: 3600000, slow: true },
     m10: { label: 'Gemächlich (1 Tag = 10 Min.)', short: '10 Min./Tag', ms: 600000, slow: true },
+    m1: { label: 'Zügig (1 Tag = 1 Min.)', short: '1 Min./Tag', ms: 60000, slow: true, noTheme: true },
     x1: { label: 'Schnell (1 Tag = 12 Sek.)', short: '1×', ms: 12000, slow: false },
     x2: { label: 'Schneller (1 Tag = 6 Sek.)', short: '2×', ms: 6000, slow: false },
     x4: { label: 'Sehr schnell (1 Tag = 3 Sek.)', short: '4×', ms: 3000, slow: false },
     x10: { label: 'Turbo (1 Tag = 1,2 Sek.)', short: '10×', ms: 1200, slow: false, local: true },
   };
-  const speedKey = (v) => (SPEEDS[v] ? v : ({ 0: 'p', 1: 'x1', 2: 'x2', 4: 'x4', 10: 'x10' }[Number(v)] || 'p'));
+  // 'rt' (Echtzeit) gibt es nicht mehr – alte Spiele laufen mit 1 Tag = 1 Std. weiter
+  const speedKey = (v) => (SPEEDS[v] ? v : v === 'rt' ? 'h1' : ({ 0: 'p', 1: 'x1', 2: 'x2', 4: 'x4', 10: 'x10' }[Number(v)] || 'p'));
   /** Menschliche Airline hinzufügen (Einzelspieler: PLY; Mehrspieler: P1–P4). */
   function addHuman(w, { id = null, name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = null, owner = null } = {}) {
     if (!P.AIRPORTS[base]) throw new Error('Unbekannter Flughafen');
@@ -2457,8 +2512,8 @@ const SM = (() => {
     if (humans > 0 || w.day > 0) w.pushNews(w.day, `Neue Airline am Markt: ${name} mit Basis ${ap(base).name}`, 'info', id);
     return al;
   }
-  function newGame({ name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = 'normal', seed = (Date.now() >>> 0) } = {}) {
-    const w = newWorld({ difficulty, seed });
+  function newGame({ name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = 'normal', rivals = null, seed = (Date.now() >>> 0) } = {}) {
+    const w = newWorld({ difficulty, rivals, seed });
     addHuman(w, { id: 'PLY', name, code, base, difficulty });
     w.playerId = 'PLY';
     return w;
@@ -2495,6 +2550,24 @@ const SM = (() => {
     const fare = (gr.fare_out + gr.fare_in) / 2, share = pairRoute(receiver, pair) ? 0.4 : 0.1;
     return pax * share * fare * 0.18 * Math.min(days, 365);
   }
+  const MARKET = 'MARKET';
+  /** Flugzeuge einer Airline, die zu einem Gesuch passen (Typ oder Familie), ungenutzte zuerst. */
+  function acMatches(w, al, it) {
+    return al.fleet.filter((a) => a.delivery_day <= w.day && !(a.acmi && a.acmi.end > w.day) && (it.fam ? P.AIRCRAFT_TYPES[a.type_id].group === P.AIRCRAFT_TYPES[it.type].group : a.type_id === it.type)
+      && (!it.maxAge || al.acAge(a, w.day) <= it.maxAge)).sort((x, y) => (x.used_hours || 0) - (y.used_hours || 0) || al.acAge(x, w.day) - al.acAge(y, w.day));
+  }
+  /** Gesuch „irgendein Flugzeug vom Typ X“ in konkrete Flugzeuge des Gebers auflösen. ids: Wunschauswahl. */
+  function resolveItems(w, giver, items, ids = null) {
+    const out = [];
+    for (const it of items) {
+      if (it.k !== 'acAny') { out.push({ ...it }); continue; }
+      const pool = acMatches(w, giver, it).filter((a) => !out.some((x) => x.k === 'ac' && x.id === a.id));
+      const pick = ids ? pool.filter((a) => ids.includes(a.id)).slice(0, it.n) : pool.slice(0, it.n);
+      if (pick.length < it.n) return null;
+      for (const a of pick) out.push({ k: 'ac', id: a.id });
+    }
+    return out;
+  }
   function cleanItems(arr) {
     if (!Array.isArray(arr)) return [];
     const out = [];
@@ -2502,6 +2575,7 @@ const SM = (() => {
       if (!it || typeof it !== 'object') continue;
       if (it.k === 'cash') { const amount = Math.round(num(it.amount)); if (amount > 0 && amount <= 5e8) out.push({ k: 'cash', amount }); }
       else if (it.k === 'ac' && typeof it.id === 'string' && it.id.length < 30) { if (!out.some((x) => x.k === 'ac' && x.id === it.id)) out.push({ k: 'ac', id: it.id }); }
+      else if (it.k === 'acAny' && P.AIRCRAFT_TYPES[it.type] && !P.AIRCRAFT_TYPES[it.type].launch) out.push({ k: 'acAny', type: it.type, fam: !!it.fam, n: clamp(Math.round(num(it.n, 1)), 1, 4), maxAge: it.maxAge ? clamp(Math.round(num(it.maxAge)), 1, 30) : null });
       else if (it.k === 'staff' && ['pilot', 'cabin', 'tech'].includes(it.role)) {
         const group = it.role === 'pilot' ? (STAFF_GROUPS.includes(it.group) ? it.group : null) : null, n = clamp(Math.round(num(it.n)), 0, 60);
         if (n > 0 && (it.role !== 'pilot' || group)) out.push({ k: 'staff', role: it.role, group, n });
@@ -2529,7 +2603,7 @@ const SM = (() => {
         if (!a) return `Das Flugzeug ${it.id} gehört nicht (mehr) ${giver.name}.`;
         if (a.delivery_day > w.day) return `${it.id} ist noch nicht ausgeliefert.`;
         if (a.acmi && a.acmi.end > w.day) return `${it.id} ist verchartert.`;
-        if (!receiver.isPlayer && receiver.fleet.length >= receiver.maxFleet) return `${receiver.name} hat keinen Platz für weitere Flugzeuge.`;
+        if (receiver && !receiver.isPlayer && receiver.fleet.length >= receiver.maxFleet) return `${receiver.name} hat keinen Platz für weitere Flugzeuge.`;
       } else if (it.k === 'staff') { const key = it.role === 'pilot' ? it.group : it.role; staff[key] = (staff[key] || 0) + it.n; }
       else if (it.k === 'slots') slots[it.apt] = (slots[it.apt] || 0) + it.n;
     }
@@ -2542,6 +2616,7 @@ const SM = (() => {
   }
   function itemText(w, it, giver) {
     if (it.k === 'cash') return `${Math.round(it.amount).toLocaleString('de-DE')} EUR`;
+    if (it.k === 'acAny') return `${it.n} × ${it.fam ? P.TYPE_GROUPS[P.AIRCRAFT_TYPES[it.type].group] + ' (beliebiges Muster)' : P.AIRCRAFT_TYPES[it.type].label}${it.maxAge ? `, höchstens ${it.maxAge} Jahre alt` : ''}`;
     if (it.k === 'ac') { const a = giver && giver.fleet.find((x) => x.id === it.id); return a ? `${P.AIRCRAFT_TYPES[a.type_id].label} (${a.owned ? 'Eigentum' : 'Leasing'}, ${Math.round(a.age0 + Math.max(0, w.day - a.bornDay) / 365)} J.)` : it.desc || `Flugzeug ${it.id}`; }
     if (it.k === 'staff') return `${it.n} ${it.role === 'pilot' ? 'Piloten (' + P.TYPE_GROUPS[it.group] + ')' : it.role === 'cabin' ? 'Flugbegleiterinnen' : 'Techniker'}`;
     if (it.k === 'slots') return `${it.n} ${it.n === 1 ? 'Slot' : 'Slots'} in ${it.apt}`;
@@ -2550,7 +2625,7 @@ const SM = (() => {
     return '?';
   }
   function dealText(w, d) {
-    const A = w.airlines[d.from], B = w.airlines[d.to];
+    const A = w.airlines[d.from], B = d.to === MARKET ? { name: 'der Markt', fleet: [] } : w.airlines[d.to];
     const g = d.give.map((x) => itemText(w, x, A)).join(', ') || 'nichts', t = d.take.map((x) => itemText(w, x, B)).join(', ') || 'nichts';
     return `${A.name} gibt ${g} · ${B.name} gibt ${t}`;
   }
@@ -2742,16 +2817,100 @@ const SM = (() => {
   function expireDeals(w) {
     for (const d of w.deals) if (d.status === 'open' && d.expires <= w.day) {
       d.status = 'expired'; d.resolvedDay = w.day;
-      const A = w.airlines[d.from]; if (A && A.isPlayer) A.log(w.day, `Angebot an ${w.airlines[d.to].name} ist abgelaufen`, 'info');
+      const A = w.airlines[d.from]; if (A && A.isPlayer) A.log(w.day, d.to === MARKET ? 'Ihr Marktgesuch ist abgelaufen' : `Angebot an ${w.airlines[d.to].name} ist abgelaufen`, 'info');
+      if (d.to === MARKET) for (const x of w.deals) if (x.marketOf === d.id && x.status === 'open') { x.status = 'withdrawn'; x.resolvedDay = w.day; }
     }
+    // Neue KI-Antworten auf Marktgesuche (alle drei Tage)
+    if (w.day % 3 === 0) for (const d of w.deals) if (d.status === 'open' && d.to === MARKET && w.day - d.day <= 12) marketAiResponses(w, d, 1);
+  }
+  /** KI-Airlines prüfen ein Marktgesuch und schicken passende Angebote (zu den Bedingungen oder mit Aufschlag). */
+  function marketAiResponses(w, d, maxNew = 3) {
+    const poster = w.airlines[d.from]; if (!poster) return 0;
+    const answered = new Set(w.deals.filter((x) => x.marketOf === d.id).map((x) => x.from));
+    const cands = [];
+    for (const ai of w.list.filter((a) => a.archetype && a.status === 'active' && !answered.has(a.id))) {
+      const give = resolveItems(w, ai, d.take); if (!give) continue;               // KI liefert, was gesucht wird
+      if (checkSide(w, ai, poster, give)) continue;
+      const c = { from: ai.id, to: poster.id, give, take: d.give.map((x) => ({ ...x })) };
+      if (!c.give.length && !c.take.length) continue;
+      const selling = d.give.some((y) => y.k !== 'cash');                         // Anzeige verkauft etwas
+      const ask = d.take.filter((y) => y.k === 'cash').reduce((a, y) => a + y.amount, 0);
+      if (selling && !ask) {                                                       // „Angebote erbeten“: KI bietet selbst
+        const ev0 = aiDealValue(w, ai, c); if (ev0.why.length) continue;
+        const bid = Math.floor((ev0.vin - ev0.vout - ev0.margin) * w.rng.range(0.78, 0.95) / 5000) * 5000;
+        if (bid >= 10000) { c.give.push({ k: 'cash', amount: bid }); if (!aiDealValue(w, ai, c).why.length) cands.push({ ai, c, extra: 0, score: bid }); }
+        continue;
+      }
+      const ev = aiDealValue(w, ai, c);
+      if (ev.why.length) continue;
+      const vol = ev.vin + ev.vout + 1;
+      if (ev.value >= 0) cands.push({ ai, c, extra: 0, score: ev.value / vol });
+      else if (selling ? ev.need <= 0.4 * ask : (!d.give.length || ev.need < 0.35 * vol + 50000)) cands.push({ ai, c, extra: roundTo(ev.need * w.rng.range(1.02, 1.3), 5000), score: -ev.need / vol });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    let n = 0;
+    for (const x of cands.slice(0, maxNew)) {
+      const { ai, c, extra } = x;
+      const selling = d.give.some((y) => y.k !== 'cash');
+      if (extra > 0) {
+        const posterPays = c.take.find((y) => y.k === 'cash'), aiPays = c.give.find((y) => y.k === 'cash');
+        let need = extra;
+        if (aiPays) { const cut = Math.min(aiPays.amount, need); aiPays.amount -= cut; need -= cut; }
+        if (need > 0 && selling) continue;                                         // Verkäufer zahlt nie drauf
+        if (need > 0) { if (posterPays) posterPays.amount += need; else c.take.push({ k: 'cash', amount: need }); }
+        c.give = c.give.filter((y) => y.k !== 'cash' || y.amount > 0); c.take = c.take.filter((y) => y.k !== 'cash' || y.amount > 0);
+      }
+      const note = extra > 0 ? (selling ? 'Auf Ihre Marktanzeige – etwas unter Ihrem Preis.' : 'Auf Ihre Marktanzeige – mit kleinem Aufschlag.') : 'Auf Ihre Marktanzeige – zu Ihren Bedingungen.';
+      const r = newDeal(w, ai.id, poster.id, c.give, c.take, note, { marketOf: d.id, expires: Math.min(d.expires + 3, w.day + 10) });
+      poster.log(w.day, `${ai.name} antwortet auf Ihr Marktgesuch: ${dealText(w, r)}`, 'deal');
+      n++;
+    }
+    return n;
+  }
+  /** Gesuch geschlossen: offene Antworten darauf zurückziehen. */
+  function closeMarket(w, mid, status = 'accepted') {
+    const m = w.deals.find((x) => x.id === mid); if (!m || m.status !== 'open') return;
+    m.status = status; m.resolvedDay = w.day;
+    for (const x of w.deals) if (x.marketOf === mid && x.status === 'open') { x.status = 'withdrawn'; x.resolvedDay = w.day; }
   }
   function dealAction(w, al, a) {
     const day = w.day;
+    if (a.type === 'dealPropose' && a.to === MARKET) {
+      const give = cleanItems(a.give), take = cleanItems(a.take);
+      if (!give.length && !take.length) return { ok: false, msg: 'Das Gesuch ist leer.' };
+      if (give.some((x) => x.k === 'acAny' || x.k === 'exit' || x.k === 'coop') || take.some((x) => x.k === 'exit' || x.k === 'coop' || x.k === 'ac'))
+        return { ok: false, msg: 'Am Markt geht es um Geld, Flugzeuge, Personal und Slots. Rückzüge und Kooperationen verhandeln Sie direkt mit einer Airline.' };
+      if (w.deals.filter((d) => d.status === 'open' && d.from === al.id && d.to === MARKET).length >= 4) return { ok: false, msg: 'Höchstens vier offene Marktanzeigen gleichzeitig.' };
+      const sells = give.some((x) => x.k !== 'cash'), buys = take.some((x) => x.k !== 'cash');
+      if (!sells && !buys) return { ok: false, msg: 'Eine Anzeige braucht etwas, das Sie anbieten oder suchen – nicht nur Geld.' };
+      if (sells && buys) return { ok: false, msg: 'Bitte entweder anbieten (gegen Geld) oder suchen (gegen Geld) – Tausch verhandeln Sie direkt mit einer Airline.' };
+      const err = checkSide(w, al, null, give); if (err) return { ok: false, msg: err };
+      const d = newDeal(w, al.id, MARKET, give, take, a.note, { market: true, expires: day + 21 });
+      const n = marketAiResponses(w, d, 3);
+      w.pushNews(day, `Marktplatz: ${al.name} ${take.length ? 'sucht' : 'bietet'} ${(take.length ? take : give).map((x) => itemText(w, x, al)).join(', ')}`, 'trade', al.id);
+      for (const h of w.humans) if (h.id !== al.id) h.log(day, `Neues Marktgesuch von ${al.name}: ${dealText(w, d)}`, 'deal');
+      return { ok: true, id: d.id, status: 'open', reply: n ? `${n} ${n === 1 ? 'Airline hat' : 'Airlines haben'} schon geantwortet – die Angebote liegen in Ihrem Eingang.` : 'Noch keine Antwort. KI-Airlines prüfen das Gesuch in den nächsten Tagen.' };
+    }
+    if (a.type === 'marketAccept') {
+      const m = w.deals.find((x) => x.id === a.id && x.to === MARKET);
+      if (!m || m.status !== 'open') return { ok: false, msg: 'Dieses Marktgesuch ist nicht mehr offen.' };
+      if (m.from === al.id) return { ok: false, msg: 'Das ist Ihre eigene Anzeige.' };
+      if (m.give.some((x) => x.k !== 'cash') && !m.take.length) return { ok: false, msg: 'Hier ist kein Preis genannt – machen Sie ein Angebot.' };
+      if (m.take.some((x) => x.k !== 'cash') && !m.give.length) return { ok: false, msg: 'Hier ist kein Preis genannt – machen Sie ein Angebot.' };
+      const give = resolveItems(w, al, m.take, Array.isArray(a.acIds) && a.acIds.length ? a.acIds.map(String) : null);
+      if (!give) return { ok: false, msg: 'Sie haben kein passendes Flugzeug frei.' };
+      const d = newDeal(w, al.id, m.from, give, m.give.map((x) => ({ ...x })), '', { marketOf: m.id });
+      const res = executeDeal(w, d);
+      if (!res.ok) { d.status = 'failed'; d.resolvedDay = day; return res; }
+      closeMarket(w, m.id);
+      const P0 = w.airlines[m.from]; if (P0 && P0.isPlayer) P0.log(day, `${al.name} hat Ihr Marktgesuch angenommen: ${dealText(w, d)}`, 'good');
+      return res;
+    }
     if (a.type === 'dealPropose') {
       const to = w.airlines[a.to];
       if (!to || to.id === al.id) return { ok: false, msg: 'Ungültiger Handelspartner.' };
       if (to.status === 'insolvent') return { ok: false, msg: `${to.name} ist insolvent.` };
-      const give = cleanItems(a.give), take = cleanItems(a.take);
+      const give = cleanItems(a.give).filter((x) => x.k !== 'acAny'), take = cleanItems(a.take).filter((x) => x.k !== 'acAny');
       if (!give.length && !take.length) return { ok: false, msg: 'Das Angebot ist leer.' };
       if (give.some((x) => x.k === 'exit') && take.some((x) => x.k === 'exit' && give.some((y) => y.k === 'exit' && y.pair === x.pair))) return { ok: false, msg: 'Beide Seiten können nicht von derselben Strecke zurücktreten.' };
       if (w.deals.filter((d) => d.status === 'open' && d.from === al.id).length >= DEAL_MAX_OPEN) return { ok: false, msg: `Höchstens ${DEAL_MAX_OPEN} offene Angebote gleichzeitig.` };
@@ -2763,7 +2922,8 @@ const SM = (() => {
         if (orig.from !== to.id) return { ok: false, msg: 'Gegenangebote gehen an den ursprünglichen Absender.' };
       }
       if (to.isPlayer) { const e2 = checkSide(w, to, al, take); if (e2) return { ok: false, msg: e2 }; }
-      const d = newDeal(w, al.id, to.id, give, take, a.note, orig ? { counterOf: orig.id } : {});
+      const mk = typeof a.marketOf === 'string' ? w.deals.find((x) => x.id === a.marketOf && x.to === MARKET && x.status === 'open' && x.from === to.id) : null;
+      const d = newDeal(w, al.id, to.id, give, take, a.note, { ...(orig ? { counterOf: orig.id } : {}), ...(mk ? { marketOf: mk.id } : {}) });
       if (orig) { orig.status = 'countered'; orig.resolvedDay = day; orig.counterId = d.id; }
       if (to.isPlayer) { to.log(day, `${orig ? 'Gegenangebot' : 'Neues Angebot'} von ${al.name}: ${dealText(w, d)}`, 'deal'); al.log(day, `Angebot an ${to.name} gesendet`, 'info'); return { ok: true, id: d.id, status: 'open' }; }
       aiRespond(w, to, d);
@@ -2774,6 +2934,7 @@ const SM = (() => {
     if (d.status !== 'open') return { ok: false, msg: 'Das Angebot ist nicht mehr offen.' };
     if (a.type === 'dealWithdraw') {
       if (d.from !== al.id) return { ok: false, msg: 'Nur der Absender kann zurückziehen.' };
+      if (d.to === MARKET) { closeMarket(w, d.id, 'withdrawn'); return { ok: true }; }
       d.status = 'withdrawn'; d.resolvedDay = day;
       const B = w.airlines[d.to]; if (B.isPlayer) B.log(day, `${al.name} hat ein Angebot zurückgezogen`, 'info');
       return { ok: true };
@@ -2790,6 +2951,7 @@ const SM = (() => {
       if (!A.isPlayer) { const ev = aiDealValue(w, A, d); if (ev.why.length) { d.status = 'failed'; d.resolvedDay = day; return { ok: false, msg: `${A.name} kann das Angebot nicht mehr erfüllen.` }; } }
       const res = executeDeal(w, d);
       if (!res.ok) { d.status = 'failed'; d.resolvedDay = day; if (A.isPlayer) A.log(day, `Handel mit ${al.name} gescheitert: ${res.msg}`, 'warn'); }
+      else if (d.marketOf) closeMarket(w, d.marketOf);
       return res;
     }
     return { ok: false, msg: 'Unbekannte Aktion.' };
@@ -2989,6 +3151,7 @@ const SM = (() => {
       }
       case 'poach': return w.poach(al, a.target, a.role, a.group || null, num(a.n, 1), num(a.bonus));
       case 'poachExpert': return w.poachExpert(al, a.target, a.id, num(a.factor, 1.2));
+      case 'setRivals': { if (!setRivals(w, a.key)) return { ok: false, msg: 'Unbekannte Stufe.' }; w.pushNews(day, `Die Konkurrenz spielt jetzt „${RIVALS[a.key].label}“`, 'info', null); return { ok: true }; }
       case 'setLogo': {
         const hex = (c) => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : null);
         if (!LOGO_SHAPES.includes(a.shape) || !LOGO_SYMBOLS.includes(a.sym) || !hex(a.c1) || !hex(a.c2)) return { ok: false, msg: 'Ungültiges Logo.' };
@@ -3021,7 +3184,7 @@ const SM = (() => {
   function serialize(w, opt = {}) {
     const aiH = opt.compact ? -8 : -30, plH = opt.compact ? -30 : -60;
     return {
-      v: 4, param: P.VERSION, day: w.day, difficulty: w.difficulty, rng: w.rng.s, macro: w.macro, fuelHist: w.fuelHist.slice(-370),
+      v: 4, param: P.VERSION, day: w.day, difficulty: w.difficulty, rivals: w.rivals || null, rng: w.rng.s, macro: w.macro, fuelHist: w.fuelHist.slice(-370),
       playerId: w.playerId, order: w.order, news: w.news.slice(-120), events: w.events.filter((e) => e.end + (e.recovery || 0) > w.day - 30), eventCounter: w.eventCounter,
       seed: w.seed, slotCap: w.slotCap, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
@@ -3040,7 +3203,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -3050,7 +3213,7 @@ const SM = (() => {
   function deserialize(s) {
     if (s.v !== 4) throw new Error('Spielstand aus einer älteren Version');
     const w = new World(1);
-    Object.assign(w, { difficulty: s.difficulty || 'normal', day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
+    Object.assign(w, { difficulty: s.difficulty || 'normal', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], coops: s.coops || [], auctions: s.auctions || [],
       lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
@@ -3085,7 +3248,7 @@ const SM = (() => {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk,
     evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
-    ACADEMY, MILESTONES, stockCap, laborPool, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
+    RIVALS, setRivals, MARKET, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();

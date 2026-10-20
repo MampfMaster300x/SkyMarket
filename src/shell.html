@@ -220,6 +220,7 @@ nav.tabs .dot { position: absolute; top: 1px; right: 1px; width: 7px; height: 7p
 .plane.me path { fill: var(--plane); stroke: var(--plane-edge); stroke-width: .6; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--plane) 70%, transparent)); }
 .plane.sel path { fill: #22d3ee; stroke: #04122a; }
 .plane circle { fill: transparent; }
+.plane.me circle { fill: color-mix(in srgb, var(--plane) 16%, transparent); stroke: var(--plane); stroke-width: .8; stroke-opacity: .75; vector-effect: non-scaling-stroke; }
 .map-legend { position: absolute; left: 12px; bottom: 12px; background: var(--panel-glass); backdrop-filter: blur(8px);
   border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 11.5px; color: var(--ink-2); max-width: calc(100% - 210px); }
 .map-legend .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
@@ -558,6 +559,58 @@ body, .card2, .side, .mapwrap, .pane { transition: background-color .8s ease, co
 .ownt.on { background: var(--sec); border-color: var(--sec); } .ownt.on b, .ownt.on span { color: #fff; }
 .ownt:disabled { opacity: .45; }
 select option.own { font-weight: 700; }
+
+/* Startpaket in der Planung */
+.kit { gap: 10px; border-color: color-mix(in srgb, var(--sec) 45%, var(--line)); }
+.kit-row { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+.kit-ic { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 800 13px var(--f-body); }
+.kit-row.ok .kit-ic { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+.kit-row.todo .kit-ic { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+.kit-opts { display: grid; gap: 6px; margin-top: 6px; }
+.kit-opts .chk { align-items: start; }
+
+/* Prognose-Herleitung */
+details.fcx { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 8px 12px; background: var(--panel-2); }
+details.fcx summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--ink); }
+details.fcx[open] summary { margin-bottom: 8px; }
+.fcx-steps { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 12.5px; color: var(--ink-2); line-height: 1.45; }
+
+/* Dashboard */
+.dash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@container (max-width: 640px) { .dash { grid-template-columns: minmax(0, 1fr); } }
+.dtiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@container (max-width: 640px) { .dtiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dpanel { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel-2); padding: 12px 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.dpanel .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dp-head { display: flex; align-items: center; gap: 8px; } .dp-head b { font-size: 13.5px; } .dp-head .small { margin-left: auto; } .dp-head .btn { margin-left: 8px; }
+.dp-head b + .btn { margin-left: auto; }
+.dbars { display: grid; gap: 5px; }
+.dbar { display: grid; grid-template-columns: minmax(64px, 92px) 1fr minmax(70px, auto); gap: 8px; align-items: center; font-size: 12px; }
+.dbar .dl { font: 600 11.5px var(--f-mono); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dbar .dv { font: 500 12px var(--f-mono); text-align: right; white-space: nowrap; color: var(--ink); }
+.dtrack { position: relative; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--ink-3) 14%, transparent); overflow: hidden; }
+.dtrack i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; background: var(--accent); }
+.dtrack i.pos { background: var(--good); } .dtrack i.neg { background: var(--crit); } .dtrack i.warn { background: var(--warn); } .dtrack i.crit { background: var(--crit); } .dtrack i.me { background: var(--sec, var(--accent)); }
+.dtrack.div::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--ink-3); opacity: .6; }
+.dtrack .tgt { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink-2); opacity: .7; }
+.mbars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; height: 120px; align-items: stretch; }
+.mb { display: grid; grid-template-rows: 1fr 1fr auto; min-width: 0; }
+.mb-up, .mb-dn { position: relative; } .mb-up { border-bottom: 1px solid var(--ink-3); }
+.mb-up i, .mb-dn i { position: absolute; left: 15%; right: 15%; border-radius: 3px; }
+.mb-up i { bottom: 0; } .mb-dn i { top: 0; }
+.mb i.pos { background: var(--good); } .mb i.neg { background: var(--crit); }
+.mb em { font: normal 10px var(--f-mono); color: var(--ink-3); text-align: center; margin-top: 3px; }
+
+/* Marktplatz */
+.deal.mkt { border-left: 3px solid var(--sec, var(--accent)); }
+.deal.mkt.mine { background: color-mix(in srgb, var(--sec, var(--accent)) 7%, var(--panel-2)); }
+.mkt-items { margin: 4px 0; padding-left: 18px; font-size: 13px; display: grid; gap: 3px; }
+.mkt-items li .btn { padding: 0 8px; margin-left: 6px; }
+
+.crewrule { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.crewrule > div { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px 12px; background: var(--panel-2); display: grid; gap: 3px; }
+.crewrule b { font-size: 13px; } .crewrule span { font-size: 12px; color: var(--ink-2); }
+@container (max-width: 520px) { .crewrule { grid-template-columns: 1fr; } }
 </style>
 
 <div id="app">

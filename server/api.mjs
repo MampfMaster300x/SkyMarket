@@ -247,7 +247,8 @@ export async function handle(req, { store }) {
       let code = null;
       for (let i = 0; i < 8 && !code; i++) { const c = rnd(6); const r = await store.set(K.code(c), id, { onlyIfNew: true }); if (r.modified !== false) code = c; }
       if (!code) return fail(500, 'Kein freier Code gefunden, bitte noch einmal versuchen.');
-      const w = SM.newWorld({ difficulty, seed: randomBytes(4).readUInt32LE(0) });
+      const rivals = SM.RIVALS[body.rivals] ? body.rivals : null;
+      const w = SM.newWorld({ difficulty, rivals, seed: randomBytes(4).readUInt32LE(0) });
       const h = SM.addHuman(w, { name: al.name, code: al.code, base: al.base, owner: user.key });
       w.playerId = h.id;
       const now = Date.now();
@@ -339,6 +340,7 @@ export async function handle(req, { store }) {
       if (op === 'action' && method === 'POST') {
         const { action } = await readJson(req);
         if (!action || typeof action !== 'object' || typeof action.type !== 'string') return fail(400, 'Ungültige Aktion.');
+        if (action.type === 'setRivals' && meta.host !== user.key && !isAdmin(user)) return fail(403, 'Die Stärke der Konkurrenz stellt nur die Spielleitung ein.');
         const r = await mutateState(store, id, (w) => SM.applyAction(w, me.airlineId, action));
         const res = r.result || { ok: false };
         return json({ ok: !!res.ok, msg: res.msg || null, ver: r.etag, day: r.md.day, id: res.id ?? null, status: res.status ?? null, reply: res.reply ?? null, counterId: res.counterId ?? null });

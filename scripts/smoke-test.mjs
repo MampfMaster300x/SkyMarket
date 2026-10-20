@@ -66,7 +66,7 @@ ok(await call('dora', 'POST', '/register', { username: 'Dora', password: 'passwo
 ok(await call('dora', 'POST', `/games/${g.id}/join`, { invite: infoA.invite, airline: { name: 'Rhein Air', code: 'RA', base: 'DUS' } }), 'Beitritt Dora');
 ok(await call('emil', 'POST', '/register', { username: 'Emil', password: 'passwort4' }), 'Emil');
 assert.equal((await call('emil', 'POST', `/games/${g.id}/join`, { invite: infoA.invite, airline: { name: 'Fünfte Air', code: 'FA', base: 'FRA' } })).status, 409, 'max. 4');
-// Echtzeit: läuft offline weiter
+// Langsame Stufe: läuft offline weiter
 ok(await call('anna', 'POST', `/games/${g.id}/control`, { speed: 'h1', tz: -120 }), 'Langzeit');
 const m2 = await store.getWithMetadata(`games/${g.id}/state`, { type: 'arrayBuffer' });
 const d0 = m2.metadata.day;
@@ -75,8 +75,9 @@ st = await call('anna', 'GET', `/games/${g.id}/state?v=y`);
 w = JSON.parse(gunzipSync(Buffer.from(st.data)).toString());
 console.log('Langzeit: 5 Std. offline →', w.day - d0, 'Tage');
 assert.equal(w.day - d0, 5);
-ok(await call('anna', 'POST', `/games/${g.id}/control`, { speed: 'rt', tz: -120 }), 'Echtzeit');
-console.log('Echtzeit-Uhr', st.headers.get('x-clock'));
+ok(await call('anna', 'POST', `/games/${g.id}/control`, { speed: 'm1', tz: -120 }), '1 Min. je Tag');
+assert.equal((await call('anna', 'POST', `/games/${g.id}/control`, { speed: 'rt' })).status, 400, 'Echtzeit gibt es nicht mehr');
+console.log('Tempo 1 Min./Tag gesetzt');
 assert.equal((await call('anna', 'POST', `/games/${g.id}/control`, { speed: 'x10' })).status, 400, 'Turbo nur offline');
 // Handel zwischen Menschen: Ben verkauft Anna sein Flugzeug, Cleo darf nicht annehmen, Anna nimmt an
 ok(await call('anna', 'POST', `/games/${g.id}/control`, { speed: 'p' }), 'Pause für Handel');
@@ -130,6 +131,12 @@ ws = JSON.parse(gunzipSync(Buffer.from((await call('anna', 'GET', `/games/${g.id
 assert.ok(ws.coops.some((c) => c.kind === 'alliance' && [c.a, c.b].includes(annaAl.id) && [c.a, c.b].includes(benAl.id)), 'Allianz aktiv');
 r = ok(await call('dora', 'POST', `/games/${g.id}/action`, { action: { type: 'poach', target: annaAl.id, role: 'cabin', n: 2, bonus: 0.2 } }), 'Abwerben');
 console.log('Akademie ok · Allianz ok · Abwerben:', r.ok ? 'ok' : r.msg);
+// v0.10: Marktanzeige, Konkurrenz nur durch Spielleitung
+r = ok(await call('anna', 'POST', `/games/${g.id}/action`, { action: { type: 'dealPropose', to: 'MARKET', give: [{ k: 'cash', amount: 900000 }], take: [{ k: 'acAny', type: 'A20N', n: 1 }], note: 'Suche A320neo' } }), 'Marktgesuch');
+assert.equal(r.ok, true, JSON.stringify(r)); console.log('Marktgesuch:', r.reply);
+assert.equal((await call('ben', 'POST', `/games/${g.id}/action`, { action: { type: 'setRivals', key: 'hard' } })).status, 403, 'Konkurrenz nur Spielleitung');
+r = ok(await call('anna', 'POST', `/games/${g.id}/action`, { action: { type: 'setRivals', key: 'hard' } }), 'Konkurrenz stark');
+assert.equal(r.ok, true);
 // Admin Tim: sieht alle Spiele, tritt ohne Passwort bei, darf fremde Spiele löschen
 const tim = ok(await call('tim', 'POST', '/register', { username: 'Tim', password: 'admin1234' }), 'Registrierung Tim');
 assert.equal(tim.admin, true, 'Tim ist Admin');

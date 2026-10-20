@@ -1,4 +1,4 @@
-# SKYMARKET Online (Testversion 0.9)
+# SKYMARKET Online (Testversion 0.10)
 
 Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Afrika), 24 KI-Airlines und gemeinsame Spiele mit bis zu vier Personen.
 
@@ -11,6 +11,34 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
 
   Bei Code und Suche ist das Passwort nötig, falls eines gesetzt ist.
 - **Offline:** Allein spielen geht auch ohne Konto. Der Spielstand bleibt dann im Browser.
+- **Neu in 0.10 – übersichtlicher und schneller:**
+  - **Konkurrenz einstellbar** (Einfach / Mittel / Stark), unabhängig von der Schwierigkeit:
+    - wählbar beim Spielstart und beim Anlegen eines Online-Spiels;
+    - im Spiel unter Markt → Wettbewerb änderbar, online nur durch die Spielleitung;
+    - wirkt auf Angriffe, Preiskämpfe, Abwerben, Planungsgenauigkeit und Kosten der KI.
+  - **Strecke in einem Schritt:** Die Planung enthält ein „Startpaket“.
+    - Fehlt ein Flugzeug, wird es geleast oder gebraucht übernommen.
+    - Fehlendes Personal wird gleich mit eingestellt.
+    - Der Einsatz wird automatisch geplant.
+    - Nach einem Kauf unter Beschaffung bietet das Spiel „Strecke dafür planen“ an.
+  - **Dashboard** (Karte → Dashboard), alles auf einen Blick: Ergebnis, Kontostand, Auslastung, Pünktlichkeit, Profitabilität und Auslastung je Strecke, Ergebnis je Monat, Personal gegen Bedarf, Flotte (Nutzung, Ungenutzte, Wartung) sowie Markt und Risiko.
+  - **Prognose transparent:**
+    - Die Kacheln zeigen den Streckenbeitrag wie später in der Streckenliste. Gegenprobe: etwa 4 % Abweichung bei ausgereiften Strecken.
+    - Darunter steht das Ergebnis nach allen Kosten.
+    - „So rechnet die Prognose“ erklärt Markt, Anteil, Saison, Anlauf und Unsicherheit und zeigt die Kostenrechnung Zeile für Zeile.
+  - **Marktplatz** (Markt → Handel): Anzeigen an alle Airlines.
+    - Biete oder suche Flugzeuge (auch „irgendein A320neo bis 10 Jahre“), Personal oder Slots, mit oder ohne Preis.
+    - KI-Airlines antworten mit Angeboten in den Eingang. Mitspielende können direkt kaufen oder liefern oder ein Angebot machen.
+  - **Eigene Flugzeuge klar erkennbar:**
+    - Die Flottenliste zeigt je Flugzeug „Crew besetzt“, „Crew teils Agentur“ oder „Crew fehlt“ sowie „Reserve in HAM“ oder „bereit ohne Strecke“, dazu oben eine Zusammenfassung.
+    - Auf der Karte haben die eigenen Flugzeuge einen Ring. Ihre Flugzeugkarte zeigt „Ihr Flugzeug“ und die Crew-Lage.
+  - **Gleiche Muster, gleiche Crews:**
+    - Wettbewerb lässt sich nach Musterfamilie filtern („Gleiche Muster wie ich“).
+    - Beim Abwerben stehen die Airlines mit der passenden Familie oben.
+    - Piloten werden je Familie eingestellt (Typ-Rating, Umschulung möglich). Flugbegleiterinnen und Technik arbeiten auf allen Mustern.
+  - **Tempo:** neu „1 Tag = 1 Min.“ (läuft wie die langsamen Stufen auch offline weiter). Den Echtzeit-Modus (1 Tag = 24 Std.) gibt es nicht mehr; laufende Spiele damit gehen automatisch auf 1 Tag = 1 Std.
+  - **Fachkräfte geprüft:** Alle Wirkungen sind nachgemessen. Die Finanzfachkraft erhöht die Kreditlinie jetzt wirklich um +25 / +50 / +100 %. Der Text zum Revenue Management wurde berichtigt.
+  - **Leistung:** Der Spieltag rechnet etwa 30 % schneller, die Rechenspitze am Monatsende ist halbiert.
 - **Neu in 0.9 – härter und vernetzter:**
   - **Schwierigkeit:** weniger Startkapital (leicht 25, normal 16, schwer 10 Mio. €). Mehr und stärkere Schocks, darunter Handelskriege, Ölkrise, Luftraumsperren, CO₂-Abgabe, Gebührenerhöhungen und Währungskrisen. Dazu ein regional versetzter Konjunkturzyklus.
   - **Keine Preisautomatik mehr:** Die Preise führen Sie selbst. Die Planung macht einen Vorschlag aus der Prognose.
@@ -43,7 +71,7 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
 - **Neu in 0.8:**
   - **Chat** im Mehrspieler: an alle oder privat an eine Airline (Sprechblasen-Symbol oben, Zähler für Ungelesenes). Gespeichert in einem eigenen Blob je Spiel (letzte 300 Nachrichten).
   - **Logo gestalten** (Unternehmen → Profil & Logo): Form, Symbol und zwei Farben, aus Vorlagen oder frei. Erscheint in Seitenleiste, Menü, Handel, Mitspielerliste und auf dem Leitwerk.
-  - **Design-Schalter** oben (Automatisch, Dunkel, Hell). Automatisch folgt bei langen Spieltagen (Echtzeit, 1 Std., 10 Min.) der Tageszeit, sonst dunkel.
+  - **Design-Schalter** oben (Automatisch, Dunkel, Hell). Automatisch folgt bei langen Spieltagen (1 Std., 10 Min.) der Tageszeit, sonst dunkel.
   - **Basen schließen** (Unternehmen → Stationen): Strecken ab dort werden eingestellt, Flugzeuge an eine andere Basis verlegt.
   - **Fehlerbehebung Langstrecke:** Dauert ein Umlauf länger als das Betriebsfenster (z. B. BCN–LAS, 27,6 h), braucht der tägliche Flug zwei Flugzeuge. Mit nur einem fliegt die Strecke jetzt im Teilbetrieb jeden zweiten Tag statt gar nicht; Planung, Strecke und Assistenz erklären das.
 - **Einsatzplan** (Flotte → Einsatzplan): Flugzeuge automatisch einsetzen, festen Strecken zuweisen oder als Reserve vorhalten. Grenzen: gleiche Basis, gleicher Typ wie die Strecke, höchstens 17 Stunden am Tag, nicht mehr Umläufe als die Frequenz; Langstrecke belegt ein Flugzeug ganz. Strecken lassen sich auf einen anderen Flugzeugtyp umstellen (Umflottung).
@@ -55,7 +83,7 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - Slot-Reserve: Wer an einem koordinierten Flughafen Flüge streicht, behält die Slots 180 Tage (per Handel erworbene 365 Tage).
 - **Neu in 0.6:**
   - Oberfläche im SKYMARKET-Design mit sechs farbcodierten Bereichen: Karte (blau), Flotte (grün), Strecken (violett), Finanzen (orange), Markt (pink), Unternehmen (türkis), jeweils mit Unter-Tabs.
-  - **Echtzeit-Modus** für Langzeitspiele: 1 Spieltag = 24 Stunden, die Spieluhr läuft mit der Ortszeit. Dazu „1 Tag = 1 Std.“ und „1 Tag = 10 Min.“.
+  - **Echtzeit-Modus** (seit 0.10 entfernt) für Langzeitspiele: 1 Spieltag = 24 Stunden, die Spieluhr läuft mit der Ortszeit. Dazu „1 Tag = 1 Std.“ und „1 Tag = 10 Min.“.
   - **Assistenz:** Zum Start wählt jede Person Lena, Marco, Aiko oder Samuel. Die Assistenz gibt Hinweise, erinnert und meldet Ereignisse und Monatsberichte.
 
 ## Admin
@@ -135,8 +163,8 @@ Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, ink
   - Jede Aktion (Flugzeug leasen, Strecke eröffnen, Personal einstellen …) wird lokal sofort geprüft und angezeigt.
   - Gleichzeitig geht sie an den Server. Er rechnet sie mit derselben Engine nach und ist maßgeblich.
 - **Zeit:**
-  - Wer das Spiel leitet, wählt das Tempo: Echtzeit (1 Tag = 24 Std.), 1 Tag = 1 Std., 1 Tag = 10 Min. oder die schnellen Stufen 1×, 2×, 4× (1× = 1 Tag in 12 Sekunden).
-  - **Langsame Stufen laufen auch ohne Spielende weiter.** Der Server holt beim nächsten Aufruf die verpasste Zeit nach (bis zu 400 Tage, höchstens 30 Tage je Anfrage). Echtzeit schließt den Spieltag um Mitternacht in der Zeitzone der Spielleitung.
+  - Wer das Spiel leitet, wählt das Tempo: 1 Tag = 1 Std., 1 Tag = 10 Min., 1 Tag = 1 Min. oder die schnellen Stufen 1×, 2×, 4× (1× = 1 Tag in 12 Sekunden).
+  - **Langsame Stufen laufen auch ohne Spielende weiter.** Der Server holt beim nächsten Aufruf die verpasste Zeit nach (bis zu 400 Tage, höchstens 30 Tage je Anfrage).
   - Bei den schnellen Stufen holt der Server ohne Spielende höchstens eine Minute nach. Das Spiel läuft also nicht ohne Sie davon.
 - **Airlines:**
   - Bis zu vier Personen spielen in einer gemeinsamen Welt, jede mit eigener Airline.
