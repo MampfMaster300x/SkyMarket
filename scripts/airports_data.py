@@ -107,8 +107,22 @@ VIE|Wien|48.11|16.57|AT|3.0|1.0|1.2|32
 BER|Berlin|52.37|13.50|DE|6.0|1.0|1.3|25
 DUS|Düsseldorf|51.29|6.77|DE|7.0|1.1|0.5|20
 HAM|Hamburg|53.63|9.99|DE|3.2|1.0|0.9|15
+JNB|Johannesburg|-26.14|28.25|ZA|10|1.2|1.0|21
+CPT|Kapstadt|-33.97|18.60|ZA|4.7|0.9|2.2|11
+ADD|Addis Abeba|8.98|38.80|ET|5.5|0.9|0.6|13
+NBO|Nairobi|-1.32|36.93|KE|5|1.0|1.3|9
+LOS|Lagos|6.58|3.32|NG|20|1.1|0.5|8
+ACC|Accra|5.61|-0.17|GH|5|0.9|0.8|3.5
+CMN|Casablanca|33.37|-7.59|MA|4.3|1.0|1.0|10
+RAK|Marrakesch|31.61|-8.04|MA|1.3|0.4|2.4|8
+ALG|Algier|36.69|3.22|DZ|4|0.8|0.4|9
+TUN|Tunis|36.85|10.23|TN|2.7|0.8|1.3|5
+DSS|Dakar|14.67|-17.07|SN|3.5|0.8|0.9|3
+DAR|Daressalam|-6.88|39.20|TZ|7|0.8|1.0|3
+HRG|Hurghada|27.18|33.80|EG|0.3|0.2|2.6|9
+MRU|Mauritius|-20.43|57.68|MU|1.3|0.6|2.6|4
 """
-EXTRA = {'VIE', 'BER', 'DUS', 'HAM'}   # nicht in den Top 100, aus der Europa-Version übernommen
+EXTRA = {'VIE', 'BER', 'DUS', 'HAM'} | {'JNB','CPT','ADD','NBO','LOS','ACC','CMN','RAK','ALG','TUN','DSS','DAR','HRG','MRU'}   # nicht in den Top 100, aus der Europa-Version übernommen
 
 # Land: Dativ-Name, Kurzname, Region, Einkommen, Landeentgelt €/t, Pax-Entgelt €, Ticketsteuer €, Steuer Langstrecke €, Kerosin-Faktor, Kosten-Faktor, Abfertigungs-Faktor
 COUNTRIES = {
@@ -133,10 +147,21 @@ COUNTRIES = {
  'GR': ('Griechenland', 'Griechenland', 'Europa', 0.60, 6, 22, 0, 0, 1.04, 0.9, 0.9),
  'TR': ('der Türkei', 'Türkei', 'Europa', 0.45, 4, 15, 5, 10, 1.0, 0.8, 0.8),
  'RU': ('Russland', 'Russland', 'Europa', 0.45, 5, 12, 0, 0, 0.95, 0.9, 0.85),
- 'AE': ('den Vereinigten Arabischen Emiraten', 'VAE', 'Nahost & Afrika', 1.20, 5, 20, 10, 10, 0.9, 1.2, 1.0),
- 'QA': ('Katar', 'Katar', 'Nahost & Afrika', 1.40, 5, 20, 10, 10, 0.9, 1.2, 1.0),
- 'SA': ('Saudi-Arabien', 'Saudi-Arabien', 'Nahost & Afrika', 0.80, 5, 18, 12, 20, 0.85, 1.0, 0.9),
- 'EG': ('Ägypten', 'Ägypten', 'Nahost & Afrika', 0.20, 4, 15, 10, 25, 1.0, 0.6, 0.7),
+ 'AE': ('den Vereinigten Arabischen Emiraten', 'VAE', 'Nahost', 1.20, 5, 20, 10, 10, 0.9, 1.2, 1.0),
+ 'QA': ('Katar', 'Katar', 'Nahost', 1.40, 5, 20, 10, 10, 0.9, 1.2, 1.0),
+ 'SA': ('Saudi-Arabien', 'Saudi-Arabien', 'Nahost', 0.80, 5, 18, 12, 20, 0.85, 1.0, 0.9),
+ 'EG': ('Ägypten', 'Ägypten', 'Afrika', 0.20, 4, 15, 10, 25, 1.0, 0.6, 0.7),
+ 'ZA': ('Südafrika', 'Südafrika', 'Afrika', 0.30, 5, 18, 10, 15, 1.05, 0.75, 0.75),
+ 'ET': ('Äthiopien', 'Äthiopien', 'Afrika', 0.08, 4, 12, 5, 10, 1.10, 0.55, 0.6),
+ 'KE': ('Kenia', 'Kenia', 'Afrika', 0.12, 4, 15, 8, 12, 1.12, 0.6, 0.65),
+ 'NG': ('Nigeria', 'Nigeria', 'Afrika', 0.12, 5, 20, 10, 20, 1.25, 0.7, 0.75),
+ 'GH': ('Ghana', 'Ghana', 'Afrika', 0.14, 5, 18, 8, 15, 1.20, 0.65, 0.7),
+ 'MA': ('Marokko', 'Marokko', 'Afrika', 0.22, 4, 14, 5, 10, 1.05, 0.6, 0.65),
+ 'DZ': ('Algerien', 'Algerien', 'Afrika', 0.25, 4, 12, 5, 10, 0.90, 0.6, 0.65),
+ 'TN': ('Tunesien', 'Tunesien', 'Afrika', 0.25, 4, 12, 5, 10, 1.00, 0.6, 0.65),
+ 'SN': ('dem Senegal', 'Senegal', 'Afrika', 0.10, 5, 18, 8, 15, 1.15, 0.6, 0.7),
+ 'TZ': ('Tansania', 'Tansania', 'Afrika', 0.08, 4, 14, 8, 12, 1.15, 0.55, 0.6),
+ 'MU': ('Mauritius', 'Mauritius', 'Afrika', 0.45, 6, 20, 10, 15, 1.10, 0.8, 0.8),
  'IN': ('Indien', 'Indien', 'Asien', 0.18, 4, 8, 4, 8, 1.2, 0.6, 0.6),
  'CN': ('China', 'China', 'Asien', 0.45, 5, 12, 6, 12, 1.05, 0.9, 0.8),
  'HK': ('Hongkong', 'Hongkong', 'Asien', 1.10, 7, 15, 15, 15, 1.03, 1.5, 1.2),
@@ -162,7 +187,8 @@ SLOTS = {
 # Ferienziele mit Saisonprofil
 SEASON = {'PMI': 'island', 'BCN': 'sun', 'FCO': 'sun', 'LIS': 'sun', 'AYT': 'island', 'CJU': 'sun', 'ATH': 'sun',
           'CUN': 'winter_sun', 'MCO': 'winter_sun', 'MIA': 'winter_sun', 'FLL': 'winter_sun', 'TPA': 'winter_sun', 'LAS': 'city',
-          'BKK': 'winter_sun', 'DMK': 'winter_sun', 'DXB': 'winter_sun', 'AUH': 'winter_sun', 'SYD': 'sun', 'MEL': 'sun', 'SAN': 'sun', 'CAI': 'winter_sun'}
+          'BKK': 'winter_sun', 'DMK': 'winter_sun', 'DXB': 'winter_sun', 'AUH': 'winter_sun', 'SYD': 'sun', 'MEL': 'sun', 'SAN': 'sun', 'CAI': 'winter_sun',
+          'HRG': 'winter_sun', 'RAK': 'winter_sun', 'MRU': 'winter_sun', 'CPT': 'winter_sun', 'TUN': 'sun'}
 # Europa-Flughäfen aus v0.1–v0.3 behalten ihre kalibrierten Werte
 OLD = {
  'HAM': dict(pop=3.2, income=1.10, biz=1.00, tour=0.90, land=7, paxfee=17, tax=15, taxi=0.00, cost=1.00, fuel=1.00, hand=1.00, slots=None, slotFee=0),
@@ -179,7 +205,7 @@ OLD = {
  'FCO': dict(pop=4.3, income=0.85, biz=1.00, tour=1.70, land=7, paxfee=20, tax=7, taxi=0.05, cost=1.10, fuel=1.03, hand=1.00, slots=None, slotFee=0),
  'LIS': dict(pop=2.9, income=0.75, biz=0.80, tour=1.60, land=6, paxfee=18, tax=0, taxi=0.00, cost=0.85, fuel=1.04, hand=0.90, slots=None, slotFee=0),
 }
-REGION_ORDER = ['Europa', 'Nordamerika', 'Lateinamerika', 'Nahost & Afrika', 'Asien', 'Ozeanien']
+REGION_ORDER = ['Europa', 'Nordamerika', 'Lateinamerika', 'Nahost', 'Afrika', 'Asien', 'Ozeanien']
 
 import json
 def build():

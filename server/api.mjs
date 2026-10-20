@@ -5,8 +5,9 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import SM from '../shared/engine.cjs';
 
 const MAX_PLAYERS = 4;
-const MAX_DAYS_PER_TICK = 20;          // Aufholen höchstens 20 Tage je Anfrage
-const IDLE_CAP_MS = 60000;              // Ohne Anfragen läuft höchstens eine Minute Spielzeit nach
+const MAX_DAYS_PER_TICK = 30;          // Aufholen höchstens 30 Tage je Anfrage (Rest folgt mit der nächsten)
+const IDLE_CAP_MS = 60000;              // Schnelle Stufen: ohne Anfragen läuft höchstens eine Minute nach
+const SLOW_CAP_DAYS = 400;              // Langsame Stufen laufen auch offline weiter (bis 400 Tage Rückstand)
 const SESSION_DAYS = 30;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const enc = new TextEncoder();
@@ -18,7 +19,8 @@ const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(d
 const fail = (status, error) => json({ error }, status);
 const rnd = (n, chars = CODE_CHARS) => { const b = randomBytes(n); let s = ''; for (let i = 0; i < n; i++) s += chars[b[i] % chars.length]; return s; };
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
-const msPerDay = (speed) => (speed > 0 ? 12000 / speed : Infinity);
+const speedInfo = (v) => SM.SPEEDS[SM.speedKey(v)];
+const dayMsLocal = (tzMin, now) => ((((now - (Number(tzMin) || 0) * 60000) % 86400000) + 86400000) % 86400000);
 const toArrayBuffer = (u8) => u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
 async function readJson(req) { try { return await req.json(); } catch (e) { return {}; } }
 function hashPw(password, salt = b64u(randomBytes(16))) {
@@ -62,8 +64,13 @@ async function sessionUser(store, req) {
 // ---------------------------------------------------------------------------
 // Speicher: Schlüssel
 // ---------------------------------------------------------------------------
+// Admins: Benutzernamen (ohne Groß/Klein) mit Verwaltungsrechten, z. B. alle Spiele löschen.
+// Umgebungsvariable ADMIN_USERS (Komma-Liste) überschreibt die Vorgabe.
+const ADMINS = new Set(String(process.env.ADMIN_USERS ?? 'tim').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean));
+const isAdmin = (user) => !!user && ADMINS.has(user.key);
+
 const K = {
-  user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, presence: (id) => `games/${id}/presence`,
+  user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, presence: (id) => `games/${id}/presence`, chat: (id) => `games/${id}/chat`,
   code: (c) => `codes/${c}`, index: 'index/games',
 };
 async function updateJson(store, key, fn, init = null, tries = 6) {
@@ -79,6 +86,12 @@ async function updateJson(store, key, fn, init = null, tries = 6) {
 }
 const summary = (meta, extra = {}) => ({ id: meta.id, name: meta.name, code: meta.code, players: meta.players.length, max: meta.max, locked: !!meta.pw, created: meta.created,
   names: meta.players.map((p) => p.airlineName), ...extra });
+async function deleteGame(store, meta) {
+  const id = meta.id;
+  await store.delete(K.state(id)); await store.delete(K.meta(id)); await store.delete(K.code(meta.code)); await store.delete(K.presence(id)); await store.delete(K.chat(id));
+  await updateJson(store, K.index, (list) => (list || []).filter((g) => g.id !== id), []);
+  for (const p of meta.players) await updateJson(store, K.user(p.u), (u) => { if (!u) return undefined; u.games = (u.games || []).filter((g) => g !== id); return u; });
+}
 async function indexUpsert(store, meta) {
   await updateJson(store, K.index, (list) => { list = (list || []).filter((g) => g.id !== meta.id); list.unshift(summary(meta)); return list.slice(0, 500); }, []);
 }
@@ -99,12 +112,13 @@ function packSized(w) {
   return buf;
 }
 function clockDue(md, now) {
-  const speed = md.speed || 0;
-  if (!(speed > 0)) return { days: 0, carry: md.carry || 0 };
-  const el = Math.min(Math.max(0, now - (md.lastTick || now)), IDLE_CAP_MS);
-  const total = (md.carry || 0) + el, per = msPerDay(speed);
-  const days = Math.floor(total / per);
-  return { days: Math.min(days, MAX_DAYS_PER_TICK), carry: days > MAX_DAYS_PER_TICK ? 0 : total - days * per };
+  const sp = speedInfo(md.speed);
+  if (!sp.ms) return { days: 0, carry: md.carry || 0 };
+  let el = Math.max(0, now - (md.lastTick || now));
+  el = sp.slow ? Math.min(el, SLOW_CAP_DAYS * sp.ms) : Math.min(el, IDLE_CAP_MS);
+  const total = (md.carry || 0) + el;
+  const days = Math.floor(total / sp.ms), run = Math.min(days, MAX_DAYS_PER_TICK);
+  return { days: run, carry: total - run * sp.ms, backlog: days - run };
 }
 /** Lädt den Stand, lässt fällige Tage laufen, wendet optional eine Änderung an und speichert mit Versionsprüfung. */
 async function mutateState(store, id, fn = null) {
@@ -129,7 +143,7 @@ async function mutateState(store, id, fn = null) {
 }
 async function loadMeta(store, id) { return store.get(K.meta(id), { type: 'json' }); }
 function memberOf(meta, user) { return meta && meta.players.find((p) => p.u === user.key); }
-function clockHeader(md) { return JSON.stringify({ speed: md.speed || 0, lastTick: md.lastTick || Date.now(), carry: md.carry || 0, now: Date.now(), day: md.day || 0 }); }
+function clockHeader(md) { const key = SM.speedKey(md.speed), sp = SM.SPEEDS[key]; return JSON.stringify({ speed: key, ms: sp.ms, lastTick: md.lastTick || Date.now(), carry: md.carry || 0, now: Date.now(), day: md.day || 0 }); }
 
 // ---------------------------------------------------------------------------
 // Validierung
@@ -164,19 +178,19 @@ export async function handle(req, { store }) {
       const { salt, hash } = hashPw(password);
       const res = await store.setJSON(K.user(key), { key, name, salt, hash, created: Date.now(), games: [] }, { onlyIfNew: true });
       if (res.modified === false) return fail(409, 'Diesen Benutzernamen gibt es schon.');
-      return json({ name, key }, 200, { 'set-cookie': await makeCookie(store, req, { key, name }) });
+      return json({ name, key, admin: ADMINS.has(key) }, 200, { 'set-cookie': await makeCookie(store, req, { key, name }) });
     }
     if (path === '/login' && method === 'POST') {
       const { username, password } = await readJson(req);
       const key = cleanName(username, 20).toLowerCase();
       const u = key ? await store.get(K.user(key), { type: 'json' }) : null;
       if (!u || !checkPw(password || '', u.salt, u.hash)) return fail(401, 'Benutzername oder Passwort stimmt nicht.');
-      return json({ name: u.name, key }, 200, { 'set-cookie': await makeCookie(store, req, u) });
+      return json({ name: u.name, key, admin: ADMINS.has(key) }, 200, { 'set-cookie': await makeCookie(store, req, u) });
     }
     if (path === '/logout' && method === 'POST') return json({ ok: true }, 200, { 'set-cookie': 'sm_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
 
     const user = await sessionUser(store, req);
-    if (path === '/me') return user ? json({ name: user.name, key: user.key }) : fail(401, 'Nicht angemeldet.');
+    if (path === '/me') return user ? json({ name: user.name, key: user.key, admin: isAdmin(user) }) : fail(401, 'Nicht angemeldet.');
     if (!user) return fail(401, 'Bitte zuerst anmelden.');
 
     // ---- Spielelisten ----
@@ -199,6 +213,17 @@ export async function handle(req, { store }) {
         .map((g) => ({ ...g, member: mine.has(g.id) }));
       return json({ games: hits });
     }
+    // ---- Verwaltung (nur Admins) ----
+    if (path === '/admin/games' && method === 'GET') {
+      if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+      const list = ((await store.get(K.index, { type: 'json' })) || []).slice(0, 500);
+      const out = await Promise.all(list.map(async (g) => {
+        const m = await loadMeta(store, g.id); if (!m) return null;
+        const st = await store.getMetadata(K.state(g.id));
+        return summary(m, { hostName: m.hostName, day: st && st.metadata ? st.metadata.day || 0 : 0, admin: true, member: !!memberOf(m, user) });
+      }));
+      return json({ games: out.filter(Boolean) });
+    }
     if (path === '/games/lookup' && method === 'GET') {
       const code = String(url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const id = code ? await store.get(K.code(code)) : null;
@@ -206,7 +231,7 @@ export async function handle(req, { store }) {
       if (!meta) return fail(404, `Kein Spiel mit dem Code ${code || '–'} gefunden.`);
       const t = url.searchParams.get('t');
       const st = await store.getMetadata(K.state(meta.id));
-      return json({ ...summary(meta), day: st && st.metadata ? st.metadata.day || 0 : 0, member: !!memberOf(meta, user), tokenOk: !!t && t === meta.invite, codes: meta.players.map((p) => p.code) });
+      return json({ ...summary(meta), day: st && st.metadata ? st.metadata.day || 0 : 0, member: !!memberOf(meta, user), tokenOk: !!t && t === meta.invite, adminOk: isAdmin(user), codes: meta.players.map((p) => p.code) });
     }
 
     // ---- Neues Spiel ----
@@ -216,7 +241,7 @@ export async function handle(req, { store }) {
       if (name.length < 3) return fail(400, 'Der Spielname braucht mindestens 3 Zeichen.');
       const al = validAirline(body.airline); if (al.error) return fail(400, al.error);
       const difficulty = SM.DIFFICULTY[body.difficulty] ? body.difficulty : 'normal';
-      const speed = [0, 1, 2, 4].includes(Number(body.speed)) ? Number(body.speed) : 1;
+      const speed = SM.SPEEDS[body.speed] && !SM.SPEEDS[body.speed].local ? body.speed : 'h1';
       const pw = typeof body.password === 'string' && body.password.length ? body.password.slice(0, 200) : null;
       const id = rnd(10, 'abcdefghijkmnpqrstuvwxyz23456789');
       let code = null;
@@ -226,7 +251,7 @@ export async function handle(req, { store }) {
       const h = SM.addHuman(w, { name: al.name, code: al.code, base: al.base, owner: user.key });
       w.playerId = h.id;
       const now = Date.now();
-      await store.set(K.state(id), packSized(w), { metadata: { speed, lastTick: now, carry: 0, day: w.day, ver: 1 }, onlyIfNew: true });
+      await store.set(K.state(id), packSized(w), { metadata: { speed, lastTick: now, carry: speed === 'rt' ? dayMsLocal(body.tz, now) : 0, day: w.day, ver: 1 }, onlyIfNew: true });
       const meta = { id, name, code, invite: rnd(16, 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'), host: user.key, hostName: user.name, created: now, difficulty, max: MAX_PLAYERS,
         pw: pw ? hashPw(pw) : null, players: [{ u: user.key, name: user.name, airlineId: h.id, airlineName: al.name, code: al.code, base: al.base, joined: now }] };
       await store.setJSON(K.meta(id), meta);
@@ -246,7 +271,7 @@ export async function handle(req, { store }) {
         const body = await readJson(req);
         if (meta.players.length >= meta.max) return fail(409, 'Das Spiel ist voll.');
         const viaInvite = body.invite && body.invite === meta.invite;
-        if (meta.pw && !viaInvite && !checkPw(body.password || '', meta.pw.salt, meta.pw.hash)) return fail(403, 'Das Passwort stimmt nicht.');
+        if (meta.pw && !viaInvite && !isAdmin(user) && !checkPw(body.password || '', meta.pw.salt, meta.pw.hash)) return fail(403, 'Das Passwort stimmt nicht.');
         const al = validAirline(body.airline, meta); if (al.error) return fail(400, al.error);
         let airlineId = null;
         await mutateState(store, id, (w) => {
@@ -260,6 +285,11 @@ export async function handle(req, { store }) {
         return json({ ok: true, airlineId });
       }
 
+      if (op === 'delete' && method === 'POST' && isAdmin(user)) {
+        await deleteGame(store, meta);
+        console.log(`Admin ${user.key} hat das Spiel ${meta.id} (${meta.name}) gelöscht.`);
+        return json({ ok: true });
+      }
       const me = memberOf(meta, user);
       if (!me) return fail(403, 'Sie sind in diesem Spiel nicht angemeldet.');
 
@@ -267,7 +297,7 @@ export async function handle(req, { store }) {
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
         const now = Date.now();
         return json({ id, name: meta.name, code: meta.code, invite: meta.invite, max: meta.max, locked: !!meta.pw,
-          me: { airlineId: me.airlineId, host: meta.host === user.key },
+          me: { airlineId: me.airlineId, host: meta.host === user.key, admin: isAdmin(user) },
           players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000 })) });
       }
       if (op === 'state' && method === 'GET') {
@@ -276,29 +306,59 @@ export async function handle(req, { store }) {
         }
         const r = await mutateState(store, id, null);
         const md = r.md, v = url.searchParams.get('v') || '';
-        const headers = { 'x-ver': r.etag || String(md.ver), 'x-clock': clockHeader(md), 'cache-control': 'no-store', 'access-control-expose-headers': 'x-ver, x-clock' };
+        const headers = { 'x-ver': r.etag || String(md.ver), 'x-clock': clockHeader(md), 'x-chat': String(meta.chatSeq || 0), 'cache-control': 'no-store', 'access-control-expose-headers': 'x-ver, x-clock, x-chat' };
         if (v && v === headers['x-ver']) return new Response(null, { status: 204, headers });
         return new Response(r.buf, { status: 200, headers: { ...headers, 'content-type': 'application/octet-stream' } });
+      }
+      // ---- Chat: eigener Speicher, damit der Spielstand klein bleibt; Zähler im Meta für billiges Abfragen ----
+      if (op === 'chat' && method === 'GET') {
+        const since = Number(url.searchParams.get('since')) || 0;
+        const list = (await store.get(K.chat(id), { type: 'json' })) || [];
+        const mine = list.filter((m) => m.seq > since && (!m.to || m.to === me.airlineId || m.from === me.airlineId));
+        return json({ seq: list.length ? list[list.length - 1].seq : 0, messages: mine.slice(-150).map(({ u, ...m }) => m) });
+      }
+      if (op === 'chat' && method === 'POST') {
+        const body = await readJson(req);
+        const text = String(body.text || '').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, 500);
+        if (!text) return fail(400, 'Die Nachricht ist leer.');
+        const to = body.to && meta.players.some((p) => p.airlineId === body.to && p.airlineId !== me.airlineId) ? body.to : null;
+        let msg = null, tooFast = false;
+        await updateJson(store, K.chat(id), (list) => {
+          list = list || [];
+          const last = [...list].reverse().find((m) => m.u === user.key);
+          if (last && Date.now() - last.t < 700) { tooFast = true; return undefined; }
+          msg = { seq: (list.length ? list[list.length - 1].seq : 0) + 1, t: Date.now(), u: user.key, from: me.airlineId, name: user.name, airline: me.airlineName, to, text };
+          list.push(msg);
+          return list.slice(-300);
+        }, []);
+        if (tooFast) return fail(429, 'Bitte etwas langsamer schreiben.');
+        try { await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.chatSeq = Math.max(m.chatSeq || 0, msg.seq); return m; }); } catch (e) { /* Zähler holt sich beim nächsten Mal */ }
+        const { u, ...pub } = msg;
+        return json({ ok: true, message: pub });
       }
       if (op === 'action' && method === 'POST') {
         const { action } = await readJson(req);
         if (!action || typeof action !== 'object' || typeof action.type !== 'string') return fail(400, 'Ungültige Aktion.');
         const r = await mutateState(store, id, (w) => SM.applyAction(w, me.airlineId, action));
         const res = r.result || { ok: false };
-        return json({ ok: !!res.ok, msg: res.msg || null, ver: r.etag, day: r.md.day });
+        return json({ ok: !!res.ok, msg: res.msg || null, ver: r.etag, day: r.md.day, id: res.id ?? null, status: res.status ?? null, reply: res.reply ?? null, counterId: res.counterId ?? null });
       }
       if (op === 'control' && method === 'POST') {
         if (meta.host !== user.key) return fail(403, 'Nur die Spielleitung ändert das Tempo.');
-        const { speed } = await readJson(req);
-        if (![0, 1, 2, 4].includes(Number(speed))) return fail(400, 'Ungültiges Tempo.');
-        const r = await mutateState(store, id, (w, md, now) => { md.speed = Number(speed); md.lastTick = now; });
+        const { speed, tz } = await readJson(req);
+        if (!SM.SPEEDS[speed] || SM.SPEEDS[speed].local) return fail(400, 'Ungültiges Tempo.');
+        const r = await mutateState(store, id, (w, md, now) => {
+          const was = SM.speedKey(md.speed);
+          md.speed = speed; md.lastTick = now;
+          if (speed === 'rt') md.carry = dayMsLocal(tz, now);
+          else if (was !== speed) { const pw = speedInfo(was).ms, pn = speedInfo(speed).ms; md.carry = pw && pn ? Math.min(pn * 0.999, (md.carry || 0) / pw * pn) : 0; }
+          if (was !== speed && w.humans.length) w.pushNews(w.day, `Die Spielleitung stellt das Tempo auf „${SM.SPEEDS[speed].label}“`, 'info', null);
+        });
         return json({ ok: true, clock: JSON.parse(clockHeader(r.md)) });
       }
       if (op === 'delete' && method === 'POST') {
-        if (meta.host !== user.key) return fail(403, 'Nur die Spielleitung kann das Spiel löschen.');
-        await store.delete(K.state(id)); await store.delete(K.meta(id)); await store.delete(K.code(meta.code)); await store.delete(K.presence(id));
-        await updateJson(store, K.index, (list) => (list || []).filter((g) => g.id !== id), []);
-        for (const p of meta.players) await updateJson(store, K.user(p.u), (u) => { if (!u) return undefined; u.games = (u.games || []).filter((g) => g !== id); return u; });
+        if (meta.host !== user.key) return fail(403, 'Nur die Spielleitung oder ein Admin kann das Spiel löschen.');
+        await deleteGame(store, meta);
         return json({ ok: true });
       }
     }
