@@ -609,7 +609,7 @@ VIEWS.cockpit = function viewCockpit() {
     [W.day > 20 && routes.length > 0, 'Zeit laufen lassen', ui.mp ? 'Die Spielleitung stellt oben das Tempo ein. Preise wirken nach zwei Tagen, Einstellungen nach einigen Wochen.' : 'Oben 1× bis 10× wählen. Preise wirken nach zwei Tagen, Einstellungen nach einigen Wochen.', null],
   ];
   if (steps.some((s) => !s[0])) {
-    html += `<div class="card pad stack"><h3>Erste Schritte</h3>${steps.map(([done, t, d, tab], i) => `<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="chip ${done ? 'good' : ''}" style="min-width:26px;justify-content:center">${done ? '✓' : i + 1}</span><div style="min-width:0"><b>${t}</b><div class="small muted">${d}</div></div>${!done && tab ? `<button class="btn small" data-act="tab" data-tab="${tab}" style="margin-left:auto">Öffnen</button>` : ''}</div>`).join('')}</div>`;
+    html += `<div class="card pad stack"><div class="spread"><h3>Erste Schritte</h3><button class="btn small" data-act="guide">Anleitung</button></div>${steps.map(([done, t, d, tab], i) => `<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="chip ${done ? 'good' : ''}" style="min-width:26px;justify-content:center">${done ? '✓' : i + 1}</span><div style="min-width:0"><b>${t}</b><div class="small muted">${d}</div></div>${!done && tab ? `<button class="btn small" data-act="tab" data-tab="${tab}" style="margin-left:auto">Öffnen</button>` : ''}</div>`).join('')}</div>`;
   }
   const cov = pl.staff.cov;
   if (cov && routes.length) {
@@ -1247,6 +1247,7 @@ function onPaneClick(e) {
   switch (act) {
     case 'tab': setTab(b.dataset.tab); break;
     case 'invite': showInvite(); break;
+    case 'guide': showGuide(); break;
     case 'plan': ui.planner = defaultPlanner(ui.selApt && !pl.bases.includes(ui.selApt) ? ui.selApt : null); ui.selApt = ui.planner.dest; renderPane(true); renderDraft(); renderMapRoutes(true); break;
     case 'planfrom': ui.planner = defaultPlanner(b.dataset.apt); setTab('routes'); break;
     case 'closeplan': ui.planner = null; renderPane(true); renderDraft(); break;
@@ -1413,6 +1414,75 @@ function modal(html, wide = true) {
 }
 function formError(msg) { const e = $('#formErr'); if (e) { e.textContent = msg; e.hidden = !msg; } else toast(msg); }
 
+// ---------- Anleitung (nach der Registrierung, später über „Anleitung“) ----------
+const GUIDE = [
+  { t: 'Willkommen bei Skymarket', html: () => `
+    <div class="acv-box">${acSvg('A20N', { color: 'var(--accent)', code: (mpState.user && mpState.user.name ? mpState.user.name.slice(0, 2).toUpperCase() : 'SM') })}</div>
+    <p>Sie gründen eine Airline und bauen ein Streckennetz über 104 Flughäfen weltweit auf. Sie beschaffen Flugzeuge, Personal, Kerosin und Terminalflächen selbst und treten gegen 14 KI-Airlines und bis zu drei Mitspielende an.</p>
+    <div class="gsteps">
+      <div><b>Ziel</b><span>Wachsen und Gewinn machen, ohne dass das Geld ausgeht.</span></div>
+      <div><b>Gefahr</b><span>Ist das Konto 30 Tage lang im Minus, ist die Airline insolvent.</span></div>
+      <div><b>Wichtig</b><span>Kontostand und Gewinn sind zweierlei: Kautionen und Käufe kosten sofort Geld, wirken aber nicht als Verlust.</span></div>
+    </div>` },
+  { t: 'Gemeinsam spielen', html: () => `
+    <ol class="glist-num">
+      <li><b>Spiel anlegen:</b> In der Lobby auf „Neues Spiel“. Name, optional ein Passwort, Schwierigkeit und Tempo wählen, dann die eigene Airline mit Kürzel und Heimatbasis gründen.</li>
+      <li><b>Einladen:</b> Im Spiel oben auf „Einladen“. Der <b>Link</b> funktioniert ohne Passwort, der <b>6-stellige Code</b> mit Passwort. Bis zu vier Airlines pro Spiel.</li>
+      <li><b>Beitreten:</b> Link öffnen oder in der Lobby Code eingeben bzw. nach dem Spielnamen suchen.</li>
+      <li><b>Zeit:</b> Wer das Spiel anlegt, leitet es und stellt oben Pause, 1×, 2× oder 4× ein. 1× heißt: ein Tag in 12 Sekunden. Ist niemand im Spiel, bleibt die Zeit stehen.</li>
+    </ol>` },
+  { t: 'Die ersten zehn Minuten', html: () => `
+    <ol class="glist-num">
+      <li><b>Flugzeug leasen:</b> Tab <b>Flotte → Beschaffen</b>. Zum Start eignen sich zwei Airbus A320neo. Leasing kostet nur die Kaution, Lieferung nach 14 Tagen.</li>
+      <li><b>Strecke planen:</b> Tab <b>Strecken → Neue Strecke</b> oder einen Flughafen auf der Karte antippen. Die Prognose zeigt Passagiere, Erlös und den <b>DB2</b> (Beitrag nach Flugzeugkosten). Grün heißt: lohnt sich. „Preis mit bestem Beitrag suchen“ hilft beim Tarif.</li>
+      <li><b>Personal einstellen:</b> Tab <b>Personal → Bedarf plus 10 % Reserve decken</b>. Bis die Leute anfangen, springt teures Agenturpersonal ein.</li>
+      <li><b>Zeit laufen lassen</b> und nach ein paar Wochen im <b>Cockpit</b> nachsehen, welche Strecken verdienen.</li>
+    </ol>
+    <p class="small muted">Gute erste Ziele ab Hamburg: Paris, Barcelona, Wien, Rom, London – jeweils einmal täglich.</p>` },
+  { t: 'Karte und Bedienung', html: () => `
+    <div class="gsteps">
+      <div><b>Zoomen und verschieben</b><span>Mausrad oder zwei Finger, Karte mit gedrückter Maus ziehen. „Mein Netz“ springt zu Ihren Strecken, „Welt“ zeigt alles.</span></div>
+      <div><b>Flugzeug antippen</b><span>Zeigt Flugnummer, Route, Fortschritt, Passagiere und Tarif. Ihre Flugzeuge sind gelb, Mitspielende farbig, die KI grau.</span></div>
+      <div><b>Flughafen antippen</b><span>Öffnet den Markt: Einzugsgebiet, Entgelte, Konkurrenz und die größten Ziele ab Ihrer Basis.</span></div>
+      <div><b>Gestrichelte Kreise</b><span>Rot: Streik, Sturm oder Sperrung. Grün: Großereignis mit mehr Nachfrage.</span></div>
+    </div>` },
+  { t: 'Die Bereiche im Überblick', html: () => `
+    <div class="gtabs">
+      <div><b>Cockpit</b>Kontostand, Warnungen, Entscheidungen, Mitspielende</div>
+      <div><b>Strecken</b>Planen, Preise, Frequenz, Produkt, einstellen</div>
+      <div><b>Flotte</b>Ihre Flugzeuge, Gebrauchtmarkt, Neubestellung, Charter</div>
+      <div><b>Personal</b>Crews, Gehalt, Stimmung, Fachkräfte und Berater</div>
+      <div><b>Stationen</b>Terminal, Abfertigung, Hangar, Slots, neue Basen</div>
+      <div><b>Einkauf</b>Kerosin absichern, Versicherung, Marketing, Fracht</div>
+      <div><b>Markt</b>Nachfrage und Konkurrenz, Marktstudien</div>
+      <div><b>Finanzen</b>Gewinn und Verlust, Bilanz, Kredite, Rating</div>
+      <div><b>Welt</b>Konjunktur, Ölpreis, Zinsen, Ereignisse, alle Airlines</div>
+      <div><b>Meldungen</b>Alles, was passiert ist</div>
+    </div>` },
+  { t: 'Tipps für den Erfolg', html: () => `
+    <ul class="glist-num tips">
+      <li><b>Klein anfangen:</b> zwei Flugzeuge, vier bis fünf Strecken mit einem Flug am Tag. Mehr Flugzeuge erst, wenn die Strecken grün sind.</li>
+      <li><b>Auslastung 80–90 %:</b> Die Preisautomatik steuert das von selbst. Ist die Maschine dauerhaft voll, ist der Preis zu niedrig.</li>
+      <li><b>Unter 600 km gewinnt oft die Bahn,</b> und große Flugzeuge auf kleinen Märkten fliegen leer.</li>
+      <li><b>Agenturpersonal kostet das 1,6-Fache.</b> Rechtzeitig einstellen, Einstellungen dauern 12–35 Tage.</li>
+      <li><b>Reserve halten:</b> Ölpreisschocks, Streiks und Stürme kommen. Kerosin im Tab Einkauf absichern, Kreditlinie im Blick behalten.</li>
+      <li><b>Langstrecke erst später:</b> Großraumjets kosten rund 1 Mio. € Leasing im Monat und brauchen große Märkte.</li>
+    </ul>` },
+];
+function showGuide(onDone = null, page = 0) {
+  const g = GUIDE[page], last = page === GUIDE.length - 1;
+  const m = modal(`<div class="spread"><span class="small muted">Anleitung · ${page + 1} von ${GUIDE.length}</span><button class="btn small" id="gdSkip">${last ? 'Schließen' : 'Überspringen'}</button></div>
+    <h1 class="gtitle">${g.t}</h1>
+    <div class="guide">${g.html()}</div>
+    <div class="gdots">${GUIDE.map((_, i) => `<button data-gp="${i}" aria-label="Seite ${i + 1}" aria-current="${i === page}"></button>`).join('')}</div>
+    <div class="row">${page > 0 ? '<button class="btn" id="gdBack">Zurück</button>' : ''}<button class="btn primary" id="gdNext" style="margin-left:auto">${last ? 'Los geht’s' : 'Weiter'}</button></div>`);
+  const done = () => { try { localStorage.setItem('skymarket-guide-seen', '1'); } catch (e) { /* egal */ } if (onDone) onDone(); else m.hidden = true; };
+  $('#gdSkip').addEventListener('click', done);
+  $('#gdNext').addEventListener('click', () => (last ? done() : showGuide(onDone, page + 1)));
+  if (page > 0) $('#gdBack').addEventListener('click', () => showGuide(onDone, page - 1));
+  m.querySelectorAll('[data-gp]').forEach((b) => b.addEventListener('click', () => showGuide(onDone, Number(b.dataset.gp))));
+}
+
 // ---------- Anmeldung ----------
 function showAuth(mode = 'login') {
   setSpeed(0);
@@ -1431,7 +1501,7 @@ function showAuth(mode = 'login') {
     e.preventDefault();
     const username = $('#auUser').value.trim(), password = $('#auPw').value;
     if (mode === 'register' && password !== $('#auPw2').value) { formError('Die Passwörter stimmen nicht überein.'); return; }
-    try { mpState.user = await api(mode === 'login' ? '/login' : '/register', { body: { username, password } }); showLobby(); }
+    try { mpState.user = await api(mode === 'login' ? '/login' : '/register', { body: { username, password } }); if (mode === 'register') showGuide(() => showLobby()); else showLobby(); }
     catch (err) { formError(err.message); }
   });
   setTimeout(() => $('#auUser') && $('#auUser').focus(), 50);
@@ -1452,10 +1522,11 @@ async function showLobby(tab = null) {
         <p class="small muted">Spiele mit Schloss brauchen ein Passwort, außer Sie kommen über einen Einladungslink.</p>
       </section>
     </div>
-    <div class="row small"><button class="btn small" id="lbSolo">Allein und offline spielen</button><span class="muted">Ein Offline-Spiel bleibt in diesem Browser.</span></div>`);
+    <div class="row small"><button class="btn small" id="lbGuide">Anleitung</button><button class="btn small" id="lbSolo">Allein und offline spielen</button><span class="muted">Ein Offline-Spiel bleibt in diesem Browser.</span></div>`);
   $('#lbLogout').addEventListener('click', async () => { try { await api('/logout', { body: {} }); } catch (e) { /* egal */ } mpState.user = null; showAuth(); });
   $('#lbNew').addEventListener('click', showCreate);
   $('#lbSolo').addEventListener('click', () => showStart(false));
+  $('#lbGuide').addEventListener('click', () => showGuide(() => showLobby()));
   $('#lbCodeForm').addEventListener('submit', (e) => { e.preventDefault(); const c = $('#lbCode').value.trim().toUpperCase(); if (c) showJoin(c); });
   $('#lbSearchForm').addEventListener('submit', (e) => { e.preventDefault(); lobbySearch($('#lbQ').value.trim()); });
   m.addEventListener('click', (e) => {
