@@ -395,7 +395,7 @@ table.t td b { white-space: nowrap; }
 .news .crit { color: var(--crit); } .news .warn { color: var(--warn); } .news .good { color: var(--good); }
 
 /* Modal */
-.modal { position: fixed; inset: 0; background: rgba(8,12,16,.55); backdrop-filter: blur(3px); display: grid; place-items: center; z-index: 50;
+.modal { position: fixed; inset: 0; background: rgba(8,12,16,.55); backdrop-filter: blur(3px); display: grid; place-items: center; z-index: 70;
   padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
 .dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); width: min(560px, 100%); max-height: 100%; overflow: auto; padding: 24px; display: grid; gap: 16px; }
 .dialog h1 { font: 700 28px/1 var(--f-body); letter-spacing: -.01em; margin: 0 0 6px; }
@@ -611,6 +611,22 @@ details.fcx[open] summary { margin-bottom: 8px; }
 .crewrule > div { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px 12px; background: var(--panel-2); display: grid; gap: 3px; }
 .crewrule b { font-size: 13px; } .crewrule span { font-size: 12px; color: var(--ink-2); }
 @container (max-width: 520px) { .crewrule { grid-template-columns: 1fr; } }
+
+/* Datenblatt-Link und Flughafen-Karte */
+.acl { border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted color-mix(in srgb, currentColor 55%, transparent); text-underline-offset: 3px; }
+.acl:hover { color: var(--accent); }
+.acl.small { font-size: 11px; margin-left: 6px; color: var(--accent); text-decoration: none; }
+.apt-card { padding: 0; }
+.apc-head { display: flex; justify-content: space-between; align-items: start; gap: 8px; padding: 12px 12px 6px; }
+.apc-head b { display: block; font-size: 14px; } .apc-head span { font-size: 11.5px; color: var(--ink-3); }
+.apc-head .x { border: 0; background: transparent; color: var(--ink-3); font-size: 18px; line-height: 1; }
+.apc-body { padding: 0 12px 8px; display: grid; gap: 6px; font-size: 12.5px; }
+.apc-foot { padding: 8px 12px 12px; display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--line); }
+.ac-pot span { display: block; font-size: 11px; color: var(--ink-3); } .ac-pot b { font: 600 24px var(--f-mono); color: var(--ink); } .ac-pot em { display: block; font-style: normal; font-size: 11px; color: var(--ink-3); }
+.ac-mix { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.ac-mix .l { background: var(--c-strecken); } .ac-mix .b { background: var(--c-karte); } .ac-mix .v { background: var(--c-unternehmen); }
+.ac-season { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; height: 34px; align-items: end; }
+.ac-season i { display: block; background: color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 2px 2px 0 0; min-height: 2px; }
 </style>
 
 <div id="app">
@@ -654,6 +670,7 @@ details.fcx[open] summary { margin-bottom: 8px; }
         <button id="tglAi" aria-pressed="true" title="Konkurrenz ein- oder ausblenden" aria-label="Konkurrenz zeigen"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5z"/><path d="M2 13l10 5 10-5"/></svg></button>
       </div>
       <div class="plane-card" id="planeCard" hidden></div>
+      <div class="plane-card apt-card" id="aptCard" hidden></div>
       <div class="map-legend" id="legend"></div>
       <div class="activebox" id="activeBox"></div>
       <div class="daybar"><div id="daybar"></div></div>
