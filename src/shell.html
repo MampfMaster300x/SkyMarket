@@ -69,14 +69,17 @@ header.top { display: flex; align-items: stretch; gap: 0; min-height: 60px; back
 .logo .wm { display: grid; line-height: 1.05; }
 .logo .wm b { font: 800 19px/1 var(--f-body); letter-spacing: .14em; }
 .logo .wm span { font-size: 10.5px; color: var(--bar-ink-2); letter-spacing: .06em; margin-top: 3px; }
-nav.main { display: flex; align-items: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; height: 48px; flex: none;
+nav.main { display: flex; align-items: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; height: 54px; flex: none;
   background: linear-gradient(180deg, var(--bar-2), var(--bar)); border-radius: var(--r-lg); border: 1px solid rgba(120,160,230,.14); box-shadow: var(--shadow); padding: 0 4px; }
 nav.main::-webkit-scrollbar { display: none; }
 nav.main button { flex: 1 1 auto; justify-content: center; border: 0; background: transparent; color: var(--bar-ink-2); display: flex; align-items: center; gap: 7px; padding: 0 10px; font: 500 13.5px var(--f-body); white-space: nowrap; position: relative; }
 nav.main button:hover { color: var(--bar-ink); background: rgba(255,255,255,.04); }
 nav.main button[aria-selected="true"] { color: #fff; background: linear-gradient(180deg, color-mix(in srgb, var(--sc) 30%, transparent), color-mix(in srgb, var(--sc) 8%, transparent)); }
 nav.main button[aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--sc); }
-nav.main button .ic { color: var(--sc); }
+nav.main button .ic { color: var(--sc); width: 21px; height: 21px; stroke-width: 2.1; box-sizing: content-box; padding: 6px; border-radius: 10px;
+  background: color-mix(in srgb, var(--sc) 22%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--sc) 45%, transparent), 0 0 14px color-mix(in srgb, var(--sc) 35%, transparent); transition: background .15s, transform .15s; }
+nav.main button:hover .ic { background: color-mix(in srgb, var(--sc) 36%, transparent); transform: translateY(-1px); }
+nav.main button[aria-selected="true"] .ic { background: var(--sc); color: #fff; box-shadow: 0 0 16px color-mix(in srgb, var(--sc) 60%, transparent); }
 nav.main .dot { position: absolute; top: 8px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #fb7185; }
 .topright { margin-left: auto; display: flex; align-items: center; gap: 14px; padding-left: 14px; }
 .date { text-align: right; line-height: 1.15; }
@@ -539,6 +542,22 @@ body, .card2, .side, .mapwrap, .pane { transition: background-color .8s ease, co
 .ms.done { opacity: 1; border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); }
 .ms-ic { font-size: 22px; line-height: 1; color: var(--accent); }
 .ms b { display: block; font-size: 13px; } .ms span { display: block; font-size: 12px; color: var(--ink-2); } .ms em { display: block; font-style: normal; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+
+/* Rundgang */
+.tour { position: fixed; inset: 0; z-index: 90; }
+.tour-spot { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(2, 8, 20, .62); outline: 2px solid var(--accent); outline-offset: 2px; transition: all .25s ease; pointer-events: none; }
+.tour-spot.none { left: 50%; top: 50%; width: 0; height: 0; outline: 0; }
+.tour-card { position: fixed; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; display: grid; gap: 10px; transition: left .25s ease, top .25s ease; }
+.tour-card p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.tour-head { display: flex; gap: 10px; align-items: center; } .tour-head .av { width: 40px; height: 40px; flex: none; }
+.tour-head b { display: block; font-size: 13px; } .tour-head span { font-size: 11.5px; color: var(--ink-3); }
+/* Eigene Flugzeuge in der Planung */
+.owntypes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ownt { border: 1px solid color-mix(in srgb, var(--sec) 55%, var(--line)); background: color-mix(in srgb, var(--sec) 12%, var(--panel-2)); border-radius: 10px; padding: 6px 10px; display: grid; text-align: left; line-height: 1.2; }
+.ownt b { font-size: 13px; font-weight: 800; color: var(--ink); } .ownt span { font-size: 11px; color: var(--ink-3); }
+.ownt.on { background: var(--sec); border-color: var(--sec); } .ownt.on b, .ownt.on span { color: #fff; }
+.ownt:disabled { opacity: .45; }
+select option.own { font-weight: 700; }
 </style>
 
 <div id="app">
@@ -600,6 +619,7 @@ body, .card2, .side, .mapwrap, .pane { transition: background-color .8s ease, co
 <div class="modal" id="modal" hidden></div>
 <div class="toast" id="toast" hidden></div>
 <div class="bubble" id="bubble" hidden></div>
+<div class="tour" id="tour" hidden></div>
 <aside class="chat" id="chatPanel" hidden aria-label="Chat"></aside>
 
 <script>

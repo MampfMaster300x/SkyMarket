@@ -577,6 +577,10 @@ const SM = (() => {
     }
     skill(role) { let lv = 0; for (const e of this.experts) if (e.role === role || (P.EXPERT_ROLES[e.role] && P.EXPERT_ROLES[e.role].unique)) lv = Math.max(lv, e.level); return lv; }
     /** Luis Perez an Bord? Dann kennt die Airline Zustand und Wert älterer Flugzeuge. */
+    /** Kontostand abzüglich genutzter Kreditlinie: darf bis zur Linie ins Minus (Dispo). */
+    netCash() { return this.ledger.cash / 100 - (this.creditUsed || 0); }
+    /** Was jetzt ausgegeben werden kann: Kontostand plus freier Dispo. */
+    spendable(bank = 1) { return this.ledger.cash / 100 + Math.max(0, this.creditLimit(bank) - (this.creditUsed || 0)); }
     oldAcExpert() { return this.experts.some((e) => e.role === 'fleetadvisor'); }
     /** Preisfaktor für ältere Flugzeuge (Gebrauchtmarkt, alte Muster vom Leasinggeber). */
     oldAcFactor(age) { return this.oldAcExpert() && age >= P.OLD_AC_AGE ? 0.9 : 1; }
@@ -1533,6 +1537,7 @@ const SM = (() => {
         const repay = Math.round(Math.min(al.creditUsed, cash * 0.5) * 100) / 100;
         al.creditUsed -= repay; L.cashOnly(-repay, 'credit_repay');
       }
+      if (al.isPlayer) { al.netHist = al.netHist || []; al.netHist.push(Math.round(L.cash / 100 - al.creditUsed)); if (al.netHist.length > 400) al.netHist.shift(); }
       const h = L.cashHist.slice(-30);
       if (h.length >= 10 && L.cash > 0) {
         const burn = (h[0] - L.cash / 100) / h.length;
@@ -1544,7 +1549,7 @@ const SM = (() => {
       } else if (L.cash <= 0) al.runway = 0;
       if (L.cash < 0) {
         al.distressDays++;
-        if (al.distressDays === 1) al.log(this.day, `Kreditlinie ausgeschöpft, Kontostand negativ. Nach ${P.RESTRUCTURING_AFTER_DAYS} Tagen folgt die Restrukturierung.`, 'crit');
+        if (al.distressDays === 1) al.log(this.day, `Dispo ausgeschöpft: Das Konto steht über die Kreditlinie hinaus im Minus. Nach ${P.RESTRUCTURING_AFTER_DAYS} Tagen folgt die Restrukturierung.`, 'crit');
         if (al.distressDays === P.RESTRUCTURING_AFTER_DAYS && al.archetype && !al.rescued) {
           // Letzte Rettung für KI-Airlines: Investor oder Staatsfonds, einmalig
           const amt = Math.round((20e6 + al.fleet.length * 1.5e6) * this.macro.cpi / 1e5) * 1e5;
@@ -1828,7 +1833,7 @@ const SM = (() => {
           if (a.winners.length >= a.n) break;
           const al = this.airlines[alId]; if (!al || al.status === 'insolvent') continue;
           const t = P.AIRCRAFT_TYPES[a.type], deposit = P.LEASE_DEPOSIT_MONTHS * t.lease_month * (1 + acTariff(this, al, a.type));
-          if (al.ledger.cash / 100 < amt + deposit) { if (al.isPlayer) al.log(this.day, `Auktion ${t.label}: Zuschlag verfallen – zu wenig Geld für Gebot und Kaution.`, 'warn'); continue; }
+          if (al.spendable(this.macro.bank ?? 1) < amt + deposit) { if (al.isPlayer) al.log(this.day, `Auktion ${t.label}: Zuschlag verfallen – zu wenig Geld für Gebot und Kaution.`, 'warn'); continue; }
           al.ledger.post('one_off', -amt);
           const ac = al.acquire(this.day, a.type, al.bases[0], 'lease', { delivery: a.delivery, lease_month: t.lease_month, age: 0, auction: true }, this);
           a.winners.push(alId);
@@ -1846,7 +1851,7 @@ const SM = (() => {
       amount = Math.round(amount / 10000) * 10000;
       if (amount < a.minBid) return { ok: false, msg: `Mindestgebot ${Math.round(a.minBid / 1000)} Tsd. EUR.` };
       if (a.bids[al.id] && amount < a.bids[al.id]) return { ok: false, msg: 'Gebote lassen sich nur erhöhen.' };
-      if (al.ledger.cash / 100 < amount) return { ok: false, msg: 'Dafür reicht der Kontostand nicht.' };
+      if (al.spendable(this.macro.bank ?? 1) < amount) return { ok: false, msg: 'Dafür reicht auch der Dispo nicht.' };
       a.bids[al.id] = amount;
       al.log(this.day, `Gebot ${Math.round(amount / 1000)} Tsd. EUR für ${P.AIRCRAFT_TYPES[a.type].label} abgegeben`, 'info');
       return { ok: true };
@@ -2516,7 +2521,7 @@ const SM = (() => {
   /** Prüft, ob „giver“ die Positionen abgeben kann. Gibt eine Fehlermeldung oder null zurück. */
   function checkSide(w, giver, receiver, items) {
     const cash = items.filter((x) => x.k === 'cash').reduce((s, x) => s + x.amount, 0);
-    if (cash > 0 && giver.ledger.cash / 100 < cash) return `${giver.name} hat nicht genug Geld auf dem Konto.`;
+    if (cash > 0 && giver.spendable(w.macro.bank ?? 1) < cash) return `${giver.name} hat nicht genug Geld – auch nicht mit Dispo.`;
     const staff = {}, slots = {};
     for (const it of items) {
       if (it.k === 'ac') {
@@ -2919,7 +2924,7 @@ const SM = (() => {
         if (!P.AIRCRAFT_TYPES[type] || !['lease', 'flex', 'buy', 'factory'].includes(mode)) return { ok: false, msg: 'Ungültiges Flugzeug.' };
         { const t = P.AIRCRAFT_TYPES[type]; if (!offer && t.launch && day < t.launch + 365) return { ok: false, msg: day < t.launch - 30 ? `${t.label} ist noch nicht auf dem Markt.` : `${t.label} gibt es im ersten Jahr nur über Auktionen (Flotte → Beschaffung).` }; }
         const base = al.bases.includes(a.base) ? a.base : al.bases[0];
-        if (cash < acquireCost(al, type, mode, offer, w.macro.eurusd, w)) return { ok: false, msg: 'Dafür reicht der Kontostand nicht.' };
+        if (al.spendable(w.macro.bank ?? 1) < acquireCost(al, type, mode, offer, w.macro.eurusd, w)) return { ok: false, msg: 'Dafür reicht auch der Dispo nicht.' };
         const x = offer ? w.takeMarketAircraft(al, offer.id, mode, base).ac : al.acquire(day, type, base, mode, null, w);
         if (!x) return { ok: false, msg: `Beim Leasinggeber ist gerade keine ${P.AIRCRAFT_TYPES[type].label} verfügbar – andere Airlines haben den Bestand leer gekauft. Gebrauchtmarkt, Auktion, Werksbestellung oder nächsten Monat erneut versuchen.` };
         return { ok: true, acId: x.id, delivery: x.delivery_day, base };
@@ -3035,7 +3040,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },

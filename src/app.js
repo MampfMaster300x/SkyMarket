@@ -25,6 +25,9 @@ function eur(x, opts = {}) {
 const pct = (x, d = 0) => (x === null || !isFinite(x) ? '–' : `${(d ? NF1 : NF0).format(x * 100)} %`);
 const n0 = (x) => NF0.format(x);
 /** Gewinn grün, Verlust rot, null neutral. */
+/** Kontostand wie bei der Bank: genutzte Kreditlinie (Dispo) zählt als Minus. */
+const netCash = (al) => al.ledger.cash / 100 - (al.creditUsed || 0);
+const netHistOf = (al) => (al.netHist && al.netHist.length ? al.netHist : al.ledger.cashHist);
 const sgn = (x) => (x > 0 ? 'pos' : x < 0 ? 'neg' : '');
 const n1 = (x) => NF1.format(x);
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -682,7 +685,7 @@ function kpiDelta(d, invert = false) {
 }
 function renderSidebar() {
   const sb = $('#sidebar'); if (!sb || getComputedStyle(sb).display === 'none') return;
-  const pl = W.player, bs = SM.balanceSheet(pl), h = pl.ledger.cashHist;
+  const pl = W.player, bs = SM.balanceSheet(pl), h = netHistOf(pl), nc = netCash(pl);
   const routes = pl.activeRoutes(), s7 = routes.map((r) => rstats(r, 7)), s14 = routes.map((r) => rstats(r, 14));
   const seats7 = s7.reduce((a, x) => a + x.seats, 0), pax7 = s7.reduce((a, x) => a + x.pax, 0);
   const seats14 = s14.reduce((a, x) => a + x.seats, 0) - seats7, pax14 = s14.reduce((a, x) => a + x.pax, 0) - pax7;
@@ -691,7 +694,7 @@ function renderSidebar() {
   sb.innerHTML = `
     <div class="card2 alcard"><button class="albadge" data-act="tab" data-tab="profile" title="Logo gestalten">${logoSvg(pl, 46)}</button><div style="min-width:0"><b>${esc(pl.name)}</b><span>${pl.stage().label} · Basis ${pl.bases.join(', ')}${ui.mp ? ' · ' + esc(ui.mp.name) : ''}</span></div></div>
     <div class="card2 kpilist">
-      <div><span>Kontostand</span><b class="${bs.cash < 0 ? 'neg' : ''}">${eur(bs.cash)}</b>${kpiDelta(trendPct(bs.cash, cashPrev))}</div>
+      <div><span>Kontostand${nc < 0 ? ' · im Dispo' : ''}</span><b class="${nc < 0 ? 'neg' : ''}">${eur(nc)}</b>${nc > 0 && cashPrev > 0 ? kpiDelta(trendPct(nc, cashPrev)) : '<em></em>'}</div>
       <div><span>Tagesergebnis</span><b class="${sgn(pl.ledger.lastDay || 0)}">${eur(pl.ledger.lastDay || 0, { plus: true })}</b><em></em></div>
       <div><span>Auslastung 7 Tage</span><b>${lf === null ? '–' : pct(lf)}</b>${lf !== null && lfPrev ? kpiDelta(lf - lfPrev) : '<em></em>'}</div>
       <div><span>Pünktlichkeit</span><b>${otp === null ? '–' : pct(otp)}</b><em></em></div>
@@ -715,7 +718,7 @@ function renderUserMenu() {
   else { items.push(['save', 'Speichern'], ['newgame', 'Neues Spiel']); if (ONLINE) items.push(['lobby', 'Online spielen']); }
   const dark = document.documentElement.dataset.theme !== 'light';
   void dark;
-  items.push(['sep'], ['guide', 'Anleitung'], ['assistant', 'Assistenz einstellen'], ['profile', 'Logo gestalten'], ['theme', `Design: ${THEME_LABEL[themePref()]} (wechseln)`]);
+  items.push(['sep'], ['tour', 'Kurzer Rundgang'], ['guide', 'Anleitung'], ['assistant', 'Assistenz einstellen'], ['profile', 'Logo gestalten'], ['theme', `Design: ${THEME_LABEL[themePref()]} (wechseln)`]);
   if (ONLINE && mpState.user) items.push(['sep'], ['logout', `Abmelden (${mpState.user.name})`]);
   m.innerHTML = items.map(([k, l]) => (k === 'sep' ? '<div class="sep"></div>' : `<button data-um="${k}">${esc(l)}</button>`)).join('');
 }
@@ -726,6 +729,7 @@ function onUserMenu(k) {
   else if (k === 'save') saveGame(true);
   else if (k === 'newgame') showStart(true);
   else if (k === 'guide') showGuide();
+  else if (k === 'tour') startTour();
   else if (k === 'assistant') setTab('assistant');
   else if (k === 'theme') cycleTheme();
   else if (k === 'profile') setTab('profile');
@@ -753,7 +757,7 @@ VIEWS.cockpit = function viewCockpit() {
     [W.day > 20 && routes.length > 0, 'Zeit laufen lassen', ui.mp ? 'Die Spielleitung stellt oben das Tempo ein, von Echtzeit bis 1 Tag in 12 Sekunden.' : 'Oben Tempo wählen und auf Weiter drücken: von Echtzeit (1 Tag = 24 Stunden) bis Turbo.', null],
   ];
   if (steps.some((s) => !s[0])) {
-    html += `<div class="card pad stack"><div class="spread"><h3>Erste Schritte</h3><button class="btn small" data-act="guide">Anleitung</button></div>${steps.map(([done, t, d, tab], i) => `<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="chip ${done ? 'good' : ''}" style="min-width:26px;justify-content:center">${done ? '✓' : i + 1}</span><div style="min-width:0"><b>${t}</b><div class="small muted">${d}</div></div>${!done && tab ? `<button class="btn small" data-act="tab" data-tab="${tab}" style="margin-left:auto">Öffnen</button>` : ''}</div>`).join('')}</div>`;
+    html += `<div class="card pad stack"><div class="spread"><h3>Erste Schritte</h3><span class="row" style="gap:6px"><button class="btn small" data-act="tour">Rundgang</button><button class="btn small" data-act="guide">Anleitung</button></span></div>${steps.map(([done, t, d, tab], i) => `<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="chip ${done ? 'good' : ''}" style="min-width:26px;justify-content:center">${done ? '✓' : i + 1}</span><div style="min-width:0"><b>${t}</b><div class="small muted">${d}</div></div>${!done && tab ? `<button class="btn small" data-act="tab" data-tab="${tab}" style="margin-left:auto">Öffnen</button>` : ''}</div>`).join('')}</div>`;
   }
   const cov = pl.staff.cov;
   if (cov && routes.length) {
@@ -766,7 +770,7 @@ VIEWS.cockpit = function viewCockpit() {
   if (pl.status === 'restructuring') html += `<div class="callout crit"><b>Restrukturierung läuft</b>Ohne positiven Kontostand innerhalb von ${P.INSOLVENCY_AFTER_DAYS - pl.distressDays} Tagen folgt die Insolvenz. Verlustbringer schließen, Flugzeuge abgeben oder einen Kredit aufnehmen.</div>`;
   const stg = pl.stage(), next = P.STAGES.find((s) => s.min > pl.fleet.length);
   html += `<div class="tiles">
-    <div class="tile"><span>Kontostand</span><b class="${bs.cash < 0 ? 'neg' : ''}">${eur(bs.cash)}</b><em>Kreditlinie ${eur(pl.creditUsed)} / ${eur(pl.creditLimit(W.macro.bank ?? 1))}</em></div>
+    <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>Dispo bis ${eur(-pl.creditLimit(W.macro.bank ?? 1))} · frei ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
     <div class="tile"><span>Eigenkapital</span><b>${eur(bs.equity)}</b><em>Start ${eur(pl.ledger.equityContrib / 100)}</em></div>
     <div class="tile"><span>Reichweite</span><b class="${pl.runway < 60 ? 'warnc' : ''}">${pl.runway === undefined || !isFinite(pl.runway) ? 'stabil' : `${n0(pl.runway)} Tage`}</b><em>beim Abfluss der letzten 30 Tage</em></div>
     <div class="tile"><span>Auslastung 7 T.</span><b>${seats ? pct(pax / seats) : '–'}</b><em>${n0(pax / 7)} Pax pro Tag</em></div>
@@ -779,7 +783,7 @@ VIEWS.cockpit = function viewCockpit() {
   if (last) html += `<p class="small ink2">Abgeschlossener Monat ${MONTHS_L[last.label.m]} ${2027 + last.label.y}: Ergebnis <b class="${lastRes < 0 ? 'neg' : 'pos'}">${eur(lastRes, { plus: true })}</b>.</p>`;
   const evs = W.activeEvents().concat(W.upcomingEvents()).filter((e) => e.type !== 'rate_change' && e.type !== 'fx_shock').slice(-4);
   if (evs.length) html += `<div class="stack"><h2 class="sec">Lage <small>laufende und angekündigte Ereignisse</small></h2><div class="news">${evs.map(eventRow).join('')}</div></div>`;
-  html += `<div class="stack"><h2 class="sec">Kontostand <small>letzte ${Math.min(pl.ledger.cashHist.length, 365)} Tage</small></h2>${sparkline(pl.ledger.cashHist.slice(-365))}</div>`;
+  html += `<div class="stack"><h2 class="sec">Kontostand <small>letzte ${Math.min(netHistOf(pl).length, 365)} Tage</small></h2>${sparkline(netHistOf(pl).slice(-365))}</div>`;
   if (routes.length) {
     const rows = routes.map((r, i) => ({ r, s: st30[i] })).sort((a, b) => b.s.db2 / Math.max(b.s.n, 1) - a.s.db2 / Math.max(a.s.n, 1));
     html += `<div class="stack"><h2 class="sec">Strecken nach Beitrag <small>Ø 30 Tage</small></h2><div class="tw"><table class="t"><thead><tr><th>Strecke</th><th class="r">Auslastung</th><th class="r">Ø Tarif</th><th class="r">DB2/Tag</th></tr></thead><tbody>
@@ -925,9 +929,15 @@ function viewPlanner() {
     <div class="grid2">
       ${pl.bases.length > 1 ? `<label class="f"><span>Basis</span><select id="pl-base">${pl.bases.map((b) => `<option value="${b}" ${b === base ? 'selected' : ''}>${b} · ${apName(b)}</option>`).join('')}</select></label>` : ''}
       <label class="f"><span>Ziel</span><select id="pl-dest">${byRegion(dests).map(([rg, l]) => `<optgroup label="${esc(rg)}">${l.map((c) => `<option value="${c}" ${c === p.dest ? 'selected' : ''}>${esc(apName(c))} ${c} (${n0(SM.gcDistanceKm(base, c))} km)</option>`).join('')}</optgroup>`).join('')}</select></label>
-      <label class="f"><span>Flugzeugtyp</span><select id="pl-type">${types.map((t) => { const own = pl.fleet.filter((a) => a.type_id === t && a.base === base).length; const ok = SM.rangeOk(base, p.dest, t); return `<option value="${t}" ${t === p.type ? 'selected' : ''} ${ok ? '' : 'disabled'}>${t} · ${P.AIRCRAFT_TYPES[t].label}${own ? ` · ${own} an ${base}` : ''}${ok ? '' : ' · Reichweite zu kurz'}</option>`; }).join('')}</select></label>
+      <label class="f"><span>Flugzeugtyp</span><select id="pl-type">${(() => {
+        const opt = (t, ownTxt) => { const ok = SM.rangeOk(base, p.dest, t); return `<option value="${t}" ${t === p.type ? 'selected' : ''} ${ok ? '' : 'disabled'} ${ownTxt ? 'class="own"' : ''}>${ownTxt ? '★ ' : ''}${t} · ${P.AIRCRAFT_TYPES[t].label}${ownTxt}${ok ? '' : ' · Reichweite zu kurz'}</option>`; };
+        const own = types.filter((t) => pl.fleet.some((a) => a.type_id === t)), rest = types.filter((t) => !own.includes(t));
+        const ownTxt = (t) => { const here = pl.fleet.filter((a) => a.type_id === t && a.base === base).length, all = pl.fleet.filter((a) => a.type_id === t).length; return ` · ${here ? `${here} an ${base}` : ''}${all > here ? `${here ? ', ' : ''}${all - here} anderswo` : ''}`; };
+        return (own.length ? `<optgroup label="Ihre Flugzeuge">${own.map((t) => opt(t, ownTxt(t))).join('')}</optgroup><optgroup label="Weitere Typen (noch beschaffen)">` : '') + rest.map((t) => opt(t, '')).join('') + (own.length ? '</optgroup>' : '');
+      })()}</select></label>
       <label class="f"><span>Terminal in ${p.dest}</span><select id="pl-term" ${st ? 'disabled' : ''}>${Object.entries(P.TERMINALS).map(([k, t]) => `<option value="${k}" ${k === p.term ? 'selected' : ''}>${t.label} · ${eur(t.rent * SM.apx(p.dest).cost * cpi())}/Mon.</option>`).join('')}</select></label>
     </div>
+    ${(() => { const own = [...new Set(pl.fleet.map((a) => a.type_id))]; return own.length ? `<div class="owntypes"><span class="small muted">Ihre Flugzeuge:</span>${own.map((t) => { const here = pl.fleet.filter((a) => a.type_id === t && a.base === base).length, ok = SM.rangeOk(base, p.dest, t); return `<button class="ownt${t === p.type ? ' on' : ''}" data-act="pltype" data-t="${t}" ${ok ? '' : 'disabled title="Reichweite zu kurz"'}><b>${esc(tl(t))}</b><span>${here} an ${base}</span></button>`; }).join('')}</div>` : ''; })()}
     <div class="grid3">
       <label class="f"><span>Flüge pro Tag</span><select id="pl-freq">${[1, 2, 3, 4, 5, 6].map((f) => `<option ${f === p.freq ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
       <label class="f"><span>Produkt</span><select id="pl-svc">${Object.keys(P.SERVICE).map((s) => `<option value="${s}" ${s === p.service ? 'selected' : ''}>${svcLabel(s)}</option>`).join('')}</select></label>
@@ -1096,9 +1106,9 @@ VIEWS.fleetBuy = function viewFleetBuy() {
   const base = pl.bases.includes(ui.acqBase) ? ui.acqBase : pl.bases[0];
   let html = `<h2 class="sec">Beschaffung <small>Leasing, Gebrauchtmarkt, ab Werk, Auktionen</small></h2>`;
   html += auctionsHtml();
-  const cash = pl.ledger.cash / 100;
+  const cash = pl.spendable(W.macro.bank ?? 1);
   if (pl.bases.length > 1) html += `<label class="f"><span>Stationieren in</span><select id="acq-base">${pl.bases.map((b) => `<option ${b === base ? 'selected' : ''}>${b}</option>`).join('')}</select></label>`;
-  const btn = (id, mode, label, offer = null, primary = false) => { const need = acquireCost(id, mode, offer); const ok = cash >= need; return `<button class="btn small${primary ? ' primary' : ''}" data-act="acquire" data-type="${id}" data-mode="${mode}"${offer ? ` data-offer="${offer.id}"` : ''} ${ok ? '' : 'disabled'} title="${ok ? `sofort ${eur(need)}` : 'Es fehlen ' + eur(need - cash)}">${label}</button>`; };
+  const btn = (id, mode, label, offer = null, primary = false) => { const need = acquireCost(id, mode, offer); const ok = cash >= need; return `<button class="btn small${primary ? ' primary' : ''}" data-act="acquire" data-type="${id}" data-mode="${mode}"${offer ? ` data-offer="${offer.id}"` : ''} ${ok ? '' : 'disabled'} title="${ok ? `sofort ${eur(need)}${need > pl.ledger.cash / 100 ? ' – geht in den Dispo' : ''}` : 'Auch mit Dispo fehlen ' + eur(need - cash)}">${label}</button>`; };
   html += `<div class="stack"><h2 class="sec">Gebrauchtmarkt <small>wechselt monatlich</small></h2><div class="tw"><table class="t"><thead><tr><th>Typ</th><th class="r">Alter · Zustand</th><th class="r">Konditionen</th><th></th></tr></thead><tbody>
     ${W.acMarket.slice().sort((a, b) => a.type.localeCompare(b.type) || a.age - b.age).map((o) => `<tr><td><b>${tl(o.type)}</b><div class="small muted">Angebot bis ${dateShort(o.expires)} · Lieferung ${o.delivery} T.</div></td><td style="text-align:right"><span class="mono">${o.age} J.</span><div>${condInfo(o)}</div></td>
       <td style="text-align:right">${(() => { const f = pl.oldAcFactor(o.age), v = o.kind === 'lease' ? o.lease_month : o.price; return `<b class="mono">${eur(v * f)}${o.kind === 'lease' ? '/Mon.' : ''}</b><div class="small muted">${o.kind === 'lease' ? 'Leasing 36 M.' : 'Kauf'}${f < 1 ? ` · <span class="pos" title="statt ${eur(v)}">Luis −10 %</span>` : ''}</div>`; })()}</td>
@@ -1306,11 +1316,11 @@ VIEWS.finance = function viewFinance() {
   const used = new Set(PNL_ROWS.filter(([k]) => k !== 'grp' && !['ebit', 'net'].includes(k) && (L.pnl[k] || L.month[k])).map(([k]) => k));
   let html = `<h2 class="sec">Ergebnis und Bilanz <small>EBIT-Marge seit Start ${tot.rev ? pct(tot.ebit / tot.rev, 1) : '–'}</small></h2>`;
   html += `<div class="tiles">
-    <div class="tile"><span>Kontostand</span><b class="${bs.cash < 0 ? 'neg' : ''}">${eur(bs.cash)}</b><em>verfügbares Geld</em></div>
-    <div class="tile"><span>Kreditlinie</span><b>${eur(pl.creditUsed)}</b><em>von ${eur(pl.creditLimit(W.macro.bank ?? 1))}, ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins</em></div>
+    <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>${netCash(pl) < 0 ? 'im Dispo' : 'Guthaben'} · frei ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
+    <div class="tile"><span>Dispo genutzt</span><b class="${pl.creditUsed > 0 ? 'neg' : ''}">${pl.creditUsed > 0 ? eur(-pl.creditUsed) : eur(0)}</b><em>Rahmen ${eur(pl.creditLimit(W.macro.bank ?? 1))}, ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins</em></div>
     <div class="tile"><span>Ergebnis gestern</span><b class="${sgn(L.lastDay || 0)}">${eur(L.lastDay || 0, { plus: true })}</b><em>${MONTHS[pm]} bisher <span class="${sgn(cur.net)}">${eur(cur.net, { plus: true })}</span></em></div>
   </div>
-  <div class="stack"><h2 class="sec">Kontostand <small>letzte ${Math.min(L.cashHist.length, 365)} Tage</small></h2>${sparkline(L.cashHist.slice(-365))}</div>`;
+  <div class="stack"><h2 class="sec">Kontostand <small>letzte ${Math.min(netHistOf(pl).length, 365)} Tage</small></h2>${sparkline(netHistOf(pl).slice(-365))}</div>`;
   html += `<div class="stack"><h2 class="sec">Gewinn- und Verlustrechnung <small>Ergebnis ist nicht Kontostand</small></h2><div class="tw"><table class="t"><thead><tr><th></th><th class="r">${MONTHS[pm]} (lfd.)</th><th class="r">Vormonat</th><th class="r">seit Start</th></tr></thead><tbody>
     ${PNL_ROWS.filter(([k]) => k === 'grp' || ['ebit', 'net', 'interest', 'tax'].includes(k) || used.has(k)).map(([k, l]) => k === 'grp' ? `<tr class="grp"><td colspan="4">${l}</td></tr>` : `<tr class="${['ebit', 'net'].includes(k) ? 'sum' : ''}"><td>${l}</td>${cell(cur, k)}${cell(prev, k)}${cell(tot, k)}</tr>`).join('')}
   </tbody></table></div></div>`;
@@ -1335,8 +1345,8 @@ VIEWS.credit = function viewCredit() {
   let html = `<h2 class="sec">Kredite und Rating <small>Rating ${pl.rating} · Leitzins ${pct(W.macro.rate, 1)}</small></h2>`;
   html += `<div class="tiles">
     <div class="tile"><span>Rating</span><b>${pl.rating}</b><em>monatlich neu bewertet</em></div>
-    <div class="tile"><span>Kreditlinie</span><b>${eur(pl.creditUsed)}</b><em>von ${eur(pl.creditLimit(W.macro.bank ?? 1))}, ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins</em></div>
-    <div class="tile"><span>Reichweite</span><b class="${pl.runway < 60 ? 'warnc' : ''}">${pl.runway === undefined || !isFinite(pl.runway) ? 'stabil' : `${n0(pl.runway)} Tage`}</b><em>Kontostand ${eur(bs.cash)}</em></div>
+    <div class="tile"><span>Dispo genutzt</span><b class="${pl.creditUsed > 0 ? 'neg' : ''}">${pl.creditUsed > 0 ? eur(-pl.creditUsed) : eur(0)}</b><em>Rahmen ${eur(pl.creditLimit(W.macro.bank ?? 1))}, ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins</em></div>
+    <div class="tile"><span>Reichweite</span><b class="${pl.runway < 60 ? 'warnc' : ''}">${pl.runway === undefined || !isFinite(pl.runway) ? 'stabil' : `${n0(pl.runway)} Tage`}</b><em>Kontostand ${eur(netCash(pl))}</em></div>
   </div>`;
   // Kredite
   const lim = W.loanLimit(pl), rate = W.loanRate(pl);
@@ -2128,7 +2138,8 @@ function assistantHints() {
   for (const d of incomingDeals().slice(0, 2)) add('deal' + d.id, 'info', 'strat', `<b>${esc(W.airlines[d.from].name)}</b> bietet einen Handel an (bis ${dateShort(d.expires)}): ${esc(SM.dealText(W, d))}.`, 'trade');
   for (const d of openDecisions()) add('dec' + d.id, 'crit', 'ops', `<b>Entscheidung bis ${dateShort(d.deadline)}:</b> ${esc(d.text)}`, 'cockpit');
   if (pl.status === 'restructuring') add('restr', 'crit', 'fin', `<b>Restrukturierung:</b> Noch ${P.INSOLVENCY_AFTER_DAYS - pl.distressDays} Tage, bis der Kontostand wieder positiv sein muss.`, 'credit');
-  else if (bs.cash < 0) add('neg', 'crit', 'fin', `<b>Konto im Minus</b> (${eur(bs.cash)}). Nach ${P.INSOLVENCY_AFTER_DAYS} Tagen droht die Insolvenz. Kredit aufnehmen oder Verlustbringer schließen.`, 'credit');
+  else if (netCash(pl) < 0 && bs.cash >= 0) add('dispo', 'warn', 'fin', `<b>Konto im Dispo</b> (${eur(netCash(pl))}). Das ist erlaubt, kostet aber ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins – und kürzt die Bank die Linie, wird der Überhang sofort eingezogen.`, 'credit');
+  if (bs.cash < 0 && pl.status !== 'restructuring') add('neg', 'crit', 'fin', `<b>Dispo überzogen</b> (${eur(netCash(pl))}). Nach ${P.INSOLVENCY_AFTER_DAYS} Tagen droht die Insolvenz. Kredit aufnehmen oder Verlustbringer schließen.`, 'credit');
   else if (isFinite(pl.runway) && pl.runway < 60 && routes.length) add('runway', 'warn', 'fin', `Das Geld reicht beim jetzigen Abfluss noch etwa <b>${n0(pl.runway)} Tage</b>.`, 'credit');
   if (!pl.fleet.length) add('nofleet', 'info', 'strat', `Wir brauchen zuerst ein Flugzeug. Zwei <b>A320neo</b> im Leasing sind ein solider Start – das kostet nur die Kaution.`, 'fleetBuy');
   else if (!routes.length) add('noroute', 'info', 'net', `Die Flotte ist da oder unterwegs, aber es gibt noch <b>keine Strecke</b>. Tippen Sie ein Ziel auf der Karte an.`, 'plan');
@@ -2234,7 +2245,7 @@ function showAssistantPick(onDone = null) {
     m.hidden = true;
     setAssistant(sel);
     refreshAll();
-    sayHello();
+    greet();
     if (onDone) onDone();
   });
 }
@@ -2271,6 +2282,82 @@ function onBubbleClick(e) {
   if (b.dataset.bub === 'close') { ui.bubbleQ = []; $('#bubble').hidden = true; return; }
   if (b.dataset.act) { onPaneClick(e); $('#bubble').hidden = true; if (ui.bubbleQ.length) setTimeout(nextBubble, 400); }
 }
+// ---------- Rundgang zum Start ----------
+const tourKey = () => (ui.mp ? `skymarket-tour-${ui.mp.id}-${ui.mp.airlineId}` : `skymarket-tour-solo-${W.seed ?? 0}`);
+function tourSeen() { try { return !!localStorage.getItem(tourKey()) || !!localStorage.getItem('skymarket-tour-off'); } catch (e) { return false; } }
+/** Beim Start einer Runde: erst der kurze Rundgang, danach die Begrüßung. */
+function greet() { if (tourSeen()) sayHello(); else setTimeout(() => startTour(sayHello), 350); }
+function tourSteps() {
+  const mpGuest = ui.mp && !ui.mp.host, chatOn = !$('#chatBtn').hidden;
+  return [
+    { t: null, h: `Willkommen bei <b>${esc(W.player.name)}</b>! Ich zeige Ihnen in einer halben Minute, wo Sie was finden.` },
+    { t: '#sidebar', h: 'Hier links sehen Sie Ihre Airline auf einen Blick: Kontostand, Tagesergebnis, Auslastung und Pünktlichkeit. Darunter stehen meine Hinweise – „Öffnen“ springt direkt an die richtige Stelle.' },
+    { t: '#mapwrap', h: 'Die Karte zeigt Flughäfen, Strecken und Flugzeuge live. <b>Flughafen antippen</b>: Markt ansehen und Strecke planen. <b>Flugzeug antippen</b>: Flugdaten. Zoomen mit Mausrad oder zwei Fingern, rechts die Knöpfe für Ihr Netz und die ganze Welt.' },
+    { t: '#nav', h: 'Die sechs Bereiche: <b>Karte</b>, <b>Flotte</b>, <b>Strecken</b>, <b>Finanzen</b>, <b>Markt</b> und <b>Unternehmen</b>. Ein roter Punkt heißt: Dort wartet etwas auf Sie.' },
+    { t: '#tabs', h: 'Jeder Bereich hat Unterseiten – in der Flotte etwa Beschaffung und Einsatzplan, im Markt Handel und Weltlage, im Unternehmen Personal und Meilensteine.' },
+    { t: '#resizer', h: 'Diesen Rand können Sie ziehen und den Bereich breiter machen – praktisch für große Tabellen. Doppelklick stellt die Standardbreite wieder her.' },
+    { t: '.speed', h: mpGuest ? 'Hier sehen Sie Datum, Uhrzeit und Tempo. Das Tempo stellt die Spielleitung ein.' : 'Hier steuern Sie die Zeit: <b>Pause</b>, <b>Weiter</b> und das Tempo. Die Leertaste pausiert ebenfalls.' },
+    { t: '#bell', h: `Die Glocke sammelt alle Meldungen.${chatOn ? ' Daneben der <b>Chat</b> mit den Mitspielenden – an alle oder privat.' : ''} Der Kreis davor wechselt zwischen hellem und dunklem Design.` },
+    { t: '#userBtn', h: `Im Menü finden Sie ${ui.mp ? 'die Einladung für Mitspielende' : 'Speichern und Neues Spiel'}, die Anleitung, Ihr Logo – und diesen Rundgang noch einmal.` },
+    { t: null, h: `Das war's! Mein Vorschlag für den Start: zwei Flugzeuge unter <b>Flotte → Beschaffung</b> leasen, dann unter <b>Strecken → Planung</b> die ersten Ziele anlegen.`, end: true },
+  ].filter((x) => { if (!x.t) return true; const el = $(x.t); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none'; });
+}
+function startTour(after = null) {
+  if (!W || !W.player) return;
+  ui.tour = { i: 0, steps: tourSteps(), after };
+  try { localStorage.setItem(tourKey(), '1'); } catch (e) { /* egal */ }
+  $('#bubble').hidden = true;
+  showTourStep();
+}
+function endTour(go = null) {
+  const t = ui.tour; ui.tour = null;
+  $('#tour').hidden = true; $('#tour').innerHTML = '';
+  if (go) setTab(go);
+  if (t && t.after) t.after();
+}
+function showTourStep() {
+  const T = ui.tour, box = $('#tour'); if (!T) return;
+  const st = T.steps[T.i], p = asstP(), a = asst(), last = T.i === T.steps.length - 1;
+  const el = st.t ? $(st.t) : null;
+  if (el && window.innerWidth <= 900) el.scrollIntoView({ block: 'center' });
+  box.hidden = false;
+  box.innerHTML = `<div class="tour-spot${el ? '' : ' none'}"></div><div class="tour-card" role="dialog" aria-label="Rundgang">
+    <div class="tour-head">${a ? avatarSvg(a.id) : ''}<div><b>${p ? esc(p.name) : 'Ihre Assistenz'}</b><span>Kurzer Rundgang · ${T.i + 1} von ${T.steps.length}</span></div></div>
+    <p>${st.h}</p>
+    <div class="row" style="justify-content:space-between;gap:6px"><button class="btn small" data-tour="skip">${last ? 'Schließen' : 'Überspringen'}</button>
+      <span class="row" style="gap:6px">${T.i ? '<button class="btn small" data-tour="back">Zurück</button>' : ''}${st.end ? '<button class="btn small" data-tour="go">Zur Beschaffung</button>' : ''}<button class="btn small primary" data-tour="next">${last ? 'Los geht’s' : 'Weiter'}</button></span></div></div>`;
+  placeTour();
+}
+function placeTour() {
+  const T = ui.tour, box = $('#tour'); if (!T || box.hidden) return;
+  const st = T.steps[T.i], el = st.t ? $(st.t) : null, spot = box.querySelector('.tour-spot'), card = box.querySelector('.tour-card');
+  const vw = window.innerWidth, vh = window.innerHeight, cw = Math.min(360, vw - 24), ch = card.offsetHeight || 200, gap = 14;
+  card.style.width = cw + 'px';
+  if (!el) { card.style.left = (vw - cw) / 2 + 'px'; card.style.top = Math.max(12, (vh - ch) / 2) + 'px'; return; }
+  const r = el.getBoundingClientRect(), pad = st.t === '#resizer' ? 2 : 6;
+  Object.assign(spot.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + 2 * pad + 'px', height: r.height + 2 * pad + 'px' });
+  const fits = { below: r.bottom + gap + ch < vh, above: r.top - gap - ch > 0, right: r.right + gap + cw < vw, left: r.left - gap - cw > 0 };
+  const big = r.height > vh * 0.5;
+  const order = big ? ['right', 'left', 'below', 'above'] : ['below', 'above', 'left', 'right'];
+  const side = order.find((k) => fits[k]) || 'center';
+  let x, y;
+  if (side === 'below') { x = r.left + r.width / 2 - cw / 2; y = r.bottom + gap; }
+  else if (side === 'above') { x = r.left + r.width / 2 - cw / 2; y = r.top - gap - ch; }
+  else if (side === 'right') { x = r.right + gap; y = r.top + r.height / 2 - ch / 2; }
+  else if (side === 'left') { x = r.left - gap - cw; y = r.top + r.height / 2 - ch / 2; }
+  else { x = (vw - cw) / 2; y = vh - ch - 16; }
+  card.style.left = Math.max(12, Math.min(vw - cw - 12, x)) + 'px';
+  card.style.top = Math.max(12, Math.min(vh - ch - 12, y)) + 'px';
+}
+function onTourClick(e) {
+  const b = e.target.closest('[data-tour]'); if (!b || !ui.tour) return;
+  const k = b.dataset.tour, T = ui.tour;
+  if (k === 'skip') endTour();
+  else if (k === 'go') endTour('fleetBuy');
+  else if (k === 'back') { T.i = Math.max(0, T.i - 1); showTourStep(); }
+  else if (k === 'next') { if (T.i >= T.steps.length - 1) endTour(); else { T.i++; showTourStep(); } }
+}
+
 function sayHello() {
   const p = asstP(); if (!p) return;
   const first = assistantHints()[0];
@@ -2313,7 +2400,7 @@ function assistantAfterDays(prev) {
       ops: `Pünktlichkeit ${playerOtp() === null ? '–' : pct(playerOtp())}, Stimmung ${pct(pl.staff.morale)}.`,
       net: best ? `Stärkste Strecke: ${best.r.base}–${best.r.dest} mit <span class="${sgn(best.d)}">${eur(best.d, { plus: true })}</span> pro Tag.` : 'Zeit für die erste Strecke!',
       strat: `Marke ${n0(pl.brand * 100)}/100, Rating ${pl.rating}.` }[p.focus];
-    bubble(c.net < 0 ? 'warn' : 'good', `<b>${MONTHS_L[lm.label.m]}:</b> Ergebnis <span class="${sgn(c.net)}">${eur(c.net, { plus: true })}</span>, Umsatz ${eur(c.rev)}, Auslastung ${seats ? pct(pax / seats) : '–'}, Kontostand ${eur(pl.ledger.cash / 100)}. ${tip}`,
+    bubble(c.net < 0 ? 'warn' : 'good', `<b>${MONTHS_L[lm.label.m]}:</b> Ergebnis <span class="${sgn(c.net)}">${eur(c.net, { plus: true })}</span>, Umsatz ${eur(c.rev)}, Auslastung ${seats ? pct(pax / seats) : '–'}, Kontostand <span class="${sgn(netCash(pl))}">${eur(netCash(pl))}</span>. ${tip}`,
       { title: 'Monatsbericht', noPre: true, btn: '<button class="btn small" data-act="tab" data-tab="finance">Finanzen</button>' });
   }
 }
@@ -2334,6 +2421,8 @@ function onPaneClick(e) {
   if (b.tagName === 'SELECT') return;
   e.preventDefault();
   const act = b.dataset.act, pl = W.player;
+  if (act === 'pltype') { const sel = $('#pl-type'); if (sel) { sel.value = b.dataset.t; sel.dispatchEvent(new Event('change', { bubbles: true })); } return; }
+  if (act === 'tour') { startTour(); return; }
   if (act.startsWith('deal') && onDealClick(act, b)) return;
   if ((act.startsWith('asg') || act === 'retype') && onAssignClick(act, b)) return;
   if (act.startsWith('lg') && onLogoClick(act, b)) return;
@@ -2479,7 +2568,7 @@ async function showStart(canClose = false) {
       ui.lastSpeed = sel.speed;
       if (SM.SPEEDS[sel.speed].slow) setSpeed(sel.speed); else setSpeed('p');
       saveGame(false);
-      sayHello();
+      greet();
     }
   };
 }
@@ -2541,7 +2630,7 @@ const GUIDE = [
     <p>Sie gründen eine Airline und bauen ein Streckennetz über 118 Flughäfen weltweit auf. Sie beschaffen Flugzeuge, Personal, Kerosin und Terminalflächen selbst und treten gegen 24 KI-Airlines und bis zu drei Mitspielende an. Märkte, Arbeitskräfte, Leasingflugzeuge und Kerosin teilen sich alle – jede Entscheidung trifft die anderen.</p>
     <div class="gsteps">
       <div><b>Ziel</b><span>Wachsen und Gewinn machen, ohne dass das Geld ausgeht.</span></div>
-      <div><b>Gefahr</b><span>Ist das Konto 30 Tage lang im Minus, ist die Airline insolvent.</span></div>
+      <div><b>Gefahr</b><span>Das Konto darf bis zur Kreditlinie ins Minus (Dispo). Ist auch der Dispo 30 Tage lang überzogen, ist die Airline insolvent.</span></div>
       <div><b>Wichtig</b><span>Kontostand und Gewinn sind zweierlei: Kautionen und Käufe kosten sofort Geld, wirken aber nicht als Verlust.</span></div>
       <div><b>Meilensteine</b><span>Erstflug, Passagierzahlen, Gewinnserien, Krisenfest … Unter Unternehmen → Meilensteine sehen alle, wer vorn liegt.</span></div>
     </div>` },
@@ -2759,7 +2848,7 @@ async function enterGame(id) {
     applyOnlineChrome();
     const seenKey = `skymarket-seen-${id}-${ui.mp.airlineId}`;
     let seen = null; try { seen = JSON.parse(localStorage.getItem(seenKey) || 'null'); } catch (e) { /* egal */ }
-    if (mpState.pendingAssistant) { const pa = mpState.pendingAssistant; mpState.pendingAssistant = null; setAssistant(pa); refreshAll(); sayHello(); }
+    if (mpState.pendingAssistant) { const pa = mpState.pendingAssistant; mpState.pendingAssistant = null; setAssistant(pa); refreshAll(); greet(); }
     else if (!asst()) showAssistantPick();
     else if (seen && W.day > seen.day) awayReport(W.day - seen.day, seen.cash);
     else toast(`Willkommen in „${info.name}“`);
@@ -2824,7 +2913,7 @@ function applyServerState(s, ver, first) {
   }
   const pl = W.player;
   if (!pl) return;
-  try { if (mpState.seenKey) localStorage.setItem(mpState.seenKey, JSON.stringify({ day: W.day, cash: pl.ledger.cash / 100 })); } catch (e) { /* egal */ }
+  try { if (mpState.seenKey) localStorage.setItem(mpState.seenKey, JSON.stringify({ day: W.day, cash: netCash(pl) })); } catch (e) { /* egal */ }
   if (pl.status === 'insolvent') { gameOver(); return; }
   if (prev && W.day !== prev.day) {
     if (pl.decisions.length > prev.dec && openDecisions().length && !asst()) toast('Entscheidung nötig: Die Gewerkschaft droht mit Streik.');
@@ -2919,7 +3008,7 @@ function resumeLocal(save) {
   return n;
 }
 function awayReport(days, cash0) {
-  const pl = W.player, cash = pl.ledger.cash / 100, d = typeof cash0 === 'number' ? cash - cash0 : null;
+  const pl = W.player, cash = netCash(pl), d = typeof cash0 === 'number' ? cash - cash0 : null;
   const txt = `Willkommen zurück! Seit Ihrem letzten Besuch sind <b>${n0(days)} ${days === 1 ? 'Tag' : 'Tage'}</b> vergangen. Kontostand ${eur(cash)}${d !== null ? ` (${eur(d, { plus: true })})` : ''}.`;
   if (asst()) {
     const h = assistantHints()[0];
@@ -2978,6 +3067,9 @@ function boot(hotData) {
   $('#planeCard').addEventListener('click', (e) => { const b = e.target.closest('[data-pc]'); if (!b) return; if (b.dataset.pc === 'close') { ui.sel = null; $('#planeCard').hidden = true; } else { ui.expanded = b.dataset.id; setTab('routes'); renderMapRoutes(true); } });
   $('#sidebar').addEventListener('click', onPaneClick);
   $('#bubble').addEventListener('click', onBubbleClick);
+  $('#tour').addEventListener('click', onTourClick);
+  window.addEventListener('resize', placeTour);
+  document.addEventListener('keydown', (e) => { if (!ui.tour) return; if (e.key === 'Escape') endTour(); else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); $('#tour [data-tour="next"]').click(); } else if (e.key === 'ArrowLeft' && ui.tour.i) { ui.tour.i--; showTourStep(); } }, true);
   $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
   initResizer();
   $('#nav').addEventListener('click', (e) => {

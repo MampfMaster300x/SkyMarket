@@ -24,7 +24,7 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Personal und Fachkräfte abwerben**, auch bei Mitspielenden; die KI wirbt ebenfalls ab. Löhne relativ zum Marktlohn.
   - **Akademien:** Flugschule, Kabinenakademie und Technikschule finanziell fördern, dann kommt monatlich eigener Nachwuchs.
   - **Kooperationen im Handel:** Codeshare auf einer Strecke oder Allianz mit 2 % Kerosinrabatt.
-  - **Strengere Kreditlinien:** Sie hängen an Umsatz, Anlagevermögen und Bankenstimmung. Bei Kürzung wird der Überhang eingezogen.
+  - **Strengere Kreditlinien als Dispo:** Die Linie hängt an Umsatz, Anlagevermögen und Bankenstimmung. Das Konto darf bis zur Linie ins Minus; Käufe, Leasing, Gebote und Handel sind bis „Kontostand + freier Dispo“ möglich. Der Kontostand wird wie bei der Bank netto angezeigt, also negativ im Dispo. Kürzt die Bank die Linie, wird der Überhang eingezogen. Wird auch der Dispo überzogen und bleibt 30 Tage so, folgt die Insolvenz.
   - **Meilensteine** je Spieler mit Punkten und Rangliste.
   - **Zwei Einzelberater**, die es pro Welt nur einmal gibt (Unternehmen → Personal):
     - **Tim Kaminski:** der Beste, wirkt in allen Bereichen über Expertenniveau. 260 Tsd. €/Monat plus 450 Tsd. € Antrittshonorar.
@@ -37,6 +37,8 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Gebrauchtmarkt mit verborgenem Zustand:** Verbrauchte Maschinen verhalten sich wie deutlich ältere (mehr Kerosin, Wartung, Ausfälle). Ohne Gutachter sehen Sie nur Alter und Preis, mit einer Technik-Fachkraft ab Senior eine grobe Schätzung.
   - Länder ohne Nachfrage werden auf der Karte **ausgegraut**.
   - „Flugbegleiterinnen“ statt „Flugbegleiter“.
+  - **Rundgang zum Start:** Zu Beginn jeder Runde zeigt die Assistenz in zehn kurzen Schritten, wo was zu finden ist. Die gezeigte Stelle ist hervorgehoben, den Rundgang kann man überspringen. Er kommt einmal je Spiel und Browser und lässt sich über das Menü oder „Erste Schritte“ wiederholen.
+  - **Planung:** Eigene Flugzeugtypen stehen in der Typauswahl oben unter „Ihre Flugzeuge“ (★) und darunter als fette Schnellwahl-Knöpfe.
   - **Bedienung:** Die Bereichsleiste (Karte, Flotte, Strecken, Finanzen, Markt, Unternehmen) sitzt direkt über dem rechten Block. Der Block lässt sich an seinem linken Rand breiter oder schmaler ziehen; Doppelklick stellt die Standardbreite wieder her. Die Breite merkt sich der Browser.
 - **Neu in 0.8:**
   - **Chat** im Mehrspieler: an alle oder privat an eine Airline (Sprechblasen-Symbol oben, Zähler für Ungelesenes). Gespeichert in einem eigenen Blob je Spiel (letzte 300 Nachrichten).
