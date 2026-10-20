@@ -3,7 +3,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { handle } from './server/api.mjs';
+import { handle, tickMain } from './server/api.mjs';
 import { memStore } from './server/memstore.mjs';
 
 const PORT = Number(process.env.PORT || 8888);
@@ -28,3 +28,6 @@ http.createServer(async (req, res) => {
     fs.createReadStream(file).pipe(res);
   } catch (e) { console.error(e); res.writeHead(500); res.end('Fehler'); }
 }).listen(PORT, () => console.log(`SKYMARKET läuft lokal auf http://localhost:${PORT}`));
+
+// wie die stündliche Netlify-Funktion: Hauptwelt auch ohne Besuch fortschreiben
+setInterval(() => tickMain(store).catch((e) => console.error(e)), 3600000);

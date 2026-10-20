@@ -1,5 +1,5 @@
 // Prüft den API-Ablauf ohne Netlify: Konten, Spiel mit Passwort, Suche, Beitritt per Code und Einladung, Zeit, Aktionen.
-import { handle } from '../server/api.mjs';
+import { handle, tickMain } from '../server/api.mjs';
 import { memStore } from '../server/memstore.mjs';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
@@ -151,4 +151,39 @@ assert.equal((await call('cleo', 'POST', `/games/${g2.id}/delete`)).status, 403,
 ok(await call('tim', 'POST', `/games/${g2.id}/delete`), 'Admin löscht fremdes Spiel');
 assert.equal((await call('ben', 'GET', `/games/${g2.id}/info`)).status, 404, 'Spiel weg');
 console.log('Admin ok: Tim sieht', adm.games.length, 'Spiele, Beitritt ohne Passwort, Löschen fremder Spiele');
+
+// ---- Hauptwelt: legt sich selbst an, jeder darf beitreten, Tempo nur Admin, läuft offline weiter ----
+const mainInfo = ok(await call('anna', 'GET', '/main'), 'Hauptwelt');
+assert.equal(mainInfo.main, true); assert.equal(mainInfo.member, false); assert.ok(mainInfo.max >= 40, 'viele Plätze');
+assert.ok(!ok(await call('anna', 'GET', '/games/search'), 'Suche').games.some((x) => x.id === 'main'), 'Hauptwelt nicht in der normalen Suche');
+ok(await call('anna', 'POST', '/games/main/join', { airline: { name: 'Hanse Air', code: 'HX', base: 'HAM' } }), 'Anna tritt der Hauptwelt bei');
+ok(await call('ben', 'POST', '/games/main/join', { airline: { name: 'Isar Jet', code: 'IJ', base: 'MUC' } }), 'Ben tritt bei');
+assert.equal((await call('cleo', 'POST', '/games/main/join', { airline: { name: 'Elbe Wings', code: 'HX', base: 'BER' } })).status, 400, 'Kürzel in der Hauptwelt doppelt');
+for (let i = 0; i < 6; i++) { const n = 'spieler' + i; ok(await call(n, 'POST', '/register', { username: n, password: 'passwort' + i }), 'Konto ' + n);
+  ok(await call(n, 'POST', '/games/main/join', { airline: { name: 'Test Air ' + i, code: 'T' + i, base: 'FRA' } }), 'Beitritt ' + n); }
+const mi = ok(await call('ben', 'GET', '/games/main/info'), 'Info Hauptwelt');
+assert.equal(mi.players.length, 8, 'mehr als vier Airlines'); assert.equal(mi.main, true); assert.equal(mi.me.host, false);
+assert.equal((await call('anna', 'POST', '/games/main/control', { speed: 'x4' })).status, 403, 'Tempo nur Admin');
+assert.equal((await call('ben', 'POST', '/games/main/action', { action: { type: 'setRivals', key: 'hard' } })).status, 403, 'Konkurrenz nur Admin');
+// offline weiterlaufen: 30 Stunden zurückdatieren, stündlicher Lauf holt nach
+const ms = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' });
+assert.equal(ms.metadata.speed, 'm30', 'Hauptwelt: 30 Min. pro Tag');
+await store.set('games/main/state', ms.data, { metadata: { ...ms.metadata, lastTick: Date.now() - 15 * 3600000 - 1000 }, onlyIfMatch: ms.etag });
+const tk = await tickMain(store);
+assert.ok(tk.days >= 30, 'Tick holt 30 Tage nach: ' + JSON.stringify(tk));
+// Neustart: nur nach Insolvenz, außer freiwillig
+const benId = mi.players.find((p) => p.name === 'Ben').airlineId;
+assert.equal((await call('ben', 'POST', '/games/main/restart', { airline: { name: 'Phoenix', code: 'PH', base: 'VIE' } })).status, 409, 'nicht insolvent');
+ok(await call('ben', 'POST', '/games/main/restart', { force: true, airline: { name: 'Phoenix', code: 'PH', base: 'VIE' } }), 'freiwilliger Neustart');
+st = await call('ben', 'GET', '/games/main/state?v=x');
+w = JSON.parse(gunzipSync(Buffer.from(st.data)).toString());
+const ph = w.airlines.find((a) => a.id === benId);
+assert.equal(ph.name, 'Phoenix'); assert.deepEqual(ph.bases, ['VIE']); assert.equal(ph.past.length, 1); assert.equal(ph.past[0].name, 'Isar Jet');
+const mi2 = ok(await call('anna', 'GET', '/games/main/info'), 'Info nach Neustart');
+assert.equal(mi2.players.find((p) => p.airlineId === benId).airlineName, 'Phoenix');
+assert.equal((await call('tim', 'POST', '/games/main/control', { speed: 'm10' })).status < 400, true, 'Admin stellt Tempo');
+ok(await call('tim', 'POST', '/games/main/control', { speed: 'm30' }), 'Admin zurück auf 30 Min.');
+// private Runde: Neustart auch dort
+ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: { name: 'Anna Zwei', code: 'A2', base: 'DUS' } }), 'Neustart in privater Runde');
+console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 console.log('Alle Prüfungen bestanden.');

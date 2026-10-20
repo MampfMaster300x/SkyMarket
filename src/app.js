@@ -621,7 +621,7 @@ const SECTIONS = [
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung']] },
   { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['rivals', 'Wettbewerb'], ['trade', 'Handel'], ['world', 'Weltlage']] },
-  { key: 'unternehmen', label: 'Unternehmen', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Meilensteine'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
+  { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Meilensteine'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
 ];
 const TAB_ALIAS = { fleet: 'fleetOwn' };
 const sectionOf = (t) => SECTIONS.find((s) => s.tabs.some(([k]) => k === t)) || SECTIONS[0];
@@ -639,7 +639,7 @@ function tabDots() {
 }
 function renderNav() {
   const dots = tabDots(), cur = sectionOf(ui.tab);
-  $('#nav').innerHTML = SECTIONS.map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" title="${s.label}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join('');
+  $('#nav').innerHTML = SECTIONS.map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" title="${s.label}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span><span class="lbs">${s.short || s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join('');
   const bell = $('#bell .dot'); if (bell) bell.hidden = !dots.news;
 }
 function renderTabs() {
@@ -652,19 +652,39 @@ function renderTabs() {
 function setTab(t) {
   t = TAB_ALIAS[t] || t;
   if (!VIEWS[t]) t = 'cockpit';
+  const prevTab = ui.tab;
   ui.tab = t; ui.confirm = null; ui.viewDirty = true;
   ui.lastSub = ui.lastSub || {};
   ui.lastSub[sectionOf(t).key] = t;
   if (t === 'news') ui.newsSeen = W.news.length + W.player.events.length;
   renderTabs(); renderPane(true); renderDraft();
   $('#pane').scrollTop = 0;
+  if (isPhone() && !ui.tour && !ui.mapNav && prevTab && prevTab !== t) phoneScroll(sectionOf(t).key, sectionOf(prevTab).key !== sectionOf(t).key);
+}
+// Handy: nach einem Wechsel den Inhalt zeigen (Karte oben, sonst Kopf des Bereichs)
+function phoneScroll(sec, newSection) {
+  const side = $('#side'); if (!side) return;
+  const hh = $('header.top') ? $('header.top').offsetHeight : 0;
+  if (newSection && sec === 'karte') { window.scrollTo({ top: 0 }); return; }
+  const y = Math.max(0, side.getBoundingClientRect().top + window.scrollY - hh - 4);
+  // neuer Bereich: Kopf des Bereichs zeigen; Unterreiter: nur zurück nach oben, wenn man tiefer war
+  if (newSection ? Math.abs(window.scrollY - y) > 4 : window.scrollY > y + 4) window.scrollTo({ top: y });
 }
 function editing() { const a = document.activeElement; return a && $('#pane').contains(a) && /INPUT|SELECT/.test(a.tagName); }
 const VIEWS = {};
+const isPhone = () => window.matchMedia && window.matchMedia('(max-width: 760px)').matches;
+// Auf dem Handy jede Tabelle seitlich scrollbar machen, statt die Seite zu verbreitern
+function wrapTables(root) {
+  for (const t of root.querySelectorAll('table.t')) {
+    if (t.parentElement && t.parentElement.classList.contains('tw')) continue;
+    const w = document.createElement('div'); w.className = 'tw'; t.parentNode.insertBefore(w, t); w.appendChild(t);
+  }
+}
 function renderPane(force = false) {
   if (!force && editing()) return;
   const pane = $('#pane'), st = pane.scrollTop;
   pane.innerHTML = VIEWS[ui.tab]();
+  if (isPhone()) wrapTables(pane);
   if (!force) pane.scrollTop = st;
   if (ui.tab === 'plan' && ui.planner) updateForecast();
 }
@@ -676,7 +696,7 @@ const speedNow = () => (ui.mp ? (mpState.clock ? SM.speedKey(mpState.clock.speed
 function renderSpeed() {
   const cur = speedNow(), sel = $('#speedSel'); if (!sel) return;
   const keys = Object.keys(SM.SPEEDS).filter((k) => k !== 'p' && !(ui.mp && SM.SPEEDS[k].local));
-  const show = cur === 'p' ? (ui.lastSpeed || (ui.mp ? 'h1' : 'x1')) : cur;
+  const show = cur === 'p' ? (ui.lastSpeed || (ui.mp ? 'm30' : 'x1')) : cur;
   sel.innerHTML = keys.map((k) => `<option value="${k}" ${k === show ? 'selected' : ''}>${SM.SPEEDS[k].short}</option>`).join('');
   sel.title = SM.SPEEDS[show].label;
   $('#btnPause').setAttribute('aria-pressed', String(cur === 'p'));
@@ -847,7 +867,7 @@ VIEWS.cockpit = function viewCockpit() {
     [pl.fleet.length > 0, 'Flugzeug beschaffen', 'Unter Flotte → Beschaffung leasen oder gebraucht kaufen. Leasing schont den Kontostand.', 'fleetBuy'],
     [routes.length > 0, 'Erste Strecke planen', 'Ziel auf der Karte antippen oder unter Strecken → Planung. Die Prognose rechnet mit Ihren echten Kosten.', 'plan'],
     [staffed, 'Personal einstellen', 'Unter Unternehmen → Personal. Bis die Leute anfangen, springt teures Agenturpersonal ein.', 'staff'],
-    [W.day > 20 && routes.length > 0, 'Zeit laufen lassen', ui.mp ? 'Die Spielleitung stellt oben das Tempo ein, von 1 Stunde bis 3 Sekunden pro Spieltag.' : 'Oben Tempo wählen und auf Weiter drücken: von 1 Stunde pro Spieltag bis Turbo.', null],
+    [W.day > 20 && routes.length > 0, 'Zeit laufen lassen', ui.mp ? (ui.mp.main ? 'Die Hauptwelt läuft von selbst weiter: ein Spieltag alle 30 Minuten, auch wenn Sie offline sind. Schauen Sie täglich vorbei.' : 'Die Spielleitung stellt oben das Tempo ein, von 1 Stunde bis 3 Sekunden pro Spieltag.') : 'Oben Tempo wählen und auf Weiter drücken: von 1 Stunde pro Spieltag bis Turbo.', null],
   ];
   if (steps.some((s) => !s[0])) {
     html += `<div class="card pad stack"><div class="spread"><h3>Erste Schritte</h3><span class="row" style="gap:6px"><button class="btn small" data-act="tour">Rundgang</button><button class="btn small" data-act="guide">Anleitung</button></span></div>${steps.map(([done, t, d, tab], i) => `<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="chip ${done ? 'good' : ''}" style="min-width:26px;justify-content:center">${done ? '✓' : i + 1}</span><div style="min-width:0"><b>${t}</b><div class="small muted">${d}</div></div>${!done && tab ? `<button class="btn small" data-act="tab" data-tab="${tab}" style="margin-left:auto">Öffnen</button>` : ''}</div>`).join('')}</div>`;
@@ -856,7 +876,7 @@ VIEWS.cockpit = function viewCockpit() {
   if (cov && routes.length) {
     const canc = Object.entries(cov.cancel).filter(([, v]) => v > 0);
     if (canc.length) html += `<div class="callout crit"><b>Personalmangel</b>Heute fallen Flüge aus, weil Crews fehlen${pl.staff.agency ? '' : ' und Agenturpersonal abgeschaltet ist'}. <button class="btn small" data-act="tab" data-tab="staff">Personal öffnen</button></div>`;
-    else if (cov.agencyH > 0) html += `<div class="callout warn"><b>Agenturpersonal im Einsatz</b>Heute ${n0(cov.agencyH)} Crew-Stunden über Agenturen zum 1,6-fachen Stundensatz. Mehrkosten ${eur(cov.extraCost)} pro Tag. <button class="btn small" data-act="tab" data-tab="staff">Personal öffnen</button></div>`;
+    else if (cov.agencyH > 0) html += `<div class="callout warn"><b>Agenturpersonal im Einsatz</b>Heute fliegen ${n0(cov.agencyH)} Personen über Agenturen zum 1,6-fachen Satz. Mehrkosten ${eur(cov.extraCost)} pro Tag. <button class="btn small" data-act="tab" data-tab="staff">Personal öffnen</button></div>`;
   }
   const warns = pl.events.filter((e) => (e.kind === 'warn' || e.kind === 'crit') && e.day >= W.day - 10).slice(-3).reverse();
   for (const e of warns) html += `<div class="callout ${e.kind}"><b>${dateShort(e.day)}</b>${esc(e.msg)}</div>`;
@@ -1089,10 +1109,6 @@ function updateForecast() {
   const t = P.AIRCRAFT_TYPES[p.type];
   const study = pl.studies[SM.pairKey(base, p.dest)];
   const slotsB = slotsMine(base), slotsD = slotsMine(p.dest), slotOk = W.slotsOkFor(pl, base, p.dest, p.freq);
-  const bh = SM.blockHours(base, p.dest, p.type) * 2 * p.freq;
-  const needPil = 2 * bh / P.STAFF.pilotH, needCab = t.cabin * bh / P.STAFF.cabinH;
-  const sp = staffPlan(pl), pilRow = sp.find((x) => x.key === t.group), cabRow = sp.find((x) => x.key === 'cab');
-  const sparePil = pilRow ? pilRow.have + pilRow.pipe - pilRow.need : 0, spareCab = cabRow.have + cabRow.pipe - cabRow.need;
   const wnd = SM.winOf(p.type), kLong = rotH > wnd ? Math.ceil(rotH / wnd) : 0;
   const freeWhole = free.filter((x) => x.free >= wnd - 1e-9).length;
   const acNeed = kLong ? (freeWhole >= kLong * p.freq ? null : `Langstrecke: Ein Umlauf dauert ${n1(rotH)} h – länger als das Betriebsfenster von ${wnd} h. Für ${p.freq}x täglich braucht es ${kLong * p.freq} freie ${tl(p.type)} in ${base}, frei sind ${freeWhole}. ${freeWhole ? `Mit ${freeWhole} fliegt die Strecke nur an ${pct(Math.min(1, freeWhole / kLong / p.freq))} der Tage.` : ''}`)
@@ -1176,12 +1192,21 @@ function kitHtml(p, x) {
   opts.push(['none', 'Ohne Flugzeug anlegen', 'Die Strecke startet, sobald ein passendes Flugzeug frei ist']);
   if (!opts.some((o) => o[0] === p.acq)) p.acq = n ? opts[0][0] : 'none';
   if (!n) p.acq = 'none';
-  // Personal nach Eröffnung
-  const bh = SM.blockHours(base, p.dest, p.type) * 2 * p.freq;
-  const needPil = 2 * bh / P.STAFF.pilotH, needCab = t.cabin * bh / P.STAFF.cabinH;
+  // Personal: Crew wird je Flugzeug gebraucht, nicht je Strecke
+  const S = P.STAFF, leg = SM.blockHours(base, p.dest, p.type), seats = SM.pilotsFor(leg), bhRoute = leg * 2 * p.freq;
+  const cur = pl.staffNeedPlanned(), perAc = cur.perAc || {};
+  let addSets = 0, crewNote = '';
+  if (n) { addSets = n * Math.max(1, Math.ceil(bhRoute / Math.max(1, n) / S.crewSetBh - 1e-6)); crewNote = `${n > 1 ? `${n} neue Flugzeuge brauchen` : 'Das neue Flugzeug braucht'} eine eigene Crew.`; }
+  else if (x.kLong) { const idle = x.free.filter((y) => !perAc[y.a.id]).length; addSets = Math.min(idle, x.kLong * p.freq); crewNote = addSets ? 'Langstrecke: Flugzeuge ohne bisherigen Einsatz brauchen eine Crew.' : ''; }
+  else {
+    // wie der Einsatzplan: zuerst Flugzeuge, die schon fliegen und noch Zeit haben
+    const cand = x.free.filter((y) => y.free + 1e-9 >= x.rotH).sort((a2, b2) => (perAc[b2.a.id] ? 1 : 0) - (perAc[a2.a.id] ? 1 : 0) || a2.free - b2.free)[0];
+    if (cand) { const was = perAc[cand.a.id], bhNew = (was ? was.bh : 0) + bhRoute; addSets = Math.max(1, Math.ceil(bhNew / S.crewSetBh - 1e-6)) - (was ? was.sets : 0); crewNote = was ? (addSets > 0 ? `${acName(cand.a.id)} fliegt dann über ${S.crewSetBh} Blockstunden am Tag – das braucht einen zweiten Crew-Satz.` : `${acName(cand.a.id)} fliegt schon – seine Crew übernimmt die Strecke mit (dann ${n1(bhNew)} von ${S.crewSetBh} Blockstunden).`) : `${acName(cand.a.id)} hatte noch keinen Einsatz und braucht eine Crew.`; }
+  }
+  const addPil = addSets * seats * S.crewPerSeat, addCab = addSets * t.cabin * S.crewPerSeat;
   const sp = staffPlan(pl), pilRow = sp.find((y) => y.key === t.group), cabRow = sp.find((y) => y.key === 'cab');
   const sparePil = pilRow ? pilRow.have + pilRow.pipe - pilRow.need : 0, spareCab = cabRow.have + cabRow.pipe - cabRow.need;
-  const misPil = Math.max(0, Math.ceil(needPil * 1.1 - sparePil)), misCab = Math.max(0, Math.ceil(needCab * 1.1 - spareCab)), misTech = n ? Math.ceil(P.STAFF.techPerAc * n) : 0;
+  const misPil = Math.max(0, Math.ceil(addPil - sparePil)), misCab = Math.max(0, Math.ceil(addCab - spareCab)), misTech = n ? Math.ceil(S.techPerAc * n) : 0;
   const staffShort = misPil + misCab + misTech > 0;
   if (p.hire === undefined) p.hire = false;   // Personal nur auf Wunsch mit einstellen
   ui.plannerKit = { n, staffShort };
@@ -1189,9 +1214,10 @@ function kitHtml(p, x) {
   return `<div class="kit card pad stack"><div class="spread"><b>Startpaket</b><span class="small muted">alles mit einem Klick</span></div>
     ${n ? row(false, `Flugzeug: ${x.acNeed}`, `<div class="kit-opts">${opts.map(([v, l, d]) => `<label class="chk"><input type="radio" name="pl-acq" id="pl-acq-${v.replace(':', '-')}" value="${v}" ${p.acq === v ? 'checked' : ''}> <span><b>${esc(l)}</b><br><span class="muted">${esc(d)}</span></span></label>`).join('')}</div>${auctionOnly ? '<span class="small muted">Dieses Muster gibt es im ersten Jahr nur per Auktion.</span>' : !leaseOk && stock < n ? '<span class="small muted">Beim Leasinggeber derzeit nicht genug auf Lager.</span>' : ''}`)
       : row(true, x.kLong ? `Flugzeuge: ${x.kLong * p.freq} fliegen die Langstrecke im Wechsel` : `Flugzeug: passt auf ${x.free.length === 1 ? 'Ihr Flugzeug' : 'Ihre Flotte'}`, `${n1(x.rotH * p.freq)} h von ${n0(x.wnd)} h Betriebsfenster – wird automatisch eingeplant`)}
-    ${staffShort ? row(false, `Personal: es fehlen etwa ${[misPil ? `${misPil} ${SM.roleLabel('pilot', t.group)}` : '', misCab ? `${misCab} Flugbegleiterinnen` : '', misTech ? `${misTech} Techniker` : ''].filter(Boolean).join(', ')}`,
-      `<label class="chk"><input type="checkbox" id="pl-hire" ${p.hire ? 'checked' : ''}> <span>Auf Wunsch gleich mit einstellen (Bedarf plus 10 % Reserve). Sonst selbst unter <b>Unternehmen → Personal</b> – bis dahin fliegt teures Agenturpersonal.</span></label>`)
-      : row(true, 'Personal: reicht', 'Crews und Technik sind vorhanden.')}
+    ${staffShort ? row(false, `Crew: es fehlen ${[misPil ? `${misPil} ${SM.roleLabel('pilot', t.group)}` : '', misCab ? `${misCab} Flugbegleiterinnen` : '', misTech ? `${misTech} Techniker` : ''].filter(Boolean).join(', ')}`,
+      `${esc(crewNote)} Ein Crew-Satz sind ${seats * S.crewPerSeat} Piloten und ${t.cabin * S.crewPerSeat} Flugbegleiterinnen und reicht für bis zu ${S.crewSetBh} Blockstunden am Tag.
+      <label class="chk"><input type="checkbox" id="pl-hire" ${p.hire ? 'checked' : ''}> <span>Auf Wunsch gleich mit einstellen. Sonst selbst unter <b>Unternehmen → Personal</b> – bis dahin fliegt teures Agenturpersonal.</span></label>`)
+      : row(true, addSets ? 'Crew: vorhanden' : 'Crew: keine zusätzliche nötig', esc(crewNote || 'Die vorhandenen Crews reichen.'))}
     ${row(true, 'Einsatz: automatisch', 'Der Einsatzplan teilt Flugzeuge selbst zu. Unter Flotte → Einsatzplan können Sie später feste Umläufe vorgeben – nötig ist das nicht.')}
   </div>`;
 }
@@ -1251,7 +1277,7 @@ function crewInfo(pl, a) {
   const st = pl.staff, cov = st && st.cov; if (!cov) return null;
   const g = P.AIRCRAFT_TYPES[a.type_id].group, S = P.STAFF;
   const own = (capH, needH) => (needH > 0 ? Math.min(1, capH / needH) : 1);
-  const pOwn = own(st.pil[g] * S.pilotH, cov.need.pil[g] || 0), cOwn = own(st.cab * S.cabinH, cov.need.cab || 0);
+  const pOwn = own(st.pil[g], cov.need.pil[g] || 0), cOwn = own(st.cab, cov.need.cab || 0);
   const canc = Math.max(cov.cancel[g] || 0, cov.cancel.cab || 0);
   const fam = P.TYPE_GROUPS[g];
   if (canc > 0.001) return { cls: 'crit', txt: 'Crew fehlt – Flüge fallen aus', tip: `Piloten ${fam}: ${pct(pOwn)} eigen, Kabine ${pct(cOwn)} eigen, Agentur aus` };
@@ -1360,11 +1386,14 @@ VIEWS.staff = function viewStaff() {
   const hrLead = (role) => Math.round(P.STAFF.lead[role] * SM.lv3([1, 0.75, 0.6, 0.5], pl.skill('hr')) * (role === 'pilot' ? W.macro.laborTight : 1));
   let html = `<h2 class="sec">Personal <small>${n0(SM.sumObj(st.pil) + st.cab + st.tech)} Beschäftigte · ${eur(pl.staffMonthly(cpi()))} pro Monat</small></h2>`;
   html += `<div class="crewrule"><div><b>Piloten</b><span>je Musterfamilie eingestellt – ein Typ-Rating gilt nur für ${[...new Set(pl.fleet.map((a) => P.AIRCRAFT_TYPES[a.type_id].group))].map((g) => esc(P.TYPE_GROUPS[g])).join(', ') || 'die jeweilige Familie'}. Umschulung auf eine andere Familie dauert ${P.STAFF.trainDays} Tage.</span></div><div><b>Flugbegleiterinnen &amp; Technik</b><span>arbeiten auf allen Mustern und an allen Basen.</span></div></div>`;
+  { const pa = (pl.staffNeedPlanned().perAc) || {}, ids = Object.keys(pa);
+    if (ids.length) html += `<details class="fcx"><summary>Crew je Flugzeug (${ids.length} im Einsatz)</summary><table class="t"><thead><tr><th>Flugzeug</th><th class="r">Blockstunden/Tag</th><th class="r">Crew-Sätze</th><th class="r">Piloten</th><th class="r">Kabine</th></tr></thead><tbody>${ids.map((id) => { const x = pa[id], a = pl.fleet.find((y) => y.id === id); return `<tr><td><b class="mono">${acName(id)}</b> ${a ? tlx(a.type_id) : ''}</td><td class="r">${n1(x.bh)} von ${P.STAFF.crewSetBh * x.sets}</td><td class="r">${x.sets}</td><td class="r">${x.pil}</td><td class="r">${x.cab}</td></tr>`; }).join('')}</tbody></table>
+      <p class="small muted">Solange ein Flugzeug unter ${P.STAFF.crewSetBh} Blockstunden am Tag bleibt, fliegt eine Crew alle seine Strecken.</p></details>`; }
   if (cov) {
     const canc = Object.entries(cov.cancel).filter(([, v]) => v > 0);
     if (canc.length) html += `<div class="callout crit">Heute fallen Flüge aus: Es fehlen Crews${st.agency ? '' : ', und Agenturpersonal ist abgeschaltet'}.</div>`;
-    else if (cov.agencyH > 0) html += `<div class="callout warn">Heute ${n0(cov.agencyH)} Crew-Stunden über Agenturen (1,6-facher Satz) und ${n0(cov.overtimeH)} Überstunden. Mehrkosten ${eur(cov.extraCost)} pro Tag.</div>`;
-    else if (cov.overtimeH > 0) html += `<div class="callout info">Heute ${n0(cov.overtimeH)} Überstunden (1,5-facher Satz). Dauerhafte Überlastung drückt die Stimmung.</div>`;
+    else if (cov.agencyH > 0) html += `<div class="callout warn">Heute ${n0(cov.agencyH)} Personen über Agenturen (1,6-facher Satz) und ${n0(cov.overtimeH)} in Überstunden. Mehrkosten ${eur(cov.extraCost)} pro Tag.</div>`;
+    else if (cov.overtimeH > 0) html += `<div class="callout info">Heute ${n0(cov.overtimeH)} Personen in Überstunden (1,5-facher Satz). Dauerhafte Überlastung drückt die Stimmung.</div>`;
   }
   html += `<div class="tw"><table class="t"><thead><tr><th>Gruppe</th><th class="r">Bestand</th><th class="r">Bedarf</th><th class="r">kommen</th><th class="r">Gehalt</th></tr></thead><tbody>
     ${rows.map((r) => { const gap = r.have + r.pipe - r.need; return `<tr><td>${r.label}</td><td class="r">${n0(r.have)}</td><td class="r">${n0(Math.ceil(r.need))}</td><td class="r">${r.pipe ? '+' + n0(r.pipe) : '–'}</td><td class="r">${eur(r.salary * st.pay * cpi())}</td></tr>
@@ -1374,7 +1403,7 @@ VIEWS.staff = function viewStaff() {
         <span class="muted">Start in ${hrLead(r.role)} T. · ${eur(P.STAFF.recruit[r.role] * cpi() * (r.role === 'pilot' ? W.macro.laborTight : 1))} je Einstellung</span></div></td></tr>`; }).join('')}
   </tbody></table></div>
   <div class="row"><button class="btn primary" data-act="fillstaff">Bedarf plus 10 % Reserve decken</button><button class="btn" data-act="dealnew">Crews per Handel übernehmen</button><span class="small muted">Monatlich höchstens ${P.STAFF.maxHire.pilot} Piloten, ${P.STAFF.maxHire.cabin} Flugbegleiterinnen, ${P.STAFF.maxHire.tech} Techniker. Entlassen kostet ${P.STAFF.severanceMonths} Monatsgehälter.</span></div>
-  <p class="small muted">Bedarf aus dem Flugplan: Ein Pilot fliegt im Schnitt ${n1(P.STAFF.pilotH)} Blockstunden am Tag, eine Flugbegleiterin ${n1(P.STAFF.cabinH)}. Technik: ${n1(P.STAFF.techPerAc)} Personen je Flugzeug, sonst steigen Ausfälle und Wartungskosten.</p>`;
+  <p class="small muted">Bedarf je Flugzeug im Einsatz: Ein Crew-Satz – je Cockpitplatz ${P.STAFF.crewPerSeat} Piloten der Familie, je Kabinenposition ${P.STAFF.crewPerSeat} Flugbegleiterinnen (Schichten und freie Tage) – reicht für bis zu ${P.STAFF.crewSetBh} Blockstunden am Tag. Mehr Strecken auf demselben Flugzeug brauchen also keine zusätzliche Crew. Ab 9 Stunden Flugzeit fliegen 3, ab 13 Stunden 4 Piloten pro Flug. Technik: ${n1(P.STAFF.techPerAc)} Personen je Flugzeug.</p>`;
   const groups = SM.STAFF_GROUPS.filter((g) => st.pil[g] > 0);
   if (groups.length && new Set(pl.typesIntroduced.map((x) => P.AIRCRAFT_TYPES[x].group)).size > 1) {
     html += `<div class="card pad stack"><h3>Umschulung (Musterberechtigung)</h3><div class="row small"><select id="tr-from" style="width:auto">${groups.map((g) => `<option value="${g}">${P.TYPE_GROUPS[g]} (${st.pil[g]})</option>`).join('')}</select> → <select id="tr-to" style="width:auto">${SM.STAFF_GROUPS.map((g) => `<option value="${g}">${P.TYPE_GROUPS[g]}</option>`).join('')}</select>
@@ -1546,9 +1575,10 @@ function showAptCard(c) {
 // ---------- Markt ----------
 function selectAirport(c) {
   ui.selApt = c; showAptCard(c);
-  const pl = W.player;
+  const pl = W.player; ui.mapNav = true;
   if (ui.tab === 'plan' && ui.planner && c !== ui.planner.base) { ui.planner = { ...defaultPlanner(c, ui.planner.base), freq: ui.planner.freq, service: ui.planner.service, buffer: ui.planner.buffer }; setTab('plan'); }
   else { if (pl.bases.includes(c)) ui.selBase = c; setTab('market'); }
+  ui.mapNav = false;
   renderMapRoutes(true);
 }
 VIEWS.market = function viewMarket() {
@@ -1906,7 +1936,9 @@ VIEWS.profile = function viewProfile() {
     <div class="stack"><h3>Farben</h3><div class="logo-grid">${LOGO_PALETTES.map(([a, b]) => `<button data-act="lgpal" data-a="${a}" data-b="${b}" aria-pressed="${L.c1 === a && L.c2 === b}" title="${a} / ${b}">${logoSvg(demo, 44, { ...L, c1: a, c2: b })}</button>`).join('')}</div>
       <div class="row small"><label class="row" style="gap:6px">Grundfarbe <input type="color" id="lg-c1" value="${L.c1}"></label><label class="row" style="gap:6px">Symbolfarbe <input type="color" id="lg-c2" value="${L.c2}"></label></div></div>
     <div class="row"><button class="btn primary" data-act="lgsave">Logo übernehmen</button><button class="btn" data-act="lgreset">Zurücksetzen</button></div>
-    <p class="small muted">Ihre Farben erscheinen auch auf dem Leitwerk Ihrer Flugzeuge. Das Logo können Sie jederzeit ändern.</p>`;
+    <p class="small muted">Ihre Farben erscheinen auch auf dem Leitwerk Ihrer Flugzeuge. Das Logo können Sie jederzeit ändern.</p>
+    ${pl.past && pl.past.length ? `<div class="stack"><h2 class="sec">Frühere Airlines <small>${pl.past.length} Neustart${pl.past.length > 1 ? 's' : ''}</small></h2><div class="tw"><table class="t"><thead><tr><th>Airline</th><th class="r">Zeitraum</th><th class="r">Passagiere</th><th class="r">Eigenkapital am Ende</th></tr></thead><tbody>${pl.past.slice().reverse().map((x) => `<tr><td>${esc(x.name)} <span class="small muted">${esc(x.code || '')}</span>${x.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ' <span class="chip">aufgegeben</span>'}</td><td class="r">${dateShort(x.from)} – ${dateShort(x.to)}</td><td class="r">${n0(x.pax)}</td><td class="r ${x.equity < 0 ? 'neg' : ''}">${eur(x.equity)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    <div class="callout warn stack"><b>Neu anfangen</b><span class="small">Läuft es gar nicht mehr, können Sie ${esc(pl.name)} aufgeben und ${ui.mp ? 'in derselben Welt' : 'in dieser Welt'} eine neue Airline mit vollem Startkapital gründen. Flugzeuge, Strecken, Personal und Slots gehen dabei verloren.</span><div class="row"><button class="btn small danger" data-act="restartvol">Airline aufgeben und neu gründen</button></div></div>`;
 };
 function onLogoClick(act, b) {
   if (!['lg', 'lgpal', 'lgsave', 'lgreset'].includes(act)) return false;
@@ -2828,6 +2860,7 @@ function onPaneClick(e) {
   const act = b.dataset.act, pl = W.player;
   if (act === 'pltype') { const sel = $('#pl-type'); if (sel) { sel.value = b.dataset.t; sel.dispatchEvent(new Event('change', { bubbles: true })); } return; }
   if (act === 'tour') { startTour(); return; }
+  if (act === 'restartvol') { showRestart(true); return; }
   if (act.startsWith('mkt') && onMarketClick(act, b)) return;
   if (act.startsWith('deal') && onDealClick(act, b)) return;
   if ((act.startsWith('asg') || act === 'retype') && onAssignClick(act, b)) return;
@@ -2964,10 +2997,11 @@ async function showStart(canClose = false) {
     if (e.target.id === 'dlgLoad') {
       try { W = SM.deserialize(await unpack(save)); } catch (err) { toast('Der Spielstand ließ sich nicht lesen.'); return; }
       resetUi(); ui.lastSaveDay = W.day; m.hidden = true;
+      const snap0 = snapOf(W.player);
       const days = resumeLocal(save);
       startWorld();
       if (!asst()) showAssistantPick();
-      else if (days > 0) awayReport(days, save.cash);
+      else if (days > 0) awayReport(days, snap0);
       else toast('Spielstand geladen.');
     }
     if (e.target.id === 'dlgStart') {
@@ -2990,16 +3024,61 @@ function resetUi() {
   ui.decisionsSeen = W.player.decisions.length;
 }
 function gameOver() {
-  if (ui.gameOverShown) return; ui.gameOverShown = true; setSpeed(0);
+  if (ui.gameOverShown) return; ui.gameOverShown = true; if (!ui.mp) setSpeed(0);
   const pl = W.player, endDay = (pl.events.find((e) => e.msg === 'Insolvenz') || { day: W.day }).day, worst = pl.routes.map((r) => ({ r, s: rstats(r, 60) })).sort((a, b) => a.s.db2 - b.s.db2).slice(0, 3);
   const m = $('#modal');
   m.innerHTML = `<div class="dialog" role="dialog" aria-modal="true"><h1>Insolvenz</h1>
     <p>${esc(pl.name)} hat nach ${endDay} Tagen am ${dateLong(endDay)} den Flugbetrieb eingestellt. Die Kreditlinie war ausgeschöpft und der Kontostand blieb ${P.INSOLVENCY_AFTER_DAYS} Tage negativ.</p>
     ${worst.length ? `<div class="stack"><h3>Die größten Verlustbringer zuletzt</h3><table class="t"><tbody>${worst.map(({ r, s }) => `<tr><td>${r.base}–${r.dest} ${r.freq}x ${tl(r.type_id)}</td><td class="r">${pct(s.lf)} Auslastung</td><td class="r neg">${eur(s.n ? s.db2 / s.n : 0)} pro Tag</td></tr>`).join('')}</tbody></table></div>` : ''}
     <p class="small muted">Typische Ursachen: zu große Flugzeuge für den Markt, Strecken mit starker Bahnkonkurrenz, ungenutzte Flugzeuge, dauerhaft Agenturpersonal, Preiskampf gegen Low-Cost-Airlines, ungesicherter Ölpreisschock.</p>
-    <div class="row"><button class="btn primary" id="goNew">${ui.mp ? 'Zurück zur Lobby' : 'Neue Airline gründen'}</button></div></div>`;
+    <div class="callout good"><b>Kein Grund aufzuhören.</b> Gründen Sie ${ui.mp ? 'in derselben Welt' : 'in dieser Welt'} eine neue Airline mit frischem Startkapital – Markt und Konkurrenz laufen einfach weiter.</div>
+    <div class="row"><button class="btn primary" id="goRestart">Neue Airline gründen</button><button class="btn" id="goNew">${ui.mp ? 'Zur Lobby' : 'Ganz neues Spiel'}</button></div></div>`;
   m.hidden = false;
-  m.onclick = (e) => { if (e.target.id === 'goNew') { if (ui.mp || ONLINE) { if (mpState.user) showLobby(); else showAuth(); } else showStart(false); } };
+  m.onclick = (e) => {
+    if (e.target.id === 'goRestart') showRestart(false);
+    else if (e.target.id === 'goNew') { if (ui.mp || ONLINE) { if (mpState.user) showLobby(); else showAuth(); } else showStart(false); }
+  };
+}
+/** Neustart: nach der Insolvenz oder freiwillig eine neue Airline in derselben Welt gründen. */
+function showRestart(voluntary) {
+  const pl = W.player, eq = (SM.DIFFICULTY[pl.difficulty] || SM.DIFFICULTY.normal).equity;
+  const others = new Set(W.humans.filter((h) => h.id !== pl.id).map((h) => h.code));
+  const m = modal(`<h1>${voluntary ? 'Airline aufgeben' : 'Neustart'}</h1>
+    <p class="ink2">${voluntary ? `<b>${esc(pl.name)}</b> wird abgewickelt: Leasingflugzeuge gehen zurück, eigene werden verwertet, Strecken, Personal, Slots und offene Angebote verfallen. ` : ''}Ihre neue Airline startet ${ui.mp ? 'in derselben Welt' : 'in dieser Welt'} am ${dateLong(W.day)} mit <b>${eur(eq)}</b> Startkapital. Ihre Assistenz bleibt an Bord.</p>
+    <form id="rsForm" class="stack">
+      ${airlineFields('rs', '', '')}
+      ${others.size ? `<p class="small muted">Schon vergeben: ${[...others].map(esc).join(', ')}</p>` : ''}
+      ${voluntary ? `<label class="chk"><input type="checkbox" id="rsOk"> <span>Ja, ich gebe ${esc(pl.name)} endgültig auf.</span></label>` : ''}
+      <p class="small neg" id="formErr" hidden></p>
+      <div class="row"><button class="btn" type="button" id="rsBack">${voluntary ? 'Abbrechen' : 'Zurück'}</button><button class="btn primary" type="submit" style="margin-left:auto">Neu gründen</button></div>
+    </form>`);
+  const bs = $('#rsBase'); if (bs) bs.value = pl.bases[0];
+  $('#rsName').placeholder = 'z. B. ' + (pl.name.endsWith(' II') ? pl.name.slice(0, -3) + ' III' : pl.name + ' II');
+  $('#rsBack').addEventListener('click', () => { if (voluntary) m.hidden = true; else { ui.gameOverShown = false; gameOver(); } });
+  $('#rsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const a = readAirline('rs');
+    if (a.name.length < 2) return formError('Bitte einen Namen mit mindestens 2 Zeichen angeben.');
+    if (!/^[A-Z0-9]{2}$/.test(a.code)) return formError('Das Kürzel braucht genau 2 Buchstaben oder Ziffern.');
+    if (others.has(a.code)) return formError(`Das Kürzel ${a.code} ist schon vergeben.`);
+    if (voluntary && !$('#rsOk').checked) return formError('Bitte bestätigen Sie, dass Sie die Airline aufgeben.');
+    try {
+      if (ui.mp) {
+        await api(`/games/${ui.mp.id}/restart`, { body: { airline: a, force: voluntary } });
+        m.hidden = true; ui.gameOverShown = false; mpState.ver = ''; mpState.busy = false;
+        await mpPoll(true);
+        api(`/games/${ui.mp.id}/info`).then((info) => { mpState.info = info; mpState.players = info.players; renderLegend(); }).catch(() => {});
+      } else {
+        const r = SM.restartHuman(W, W.playerId, a);
+        if (!r.ok) return formError(r.msg);
+        m.hidden = true;
+        const keep = { hintSeen: ui.hintSeen }; resetUi(); Object.assign(ui, keep); startWorld(); saveGame(false);
+      }
+      ui.logo = null;
+      toast(`${a.name} ist gegründet – viel Erfolg beim zweiten Anlauf!`);
+      if (asst()) bubble('good', `Neuer Anlauf mit <b>${esc(a.name)}</b>. Mein Rat: klein anfangen – zwei, drei Flugzeuge auf Strecken mit viel Nachfrage und wenig Konkurrenz, und den Kontostand im Blick behalten.`, { noPre: true, title: 'Neustart', btn: '<button class="btn small primary" data-act="tab" data-tab="plan">Strecke planen</button>' });
+    } catch (err) { formError(err.message); }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -3113,7 +3192,7 @@ function showGuide(onDone = null, page = 0) {
 // ---------- Anmeldung ----------
 function showAuth(mode = 'login') {
   setSpeed(0);
-  const m = modal(`<div><h1>Sky<span>market</span></h1><p class="ink2">Airline-Wirtschaftssimulation für bis zu vier Personen pro Spiel. Melden Sie sich an oder legen Sie ein Konto an.</p></div>
+  const m = modal(`<div><h1>Sky<span>market</span></h1><p class="ink2">Airline-Wirtschaftssimulation: eine dauerhafte Hauptwelt für alle und private Runden für bis zu vier Personen. Melden Sie sich an oder legen Sie ein Konto an.</p></div>
     <div class="seg" role="tablist"><button data-mode="login" aria-pressed="${mode === 'login'}">Anmelden</button><button data-mode="register" aria-pressed="${mode === 'register'}">Konto anlegen</button></div>
     <form id="authForm" class="stack">
       <label class="f"><span>Benutzername</span><input type="text" id="auUser" autocomplete="username" maxlength="20" required></label>
@@ -3140,6 +3219,7 @@ async function showLobby(tab = null) {
   setSpeed(0);
   if (mpState.pendingJoin) { const pj = mpState.pendingJoin; mpState.pendingJoin = null; return showJoin(pj.code, pj.token); }
   const m = modal(`<div class="spread"><h1>Sky<span>market</span></h1><div class="row small"><span class="muted">Angemeldet als <b>${esc(mpState.user.name)}</b>${mpState.user.admin ? ' <span class="chip me">Admin</span>' : ''}</span><button class="btn small" id="lbLogout">Abmelden</button></div></div>
+    <section class="mainworld" id="lbMain"><p class="small muted">Lade die Hauptwelt …</p></section>
     <div class="lobby">
       <section class="stack"><div class="spread"><h3>Meine Spiele</h3><button class="btn small primary" id="lbNew">Neues Spiel</button></div><div id="lbMine" class="glist"><p class="small muted">Lade …</p></div></section>
       ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3><span class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</span></div><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
@@ -3166,6 +3246,7 @@ async function showLobby(tab = null) {
       api(`/games/${d.dataset.del}/delete`, { body: {} }).then(() => { toast('Spiel gelöscht.'); showLobby(); }).catch((err) => toast(err.message));
     }
   });
+  loadMainCard();
   try {
     const mine = await api('/games/mine');
     $('#lbMine').innerHTML = mine.games.length ? mine.games.map(gameCard).join('') : '<p class="small muted">Noch keine Spiele. Legen Sie eines an oder treten Sie einem bei.</p>';
@@ -3176,6 +3257,21 @@ async function showLobby(tab = null) {
     catch (e) { $('#lbAdmin').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
   }
 }
+// ---------- Hauptwelt: dauerhafte gemeinsame Welt ----------
+const MAIN_CODE = 'HAUPTW';
+async function loadMainCard() {
+  const box = $('#lbMain'); if (!box) return;
+  try {
+    const g = await api('/main');
+    const sp = SM.SPEEDS[g.speed] || SM.SPEEDS.h1, perDay = sp.ms ? Math.round(86400000 / sp.ms) : 0;
+    box.innerHTML = `<div class="mw-head"><div><span class="chip good">Dauerspiel</span><h2>Hauptwelt</h2>
+        <p class="ink2">Eine gemeinsame Welt für alle Angemeldeten. Sie läuft rund um die Uhr weiter – ${sp.ms ? `${esc(sp.short)} Spielzeit, also rund ${n0(perDay)} Spieltage pro echtem Tag` : 'gerade angehalten'}. Bauen Sie Ihre Airline über Wochen auf und schauen Sie täglich vorbei.</p></div>
+        <div class="mw-stats"><div><b>${dateShortY(g.day)}</b><span>Spieltag ${n0(g.day + 1)}</span></div><div><b>${g.players}/${g.max}</b><span>Airlines</span></div><div><b>${g.online}</b><span>zuletzt aktiv</span></div></div></div>
+      <div class="row">${g.member ? `<span class="small">Ihre Airline: <b>${esc(g.airlineName || '')}</b></span><button class="btn primary" data-open="main" style="margin-left:auto">Weiterspielen</button>`
+        : g.players >= g.max ? '<span class="chip">Die Hauptwelt ist gerade voll.</span>' : `<span class="small muted">Sie starten mit vollem Startkapital, egal wie lange die Welt schon läuft.</span><button class="btn primary" data-join="${MAIN_CODE}" style="margin-left:auto">Airline gründen</button>`}</div>`;
+  } catch (e) { if (e.status === 401) return showAuth(); box.innerHTML = `<p class="small neg">Hauptwelt nicht erreichbar: ${esc(e.message)}</p>`; }
+}
+const dateShortY = (day) => { const p = dateParts(day); return `${p.d}. ${MONTHS[p.m]} ${p.y}`; };
 function adminCard(g) {
   return `<div class="gcard"><div style="min-width:0"><b>${esc(g.name)}</b> ${g.locked ? '<span class="chip">🔒 Passwort</span>' : ''}
     <div class="small muted">Code ${esc(g.code)} · Leitung ${esc(g.hostName || '–')} · ${g.players}/${g.max} Airlines · Tag ${g.day + 1} · angelegt ${new Date(g.created).toLocaleDateString('de-DE')}${g.names ? ' · ' + g.names.map(esc).join(', ') : ''}</div></div>
@@ -3199,10 +3295,10 @@ function showCreate() {
         <label class="f"><span>Passwort (optional)</span><input type="password" id="crPw" autocomplete="new-password" placeholder="leer lassen = offen"></label></div>
       <div class="grid2"><label class="f"><span>Schwierigkeit</span><select id="crDiff">${Object.entries(SM.DIFFICULTY).map(([k, d]) => `<option value="${k}" ${k === 'normal' ? 'selected' : ''}>${d.label} · ${n0(d.equity / 1e6)} Mio. € Startkapital</option>`).join('')}</select></label>
         <label class="f"><span>Konkurrenz</span><select id="crRivals">${Object.entries(SM.RIVALS).map(([k, r]) => `<option value="${k}" ${k === 'normal' ? 'selected' : ''}>${r.label} – ${r.desc}</option>`).join('')}</select></label>
-        <label class="f"><span>Tempo</span><select id="crSpeed">${Object.entries(SM.SPEEDS).filter(([, v]) => !v.local).map(([k, v]) => `<option value="${k}" ${k === 'h1' ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label></div>
+        <label class="f"><span>Tempo</span><select id="crSpeed">${Object.entries(SM.SPEEDS).filter(([, v]) => !v.local).map(([k, v]) => `<option value="${k}" ${k === 'm30' ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label></div>
       ${airlineFields('cra', mpState.user.name.slice(0, 20) + ' Air', mpState.user.name.slice(0, 2).toUpperCase())}
       ${assistantPicker('cr')}
-      <p class="small muted">Bis zu vier Personen, jede mit eigener Airline. Sie leiten das Spiel und bestimmen das Tempo. Die langsamen Stufen (1 Std., 10 Min. oder 1 Min. pro Spieltag) laufen auch weiter, wenn niemand online ist – ideal für Partien über Tage. Die schnellen Stufen halten nach einer Minute ohne Spielende an.</p>
+      <p class="small muted">Bis zu vier Personen, jede mit eigener Airline. Sie leiten das Spiel und bestimmen das Tempo. Die langsamen Stufen (1 Std., 30 Min., 10 Min. oder 1 Min. pro Spieltag) laufen auch weiter, wenn niemand online ist – ideal für Partien über Tage. Die schnellen Stufen halten nach einer Minute ohne Spielende an.</p>
       <p class="small neg" id="formErr" hidden></p>
       <div class="row"><button class="btn" type="button" id="crBack">Zurück</button><button class="btn primary" type="submit" style="margin-left:auto">Spiel anlegen</button></div>
     </form>`);
@@ -3224,7 +3320,8 @@ async function showJoin(code, token = null) {
   const needPw = g.locked && !g.tokenOk && !g.adminOk;
   const taken = new Set(g.codes || []);
   const m = modal(`<h1>${esc(g.name)}</h1>
-    <p class="ink2">Code ${esc(g.code)} · ${g.players}/${g.max} Airlines${g.names && g.names.length ? ': ' + g.names.map(esc).join(', ') : ''} · Tag ${g.day + 1}</p>
+    <p class="ink2">Code ${esc(g.code)} · ${g.players}/${g.max} Airlines${g.names && g.names.length ? ': ' + g.names.slice(0, 8).map(esc).join(', ') + (g.names.length > 8 ? ` und ${g.names.length - 8} weitere` : '') : ''} · Tag ${g.day + 1}</p>
+    ${g.main ? '<p class="small ink2">Die Hauptwelt läuft dauerhaft weiter – auch wenn Sie offline sind. Planen Sie so, dass Ihre Airline ein paar Tage ohne Sie auskommt, und schauen Sie täglich vorbei.</p>' : ''}
     ${g.players >= g.max ? '<div class="callout warn">Das Spiel ist voll.</div><div class="row"><button class="btn" id="jnBack">Zurück</button></div>' : `
     <form id="jnForm" class="stack">
       ${needPw ? '<label class="f"><span>Passwort des Spiels</span><input type="password" id="jnPw" autocomplete="off" required></label>' : g.locked ? `<div class="callout good">${g.tokenOk ? 'Einladungslink erkannt' : 'Als Admin'}, kein Passwort nötig.</div>` : ''}
@@ -3252,17 +3349,19 @@ async function enterGame(id) {
   try {
     const info = await api(`/games/${id}/info`);
     mpState.info = info; mpState.players = info.players; mpState.ver = ''; mpState.lastInfo = Date.now();
-    ui.mp = { id, airlineId: info.me.airlineId, host: info.me.host, code: info.code, name: info.name, invite: info.invite };
+    ui.mp = { id, airlineId: info.me.airlineId, host: info.me.host, code: info.code, name: info.name, invite: info.invite, main: !!info.main };
+    // Stand vom letzten Besuch lesen, bevor der erste Abruf ihn überschreibt
+    const seenKey = `skymarket-seen-${id}-${ui.mp.airlineId}`;
+    let seen = null; try { seen = JSON.parse(localStorage.getItem(seenKey) || 'null'); } catch (e) { /* egal */ }
+    mpState.seenKey = null;
     W = null;
     await mpPoll(true);
     if (!W) throw new Error('Spielstand nicht geladen.');
     $('#modal').hidden = true;
     applyOnlineChrome();
-    const seenKey = `skymarket-seen-${id}-${ui.mp.airlineId}`;
-    let seen = null; try { seen = JSON.parse(localStorage.getItem(seenKey) || 'null'); } catch (e) { /* egal */ }
     if (mpState.pendingAssistant) { const pa = mpState.pendingAssistant; mpState.pendingAssistant = null; setAssistant(pa); refreshAll(); greet(); }
     else if (!asst()) showAssistantPick();
-    else if (seen && W.day > seen.day) awayReport(W.day - seen.day, seen.cash);
+    else if (seen && W.day > seen.day) awayReport(W.day - seen.day, seen);
     else toast(`Willkommen in „${info.name}“`);
     mpState.seenKey = seenKey;
   } catch (e) { ui.mp = null; toast(e.message); showLobby(); }
@@ -3325,7 +3424,7 @@ function applyServerState(s, ver, first) {
   }
   const pl = W.player;
   if (!pl) return;
-  try { if (mpState.seenKey) localStorage.setItem(mpState.seenKey, JSON.stringify({ day: W.day, cash: netCash(pl) })); } catch (e) { /* egal */ }
+  try { if (mpState.seenKey) localStorage.setItem(mpState.seenKey, JSON.stringify(snapOf(pl))); } catch (e) { /* egal */ }
   if (pl.status === 'insolvent') { gameOver(); return; }
   if (prev && W.day !== prev.day) {
     if (pl.decisions.length > prev.dec && openDecisions().length && !asst()) toast('Entscheidung nötig: Die Gewerkschaft droht mit Streik.');
@@ -3363,12 +3462,16 @@ function showInvite() {
 function colorOfId(id) { const al = W && W.airlines[id]; return al ? colorOf(al) : 'var(--ink-3)'; }
 function playersCard() {
   if (!ui.mp) return '';
-  const rows = W.humans.map((al) => {
-    const p = mpState.players.find((x) => x.airlineId === al.id) || {};
+  const pinfo = (al) => mpState.players.find((x) => x.airlineId === al.id) || {};
+  const eqOf = (al) => SM.balanceSheet(al).equity;
+  const all = W.humans.slice().sort((a, b) => (b.id === W.playerId) - (a.id === W.playerId) || (!!pinfo(b).online - !!pinfo(a).online) || (a.status === 'insolvent') - (b.status === 'insolvent') || eqOf(b) - eqOf(a));
+  const LIM = 12, more = Math.max(0, all.length - LIM);
+  const rows = all.slice(0, LIM).map((al) => {
+    const p = pinfo(al);
     return `<tr><td><span class="lgi">${logoSvg(al, 18)}</span> ${esc(al.name)}${al.id === W.playerId ? ' <span class="chip me">Sie</span>' : ''}${al.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}</td><td class="small muted">${esc(p.name || '')}${p.online ? ' · online' : ''}</td><td class="r">${al.fleet.length} Flz.</td><td class="r">${al.activeRoutes().length} Str.</td></tr>`;
   }).join('');
-  return `<div class="stack"><div class="spread"><h2 class="sec">Mitspielende <small>${esc(ui.mp.name)} · Code ${esc(ui.mp.code)}</small></h2><span class="row" style="gap:6px"><button class="btn small" data-act="openchat">Chat</button><button class="btn small" data-act="invite">Einladen</button></span></div><table class="t"><tbody>${rows}</tbody></table>
-    ${mpState.clock ? `<p class="small muted">Tempo: ${SM.SPEEDS[SM.speedKey(mpState.clock.speed)].label}${ui.mp.host ? ' · Sie leiten das Spiel und stellen das Tempo oben ein.' : ' · Die Spielleitung stellt das Tempo ein.'}${ui.mpOffline ? ' · <span class="neg">Verbindung unterbrochen</span>' : ''}</p>` : ''}</div>`;
+  return `<div class="stack"><div class="spread"><h2 class="sec">${ui.mp.main ? 'Airlines in der Hauptwelt' : 'Mitspielende'} <small>${esc(ui.mp.name)}${ui.mp.main ? ` · ${W.humans.length} Airlines` : ` · Code ${esc(ui.mp.code)}`}</small></h2><span class="row" style="gap:6px"><button class="btn small" data-act="openchat">Chat</button><button class="btn small" data-act="invite">Einladen</button></span></div><table class="t"><tbody>${rows}</tbody></table>${more ? `<p class="small muted">… und ${more} weitere Airlines. Die vollständige Rangliste steht unter Markt → Wettbewerb.</p>` : ''}
+    ${mpState.clock ? `<p class="small muted">Tempo: ${SM.SPEEDS[SM.speedKey(mpState.clock.speed)].label}${ui.mp.main ? ' · Hauptwelt: läuft dauerhaft, auch wenn Sie offline sind' + (ui.mp.host ? ' · Als Admin stellen Sie das Tempo ein.' : '') : ui.mp.host ? ' · Sie leiten das Spiel und stellen das Tempo oben ein.' : ' · Die Spielleitung stellt das Tempo ein.'}${ui.mpOffline ? ' · <span class="neg">Verbindung unterbrochen</span>' : ''}</p>` : ''}</div>`;
 }
 async function onlineBoot() {
   const q = new URLSearchParams(location.search);
@@ -3419,13 +3522,36 @@ function resumeLocal(save) {
   ui.rtDay = localDayNum();
   return n;
 }
-function awayReport(days, cash0) {
-  const pl = W.player, cash = netCash(pl), d = typeof cash0 === 'number' ? cash - cash0 : null;
-  const txt = `Willkommen zurück! Seit Ihrem letzten Besuch sind <b>${n0(days)} ${days === 1 ? 'Tag' : 'Tage'}</b> vergangen. Kontostand ${eur(cash)}${d !== null ? ` (${eur(d, { plus: true })})` : ''}.`;
-  if (asst()) {
-    const h = assistantHints()[0];
-    bubble(d !== null && d < 0 ? 'warn' : 'good', txt + (h ? ` Als Nächstes: ${h.html}` : ''), { noPre: true, title: 'Während Sie weg waren', btn: h ? hintBtn(h) : '<button class="btn small" data-act="tab" data-tab="news">Meldungen</button>' });
-  } else toast(`${days} Tage vergangen · Kontostand ${eur(cash)}`);
+const snapOf = (pl) => ({ day: W.day, cash: netCash(pl), ni: pl.ledger.netIncome(), pax: Math.round(pl.paxTotal || 0), name: pl.name });
+/** Tagesbericht beim Wiederkommen: was ist passiert, seit Sie zuletzt da waren? */
+function awayReport(days, seen) {
+  const pl = W.player, cash = netCash(pl);
+  const snap = typeof seen === 'number' ? { cash: seen } : seen || {};
+  const same = !snap.name || snap.name === pl.name;
+  const d = same && typeof snap.cash === 'number' ? cash - snap.cash : null;
+  const ni = same && typeof snap.ni === 'number' ? pl.ledger.netIncome() - snap.ni : null;
+  const pax = same && typeof snap.pax === 'number' ? Math.round(pl.paxTotal || 0) - snap.pax : null;
+  const from = typeof snap.day === 'number' ? snap.day : W.day - days;
+  const evs = pl.events.filter((e) => e.day > from && (e.kind === 'crit' || e.kind === 'warn' || e.kind === 'deal')).slice(-8).reverse();
+  const dec = openDecisions().length, inc = incomingDeals().length;
+  const h = asst() ? assistantHints()[0] : null;
+  if (days < 3) {
+    const txt = `Willkommen zurück! Seit Ihrem letzten Besuch ${days === 1 ? 'ist <b>1 Tag</b>' : `sind <b>${n0(days)} Tage</b>`} vergangen. Kontostand ${eur(cash)}${d !== null ? ` (${eur(d, { plus: true })})` : ''}.`;
+    if (asst()) bubble(d !== null && d < 0 ? 'warn' : 'good', txt + (h ? ` Als Nächstes: ${h.html}` : ''), { noPre: true, title: 'Während Sie weg waren', btn: h ? hintBtn(h) : '<button class="btn small" data-act="tab" data-tab="news">Meldungen</button>' });
+    else toast(`${days} ${days === 1 ? 'Tag' : 'Tage'} vergangen · Kontostand ${eur(cash)}`);
+    return;
+  }
+  const tile = (l, v, e = '') => `<div class="tile"><span>${l}</span><b>${v}</b>${e ? `<em>${e}</em>` : ''}</div>`;
+  const sg = (x) => `<span class="${x < 0 ? 'neg' : x > 0 ? 'pos' : ''}">${eur(x, { plus: true })}</span>`;
+  const m = modal(`<div class="spread"><div><h1 style="margin:0">Tagesbericht</h1><span class="small muted">${esc(pl.name)} · ${dateLong(from)} bis ${dateLong(W.day)} · ${n0(days)} Spieltage</span></div><button class="btn small" id="arClose">Schließen</button></div>
+    ${!same ? `<div class="callout info">Seit Ihrem letzten Besuch haben Sie neu gegründet: ${esc(snap.name)} → ${esc(pl.name)}.</div>` : ''}
+    <div class="tiles">${tile('Kontostand', eur(cash), d !== null ? sg(d) + ' seither' : '')}${ni !== null ? tile('Ergebnis im Zeitraum', sg(ni), 'Gewinn/Verlust nach Steuern') : ''}${pax !== null ? tile('Passagiere', n0(pax), `≈ ${n0(pax / Math.max(1, days))} pro Tag`) : ''}
+      ${tile('Flotte', `${pl.fleet.length} Flz.`, `${pl.activeRoutes().length} Strecken`)}${tile('Pünktlichkeit', playerOtp() === null ? '–' : pct(playerOtp()), `Marke ${n0(pl.brand * 100)}`)}${tile('Liquidität', pl.runway && isFinite(pl.runway) ? `${n0(pl.runway)} Tage` : 'stabil', pl.status !== 'active' ? `<span class="neg">${pl.status === 'insolvent' ? 'insolvent' : 'Restrukturierung'}</span>` : '')}</div>
+    ${dec || inc ? `<div class="callout warn">${dec ? `<b>${dec} offene Entscheidung${dec > 1 ? 'en' : ''}</b> warten auf Sie. ` : ''}${inc ? `<b>${inc} Angebot${inc > 1 ? 'e' : ''}</b> im Handelseingang.` : ''}</div>` : ''}
+    <div class="stack"><h3>Wichtige Meldungen</h3>${evs.length ? `<div class="stack" style="gap:6px">${evs.map((e) => `<div class="hint ${e.kind === 'deal' ? 'info' : e.kind}"><i></i><span><span class="small muted">${dateShort(e.day)}</span> ${esc(e.msg)}</span></div>`).join('')}</div>` : '<p class="small muted">Keine Warnungen – der Betrieb lief ruhig.</p>'}</div>
+    ${h ? `<div class="callout info"><span><b>${asstP() ? esc(asstP().name) + ' rät' : 'Als Nächstes'}:</b> ${h.html}</span></div>` : ''}
+    <div class="row">${dec ? '<button class="btn" data-ar="cockpit">Entscheidungen</button>' : ''}${inc ? '<button class="btn" data-ar="trade">Handel</button>' : ''}<button class="btn" data-ar="news">Alle Meldungen</button><button class="btn primary" data-ar="dashboard" style="margin-left:auto">Zum Dashboard</button></div>`);
+  m.onclick = (e) => { const b = e.target.closest('[data-ar]'); if (e.target.id === 'arClose' || b) { m.hidden = true; if (b) setTab(b.dataset.ar); } };
 }
 let lastTs = null;
 function frame(ts) {
@@ -3489,7 +3615,7 @@ function boot(hotData) {
     const sec = SECTIONS.find((x) => x.key === b.dataset.sec);
     setTab((ui.lastSub && ui.lastSub[sec.key]) || sec.tabs[0][0]);
   });
-  const play = () => speedChosen(ui.lastSpeed || (ui.mp ? 'h1' : 'x1'));
+  const play = () => speedChosen(ui.lastSpeed || (ui.mp ? 'm30' : 'x1'));
   $('#btnPause').addEventListener('click', () => speedChosen('p'));
   $('#btnPlay').addEventListener('click', play);
   $('#speedSel').addEventListener('change', (e) => speedChosen(e.target.value));
@@ -3533,7 +3659,7 @@ function boot(hotData) {
   }
   applyOnlineChrome();
   requestAnimationFrame(frame);
-  if (location.hash === '#debug') window.skymarketDebug = { world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui };
+  if (location.hash === '#debug') window.skymarketDebug = { world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState };
 }
 if (window.claude?.hot?.ready) window.claude.hot.ready(boot); else boot(window.claude?.hot?.data ?? {});
 })();

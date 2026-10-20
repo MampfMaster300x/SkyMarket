@@ -5,6 +5,9 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import SM from '../shared/engine.cjs';
 
 const MAX_PLAYERS = 4;
+// Hauptwelt: eine dauerhafte Welt für alle Angemeldeten, 1 Spieltag = 30 Minuten, Tempo nur durch Admins
+const MAIN_ID = 'main', MAIN_CODE = 'HAUPTW', MAIN_NAME = 'Hauptwelt';
+const MAIN_MAX = Math.max(4, Math.min(200, Number(process.env.MAIN_MAX_PLAYERS) || 60));
 const MAX_DAYS_PER_TICK = 30;          // Aufholen höchstens 30 Tage je Anfrage (Rest folgt mit der nächsten)
 const IDLE_CAP_MS = 60000;              // Schnelle Stufen: ohne Anfragen läuft höchstens eine Minute nach
 const SLOW_CAP_DAYS = 400;              // Langsame Stufen laufen auch offline weiter (bis 400 Tage Rückstand)
@@ -84,7 +87,7 @@ async function updateJson(store, key, fn, init = null, tries = 6) {
   }
   throw Object.assign(new Error('Gerade viel Betrieb, bitte noch einmal versuchen.'), { status: 409 });
 }
-const summary = (meta, extra = {}) => ({ id: meta.id, name: meta.name, code: meta.code, players: meta.players.length, max: meta.max, locked: !!meta.pw, created: meta.created,
+const summary = (meta, extra = {}) => ({ main: !!meta.main, id: meta.id, name: meta.name, code: meta.code, players: meta.players.length, max: meta.max, locked: !!meta.pw, created: meta.created,
   names: meta.players.map((p) => p.airlineName), ...extra });
 async function deleteGame(store, meta) {
   const id = meta.id;
@@ -145,6 +148,37 @@ async function loadMeta(store, id) { return store.get(K.meta(id), { type: 'json'
 function memberOf(meta, user) { return meta && meta.players.find((p) => p.u === user.key); }
 function clockHeader(md) { const key = SM.speedKey(md.speed), sp = SM.SPEEDS[key]; return JSON.stringify({ speed: key, ms: sp.ms, lastTick: md.lastTick || Date.now(), carry: md.carry || 0, now: Date.now(), day: md.day || 0 }); }
 
+/** Legt die Hauptwelt an, falls es sie noch nicht gibt, und liefert ihr Meta. */
+async function ensureMain(store) {
+  let meta = await loadMeta(store, MAIN_ID);
+  if (meta) return meta;
+  const now = Date.now();
+  const w = SM.newWorld({ difficulty: 'normal', rivals: 'normal', seed: randomBytes(4).readUInt32LE(0) });
+  w.playerId = null;
+  await store.set(K.state(MAIN_ID), packSized(w), { metadata: { speed: 'm30', lastTick: now, carry: 0, day: w.day, ver: 1 }, onlyIfNew: true });
+  await store.set(K.code(MAIN_CODE), MAIN_ID, { onlyIfNew: true });
+  meta = { id: MAIN_ID, name: MAIN_NAME, code: MAIN_CODE, main: true, invite: rnd(16, 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'), host: null, hostName: 'Admin', created: now, difficulty: 'normal', max: MAIN_MAX, pw: null, players: [] };
+  const res = await store.setJSON(K.meta(MAIN_ID), meta, { onlyIfNew: true });
+  if (res.modified === false) return loadMeta(store, MAIN_ID);
+  await indexUpsert(store, meta);
+  console.log('Hauptwelt angelegt');
+  return meta;
+}
+/** Stündlicher Lauf (Netlify Scheduled Function): Hauptwelt fortschreiben, auch wenn niemand online ist. */
+export async function tickMain(store) {
+  if (!(await loadMeta(store, MAIN_ID))) return { ok: false, msg: 'Keine Hauptwelt.' };
+  let days = 0;
+  for (let i = 0; i < 6; i++) {
+    const before = (await store.getMetadata(K.state(MAIN_ID)))?.metadata?.day || 0;
+    const r = await mutateState(store, MAIN_ID, null);
+    const after = r.md.day || before;
+    days += after - before;
+    if (!r.changed || after === before) break;
+  }
+  return { ok: true, days };
+}
+const canControl = (meta, user) => meta.host === user.key || (meta.main && isAdmin(user));
+
 // ---------------------------------------------------------------------------
 // Validierung
 // ---------------------------------------------------------------------------
@@ -193,10 +227,20 @@ export async function handle(req, { store }) {
     if (path === '/me') return user ? json({ name: user.name, key: user.key, admin: isAdmin(user) }) : fail(401, 'Nicht angemeldet.');
     if (!user) return fail(401, 'Bitte zuerst anmelden.');
 
+    // ---- Hauptwelt: Überblick für die Lobby (legt sie beim ersten Aufruf an) ----
+    if (path === '/main' && method === 'GET') {
+      const meta = await ensureMain(store);
+      const r = await mutateState(store, MAIN_ID, null);
+      const pres = (await store.get(K.presence(MAIN_ID), { type: 'json' })) || {};
+      const now = Date.now(), me = memberOf(meta, user);
+      return json({ ...summary(meta), main: true, day: r.md.day || 0, speed: SM.speedKey(r.md.speed), member: !!me, airlineName: me ? me.airlineName : null, admin: isAdmin(user),
+        online: Object.values(pres).filter((t) => now - t < 15 * 60000).length, codes: meta.players.map((p) => p.code) });
+    }
+
     // ---- Spielelisten ----
     if (path === '/games/mine' && method === 'GET') {
       const u = await store.get(K.user(user.key), { type: 'json' });
-      const metas = (await Promise.all((u && u.games ? u.games : []).slice(-30).map((id) => loadMeta(store, id)))).filter(Boolean);
+      const metas = (await Promise.all((u && u.games ? u.games : []).filter((g) => g !== MAIN_ID).slice(-30).map((id) => loadMeta(store, id)))).filter(Boolean);
       const out = [];
       for (const m of metas.reverse()) {
         const st = await store.getMetadata(K.state(m.id));
@@ -209,7 +253,7 @@ export async function handle(req, { store }) {
       const list = (await store.get(K.index, { type: 'json' })) || [];
       const u = await store.get(K.user(user.key), { type: 'json' });
       const mine = new Set((u && u.games) || []);
-      const hits = list.filter((g) => (q ? g.name.toLowerCase().includes(q) || g.code.toLowerCase() === q : g.players < g.max)).slice(0, 30)
+      const hits = list.filter((g) => g.id !== MAIN_ID).filter((g) => (q ? g.name.toLowerCase().includes(q) || g.code.toLowerCase() === q : g.players < g.max)).slice(0, 30)
         .map((g) => ({ ...g, member: mine.has(g.id) }));
       return json({ games: hits });
     }
@@ -241,7 +285,7 @@ export async function handle(req, { store }) {
       if (name.length < 3) return fail(400, 'Der Spielname braucht mindestens 3 Zeichen.');
       const al = validAirline(body.airline); if (al.error) return fail(400, al.error);
       const difficulty = SM.DIFFICULTY[body.difficulty] ? body.difficulty : 'normal';
-      const speed = SM.SPEEDS[body.speed] && !SM.SPEEDS[body.speed].local ? body.speed : 'h1';
+      const speed = SM.SPEEDS[body.speed] && !SM.SPEEDS[body.speed].local ? body.speed : 'm30';
       const pw = typeof body.password === 'string' && body.password.length ? body.password.slice(0, 200) : null;
       const id = rnd(10, 'abcdefghijkmnpqrstuvwxyz23456789');
       let code = null;
@@ -276,7 +320,7 @@ export async function handle(req, { store }) {
         const al = validAirline(body.airline, meta); if (al.error) return fail(400, al.error);
         let airlineId = null;
         await mutateState(store, id, (w) => {
-          if (w.humans.length >= MAX_PLAYERS) throw Object.assign(new Error('Das Spiel ist voll.'), { status: 409 });
+          if (w.humans.length >= (meta.max || MAX_PLAYERS)) throw Object.assign(new Error('Das Spiel ist voll.'), { status: 409 });
           const hmn = SM.addHuman(w, { name: al.name, code: al.code, base: al.base, owner: user.key });
           airlineId = hmn.id;
         });
@@ -291,14 +335,14 @@ export async function handle(req, { store }) {
         console.log(`Admin ${user.key} hat das Spiel ${meta.id} (${meta.name}) gelöscht.`);
         return json({ ok: true });
       }
-      const me = memberOf(meta, user);
+      const me = memberOf(meta, user) || (op === 'control' && meta.main && isAdmin(user) ? { u: user.key, airlineId: null } : null);
       if (!me) return fail(403, 'Sie sind in diesem Spiel nicht angemeldet.');
 
       if (op === 'info' && method === 'GET') {
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
         const now = Date.now();
         return json({ id, name: meta.name, code: meta.code, invite: meta.invite, max: meta.max, locked: !!meta.pw,
-          me: { airlineId: me.airlineId, host: meta.host === user.key, admin: isAdmin(user) },
+          main: !!meta.main, me: { airlineId: me.airlineId, host: canControl(meta, user), admin: isAdmin(user) },
           players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000 })) });
       }
       if (op === 'state' && method === 'GET') {
@@ -340,13 +384,28 @@ export async function handle(req, { store }) {
       if (op === 'action' && method === 'POST') {
         const { action } = await readJson(req);
         if (!action || typeof action !== 'object' || typeof action.type !== 'string') return fail(400, 'Ungültige Aktion.');
-        if (action.type === 'setRivals' && meta.host !== user.key && !isAdmin(user)) return fail(403, 'Die Stärke der Konkurrenz stellt nur die Spielleitung ein.');
+        if (action.type === 'setRivals' && !canControl(meta, user) && !isAdmin(user)) return fail(403, 'Die Stärke der Konkurrenz stellt nur die Spielleitung ein.');
         const r = await mutateState(store, id, (w) => SM.applyAction(w, me.airlineId, action));
         const res = r.result || { ok: false };
         return json({ ok: !!res.ok, msg: res.msg || null, ver: r.etag, day: r.md.day, id: res.id ?? null, status: res.status ?? null, reply: res.reply ?? null, counterId: res.counterId ?? null });
       }
+      // ---- Neustart: nach der Insolvenz (oder freiwillig) eine neue Airline unter derselben Kennung gründen ----
+      if (op === 'restart' && method === 'POST') {
+        const body = await readJson(req);
+        const al = validAirline(body.airline, { ...meta, players: meta.players.filter((p) => p.u !== user.key) }); if (al.error) return fail(400, al.error);
+        await mutateState(store, id, (w) => {
+          const cur = w.airlines[me.airlineId];
+          if (!cur) throw Object.assign(new Error('Ihre Airline wurde nicht gefunden.'), { status: 404 });
+          if (cur.status !== 'insolvent' && !body.force) throw Object.assign(new Error('Ihre Airline ist nicht insolvent.'), { status: 409 });
+          const r = SM.restartHuman(w, me.airlineId, { name: al.name, code: al.code, base: al.base });
+          if (!r.ok) throw Object.assign(new Error(r.msg || 'Neustart nicht möglich.'), { status: 400 });
+        });
+        const next = await updateJson(store, K.meta(id), (m) => { const p = m.players.find((x) => x.u === user.key); if (!p) return undefined; Object.assign(p, { airlineName: al.name, code: al.code, base: al.base, restarts: (p.restarts || 0) + 1, restarted: Date.now() }); return m; });
+        await indexUpsert(store, next);
+        return json({ ok: true, airlineId: me.airlineId });
+      }
       if (op === 'control' && method === 'POST') {
-        if (meta.host !== user.key) return fail(403, 'Nur die Spielleitung ändert das Tempo.');
+        if (!canControl(meta, user)) return fail(403, meta.main ? 'In der Hauptwelt stellen nur Admins das Tempo ein.' : 'Nur die Spielleitung ändert das Tempo.');
         const { speed, tz } = await readJson(req);
         if (!SM.SPEEDS[speed] || SM.SPEEDS[speed].local) return fail(400, 'Ungültiges Tempo.');
         const r = await mutateState(store, id, (w, md, now) => {

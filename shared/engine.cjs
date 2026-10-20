@@ -170,7 +170,9 @@ const SM = (() => {
     OWN_HANDLING_DAY: 2400, OWN_HANDLING_SHARE: 0.35, HANGAR_MONTH: 60000, HANGAR_MAINT: 0.94, HANGAR_CHECK_DAYS: 3,
     STAFF: {
       pilotSalary: { ATR: 10500, DH8: 11000, EJET: 12500, A220: 13500, A32F: 14500, B737: 14500, A330: 17000, A350: 18000, B787: 17500, B777: 18000 }, cabinSalary: 4600, techSalary: 6200,
-      pilotH: 2.2, cabinH: 2.5, techPerAc: 3.5, techMaintShare: 0.12,
+      // Crew je Flugzeug: ein Crew-Satz (je Sitzplatz im Cockpit/je Kabinenposition 4 Köpfe für Schichten und freie Tage)
+      // deckt bis 12 Blockstunden am Tag. Mehr Strecken auf demselben Flugzeug brauchen keine zusätzliche Crew.
+      crewPerSeat: 4, crewSetBh: 12, pilotH: 3, cabinH: 3, techPerAc: 3.5, techMaintShare: 0.12,
       recruit: { pilot: 9000, cabin: 1500, tech: 3500 }, lead: { pilot: 35, cabin: 12, tech: 21 },
       maxHire: { pilot: 24, cabin: 90, tech: 30 }, trainDays: 45, trainCost: 28000,
       agency: 1.6, overtime: 1.5, overtimeMax: 0.10, perDiem: 9, severanceMonths: 3, attrition: 0.01,
@@ -798,15 +800,26 @@ const SM = (() => {
       for (const g of STAFF_GROUPS) s += st.pil[g] * S.pilotSalary[g];
       return s * st.pay * cpi;
     }
-    staffNeedPlanned() {
-      // Bedarf an Köpfen für den aktuellen Flugplan (ohne Reserve)
-      const need = { pil: zeroGroups(), cab: 0, tech: 0 };
-      for (const r of this.activeRoutes()) {
-        const t = P.AIRCRAFT_TYPES[r.type_id], leg = blockHours(r.base, r.dest, r.type_id), bh = leg * 2 * r.freq;
-        need.pil[t.group] += pilotsFor(leg) * bh / P.STAFF.pilotH; need.cab += t.cabin * bh / P.STAFF.cabinH;
+    /** Crew-Bedarf je Flugzeug aus dem Einsatzplan: ein Crew-Satz je angefangene 12 Blockstunden am Tag. */
+    crewNeed(day, routes = null, horizon = 0) {
+      const S = P.STAFF, need = { pil: zeroGroups(), cab: 0, perAc: {} };
+      const { assign } = this.plan(day, routes || this.activeRoutes().filter((r) => r.opened_day <= day + horizon), horizon);
+      for (const a of this.fleet) {
+        let bh = 0, seats = 0;
+        for (const [r, , share] of assign[a.id] || []) { const leg = blockHours(r.base, r.dest, r.type_id); bh += leg * 2 * (share ?? 1); seats = Math.max(seats, pilotsFor(leg)); }
+        if (a.acmi && a.acmi.start <= day + horizon && a.acmi.end > day) { bh = Math.max(bh, 8); seats = Math.max(seats, 2); }
+        if (bh <= 0) continue;
+        const t = P.AIRCRAFT_TYPES[a.type_id], sets = Math.max(1, Math.ceil(bh / S.crewSetBh - 1e-6));
+        const pil = sets * seats * S.crewPerSeat, cab = sets * t.cabin * S.crewPerSeat;
+        need.pil[t.group] += pil; need.cab += cab;
+        need.perAc[a.id] = { group: t.group, bh, sets, pil, cab };
       }
-      need.tech = this.fleet.length * P.STAFF.techPerAc;
       return need;
+    }
+    staffNeedPlanned() {
+      // Bedarf an Köpfen für den aktuellen Flugplan (ohne Reserve), je Flugzeug gerechnet
+      const n = this.crewNeed(this._day ?? 0, null, P.LEASE_DELIVERY_DAYS);
+      return { pil: n.pil, cab: n.cab, tech: this.fleet.length * P.STAFF.techPerAc, perAc: n.perAc };
     }
   }
 
@@ -913,7 +926,7 @@ const SM = (() => {
   function laborPool(w, role) {
     const tight = role === 'pilot' ? w.macro.laborTight : 1 + (w.macro.laborTight - 1) * 0.4, month = Math.floor(w.day / 30);
     const used = w.labor && w.labor.m === month ? w.labor[role] || 0 : 0;
-    return { pool: Math.floor(P.STAFF.maxHire[role] * (1 + 0.5 * Math.max(0, w.humans.length - 1)) * 1.2 / tight), used };
+    return { pool: Math.floor(P.STAFF.maxHire[role] * (1 + 0.5 * Math.min(12, Math.max(0, w.humans.length - 1))) * 1.2 / tight), used };
   }
   /** Wie viele Flugzeuge eines Typs Leasinggeber auf Lager haben (gemeinsam für alle Airlines). */
   function stockCap(typeId) { const t = P.AIRCRAFT_TYPES[typeId]; if (['A20N', 'B38M', 'A21N'].includes(typeId)) return 10; return t.ill.kind === 'wide' ? 3 : 5; }
@@ -1282,6 +1295,7 @@ const SM = (() => {
 
     // Ein Tag
     step() {
+      for (const al of this.list) al._day = this.day;
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.completeDaily(al);
       expireDeals(this);
       const day = this.day, month = monthOf(day), dow = day % 7, cpi = this.macro.cpi;
@@ -1364,16 +1378,11 @@ const SM = (() => {
     staffCoverage(al) {
       const S = P.STAFF, st = al.staff, cpi = this.macro.cpi;
       const sick = this.events.some((e) => e.type === 'sickness' && e.airline === al.id && e.start <= this.day && e.end > this.day) ? 0.88 : 1;
-      const need = { pil: zeroGroups(), cab: 0 };
-      for (const r of al.activeRoutes()) {
-        if (!r.flyingToday) continue;
-        const t = P.AIRCRAFT_TYPES[r.type_id], leg = blockHours(r.base, r.dest, r.type_id), bh = leg * 2 * r.flyingToday;
-        need.pil[t.group] += pilotsFor(leg) * bh; need.cab += t.cabin * bh;
-      }
-      for (const a of al.fleet) if (a.acmi && a.acmi.start <= this.day && a.acmi.end > this.day && a.status !== 'aog') { const t = P.AIRCRAFT_TYPES[a.type_id]; need.pil[t.group] += 16; need.cab += t.cabin * 8; }
+      // Köpfe je Flugzeug im heutigen Einsatz (Crew-Sätze), nicht je Blockstunde
+      const cn = al.crewNeed(this.day), need = { pil: cn.pil, cab: cn.cab, perAc: cn.perAc };
       const techNeed = al.fleet.filter((a) => a.delivery_day <= this.day).length * S.techPerAc;
       const cov = { pil: {}, cab: 1, tech: techNeed ? Math.min(1, st.tech / techNeed) : 1, extraCost: 0, agencyH: 0, overtimeH: 0, cancel: { ...zeroGroups(), cab: 0 }, need, techNeed };
-      const cover = (capH, needH, hourly, key) => {
+      const cover = (capH, needH, hourly, key) => {   // hier in Köpfen; „hourly“ = Tagessatz je Kopf
         if (needH <= 0) return 1;
         capH *= sick;
         if (capH >= needH) return 1;
@@ -1384,8 +1393,9 @@ const SM = (() => {
         cov.cancel[key] = gap > 0 ? gap / needH : 0;
         return 1 - cov.cancel[key];
       };
-      for (const g of STAFF_GROUPS) cov.pil[g] = cover(st.pil[g] * S.pilotH, need.pil[g], al.staffHourly('pilot', g), g);
-      cov.cab = cover(st.cab * S.cabinH, need.cab, al.staffHourly('cabin'), 'cab');
+      const daily = (sal) => sal * st.pay / 30.4;
+      for (const g of STAFF_GROUPS) cov.pil[g] = cover(st.pil[g], need.pil[g], daily(S.pilotSalary[g]), g);
+      cov.cab = cover(st.cab, need.cab, daily(S.cabinSalary), 'cab');
       st.cov = cov;
       if (cov.extraCost > 0) al.ledger.post('staff_extra', -cov.extraCost);
     }
@@ -1782,8 +1792,8 @@ const SM = (() => {
       const cov = st.cov;
       let overload = 0;
       if (cov) {
-        for (const g of STAFF_GROUPS) if (cov.need.pil[g] > 0 && st.pil[g] > 0) overload = Math.max(overload, cov.need.pil[g] / (st.pil[g] * S.pilotH) - 1);
-        if (cov.need.cab > 0 && st.cab > 0) overload = Math.max(overload, cov.need.cab / (st.cab * S.cabinH) - 1);
+        for (const g of STAFF_GROUPS) if (cov.need.pil[g] > 0 && st.pil[g] > 0) overload = Math.max(overload, cov.need.pil[g] / st.pil[g] - 1);
+        if (cov.need.cab > 0 && st.cab > 0) overload = Math.max(overload, cov.need.cab / st.cab - 1);
       }
       const target = clamp(0.62 + 1.6 * (st.pay - (this.macro.wage || 1)) - 1.2 * Math.max(0, Math.min(overload, 0.3)) + lv3([0, 0.05, 0.1, 0.15], al.skill('hr')), 0.05, 0.97);
       st.morale = clamp(st.morale + 0.35 * (target - st.morale), 0, 1);
@@ -2490,6 +2500,7 @@ const SM = (() => {
   const SPEEDS = {
     p: { label: 'Pause', short: 'Pause', ms: 0, slow: false },
     h1: { label: 'Langzeit (1 Tag = 1 Std.)', short: '1 Std./Tag', ms: 3600000, slow: true },
+    m30: { label: 'Dauerspiel (1 Tag = 30 Min.)', short: '30 Min./Tag', ms: 1800000, slow: true },
     m10: { label: 'Gemächlich (1 Tag = 10 Min.)', short: '10 Min./Tag', ms: 600000, slow: true },
     m1: { label: 'Zügig (1 Tag = 1 Min.)', short: '1 Min./Tag', ms: 60000, slow: true, noTheme: true },
     x1: { label: 'Schnell (1 Tag = 12 Sek.)', short: '1×', ms: 12000, slow: false },
@@ -2503,14 +2514,44 @@ const SM = (() => {
   function addHuman(w, { id = null, name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = null, owner = null } = {}) {
     if (!P.AIRPORTS[base]) throw new Error('Unbekannter Flughafen');
     const diff = DIFFICULTY[difficulty || w.difficulty] || DIFFICULTY.normal;
-    id = id || HUMAN_IDS.find((x) => !w.airlines[x]);
+    if (!id) { id = HUMAN_IDS.find((x) => !w.airlines[x]); for (let n = 5; !id; n++) if (!w.airlines['P' + n]) id = 'P' + n; }
     const humans = w.humans.length;
-    const al = w.add(new Airline(id, name, base, null, diff.equity, 99, humans + 1));
+    const al = w.add(new Airline(id, name, base, null, diff.equity, 99, (humans % 8) + 1));
     al.code = code; al.difficulty = difficulty || w.difficulty || 'normal'; al.owner = owner; al.joinedDay = w.day;
     al.station(base);
     al.log(w.day, `${name} gegründet in ${ap(base).name}, Startkapital ${(diff.equity / 1e6).toFixed(0)} Mio. EUR`, 'info');
     if (humans > 0 || w.day > 0) w.pushNews(w.day, `Neue Airline am Markt: ${name} mit Basis ${ap(base).name}`, 'info', id);
+    al._day = w.day;
     return al;
+  }
+  /**
+   * Neustart einer menschlichen Airline (nach Insolvenz oder freiwillig): Die alte Gesellschaft wird abgewickelt,
+   * unter derselben Kennung startet eine neue Airline mit vollem Startkapital. Leasingflugzeuge gehen an die
+   * Leasinggeber zurück, offene Handelsangebote, Kooperationen und Gebote verfallen.
+   */
+  function restartHuman(w, id, { name, code, base, difficulty = null } = {}) {
+    const old = w.airlines[id];
+    if (!old || old.archetype) return { ok: false, msg: 'Unbekannte Airline.' };
+    if (!P.AIRPORTS[base]) return { ok: false, msg: 'Bitte eine Heimatbasis wählen.' };
+    const day = w.day, bs = balanceSheet(old);
+    for (const a of old.fleet) if (!a.owned) { w.lessorStock = w.lessorStock || {}; if (w.lessorStock[a.type_id] !== undefined) w.lessorStock[a.type_id]++; }
+    for (const d of w.deals || []) if (d.status === 'open' && (d.from === id || d.to === id)) d.status = 'expired';
+    w.agreements = (w.agreements || []).filter((g) => g.airline !== id && g.partner !== id);
+    w.coops = (w.coops || []).filter((c) => c.a !== id && c.b !== id);
+    for (const a of w.auctions || []) if (!a.done && a.bids) delete a.bids[id];
+    for (const al of w.list) { if (al.grudge && al.grudge[id] !== undefined) delete al.grudge[id]; }
+    const past = [...(old.past || []), { name: old.name, code: old.code, from: old.joinedDay || 0, to: day, status: old.status, equity: Math.round(bs.equity), pax: Math.round(old.paxTotal || 0) }].slice(-10);
+    const wasInsolvent = old.status === 'insolvent';
+    if (!wasInsolvent) w.pushNews(day, `${old.name} stellt den Flugbetrieb ein und wird abgewickelt`, 'warn', id);
+    const pos = w.order.indexOf(id);
+    delete w.airlines[id];
+    w.order = w.order.filter((k) => k !== id);
+    const al = addHuman(w, { id, name: name || old.name, code: code || old.code, base, difficulty: difficulty || old.difficulty, owner: old.owner });
+    // dieselbe Stelle in der Reihenfolge und dieselbe Farbe wie bisher
+    w.order = w.order.filter((k) => k !== id); w.order.splice(pos < 0 ? w.order.length : pos, 0, id);
+    al.color = old.color; al.past = past; al.assistant = old.assistant || null; al.logo = old.logo && al.name === old.name ? old.logo : null;
+    al.log(day, `Neustart: ${old.name} wurde ${wasInsolvent ? 'nach der Insolvenz ' : ''}abgewickelt, ${al.name} beginnt mit frischem Kapital`, 'info');
+    return { ok: true, airline: al };
   }
   function newGame({ name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = 'normal', rivals = null, seed = (Date.now() >>> 0) } = {}) {
     const w = newWorld({ difficulty, rivals, seed });
@@ -3203,7 +3244,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -3227,9 +3268,11 @@ const SM = (() => {
       al.runway = runway === null ? Infinity : runway;
       al.rngForecast.s = rngF;
       Object.assign(al.ledger, ledger);
+      al._day = s.day;
       if (!al.poachLog) delete al.poachLog;
       if (!al.grudge) delete al.grudge;
       if (!al.academy) delete al.academy;
+      if (!al.past) delete al.past;
       al.routes = routes.map((r) => {
         const keys = r.hk ? AI_HIST_KEYS : HIST_KEYS;
         const { hist, hk, ...rr } = r;
@@ -3247,7 +3290,7 @@ const SM = (() => {
   return {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk,
-    evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
+    evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };

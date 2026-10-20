@@ -1,4 +1,4 @@
-# SKYMARKET Online (Testversion 0.10)
+# SKYMARKET Online (Testversion 0.11)
 
 Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Afrika), 24 KI-Airlines und gemeinsame Spiele mit bis zu vier Personen.
 
@@ -40,6 +40,11 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Datenblatt je Flugzeugmuster:** Jeder Mustername (Flotte, Beschaffung, Gebrauchtmarkt, Auktionen, Strecken, Flugzeugkarte, Planung) lässt sich anklicken. Das Datenblatt zeigt Sitzplätze, Reichweite, Geschwindigkeit, Crew, Verbrauch, Kosten und die größten erreichbaren Märkte mit Distanz und Blockzeit.
   - **Flughafen-Karte:** Ein Klick auf einen Flughafen zeigt direkt auf der Karte das Reisepotenzial zur eigenen Basis (beide Richtungen, Mix, Saison), Distanz, Bahn, Konkurrenz und die größten Märkte ab dort. Daraus geht es direkt in die Planung.
   - **Flugdistanz überall:** Die Planung, die Streckenliste und die Übersicht zeigen Distanz und Flugzeit. Auf der Karte trägt die geplante bzw. aufgeklappte Strecke ein Schild mit km und Stunden.
+  - **Crew je Flugzeug statt je Strecke:**
+    - Jedes Flugzeug im Einsatz braucht einen Crew-Satz: je Cockpitplatz 4 Piloten der Familie, je Kabinenposition 4 Flugbegleiterinnen (Schichten, freie Tage). Beim A320neo sind das 8 Piloten und 16 Flugbegleiterinnen.
+    - Ein Crew-Satz reicht für bis zu 12 Blockstunden am Tag. Weitere Strecken auf demselben Flugzeug brauchen keine zusätzliche Crew.
+    - Die Planung zeigt nur noch, ob ein Flugzeug eine (neue) Crew braucht.
+    - Unter Personal steht eine Übersicht „Crew je Flugzeug“.
   - **Fachkräfte geprüft:** Alle Wirkungen sind nachgemessen. Die Finanzfachkraft erhöht die Kreditlinie jetzt wirklich um +25 / +50 / +100 %. Der Text zum Revenue Management wurde berichtigt.
   - **Leistung:** Der Spieltag rechnet etwa 30 % schneller, die Rechenspitze am Monatsende ist halbiert.
 - **Neu in 0.9 – härter und vernetzter:**
@@ -71,6 +76,7 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Rundgang zum Start:** Zu Beginn jeder Runde zeigt die Assistenz in zehn kurzen Schritten, wo was zu finden ist. Die gezeigte Stelle ist hervorgehoben, den Rundgang kann man überspringen. Er kommt einmal je Spiel und Browser und lässt sich über das Menü oder „Erste Schritte“ wiederholen.
   - **Planung:** Eigene Flugzeugtypen stehen in der Typauswahl oben unter „Ihre Flugzeuge“ (★) und darunter als fette Schnellwahl-Knöpfe.
   - **Bedienung:** Die Bereichsleiste (Karte, Flotte, Strecken, Finanzen, Markt, Unternehmen) sitzt direkt über dem rechten Block. Der Block lässt sich an seinem linken Rand breiter oder schmaler ziehen; Doppelklick stellt die Standardbreite wieder her. Die Breite merkt sich der Browser.
+  - **Handy:** Unter 760 px Breite bleibt die Kopfzeile mit Uhr, Pause/Weiter und Tempo oben fest, die sechs Bereiche liegen als Leiste unten am Daumen. Die Unterreiter scrollen seitlich und bleiben beim Scrollen sichtbar. Ein Bereichswechsel springt direkt zum Inhalt (Karte: nach oben). Tabellen scrollen seitlich statt die Seite zu verbreitern, Kacheln stehen zweispaltig, Flottenzeilen untereinander. Dialoge (Datenblatt, Angebote) öffnen als Blatt von unten, die Flughafenkarte bleibt kompakt mit festen Knöpfen. Eingabefelder haben 16 px, damit iOS beim Antippen nicht hineinzoomt. Das Design (hell/dunkel) wechselt man dort im Menü hinter dem Kürzel oben rechts.
 - **Neu in 0.8:**
   - **Chat** im Mehrspieler: an alle oder privat an eine Airline (Sprechblasen-Symbol oben, Zähler für Ungelesenes). Gespeichert in einem eigenen Blob je Spiel (letzte 300 Nachrichten).
   - **Logo gestalten** (Unternehmen → Profil & Logo): Form, Symbol und zwei Farben, aus Vorlagen oder frei. Erscheint in Seitenleiste, Menü, Handel, Mitspielerliste und auf dem Leitwerk.
@@ -102,6 +108,7 @@ Der Benutzer **Tim** (Groß-/Kleinschreibung egal) ist Admin. In der Lobby sieht
 |---|---|
 | `public/index.html` | Fertig gebaute Seite. Spiel, Karte, Lobby und Anmeldung stecken in einer Datei. |
 | `netlify/functions/api.mjs` | Netlify Function für alle Aufrufe unter `/api/*`. |
+| `netlify/functions/tick.mjs` | Stündliche Scheduled Function: schreibt die Hauptwelt fort, auch ohne Besuch. |
 | `server/api.mjs` | Konten, Spiele, Zeitfortschritt und Aktionen. Der Server hält den maßgeblichen Spielstand. |
 | `server/memstore.mjs` | Speicher-Ersatz für lokale Tests. Er verhält sich wie Netlify Blobs, inklusive Versionsprüfung. |
 | `shared/engine.cjs` | Wirtschaftskern. Browser und Server nutzen dieselbe Datei. |
@@ -160,13 +167,28 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Hauptwelt (Dauerspiel)
+
+- **Eine Welt für alle:** Jede angemeldete Person kann in der Hauptwelt genau eine Airline gründen (bis zu 60 Airlines, über die Umgebungsvariable `MAIN_MAX_PLAYERS` änderbar). Die Lobby zeigt sie ganz oben mit Spieltag, Zahl der Airlines und zuletzt aktiven Spielern.
+- **Läuft immer weiter:** 1 Spieltag = 30 Minuten, also rund 48 Spieltage pro echtem Tag – auch wenn niemand online ist. Die Netlify-Funktion `tick` (Scheduled Function, stündlich) schreibt die Welt fort; zusätzlich holt jeder Aufruf verpasste Tage nach. Das Tempo stellen nur Admins (auch ohne eigene Airline), Spielende können nicht pausieren.
+- **Angelegt wird sie automatisch** beim ersten Aufruf der Lobby. Löscht ein Admin sie, entsteht beim nächsten Aufruf eine frische Hauptwelt.
+- **Täglich vorbeischauen:** Wer nach drei oder mehr Spieltagen zurückkommt, bekommt einen **Tagesbericht**: Kontostand und Ergebnis im Zeitraum, Passagiere, Flotte, Pünktlichkeit, Liquidität, die wichtigsten Warnungen, offene Entscheidungen und Handelsangebote sowie den Rat der Assistenz. Das gilt auch für private Runden und das Offline-Spiel.
+- Neu: Tempostufe **„Dauerspiel (1 Tag = 30 Min.)“**, auch für private Runden wählbar (dort jetzt die Vorgabe).
+
+## Neustart nach der Pleite
+
+- Ist die Airline insolvent, bietet das Insolvenz-Fenster **„Neue Airline gründen“**: neuer Name, neues Kürzel, neue Heimatbasis, volles Startkapital – in **derselben Welt**, Markt und Konkurrenz laufen weiter. Das gilt in der Hauptwelt, in privaten Runden und im Offline-Spiel.
+- Freiwillig geht es auch: **Unternehmen → Profil & Logo → „Airline aufgeben und neu gründen“** (mit Bestätigung).
+- Die alte Airline wird abgewickelt: Leasingflugzeuge gehen an die Leasinggeber zurück, Strecken, Personal, Slots, offene Angebote, Kooperationen und Auktionsgebote verfallen. Die Assistenz bleibt.
+- Frühere Airlines stehen mit Zeitraum, Passagieren und Eigenkapital am Ende im Profil.
+
 ## So funktioniert ein gemeinsames Spiel
 
 - **Der Server rechnet, der Browser zeigt an.**
   - Jede Aktion (Flugzeug leasen, Strecke eröffnen, Personal einstellen …) wird lokal sofort geprüft und angezeigt.
   - Gleichzeitig geht sie an den Server. Er rechnet sie mit derselben Engine nach und ist maßgeblich.
 - **Zeit:**
-  - Wer das Spiel leitet, wählt das Tempo: 1 Tag = 1 Std., 1 Tag = 10 Min., 1 Tag = 1 Min. oder die schnellen Stufen 1×, 2×, 4× (1× = 1 Tag in 12 Sekunden).
+  - Wer das Spiel leitet, wählt das Tempo: 1 Tag = 1 Std., 1 Tag = 30 Min., 1 Tag = 10 Min., 1 Tag = 1 Min. oder die schnellen Stufen 1×, 2×, 4× (1× = 1 Tag in 12 Sekunden).
   - **Langsame Stufen laufen auch ohne Spielende weiter.** Der Server holt beim nächsten Aufruf die verpasste Zeit nach (bis zu 400 Tage, höchstens 30 Tage je Anfrage).
   - Bei den schnellen Stufen holt der Server ohne Spielende höchstens eine Minute nach. Das Spiel läuft also nicht ohne Sie davon.
 - **Airlines:**
