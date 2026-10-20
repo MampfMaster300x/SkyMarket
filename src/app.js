@@ -28,6 +28,9 @@ const n0 = (x) => NF0.format(x);
 /** Kontostand wie bei der Bank: genutzte Kreditlinie (Dispo) zählt als Minus. */
 const netCash = (al) => al.ledger.cash / 100 - (al.creditUsed || 0);
 const netHistOf = (al) => (al.netHist && al.netHist.length ? al.netHist : al.ledger.cashHist);
+/** Für Sie nutzbare Slots: frei am Markt plus Ihre eigene Slot-Reserve. */
+const slotsMine = (apt) => W.slotsFreeFor(W.player, apt);
+const slotTxt = (apt) => { const f = Math.max(0, W.slotsFree(apt)), h = W.player.heldAt(apt, W.day); return h ? `${f + h} (${h} aus Ihrer Reserve)` : String(f); };
 const sgn = (x) => (x > 0 ? 'pos' : x < 0 ? 'neg' : '');
 const n1 = (x) => NF1.format(x);
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -994,7 +997,7 @@ function updateForecast() {
   const segTot = r.dirs.out.seg.leisure + r.dirs.out.seg.business + r.dirs.out.seg.vfr || 1;
   const t = P.AIRCRAFT_TYPES[p.type];
   const study = pl.studies[SM.pairKey(base, p.dest)];
-  const slotsB = W.slotsFree(base), slotsD = W.slotsFree(p.dest), slotOk = W.slotsOk(base, p.dest, p.freq);
+  const slotsB = slotsMine(base), slotsD = slotsMine(p.dest), slotOk = W.slotsOkFor(pl, base, p.dest, p.freq);
   const bh = SM.blockHours(base, p.dest, p.type) * 2 * p.freq;
   const needPil = 2 * bh / P.STAFF.pilotH, needCab = t.cabin * bh / P.STAFF.cabinH;
   const sp = staffPlan(pl), pilRow = sp.find((x) => x.key === t.group), cabRow = sp.find((x) => x.key === 'cab');
@@ -1012,7 +1015,7 @@ function updateForecast() {
     </div>
     <p class="small ink2">Jahresmittel bei ausgereifter Strecke, mit Ihren Kosten: Crew zu Ihren Gehältern, Terminal, Slots, Marke ${n0(pl.brand * 100)}. Im ${MONTHS_L[m]}: DB2 <b class="${sgn(cur.db2)}">${eur(cur.db2, { plus: true })}</b> pro Tag bei ${pct(cur.lf)} Auslastung. ${study && study.done ? `<b>Marktstudie liegt vor</b> (${esc(study.by)}): Nachfrage ${pct(study.est - 1, 0).replace(/^(?!-)/, '+')} gegenüber Modell, Unsicherheit ±${pct(study.err)}.` : `Ohne Marktstudie liegt die echte Nachfrage bis zu ±${pct(band)} daneben.`}</p>
     ${acNeed ? `<div class="callout warn">${acNeed} <button class="btn small" data-act="quicklease" data-type="${p.type}" data-base="${base}">${tl(p.type)} leasen (${eur(P.LEASE_DEPOSIT_MONTHS * t.lease_month)} Kaution)</button></div>` : `<div class="callout good">${kLong ? `Passt: ${kLong * p.freq} Flugzeuge fliegen die Langstrecke im Wechsel (Umlauf ${n1(rotH)} h).` : `Passt auf ${free.length === 1 ? 'Ihr Flugzeug' : 'Ihre Flotte'}: ${n1(rotH * p.freq)} h von ${n0(wnd)} h Betriebsfenster pro Flugzeug.`}</div>`}
-    ${!slotOk ? `<div class="callout crit">Keine Slots: ${[base, p.dest].filter((x) => W.slotsFree(x) < p.freq).map((x) => `${x} hat nur ${Math.max(0, W.slotsFree(x))} freie`).join(', ')}. Neue Slots kommen zum Sommer- und Winterflugplan (April, Oktober).</div>` : ''}
+    ${!slotOk ? `<div class="callout crit">Keine Slots: ${[base, p.dest].filter((x) => slotsMine(x) < p.freq).map((x) => `${x} hat für Sie nur ${slotTxt(x)} freie`).join(', ')}. Neue Slots kommen zum Sommer- und Winterflugplan (April, Oktober).</div>` : ''}
     ${(sparePil < needPil || spareCab < needCab) ? `<div class="callout warn">Personal reicht nicht: Diese Strecke braucht etwa ${n0(Math.ceil(needPil))} ${SM.roleLabel('pilot', t.group)} und ${n0(Math.ceil(needCab))} Flugbegleiterinnen. Frei sind ${n0(Math.max(0, sparePil))} und ${n0(Math.max(0, spareCab))}. Ohne Einstellung fliegt Agenturpersonal zum 1,6-fachen Satz.</div>` : ''}
     <table class="t"><tbody>
       <tr><td>Reisepotenzial ${base}→${p.dest}</td><td class="r">${n0(potSum)} pro Tag</td></tr>
@@ -1020,7 +1023,7 @@ function updateForecast() {
       ${rail > 0.02 ? `<tr><td>Bahn nimmt weg</td><td class="r">${pct(rail)} des Potenzials</td></tr>` : ''}
       <tr><td>Umsteiger über fremde Drehkreuze</td><td class="r">${r.dirs.out.indirect > 0.5 ? n0(r.dirs.out.indirect) + ' pro Tag' : 'keine'}</td></tr>
       <tr><td>Konkurrenz</td><td class="r">${(() => { const co = W.competitorOffers(W.playerId, base, p.dest); return co.length ? co.map((c) => `${esc(W.airlines[c.airline].name)} ${c.freq}x ${eur(c.fare)}`).join(', ') : 'keine'; })()}</td></tr>
-      ${isFinite(slotsB) || isFinite(slotsD) ? `<tr><td>Freie Slots</td><td class="r">${[base, p.dest].filter((x) => isFinite(W.slotsFree(x))).map((x) => `${x} ${Math.max(0, W.slotsFree(x))}`).join(' · ')}</td></tr>` : ''}
+      ${isFinite(slotsB) || isFinite(slotsD) ? `<tr><td>Freie Slots</td><td class="r">${[base, p.dest].filter((x) => isFinite(W.slotsFree(x))).map((x) => `${x} ${slotTxt(x)}`).join(' · ')}</td></tr>` : ''}
       <tr><td>Kosten je angebotenem Sitz-km</td><td class="r">${NF2.format(r.caskCt)} ct (Erlös ${NF2.format(r.raskCt)} ct)</td></tr>
     </tbody></table>
     <button class="btn primary" data-act="openroute-new" ${slotOk ? '' : 'disabled'}>Strecke eröffnen</button>
@@ -1191,8 +1194,8 @@ VIEWS.stations = function viewStations() {
     const hangar = pl.hangars.includes(apt);
     const monthly = rent + (s.handling === 'own' ? P.OWN_HANDLING_DAY * x.cost * cpi() * 30.4 : 0) + (hangar ? P.HANGAR_MONTH * x.cost * cpi() * proc : 0);
     total += monthly;
-    const slots = W.slotsFree(apt);
-    return `<div class="card pad stack"><div class="spread"><b>${apt} · ${apName(apt)}</b><span>${isBase ? '<span class="chip me">Basis</span> ' : ''}${isFinite(slots) ? `<span class="chip ${slots < 2 ? 'warn' : ''}">${Math.max(0, slots)} Slots frei</span>` : '<span class="chip">ohne Slotvergabe</span>'}</span></div>
+    const slots = slotsMine(apt);
+    return `<div class="card pad stack"><div class="spread"><b>${apt} · ${apName(apt)}</b><span>${isBase ? '<span class="chip me">Basis</span> ' : ''}${isFinite(slots) ? `<span class="chip ${slots < 2 ? 'warn' : ''}">${slotTxt(apt)} Slots frei</span>` : '<span class="chip">ohne Slotvergabe</span>'}</span></div>
       <div class="small muted">${d.n} ${d.n === 1 ? 'Abflug' : 'Abflüge'} pro Tag · Fixkosten ${eur(monthly)} pro Monat</div>
       <div class="stack small"><span class="muted">Terminal</span><div class="opts">${Object.entries(P.TERMINALS).map(([k, t]) => `<button data-act="term" data-apt="${apt}" data-v="${k}" aria-pressed="${s.terminal === k}" title="${esc(t.desc)}"><b>${t.label}</b><span>${eur(t.rent * x.cost * cpi() * proc)}/Mon.</span></button>`).join('')}</div>
         <span class="muted">${esc(P.TERMINALS[s.terminal].desc)}. Passagierentgelte ×${NF2.format(P.TERMINALS[s.terminal].paxF)}, Bodenzeit ${P.TERMINALS[s.terminal].turn > 0 ? '+' : ''}${P.TERMINALS[s.terminal].turn} Min., Geschäftsreisende ${s.terminal === 'prem' ? 'zahlen lieber mehr' : s.terminal === 'lcc' ? 'meiden Sie eher' : 'neutral'}.</span></div>
@@ -1211,7 +1214,7 @@ VIEWS.stations = function viewStations() {
   html += `<div class="card pad stack"><h3>Neue Basis eröffnen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Einmalig ${eur(P.BASE_SETUP_COST * cpi())}, danach ${eur(P.BASE_FIXED_DAY * cpi())} pro Tag für Leitung und Crewräume. Flugzeuge lassen sich im Tab Flotte umstationieren.</p>
     <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)); return `<option value="${c}">${c} · ${apName(c)}${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase">Basis eröffnen</button></div></div>`;
   const slotApts = SM.AP_CODES.filter((c) => isFinite(W.slotsFree(c)));
-  html += `<div class="stack"><h2 class="sec">Slots <small>koordinierte Flughäfen</small></h2><table class="t"><thead><tr><th>Flughafen</th><th class="r">frei</th><th class="r">Entgelt je Bewegung</th></tr></thead><tbody>${slotApts.map((c) => `<tr><td>${c} · ${apName(c)}</td><td class="r">${Math.max(0, W.slotsFree(c))}</td><td class="r">${eur(SM.apx(c).slotFee * cpi())}</td></tr>`).join('')}</tbody></table>
+  html += `<div class="stack"><h2 class="sec">Slots <small>koordinierte Flughäfen</small></h2><table class="t"><thead><tr><th>Flughafen</th><th class="r">für Sie frei</th><th class="r">Entgelt je Bewegung</th></tr></thead><tbody>${slotApts.map((c) => `<tr><td>${c} · ${apName(c)}</td><td class="r">${slotTxt(c)}</td><td class="r">${eur(SM.apx(c).slotFee * cpi())}</td></tr>`).join('')}</tbody></table>
     <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Im April und Oktober (Sommer- und Winterflugplan) kommen neue Slots dazu; wer eine Strecke einstellt, gibt seine frei.</p></div>`;
   return html;
 };
@@ -1268,7 +1271,7 @@ VIEWS.market = function viewMarket() {
     <div class="tile"><span>Ticketsteuer</span><b>${eur(W.taxAt(c))}</b><em>zahlt der Kunde</em></div>
     <div class="tile"><span>Kerosin</span><b>${NF3.format(W.fuelPrice * SM.apx(c).fuel)} €</b><em>je kg vor Ort</em></div>
   </div>`;
-  html += `<p class="small ink2">${based.length ? 'Basis von ' + based.map((x) => `<span class="sw" style="background:${colorOf(x)}"></span> ${esc(x.name)}`).join(', ') : 'Keine Airline hat hier eine Basis.'}${isFinite(W.slotsFree(c)) ? ` Koordinierter Flughafen: ${Math.max(0, W.slotsFree(c))} Slots frei.` : ''}${P.LEISURE_SEASON_PROFILE[c] ? ` Ferienziel mit starker Saison (${P.LEISURE_SEASON_PROFILE[c] === 'island' ? 'Insel: Sommer etwa dreimal so stark wie Winter' : 'Sommer deutlich stärker'}).` : ''}</p>`;
+  html += `<p class="small ink2">${based.length ? 'Basis von ' + based.map((x) => `<span class="sw" style="background:${colorOf(x)}"></span> ${esc(x.name)}`).join(', ') : 'Keine Airline hat hier eine Basis.'}${isFinite(W.slotsFree(c)) ? ` Koordinierter Flughafen: ${slotTxt(c)} Slots frei.` : ''}${P.LEISURE_SEASON_PROFILE[c] ? ` Ferienziel mit starker Saison (${P.LEISURE_SEASON_PROFILE[c] === 'island' ? 'Insel: Sommer etwa dreimal so stark wie Winter' : 'Sommer deutlich stärker'}).` : ''}</p>`;
   // Marktstudie
   if (c !== base) {
     const k = SM.pairKey(base, c), s = pl.studies[k], lv = pl.skill('analyst');

@@ -2871,7 +2871,7 @@ const SM = (() => {
         if (!rangeOk(base, dest, type)) return { ok: false, msg: 'Reichweite zu kurz.' };
         if (al.activeRoutes().some((r) => pairKey(r.base, r.dest) === pairKey(base, dest))) return { ok: false, msg: `${base}–${dest} fliegen Sie schon. Ändern Sie die Frequenz in der Streckenliste.` };
         if (barred(w, al.id, base, dest)) { const g = w.agreements.find((x) => x.airline === al.id && x.pair === pairKey(base, dest) && x.until > day); return { ok: false, msg: `Sie haben vertraglich zugesagt, ${base}–${dest} bis Tag ${g.until + 1} nicht zu fliegen.` }; }
-        if (!w.slotsOkFor(al, base, dest, freq)) return { ok: false, msg: 'Dafür gibt es keine freien Slots.' };
+        if (!w.slotsOkFor(al, base, dest, freq)) { const bad = [base, dest].filter((x) => w.slotsFreeFor(al, x) < freq).map((x) => `${x}: ${Math.max(0, w.slotsFreeFor(al, x))} frei${al.heldAt(x, day) ? ` (davon ${al.heldAt(x, day)} aus Ihrer Reserve)` : ''}`); return { ok: false, msg: `Nicht genug Slots für ${freq} Flüge täglich – ${bad.join(', ')}.` }; }
         const service = P.SERVICE[a.service] ? a.service : 'standard', buffer = P.BUFFER_POLICY[a.buffer] ? a.buffer : 'normal';
         const fo = clamp(num(a.fo, refPrice(base, dest, cpiV)), 10, 5000), fi = clamp(num(a.fi, refPrice(dest, base, cpiV)), 10, 5000);
         if (!al.stations[dest] && P.TERMINALS[a.term]) al.station(dest).terminal = a.term;
