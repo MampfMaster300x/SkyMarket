@@ -174,11 +174,11 @@ const SM = (() => {
       // (Ruhezeiten, freie Tage, Urlaub, Krankheit – rund 1.100 im Jahr). Je Flugzeug mindestens eine volle Besetzung,
       // Piloten einer Musterfamilie und die Kabine werden über die ganze Flotte gemeinsam eingeplant.
       pilotH: 3, cabinH: 3, techPerAc: 3.5, techMaintShare: 0.12,
-      recruit: { pilot: 9000, cabin: 1500, tech: 3500 }, lead: { pilot: 35, cabin: 12, tech: 21 },
+      recruit: { pilot: 9000, cabin: 1500, tech: 3500 }, lead: { pilot: 14, cabin: 6, tech: 9 }, leadMaxFactor: 1.5,
       // Arbeitsmarkt je Monat: Obergrenze je Airline und gemeinsamer Bestand (Grundstock plus je menschlicher Airline)
       maxHire: { pilot: 120, cabin: 400, tech: 120 }, marketPool: { pilot: 400, cabin: 1500, tech: 500 }, marketPerAirline: { pilot: 60, cabin: 220, tech: 70 },
       // Gründungsphase: In den ersten Tagen liegen Bewerbungen schon vor – Einstellungen starten schnell
-      foundingDays: 60, foundingLead: 10, trainDays: 45, trainCost: 28000,
+      foundingDays: 60, foundingLead: 5, trainDays: 45, trainCost: 28000,
       agency: 1.6, overtime: 1.5, overtimeMax: 0.10, perDiem: 9, severanceMonths: 3, attrition: 0.01,
     },
     EXPERT_ROLES: {
@@ -932,6 +932,16 @@ const SM = (() => {
     { id: 'academy', label: 'Eigener Nachwuchs', desc: 'Eine Akademie gefördert.', pts: 15, test: (c) => c.al.academy && Object.values(c.al.academy).some((x) => x.lv > 0) },
     { id: 'hub', label: 'Drehkreuz', desc: 'Zwei Basen.', pts: 20, brand: 0.01, test: (c) => c.al.bases.length >= 2 },
   ];
+  /**
+   * Tage bis neue Leute anfangen: Grundwert je Rolle, kürzer mit Personal-Fachkraft, länger bei angespanntem Markt
+   * (höchstens +50 %). In der Gründungsphase einer Airline höchstens foundingLead Tage.
+   */
+  function hireLead(w, al, role) {
+    const S = P.STAFF, t = w.macro.laborTight || 1;
+    const f = Math.min(S.leadMaxFactor, role === 'pilot' ? 1 + 0.5 * (t - 1) : 1 + 0.2 * (t - 1));
+    const l = Math.max(1, Math.round(S.lead[role] * lv3([1, 0.75, 0.6, 0.5], al.skill('hr')) * f));
+    return w.day - (al.joinedDay || 0) < S.foundingDays ? Math.min(S.foundingLead, l) : l;
+  }
   /** Gemeinsamer Arbeitsmarkt je Monat: Wie viele Einstellungen es für alle Mitspielenden zusammen gibt. */
   function laborPool(w, role) {
     const tight = role === 'pilot' ? w.macro.laborTight : 1 + (w.macro.laborTight - 1) * 0.4, month = Math.floor(w.day / 30);
@@ -1932,11 +1942,11 @@ const SM = (() => {
           T.staff.morale = clamp(T.staff.morale - 0.02, 0, 1);
           T.log(day, `${al.name} hat ${taken} ${roleLabel(role, group)} abgeworben.`, 'crit');
         }
-        al.staff.pipeline.push({ kind: 'hire', role, group: role === 'pilot' ? group : null, count: taken, ready: day + 14, month: -1 });
+        al.staff.pipeline.push({ kind: 'hire', role, group: role === 'pilot' ? group : null, count: taken, ready: day + 7, month: -1 });
         T.grudge = T.grudge || {}; T.grudge[al.id] = (T.grudge[al.id] || 0) + taken;
         this.pushNews(day, `${al.name} wirbt ${taken} ${roleLabel(role, group)} bei ${T.name} ab`, 'ai', al.id);
       } else if (T.isPlayer) T.log(day, `${al.name} hat versucht, Ihr Personal abzuwerben – ohne Erfolg.`, 'warn');
-      al.log(day, `Abwerbeversuch bei ${T.name}: ${taken} von ${n} ${roleLabel(role, group)} wechseln (Start in 14 Tagen), Kosten ${Math.round(cost / 1000)} Tsd. EUR`, taken ? 'staff' : 'warn');
+      al.log(day, `Abwerbeversuch bei ${T.name}: ${taken} von ${n} ${roleLabel(role, group)} wechseln (Start in 7 Tagen), Kosten ${Math.round(cost / 1000)} Tsd. EUR`, taken ? 'staff' : 'warn');
       return { ok: true, taken, tried: n, cost, p };
     }
     poachExpert(al, tid, eid, factor) {
@@ -1967,10 +1977,8 @@ const SM = (() => {
     // Spieleraktionen
     hire(al, role, group, count) {
       const S = P.STAFF, st = al.staff;
-      const hrF = lv3([1, 0.75, 0.6, 0.5], al.skill('hr'));
       const tight = role === 'pilot' ? this.macro.laborTight : 1 + (this.macro.laborTight - 1) * 0.4;
-      const founding = this.day - (al.joinedDay || 0) < S.foundingDays;
-      const lead = founding ? Math.min(S.foundingLead, Math.round(S.lead[role] * hrF * tight)) : Math.round(S.lead[role] * hrF * tight);
+      const lead = hireLead(this, al, role);
       if (!(count > 0)) return { ok: false, msg: 'Bitte eine Anzahl angeben.' };
       const month = Math.floor(this.day / 30);
       const inPipe = st.pipeline.filter((p) => p.kind === 'hire' && p.role === role && p.month === month).reduce((s, p) => s + p.count, 0);
@@ -3257,7 +3265,7 @@ const SM = (() => {
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
         experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
-        staff: al.staff ? { ...al.staff, cov: null } : null, runway: isFinite(al.runway) ? al.runway : null,
+        staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
       })),
@@ -3285,6 +3293,8 @@ const SM = (() => {
       if (!al.grudge) delete al.grudge;
       if (!al.academy) delete al.academy;
       if (!al.past) delete al.past;
+      // ältere Stände: Einstellungen mit sehr langer Wartezeit (früher bis 100 Tage) auf die heutige Höchstdauer kappen
+      if (al.staff && al.staff.pipeline) for (const p of al.staff.pipeline) if (p.kind === 'hire' && P.STAFF.lead[p.role]) { const mx = s.day + Math.round(P.STAFF.lead[p.role] * P.STAFF.leadMaxFactor); if (p.ready > mx) p.ready = mx; }
       al.routes = routes.map((r) => {
         const keys = r.hk ? AI_HIST_KEYS : HIST_KEYS;
         const { hist, hk, ...rr } = r;
@@ -3303,7 +3313,7 @@ const SM = (() => {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk,
     evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
-    RIVALS, setRivals, MARKET, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
+    RIVALS, setRivals, MARKET, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();

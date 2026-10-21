@@ -55,7 +55,10 @@ Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Af
   - **Geteilte, begrenzte Märkte:**
     - Arbeitsmarkt je Monat für alle zusammen. Viel Einstellen verknappt ihn, Löhne steigen.
     - Ab 0.11 deutlich größer: Grundstock 400 Piloten, 1.500 Flugbegleiterinnen, 500 Techniker pro Monat, plus 60 / 220 / 70 je menschlicher Airline; je Airline höchstens 120 / 400 / 120 pro Monat. Nur ein ausgerufener Pilotenmangel oder massives Einstellen vieler Airlines verknappt ihn spürbar.
-    - **Gründungsphase:** In den ersten 60 Tagen einer Airline fangen neue Leute nach höchstens 10 Tagen an (sonst 35 Tage bei Piloten). So ist Personal am Anfang kein Engpass.
+    - **Gründungsphase:** In den ersten 60 Tagen einer Airline fangen neue Leute nach höchstens 5 Tagen an. So ist Personal am Anfang kein Engpass.
+    - **Wartezeit danach (seit 0.11 halbiert):** Piloten 14 Tage, Flugbegleiterinnen 6, Technik 9 – kürzer mit Personal-Fachkraft, bei angespanntem Markt länger, aber höchstens +50 % (Piloten also nie mehr als 21 Tage). Abgeworbenes Personal fängt nach 7 Tagen an. Früher konnten es bei knappem Markt bis zu 100 Tage werden; ältere Spielstände werden beim Laden auf die neue Höchstdauer gekappt.
+    - Unter Personal steht je Gruppe eine Liste der Einstellungsschübe, je Antrittstag eine Zeile – z. B. „5 kommen am 19. Mär · in 8 Tagen“, darunter „10 kommen am 22. Mär · in 11 Tagen“.
+    - Online zeigt der Crew-Status jetzt die tatsächliche Deckung (vorher stand dort nach dem Laden fälschlich „Crew besetzt“, auch wenn Agenturpersonal flog).
     - Leasinggeber mit begrenztem Bestand je Typ. Ausverkauft heißt: kein Leasing. Viele Bestellungen verlängern die Lieferzeit.
     - Kerosin: Große Absicherungen treiben Termin- und Tagespreis für alle.
   - **Auktionen:** frühe Lieferpositionen per verdecktem Gebot. Neue Muster (A321XLR, 777-9) gibt es im ersten Jahr nur dort.

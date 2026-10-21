@@ -533,6 +533,8 @@ h2.sec small { margin-left: auto; text-align: right; }
 .logo-svg { display: inline-block; vertical-align: middle; flex: none; }
 .lgi { display: inline-flex; vertical-align: -4px; }
 /* Mitspielende */
+.arrivals { list-style: none; margin: 0 0 8px; padding: 6px 10px; display: grid; gap: 3px; font-size: 12.5px; background: color-mix(in srgb, var(--good) 8%, var(--panel-2)); border-left: 3px solid var(--good); border-radius: 0 var(--r) var(--r) 0; }
+.arrivals b { font-variant-numeric: tabular-nums; }
 .pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
 .pcard { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel-2); padding: 12px; display: grid; gap: 10px; min-width: 0; }
 .pcard.me { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
@@ -999,11 +1001,11 @@ const SM = (() => {
       // (Ruhezeiten, freie Tage, Urlaub, Krankheit – rund 1.100 im Jahr). Je Flugzeug mindestens eine volle Besetzung,
       // Piloten einer Musterfamilie und die Kabine werden über die ganze Flotte gemeinsam eingeplant.
       pilotH: 3, cabinH: 3, techPerAc: 3.5, techMaintShare: 0.12,
-      recruit: { pilot: 9000, cabin: 1500, tech: 3500 }, lead: { pilot: 35, cabin: 12, tech: 21 },
+      recruit: { pilot: 9000, cabin: 1500, tech: 3500 }, lead: { pilot: 14, cabin: 6, tech: 9 }, leadMaxFactor: 1.5,
       // Arbeitsmarkt je Monat: Obergrenze je Airline und gemeinsamer Bestand (Grundstock plus je menschlicher Airline)
       maxHire: { pilot: 120, cabin: 400, tech: 120 }, marketPool: { pilot: 400, cabin: 1500, tech: 500 }, marketPerAirline: { pilot: 60, cabin: 220, tech: 70 },
       // Gründungsphase: In den ersten Tagen liegen Bewerbungen schon vor – Einstellungen starten schnell
-      foundingDays: 60, foundingLead: 10, trainDays: 45, trainCost: 28000,
+      foundingDays: 60, foundingLead: 5, trainDays: 45, trainCost: 28000,
       agency: 1.6, overtime: 1.5, overtimeMax: 0.10, perDiem: 9, severanceMonths: 3, attrition: 0.01,
     },
     EXPERT_ROLES: {
@@ -1757,6 +1759,16 @@ const SM = (() => {
     { id: 'academy', label: 'Eigener Nachwuchs', desc: 'Eine Akademie gefördert.', pts: 15, test: (c) => c.al.academy && Object.values(c.al.academy).some((x) => x.lv > 0) },
     { id: 'hub', label: 'Drehkreuz', desc: 'Zwei Basen.', pts: 20, brand: 0.01, test: (c) => c.al.bases.length >= 2 },
   ];
+  /**
+   * Tage bis neue Leute anfangen: Grundwert je Rolle, kürzer mit Personal-Fachkraft, länger bei angespanntem Markt
+   * (höchstens +50 %). In der Gründungsphase einer Airline höchstens foundingLead Tage.
+   */
+  function hireLead(w, al, role) {
+    const S = P.STAFF, t = w.macro.laborTight || 1;
+    const f = Math.min(S.leadMaxFactor, role === 'pilot' ? 1 + 0.5 * (t - 1) : 1 + 0.2 * (t - 1));
+    const l = Math.max(1, Math.round(S.lead[role] * lv3([1, 0.75, 0.6, 0.5], al.skill('hr')) * f));
+    return w.day - (al.joinedDay || 0) < S.foundingDays ? Math.min(S.foundingLead, l) : l;
+  }
   /** Gemeinsamer Arbeitsmarkt je Monat: Wie viele Einstellungen es für alle Mitspielenden zusammen gibt. */
   function laborPool(w, role) {
     const tight = role === 'pilot' ? w.macro.laborTight : 1 + (w.macro.laborTight - 1) * 0.4, month = Math.floor(w.day / 30);
@@ -2757,11 +2769,11 @@ const SM = (() => {
           T.staff.morale = clamp(T.staff.morale - 0.02, 0, 1);
           T.log(day, `${al.name} hat ${taken} ${roleLabel(role, group)} abgeworben.`, 'crit');
         }
-        al.staff.pipeline.push({ kind: 'hire', role, group: role === 'pilot' ? group : null, count: taken, ready: day + 14, month: -1 });
+        al.staff.pipeline.push({ kind: 'hire', role, group: role === 'pilot' ? group : null, count: taken, ready: day + 7, month: -1 });
         T.grudge = T.grudge || {}; T.grudge[al.id] = (T.grudge[al.id] || 0) + taken;
         this.pushNews(day, `${al.name} wirbt ${taken} ${roleLabel(role, group)} bei ${T.name} ab`, 'ai', al.id);
       } else if (T.isPlayer) T.log(day, `${al.name} hat versucht, Ihr Personal abzuwerben – ohne Erfolg.`, 'warn');
-      al.log(day, `Abwerbeversuch bei ${T.name}: ${taken} von ${n} ${roleLabel(role, group)} wechseln (Start in 14 Tagen), Kosten ${Math.round(cost / 1000)} Tsd. EUR`, taken ? 'staff' : 'warn');
+      al.log(day, `Abwerbeversuch bei ${T.name}: ${taken} von ${n} ${roleLabel(role, group)} wechseln (Start in 7 Tagen), Kosten ${Math.round(cost / 1000)} Tsd. EUR`, taken ? 'staff' : 'warn');
       return { ok: true, taken, tried: n, cost, p };
     }
     poachExpert(al, tid, eid, factor) {
@@ -2792,10 +2804,8 @@ const SM = (() => {
     // Spieleraktionen
     hire(al, role, group, count) {
       const S = P.STAFF, st = al.staff;
-      const hrF = lv3([1, 0.75, 0.6, 0.5], al.skill('hr'));
       const tight = role === 'pilot' ? this.macro.laborTight : 1 + (this.macro.laborTight - 1) * 0.4;
-      const founding = this.day - (al.joinedDay || 0) < S.foundingDays;
-      const lead = founding ? Math.min(S.foundingLead, Math.round(S.lead[role] * hrF * tight)) : Math.round(S.lead[role] * hrF * tight);
+      const lead = hireLead(this, al, role);
       if (!(count > 0)) return { ok: false, msg: 'Bitte eine Anzahl angeben.' };
       const month = Math.floor(this.day / 30);
       const inPipe = st.pipeline.filter((p) => p.kind === 'hire' && p.role === role && p.month === month).reduce((s, p) => s + p.count, 0);
@@ -4082,7 +4092,7 @@ const SM = (() => {
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
         experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
-        staff: al.staff ? { ...al.staff, cov: null } : null, runway: isFinite(al.runway) ? al.runway : null,
+        staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
       })),
@@ -4110,6 +4120,8 @@ const SM = (() => {
       if (!al.grudge) delete al.grudge;
       if (!al.academy) delete al.academy;
       if (!al.past) delete al.past;
+      // ältere Stände: Einstellungen mit sehr langer Wartezeit (früher bis 100 Tage) auf die heutige Höchstdauer kappen
+      if (al.staff && al.staff.pipeline) for (const p of al.staff.pipeline) if (p.kind === 'hire' && P.STAFF.lead[p.role]) { const mx = s.day + Math.round(P.STAFF.lead[p.role] * P.STAFF.leadMaxFactor); if (p.ready > mx) p.ready = mx; }
       al.routes = routes.map((r) => {
         const keys = r.hk ? AI_HIST_KEYS : HIST_KEYS;
         const { hist, hk, ...rr } = r;
@@ -4128,7 +4140,7 @@ const SM = (() => {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk,
     evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
-    RIVALS, setRivals, MARKET, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
+    RIVALS, setRivals, MARKET, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
@@ -5425,7 +5437,10 @@ function applyRoute(id) {
 const acquireCost = (typeId, mode, offer = null) => SM.acquireCost(W.player, typeId, mode, offer, W.macro.eurusd, W);
 /** Crew-Lage für ein Flugzeug: Piloten hängen an der Musterfamilie, Kabine und Technik sind allgemein. */
 function crewInfo(pl, a) {
-  const st = pl.staff, cov = st && st.cov; if (!cov) return null;
+  const st = pl.staff; if (!st) return null;
+  // ohne gespeicherte Tagesdeckung (ältere Online-Stände): Bedarf aus dem Einsatzplan, Agentur füllt Lücken
+  const cov = st.cov || { need: pl.crewNeed(W.day), cancel: st.agency ? {} : null };
+  if (!cov.cancel) { const n = cov.need; cov.cancel = {}; for (const g of SM.STAFF_GROUPS) cov.cancel[g] = n.pil[g] > st.pil[g] ? 1 - st.pil[g] / n.pil[g] : 0; cov.cancel.cab = n.cab > st.cab ? 1 - st.cab / n.cab : 0; }
   const g = P.AIRCRAFT_TYPES[a.type_id].group, S = P.STAFF;
   const own = (capH, needH) => (needH > 0 ? Math.min(1, capH / needH) : 1);
   const pOwn = own(st.pil[g], cov.need.pil[g] || 0), cOwn = own(st.cab, cov.need.cab || 0);
@@ -5535,7 +5550,7 @@ VIEWS.fleetBuy = function viewFleetBuy() {
 VIEWS.staff = function viewStaff() {
   const pl = W.player, st = pl.staff, rows = staffPlan(pl), cov = st.cov;
   const foundLeft = P.STAFF.foundingDays - (W.day - (pl.joinedDay || 0));
-  const hrLead = (role) => { const l = Math.round(P.STAFF.lead[role] * SM.lv3([1, 0.75, 0.6, 0.5], pl.skill('hr')) * (role === 'pilot' ? W.macro.laborTight : 1 + (W.macro.laborTight - 1) * 0.4)); return foundLeft > 0 ? Math.min(P.STAFF.foundingLead, l) : l; };
+  const hrLead = (role) => SM.hireLead(W, pl, role);
   let html = foundLeft > 0 ? `<div class="callout good"><b>Gründungsphase:</b> Noch ${n0(foundLeft)} ${foundLeft === 1 ? 'Tag' : 'Tage'} liegen Bewerbungen schon vor – wer jetzt eingestellt wird, fängt nach höchstens ${P.STAFF.foundingLead} Tagen an.</div>` : '';
   html += `<h2 class="sec">Personal <small>${n0(SM.sumObj(st.pil) + st.cab + st.tech)} Beschäftigte · ${eur(pl.staffMonthly(cpi()))} pro Monat</small></h2>`;
   html += `<div class="crewrule"><div><b>Piloten</b><span>je Musterfamilie eingestellt – ein Typ-Rating gilt nur für ${[...new Set(pl.fleet.map((a) => P.AIRCRAFT_TYPES[a.type_id].group))].map((g) => esc(P.TYPE_GROUPS[g])).join(', ') || 'die jeweilige Familie'}. Umschulung auf eine andere Familie dauert ${P.STAFF.trainDays} Tage.</span></div><div><b>Flugbegleiterinnen &amp; Technik</b><span>arbeiten auf allen Mustern und an allen Basen.</span></div></div>`;
@@ -5549,11 +5564,17 @@ VIEWS.staff = function viewStaff() {
     else if (cov.overtimeH > 0) html += `<div class="callout info">Heute ${n0(cov.overtimeH)} Personen in Überstunden (1,5-facher Satz). Dauerhafte Überlastung drückt die Stimmung.</div>`;
   }
   html += `<div class="tw"><table class="t"><thead><tr><th>Gruppe</th><th class="r">Bestand</th><th class="r">Bedarf</th><th class="r">kommen</th><th class="r">Gehalt</th></tr></thead><tbody>
-    ${rows.map((r) => { const gap = r.have + r.pipe - r.need; return `<tr><td>${r.label}</td><td class="r">${n0(r.have)}</td><td class="r">${n0(Math.ceil(r.need))}</td><td class="r">${r.pipe ? '+' + n0(r.pipe) : '–'}</td><td class="r">${eur(r.salary * st.pay * cpi())}</td></tr>
-      <tr class="sub"><td colspan="5"><div class="row small"><span class="${gap < 0 ? 'neg' : 'muted'}">${gap < 0 ? `fehlen ${n0(Math.ceil(-gap))}` : `Reserve ${n0(Math.floor(gap))}`}</span>
+    ${rows.map((r) => { const gap = r.have + r.pipe - r.need;
+      const arr = st.pipeline.filter((p) => (p.kind === 'hire' && p.role === r.role && (r.role !== 'pilot' || p.group === r.group)) || (p.kind === 'train' && r.role === 'pilot' && p.to === r.group)).sort((a, b) => a.ready - b.ready);
+      // Schübe nach Antrittstag zusammenfassen, je Tag eine Zeile
+      const byDay = []; for (const p of arr) { const last = byDay[byDay.length - 1]; if (last && last.day === p.ready && last.train === (p.kind === 'train')) last.n += p.count; else byDay.push({ day: p.ready, n: p.count, train: p.kind === 'train' }); }
+      const when = byDay.map((x) => `${n0(x.n)} am ${dateShort(x.day)} (in ${n0(Math.max(0, x.day - W.day))} T.)${x.train ? ' aus Umschulung' : ''}`).join(', ');
+      const whenList = byDay.length ? `<ul class="arrivals">${byDay.map((x) => `<li><b>${n0(x.n)}</b> ${x.n === 1 ? 'kommt' : 'kommen'} am <b>${dateShort(x.day)}</b> <span class="muted">· ${x.day - W.day <= 0 ? 'heute' : x.day - W.day === 1 ? 'morgen' : `in ${n0(x.day - W.day)} Tagen`}${x.train ? ' · aus Umschulung' : ''}</span></li>`).join('')}</ul>` : '';
+      return `<tr><td>${r.label}</td><td class="r">${n0(r.have)}</td><td class="r">${n0(Math.ceil(r.need))}</td><td class="r" ${when ? `title="${esc(when)}"` : ''}>${r.pipe ? '+' + n0(r.pipe) : '–'}</td><td class="r">${eur(r.salary * st.pay * cpi())}</td></tr>
+      <tr class="sub"><td colspan="5">${whenList}<div class="row small"><span class="${gap < 0 ? 'neg' : 'muted'}">${gap < 0 ? `fehlen ${n0(Math.ceil(-gap))}` : `Reserve ${n0(Math.floor(gap))}`}</span>
         <input type="number" id="hire-${r.key}" min="1" max="${P.STAFF.maxHire[r.role]}" value="${Math.max(1, Math.min(P.STAFF.maxHire[r.role], Math.ceil(Math.max(1, r.need * 1.1 - r.have - r.pipe))))}" style="width:64px">
         <button class="btn small primary" data-act="hire" data-role="${r.role}" data-group="${r.group || ''}" data-key="${r.key}">Einstellen</button><button class="btn small" data-act="fire" data-role="${r.role}" data-group="${r.group || ''}" data-key="${r.key}">Entlassen</button>
-        <span class="muted">Start in ${hrLead(r.role)} T. · ${eur(P.STAFF.recruit[r.role] * cpi() * (r.role === 'pilot' ? W.macro.laborTight : 1))} je Einstellung</span></div></td></tr>`; }).join('')}
+<span class="muted">Neue fangen nach ${hrLead(r.role)} T. an · ${eur(P.STAFF.recruit[r.role] * cpi() * (r.role === 'pilot' ? W.macro.laborTight : 1))} je Einstellung</span></div></td></tr>`; }).join('')}
   </tbody></table></div>
   <div class="row"><button class="btn primary" data-act="fillstaff">Bedarf plus 10 % Reserve decken</button><button class="btn" data-act="dealnew">Crews per Handel übernehmen</button><span class="small muted">Arbeitsmarkt diesen Monat: noch ${['pilot', 'cabin', 'tech'].map((r) => { const x = SM.laborPool(W, r); return `${n0(Math.max(0, x.pool - x.used))} ${r === 'pilot' ? 'Piloten' : r === 'cabin' ? 'Flugbegleiterinnen' : 'Techniker'}`; }).join(', ')} (je Airline höchstens ${P.STAFF.maxHire.pilot} / ${P.STAFF.maxHire.cabin} / ${P.STAFF.maxHire.tech}). Entlassen kostet ${P.STAFF.severanceMonths} Monatsgehälter.</span></div>
   <p class="small muted">Bedarf nach Blockstunden: Ein Pilot oder eine Flugbegleiterin fliegt im Schnitt ${P.STAFF.pilotH} Blockstunden am Tag (Ruhezeiten, freie Tage, Urlaub, Krankheit – rund ${n0(P.STAFF.pilotH * 365)} im Jahr). Ein A320 mit 10 Stunden am Tag braucht also etwa 7 Piloten und 14 Flugbegleiterinnen, mit 5 Stunden etwa 4 und 7 – mindestens aber eine volle Besetzung. Die Crews teilen sich die ganze Flotte. Ab 9 Stunden Flugzeit fliegen 3, ab 13 Stunden 4 Piloten pro Flug. Technik: ${n1(P.STAFF.techPerAc)} Personen je Flugzeug.</p>`;
@@ -6241,7 +6262,7 @@ function poachHtml() {
       <label class="f"><span>Wechselprämie je Person</span><select id="po-bonus">${[0, 5000, 10000, 20000, 40000].map((v) => `<option value="${v}" ${v === P0.bonus ? 'selected' : ''}>${v ? eur(v) : 'keine'}</option>`).join('')}</select></label></div>
       ${role === 'pilot' && !flies(T, group) ? `<div class="callout warn">${esc(T.name)} fliegt keine ${esc(P.TYPE_GROUPS[group])} – dort gibt es keine passenden Piloten. Oben stehen die Airlines mit dieser Familie.</div>` : ''}
       <p class="small muted">Piloten haben ein Typ-Rating je Musterfamilie und fliegen nur dort. Flugbegleiterinnen und Technik sind für alle Muster einsetzbar.</p>
-      <p class="small ink2">Erfolgschance je Person etwa <b>${pct(p)}</b>${T.staff ? ` · Stimmung drüben ${pct(theirMor)}` : ''}. Kosten: Prämie je gewonnener Person plus ${eur(S.recruit[role] * 0.4 * cpi())} Headhunter je Versuch. Wer wechselt, beginnt nach 14 Tagen.${T.isPlayer ? ' Mitspielende werden informiert.' : ' Die KI merkt sich das und wirbt zurück.'}</p>
+      <p class="small ink2">Erfolgschance je Person etwa <b>${pct(p)}</b>${T.staff ? ` · Stimmung drüben ${pct(theirMor)}` : ''}. Kosten: Prämie je gewonnener Person plus ${eur(S.recruit[role] * 0.4 * cpi())} Headhunter je Versuch. Wer wechselt, beginnt nach 7 Tagen.${T.isPlayer ? ' Mitspielende werden informiert.' : ' Die KI merkt sich das und wirbt zurück.'}</p>
       <div class="row"><button class="btn primary" data-act="poach" ${wait ? 'disabled' : ''}>${wait ? `wieder in ${wait} Tagen` : 'Abwerben'}</button></div></div>
     ${humansExp.length ? `<div class="card pad stack"><h3>Fachkräfte von Mitspielenden</h3>${humansExp.map((h) => h.experts.map((e) => `<div class="spread small"><span>${logoSvg(h, 16)} <b>${esc(e.name)}</b> · ${P.EXPERT_ROLES[e.role].label} ${LEVEL[e.level]} bei ${esc(h.name)} · ${eur(e.salary)}/Mon.</span>
       <span class="row" style="gap:6px"><select id="pe-${e.id}" style="width:auto">${[1.1, 1.25, 1.4, 1.6].map((f) => `<option value="${f}">+${Math.round((f - 1) * 100)} % Gehalt</option>`).join('')}</select><button class="btn small" data-act="poachexp" data-t="${h.id}" data-id="${e.id}">Abwerben</button></span></div>`).join('')).join('')}</div>` : ''}</div>`;
@@ -6254,7 +6275,7 @@ function onHardClick(act, b) {
     case 'poach': {
       readPoach(); const [role, group] = ui.poach.role.split(':');
       const res = doAction({ type: 'poach', target: ui.poach.target, role, group: group || null, n: ui.poach.n, bonus: ui.poach.bonus });
-      if (res.ok) toast(res.taken ? `${res.taken} von ${res.tried} wechseln zu Ihnen (Start in 14 Tagen).` : 'Niemand wollte wechseln. Die Kosten für den Headhunter bleiben.');
+      if (res.ok) toast(res.taken ? `${res.taken} von ${res.tried} wechseln zu Ihnen (Start in 7 Tagen).` : 'Niemand wollte wechseln. Die Kosten für den Headhunter bleiben.');
       refreshAll(); return true;
     }
     case 'poachexp': { const f = Number($(`#pe-${b.dataset.id}`).value); const res = doAction({ type: 'poachExpert', target: b.dataset.t, id: b.dataset.id, factor: f }); if (res.ok) toast(res.taken ? 'Wechsel geglückt.' : 'Abgelehnt – die Person bleibt bei der Konkurrenz.'); refreshAll(); return true; }
@@ -7321,7 +7342,7 @@ const GUIDE = [
       <li><b>Erfolg lockt Konkurrenz:</b> Läuft eine Strecke gut, kommen KI-Airlines mit Kampfpreisen und mehr Flügen. Rechnen Sie damit und bauen Sie Kosten- oder Markenvorteile auf.</li>
       <li><b>Alle teilen sich die Märkte:</b> Arbeitsmarkt, Slots, Lieferzeiten und Kerosin – was andere tun, trifft auch Sie. Gehalt unter Marktniveau lädt zum Abwerben ein.</li>
       <li><b>Unter 600 km gewinnt oft die Bahn,</b> und große Flugzeuge auf kleinen Märkten fliegen leer.</li>
-      <li><b>Agenturpersonal kostet das 1,6-Fache.</b> Rechtzeitig einstellen, Einstellungen dauern 12–35 Tage.</li>
+      <li><b>Agenturpersonal kostet das 1,6-Fache.</b> Rechtzeitig einstellen, Einstellungen dauern 6–21 Tage, in den ersten 60 Tagen höchstens 5.</li>
       <li><b>Reserve halten:</b> Ölpreisschocks, Streiks und Stürme kommen. Kerosin unter Unternehmen → Einkauf absichern, Kreditlinie im Blick behalten.</li>
       <li><b>Handeln statt warten:</b> Unter Markt → Handel kaufen Sie Flugzeuge sofort einsatzbereit, übernehmen Crews ohne Wartezeit, kaufen Slots oder bezahlen Konkurrenten für den Rückzug von Ihrer Strecke – mit KI-Airlines und Mitspielenden.</li>
       <li><b>Zölle und Konjunktur:</b> Handelskriege drücken Geschäftsreisen zwischen den Blöcken und verteuern Flugzeuge vom anderen Block. Die Regionen laufen zeitversetzt – ein Netz über mehrere Regionen streut das Risiko.</li>
