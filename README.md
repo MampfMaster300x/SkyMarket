@@ -1,6 +1,6 @@
-# SKYMARKET Online (Testversion 0.11)
+# SKYMARKET Online (Testversion 0.13.1)
 
-Airline-Wirtschaftssimulation im Browser: 118 Flughäfen weltweit (neu: 14 in Afrika), 24 KI-Airlines und gemeinsame Spiele mit bis zu vier Personen.
+Airline-Wirtschaftssimulation im Browser: 211 Flughäfen auf allen Kontinenten, 30 KI-Airlines, eine dauerhafte Hauptwelt für alle (bis 60 Airlines) und private Runden mit bis zu vier Personen.
 
 - **Anmelden:** Konto mit Benutzername und Passwort.
 - **Spiel anlegen:** Name, optionales Passwort, Schwierigkeit und Tempo festlegen. Wer das Spiel anlegt, leitet es und stellt das Tempo ein.
@@ -168,10 +168,75 @@ Wenn Sie das Geheimnis ändern, werden alle Personen abgemeldet.
 ```bash
 npm install
 npm run local        # http://localhost:8888, Daten in .local-data.json
-npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Aktionen, max. 4)
+npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Aktionen, max. 4, Hauptwelt, Neustart, Studien)
 ```
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
+
+## Neu in 0.13.1: Mehrere Hubs
+
+- **Basis umschalten:** Mit mehr als einer Basis zeigt **Markt → Nachfrage** oben und über der Zieltabelle einen Umschalter „Märkte ab Basis: HAM · MUC · …“. Vorher war dort immer die erste Basis zu sehen, wechseln ging nur über einen Klick auf die andere Basis in der Karte.
+- Ist gerade ein Ziel ausgewählt (z. B. London), bleibt es stehen; Reisepotenzial, Distanz, Konkurrenz und „Strecke … planen“ rechnen dann ab der neu gewählten Basis.
+- Derselbe Umschalter steht in der **Flughafen-Karte** auf der Karte und im **Datenblatt** eines Flugzeugmusters („Größte erreichbare Märkte ab …“). Alle drei merken sich die gewählte Basis gemeinsam; auch die Streckenplanung startet ab dort.
+- Der Streckentipp der Assistenz und das Strecken-Szenario der CFO gehen ebenfalls von der gewählten Basis aus statt immer von der ersten.
+
+## Neu in 0.13: Gesamtprüfung – Fehler behoben, KI erweitert, robuster
+
+Diese Version ist das Ergebnis einer Prüfung aller Teile: Wirtschaftskern (Zufallstests über 500–900 Spieltage, feindliche Eingaben, Speichern/Laden), Oberfläche (über 350 Klicks auf Desktop und Handy), Spielbalance (automatische Testspielerin an zehn Heimatbasen über zwei Jahre) und Server (Hauptwelt mit 60 Airlines).
+
+**Behobene Fehler**
+- **C-Checks viel zu häufig auf der Langstrecke:** Teilen sich zwei Flugzeuge einen Umlauf (z. B. Sydney–Los Angeles), zählte jedes Flugzeug die vollen Flugstunden statt seines Anteils. Folge: doppelt so viele C-Checks, oft beide Flugzeuge gleichzeitig in der Werft und die Strecke fiel tagelang aus. Jetzt zählt jedes Flugzeug nur die Stunden, die es wirklich fliegt.
+- **Checks gestaffelt:** Ist schon ein Flugzeug gleichen Musters derselben Basis in der Werft, wartet das nächste (höchstens 10 % über dem Intervall). Flotte und Assistenz zeigen dann „C-Check fällig – wartet …“.
+- **„Ungenutzt“ während der Werft:** Flugzeuge im C-Check oder AOG zählten als ungenutzt (Assistenz, CFO, Dashboard). Behoben.
+- **Basis ohne Geld:** Eine neue Basis ließ sich auch ohne Liquidität eröffnen (Konto bis weit unter den Dispo). Jetzt wird wie bei Flugzeugen geprüft.
+- **Server-Sicherheit:** Manipulierte Anfragen (z. B. Terminal „constructor“, unbekannte Berufsgruppe) konnten einen Spielstand so beschädigen, dass die Welt beim nächsten Spieltag abstürzt – in der Hauptwelt für alle. Alle Eingaben werden jetzt vor der Verarbeitung bereinigt, Einstellen, Entlassen und Umschulen prüfen Beruf und Musterberechtigung. 20.000 Zufallsaktionen mit Müllwerten laufen fehlerfrei.
+- **KI bestellte Flugzeuge ins Leere:** Reichte die Flugzeugzeit für eine geplante KI-Strecke am Ende nicht (z. B. weil der Leasingbestand ausging), blieben die schon geleasten Flugzeuge ungenutzt stehen und wurden nach 45 Tagen mit Vertragsstrafe zurückgegeben – vor allem Langstrecken-KIs verloren so Millionen. Jetzt werden solche Bestellungen vor der Lieferung storniert.
+- **Australien:** Die Abflugsteuer von 35 € galt auch für Inlandsflüge und machte Sydney–Melbourne & Co. für alle unrentabel. Jetzt 10 € im Inland und auf kurzen Strecken, Langstrecke weiter 40 €.
+- Kleinere: Fehlermeldungen beim Rückzahlen eines nicht vorhandenen Kredits und beim Freistellen einer Fachkraft; CFO zählt AOG-Flugzeuge nicht mehr als „steht herum“.
+
+**Kerosin**
+- Zwei Ölschocks konnten sich stapeln (Kerosin bis über das Dreifache – in Tests war damit jede Strecke im Minus). Jetzt gibt es keinen neuen Schock, solange der Preis noch über dem 1,4-Fachen liegt, und der Preis bleibt zwischen dem 0,5- und 2,2-Fachen des Referenzpreises. Eine Ölkrise tut weiter weh – Absichern lohnt sich.
+
+**Sechs neue KI-Airlines** (in neuen Spielen; in laufenden Welten entstehen Neugründungen bevorzugt in Ländern ohne KI-Basis)
+- **Coralsea Airways** (Premium, Sydney) und **Wattle Jet** (Low-Cost, Melbourne) – Australien, Neuseeland, dazu Los Angeles und Tokio.
+- **Maple Crest Air** (Premium, Toronto) und **Cascadia Jet** (Low-Cost, Vancouver) – Kanada und USA.
+- **Volga Avia** (Premium, Moskau) – Russland, Istanbul, Dubai.
+- **Pampero** (Low-Cost, Buenos Aires) – Argentinien, Chile, Brasilien, Peru.
+- Die Netze sind so bemessen, dass Platz für Spielende bleibt (in Tests 78–95 % Auslastung). Insgesamt jetzt 30 KI-Airlines.
+
+**Texte und Anleitung**
+- Anleitung neu: eigene Seiten „Die Hauptwelt“ und „Private Runden“ (nur online), Neustart nach der Pleite, Marktstudien und CFO-Beratung, A380/747/Concorde, richtige Antrittszeiten fürs Personal (3–21 Tage, in der Gründungsphase höchstens 5).
+- Überall stimmen die Zahlen (211 Flughäfen, 30 KI-Airlines statt 118 und 24). Die Einladung in der Hauptwelt spricht nicht mehr von „bis zu vier Airlines“; Tempoänderungen in der Hauptwelt heißen nicht mehr „Die Spielleitung …“.
+
+**Geprüft**
+- Wirtschaftskern: 7 Zufallsläufe à 500–900 Tage mit allen Aktionsarten, keine Ausnahme, keine ungültigen Werte, Speichern/Laden deterministisch.
+- Hauptwelt mit 60 Airlines über 400 Tage: rund 60 ms je Spieltag, Spitze 0,7 s am Monatsende, Spielstand 343 KB gepackt.
+- Balance mit einer automatischen Testspielerin (wählt Strecken nach Prognose, führt Preise nach Auslastung, schließt Verlustbringer nach 60 Tagen), Eigenkapital-Zuwachs nach zwei Jahren bei rund 15 Mio. € Start: Toronto +165 Mio. €, St. Petersburg +116, Delhi +88, Buenos Aires +82, Moskau +60, São Paulo +48, Hamburg +37, Tokio −1. Sydney: einmal insolvent, einmal +16 Mio. €; Johannesburg −12 Mio. € (siehe Grenzen).
+- KI-Welt über zwei Jahre: keine KI-Airline insolvent; die neuen KI-Airlines bleiben stabil.
+
+## Neu in 0.12: Großraumjets, Concorde, Weltkarte, Marktstudien und CFO
+
+**Flugzeuge**
+- **Airbus A380-800** (520 Sitze Standard, 15.200 km) und **Boeing 747-8** (410 Sitze, 14.300 km, großer Frachtraum): je eigene Musterberechtigung (eigene Pilotengruppe). Beide werden nicht mehr gebaut – nur Leasing (knapper Bestand) oder Gebrauchtmarkt, keine Werksbestellung. Der A380 braucht große Flughäfen (Code F, im Spiel: ab 25 Mio. Passagieren im Jahr – 102 Flughäfen). Sie lohnen sich nur auf sehr dichten Strecken zwischen großen Drehkreuzen; auf den meisten Langstrecken verdienen 787/A350/777 mehr.
+- **Concorde** (100 Sitze, 2.150 km/h, 7.200 km): bewusst extrem – rund 30 t Kerosin je Blockstunde, sehr teure Wartung, 3 Piloten. Nur gebraucht zu kaufen, weltweit höchstens 6, höchstens 2 je Airline. Geschäftsreisende zahlen für den Zeitgewinn (Nutzenaufschlag je eingesparter Stunde), dazu Prestige für die Marke. Auf London–New York um 2.500–3.500 € je Strecke verdient sie, auf den meisten anderen Strecken verliert sie 150.000–300.000 € pro Tag.
+
+**Weltkarte: 211 statt 118 Flughäfen**
+- Neu u. a. Australien (Brisbane, Perth, Adelaide, Gold Coast, Canberra, Cairns, Hobart, Darwin, Townsville, Newcastle, Sunshine Coast, Launceston, Alice Springs), Neuseeland und Pazifik (Auckland, Wellington, Christchurch, Queenstown, Nadi, Nouméa, Papeete, Port Moresby), Bali, Russland (St. Petersburg, Sotschi, Kasan, Jekaterinburg, Nowosibirsk, Irkutsk, Wladiwostok, Kaliningrad, Ufa, Krasnojarsk, Chabarowsk, Murmansk, Jakutsk, Mineralnyje Wody), Afrika (Durban, Sansibar, Kilimandscharo, Mombasa, Kigali, Entebbe, Lusaka, Harare, Victoria Falls, Maputo, Windhuk, Luanda, Abidjan, Douala, Abuja, Seychellen, Antananarivo, Scharm El-Scheich, Luxor, Agadir), Südamerika (Rio, Brasília, Belo Horizonte, Salvador, Recife, Fortaleza, Porto Alegre, Florianópolis, Manaus, Buenos Aires, Córdoba, Mendoza, Bariloche, Montevideo, Quito, Guayaquil, Medellín, Cartagena, Cali, Cusco, Asunción, Santa Cruz, Panama-Stadt) und Kanada (Montréal, Calgary, Edmonton, Ottawa, Winnipeg, Halifax, Québec, Victoria, Saskatoon, Regina, St. John's, Whitehorse, Yellowknife, Iqaluit). Echte IATA-Codes und Koordinaten, Einzugsgebiet und Passagierzahlen gerundet.
+- Neue Länder mit eigenen Entgelten, Steuern und Kostenniveau (u. a. Neuseeland, Argentinien, Uruguay, Ecuador, Panama, Bolivien, Paraguay, Ruanda, Uganda, Sambia, Simbabwe, Mosambik, Namibia, Angola, Elfenbeinküste, Kamerun, Madagaskar, Seychellen, Fidschi, Papua-Neuguinea); Länderflächen auf der Karte für alle außer kleinen Inselstaaten.
+- **Sydney:** vorher 59 Ziele in Reichweite, mit dem A320neo praktisch nur Melbourne lohnend; jetzt 113 Ziele, davon 21 mit dem A320neo erreichbar und 9 mit positivem Streckenbeitrag (Perth, Auckland, Bali, Brisbane, Gold Coast, Melbourne, Nadi …), dazu Langstrecken wie Los Angeles und Tokio.
+- Inlandsflüge zwischen Regionen eines Landes (z. B. Moskau–Wladiwostok) gelten als Inland, nicht als interkontinental. Familienbande (VFR) für typische Paare wie Sydney–Auckland, Lissabon–São Paulo, Paris–Montréal.
+
+**Marktstudien (Markt → Marktstudien)**
+- Vier Arten: **Streckenanalyse**, **Flugzeugbeschaffung**, **Standort- und Basisanalyse**, **Wettbewerb und Marktlücken** – jeweils weltweit oder mit Schwerpunkt Region, Land oder Flughafen (das deckt „Markterweiterung“ und „Regionalanalyse“ ab).
+- Drei Pakete: **Klein** 35.000 €, 4 Tage, 30 Kandidaten, 3 Vorschläge · **Erweitert** 140.000 €, 9 Tage, 80 Kandidaten, 3 Tarifstufen, 6 Vorschläge · **Umfassend** 420.000 €, 16 Tage, 160 Kandidaten, 4 Tarifstufen, 10 Vorschläge, misst zusätzlich den Nachfragetrend der drei besten Strecken. Preise und Umfang stehen in `P.STUDIES` in `shared/engine.cjs`. Eine Fachkraft für Marktanalyse macht Studien bis zu 30 % günstiger und schneller und die Zahlen genauer. Höchstens 3 Studien gleichzeitig, die letzten 12 Berichte bleiben gespeichert.
+- Der Bericht entsteht erst am Liefertag aus dem dann aktuellen Spielstand – mit derselben Prognose wie die Streckenplanung: Nachfrage, Auslastung, Erlöse, Kosten, Streckenbeitrag, Investition, Wettbewerb, Risiken, Wachstumspotenzial, Vergleich und eine begründete Empfehlung. Aus jedem Vorschlag geht es direkt in die Planung, zum Datenblatt, zur Basis-Eröffnung oder zur CFO.
+- Wo das Spiel keine Daten hat (z. B. künftige Reaktion der Konkurrenz), steht das als Risiko bzw. Annahme im Bericht.
+
+**CFO-Beratung (Finanzen → CFO-Beratung)**
+- Die CFO Katrin Vogel beantwortet elf Fragen aus den echten Zahlen: finanzielle Lage, ob ein Flugzeug oder eine neue Basis drin ist, unrentable Strecken, Kostensenkung, Liquiditätsreserve (zwei Monate Fixkosten), beste Investition, Wirkung neuer Flugzeuge, zusätzliche Schulden, Entwicklung von Einnahmen und Ausgaben, Gewinnhebel. Jede Antwort hat eine Einordnung (Wachstum, Vorsicht, Kostenoptimierung, Investitionsprüfung, Risikowarnung, Lagebild) und Knöpfe zum Handeln.
+- **Szenario-Rechner:** Flugzeug kaufen/leasen, neue Basis, neue Strecke, Strecke einstellen, Kerosinpreis, Kredit – mit Einmalkosten, Monatswirkung, Liquidität danach, 6-Monats-Verlauf mit und ohne Entscheidung, Amortisation und Urteil. Bis zu vier Szenarien lassen sich nebeneinander vergleichen.
+- Marktstudie und CFO greifen ineinander: „CFO fragen“ an jeder Empfehlung übernimmt Strecke, Muster oder Standort samt Netzwert und Kautionen in den Rechner. Die CFO führt nichts aus und garantiert nichts.
+- Bewusst ohne freie Texteingabe: Ein echter Chat bräuchte eine externe KI-Schnittstelle; der Fragenkatalog rechnet dafür nachvollziehbar mit den Spielzahlen.
 
 ## Hauptwelt (Dauerspiel)
 
@@ -213,10 +278,15 @@ Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, ink
 
 ## Grenzen dieser Testversion
 
+- **KI-Airlines** nutzen A380, 747 und Concorde nicht.
+- **Schwere Heimatbasen:** In Sydney lohnen sich anfangs nur wenige Strecken (Bali, Los Angeles, Tokio – Inlandsflüge sind jetzt umkämpft) und Langstrecke braucht viel Kapital und Personal (eine 787 auf Ultralangstrecke rund 20 Piloten). **Afrika** bleibt wegen der niedrigen Einkommen im Nachfragemodell dünn: ab Johannesburg trägt anfangs praktisch nur Durban, Großraumjets nach Europa fliegen halb leer. Gute Starts: Toronto, St. Petersburg, Delhi, Buenos Aires, Moskau, São Paulo, Hamburg.
+- **Hauptwelt:** Airlines von Personen, die nicht mehr spielen, bleiben bestehen und belegen einen der 60 Plätze. Ein Aufräumen verwaister Airlines gibt es noch nicht.
+- **Studien** rechnen mit einem Flug täglich im Standardprodukt; Frequenz, Produkt und Konkurrenzreaktion prüfen Sie danach in der Streckenplanung bzw. im CFO-Szenario.
+- Die Code-F-Grenze des A380 ist eine Vereinfachung über die Passagierzahl (manche reale A380-Flughäfen wie Brisbane oder Perth liegen darunter).
 - **Konto:** Keine E-Mail, kein Passwort-Reset. Ein vergessenes Passwort heißt neues Konto.
 - **Schutz vor Missbrauch:** Es gibt keine Begrenzung der Anmeldeversuche. Für einen öffentlichen Betrieb sollte eine dazukommen.
 - **Netlify-Verbrauch:**
   - Jedes geöffnete Spiel fragt etwa alle 1 bis 6 Sekunden nach dem Stand.
-  - Bei jedem neuen Spieltag lädt jedes Gerät den Spielstand (rund 150 bis 250 KB).
+  - Bei jedem neuen Spieltag lädt jedes Gerät den Spielstand (rund 150 bis 250 KB, in einer vollen Hauptwelt bis etwa 350 KB).
   - Auf dem kostenlosen Netlify-Plan reicht das gut für Testrunden. Behalten Sie die Function-Aufrufe und den Datenverkehr in der Netlify-Übersicht im Blick.
 - **Spielstände:** Spielstände der Claude-Artifact-Version lassen sich hier nicht laden.

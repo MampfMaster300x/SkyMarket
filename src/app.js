@@ -385,12 +385,33 @@ function renderActiveBox() {
 }
 
 // Flugzeug-Illustration (Seitenansicht, eigene schematische Zeichnung je Modell)
+/** Concorde: schlanker Rumpf, abgesenkte Nase, Deltaflügel, hohes Seitenleitwerk ohne Höhenleitwerk. */
+function sstSvg(t, o) {
+  const color = o.color || 'var(--accent)', code = (o.code || '').slice(0, 2), f = (x) => x.toFixed(1);
+  const x0 = 14, xe = 306, L = xe - x0, cy = 50, h = 11, top = cy - h / 2, bot = cy + h / 2;
+  const fus = `M${f(x0)},${f(cy + 3)} L${f(x0 + 26)},${f(top + 1)} C${f(x0 + 40)},${f(top - 0.5)} ${f(x0 + 60)},${f(top)} ${f(x0 + 70)},${f(top)} L${f(xe - 30)},${f(top)} C${f(xe - 12)},${f(top)} ${f(xe - 4)},${f(top - 1)} ${f(xe)},${f(top - 2)} L${f(xe)},${f(top + 3)} C${f(xe - 10)},${f(bot)} ${f(xe - 30)},${f(bot)} ${f(xe - 40)},${f(bot)} L${f(x0 + 40)},${f(bot)} C${f(x0 + 28)},${f(bot)} ${f(x0 + 12)},${f(cy + 4)} ${f(x0)},${f(cy + 3)}Z`;
+  const fin = `M${f(xe - L * 0.17)},${f(top + 0.5)} L${f(xe - L * 0.06)},${f(top - 27)} L${f(xe - L * 0.025)},${f(top - 27)} L${f(xe - 2)},${f(top - 2)}Z`;
+  const wing = `M${f(x0 + L * 0.36)},${f(bot - 1)} C${f(x0 + L * 0.5)},${f(bot + 1)} ${f(x0 + L * 0.7)},${f(bot + 3)} ${f(xe - L * 0.06)},${f(bot + 3.2)} L${f(xe - L * 0.06)},${f(bot + 0.5)}Z`;
+  const eng = [0.6, 0.66].map((k, i) => `<rect x="${f(x0 + L * k)}" y="${f(bot + 2.4 + i * 0.6)}" width="${f(L * 0.17)}" height="6" rx="1.2" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".8" ${i ? '' : 'opacity=".75"'}/>`).join('');
+  let win = ''; for (let x = x0 + 34; x < xe - L * 0.24; x += 5.2) win += `<rect x="${f(x)}" y="${f(cy - 2.6)}" width="2" height="2.6" rx=".9"/>`;
+  const gear = `<line x1="${f(x0 + 44)}" y1="${f(bot)}" x2="${f(x0 + 44)}" y2="${f(bot + 10)}" stroke="var(--gear)" stroke-width="1.2"/><circle cx="${f(x0 + 44)}" cy="${f(bot + 11)}" r="2.4" fill="var(--gear)"/>
+    <line x1="${f(x0 + L * 0.6)}" y1="${f(bot + 3)}" x2="${f(x0 + L * 0.6)}" y2="${f(bot + 10)}" stroke="var(--gear)" stroke-width="1.6"/><circle cx="${f(x0 + L * 0.6)}" cy="${f(bot + 11.5)}" r="3" fill="var(--gear)"/>`;
+  const label = code ? `<text x="${f(xe - L * 0.065)}" y="${f(top - 11)}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="8" fill="${o.ink || 'var(--on-accent)'}">${esc(code)}</text>` : '';
+  return `<svg class="${o.cls || 'acv'}" viewBox="0 0 320 76" role="img" aria-label="${esc(t.label)}">
+    <ellipse cx="160" cy="${f(bot + 14)}" rx="${f(L * 0.42)}" ry="2.2" fill="#000" opacity=".1"/>${gear}
+    <path d="${fin}" fill="${color}"/><path d="${fus}" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".9"/>
+    <path d="M${f(x0 + 40)},${f(cy + 2.2)} L${f(xe - L * 0.2)},${f(cy + 2.2)}" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
+    <g fill="var(--glass)">${win}</g><path d="M${f(x0 + 18)},${f(cy - 0.5)} L${f(x0 + 27)},${f(top + 1.6)} L${f(x0 + 31)},${f(top + 1.6)} L${f(x0 + 27)},${f(cy - 0.5)}Z" fill="var(--glass)"/>
+    <path d="${wing}" fill="var(--fus-line)"/>${eng}${label}
+  </svg>`;
+}
 function acSvg(id, o = {}) {
   const t = P.AIRCRAFT_TYPES[id]; if (!t) return '';
+  if (t.ill.kind === 'sst') return sstSvg(t, o);
   const I = t.ill, color = o.color || 'var(--accent)', code = (o.code || '').slice(0, 2);
   const f = (x) => x.toFixed(1);
   const L = 150 + 150 * I.len, x0 = (320 - L) / 2, xe = x0 + L, prop = I.kind === 'prop';
-  const h = prop ? 17 : 19 + (I.len >= 0.95 ? 1 : 0), cy = 52, top = cy - h / 2, bot = cy + h / 2;
+  const h = prop ? 17 : I.deck2 ? 27 : 19 + (I.len >= 0.95 ? 1 : 0), cy = I.deck2 ? 49 : 52, top = cy - h / 2, bot = cy + h / 2;
   const tailX = xe - L * 0.2;
   const fus = `M${f(x0 + h * 0.9)},${f(top)} L${f(xe - L * 0.16)},${f(top)} C${f(xe - L * 0.06)},${f(top)} ${f(xe - 6)},${f(top - 1)} ${f(xe)},${f(top - 3)} L${f(xe)},${f(top + 4)} C${f(xe - L * 0.06)},${f(cy + 2)} ${f(xe - L * 0.13)},${f(bot)} ${f(xe - L * 0.22)},${f(bot)} L${f(x0 + h)},${f(bot)} C${f(x0 + h * 0.35)},${f(bot)} ${f(x0)},${f(cy + h * 0.25)} ${f(x0)},${f(cy + 1)} C${f(x0)},${f(cy - h * 0.3)} ${f(x0 + h * 0.35)},${f(top)} ${f(x0 + h * 0.9)},${f(top)}Z`;
   const fh = prop ? h * 2.0 : I.fin === 'a220' ? h * 2.05 : h * 1.85;
@@ -403,7 +424,9 @@ function acSvg(id, o = {}) {
     : `M${f(xe - L * 0.14)},${f(top + h * 0.45)} L${f(xe - L * 0.015)},${f(top + h * 0.12)} L${f(xe - L * 0.01)},${f(top + h * 0.3)} L${f(xe - L * 0.11)},${f(top + h * 0.6)}Z`;
   const cabinX0 = x0 + h * 1.7, cabinX1 = xe - L * 0.25, n = Math.floor((cabinX1 - cabinX0) / 6.3);
   let win = '';
-  for (let k = 0; k < n; k++) win += `<rect x="${f(cabinX0 + k * 6.3)}" y="${f(cy - h * 0.2)}" width="2.8" height="3.4" rx="1.2"/>`;
+  for (let k = 0; k < n; k++) win += I.deck2 ? `<rect x="${f(cabinX0 + k * 6.3)}" y="${f(top + 5)}" width="2.8" height="3.2" rx="1.2"/><rect x="${f(cabinX0 + k * 6.3)}" y="${f(top + 14)}" width="2.8" height="3.4" rx="1.2"/>` : `<rect x="${f(cabinX0 + k * 6.3)}" y="${f(cy - h * 0.2)}" width="2.8" height="3.4" rx="1.2"/>`;
+  // 747: Buckel mit Oberdeck vorn
+  const hump = I.hump ? `<path d="M${f(x0 + h * 0.75)},${f(top + 1.5)} C${f(x0 + h * 1.4)},${f(top - 7)} ${f(x0 + L * 0.16)},${f(top - 8)} ${f(x0 + L * 0.27)},${f(top - 7.5)} C${f(x0 + L * 0.33)},${f(top - 7)} ${f(x0 + L * 0.37)},${f(top - 2)} ${f(x0 + L * 0.4)},${f(top + 0.4)}Z" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".9"/>${Array.from({ length: 7 }, (_, k) => `<rect x="${f(x0 + L * 0.09 + k * 6.3)}" y="${f(top - 4.5)}" width="2.6" height="3" rx="1.1" fill="var(--glass)"/>`).join('')}` : '';
   const doors = [x0 + h * 1.25, cabinX1 + 3].map((x) => `<rect x="${f(x)}" y="${f(top + 3)}" width="4.6" height="${f(h - 6)}" rx="1.4" fill="none" stroke="var(--fus-line)" stroke-width=".7"/>`).join('');
   const shield = `<path d="M${f(x0 + h * 0.32)},${f(cy - h * 0.12)} L${f(x0 + h * 0.72)},${f(top + h * 0.22)} L${f(x0 + h * 1.08)},${f(top + h * 0.22)} L${f(x0 + h * 1.02)},${f(cy - h * 0.12)}Z" fill="var(--glass)"/>`;
   let wing, eng, gear;
@@ -421,7 +444,8 @@ function acSvg(id, o = {}) {
     const wx = x0 + L * 0.37;
     wing = `<path d="M${f(wx)},${f(bot - 3)} L${f(wx + L * 0.22)},${f(bot - 1.2)} L${f(wx + L * 0.235)},${f(bot + 0.8)} L${f(wx + L * 0.02)},${f(bot + 0.6)}Z" fill="var(--fus-line)"/>`;
     const el = (I.neo ? 36 : 31) * L / 290, eh = I.neo ? 11.5 : 10, flat = I.fin === 'boeing', ex = wx - el * 0.45, ey = bot - (flat ? 1.5 : 0.5);
-    eng = `<line x1="${f(ex + el * 0.6)}" y1="${f(bot - 1)}" x2="${f(ex + el * 0.75)}" y2="${f(ey + 2)}" stroke="var(--fus-line)" stroke-width="2"/>
+    const ex2 = ex + L * 0.12, ey2 = ey - 2.5;
+    eng = (I.eng4 ? `<rect x="${f(ex2)}" y="${f(ey2)}" width="${f(el * 0.92)}" height="${f(eh * 0.92)}" rx="${f(eh / 2)}" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".8" opacity=".8"/><ellipse cx="${f(ex2 + 1.5)}" cy="${f(ey2 + eh * 0.46)}" rx="1.6" ry="${f(eh * 0.46 - 1)}" fill="var(--glass)" opacity=".7"/>` : '') + `<line x1="${f(ex + el * 0.6)}" y1="${f(bot - 1)}" x2="${f(ex + el * 0.75)}" y2="${f(ey + 2)}" stroke="var(--fus-line)" stroke-width="2"/>
       <rect x="${f(ex)}" y="${f(ey)}" width="${f(el)}" height="${f(eh)}" rx="${f(eh / 2)}" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".8"/>
       <ellipse cx="${f(ex + 1.6)}" cy="${f(ey + eh / 2)}" rx="1.8" ry="${f(eh / 2 - 1)}" fill="var(--glass)" opacity=".85"/>
       <path d="M${f(ex + el - 1)},${f(ey + 2.5)} L${f(ex + el + 4)},${f(ey + eh / 2)} L${f(ex + el - 1)},${f(ey + eh - 2.5)}Z" fill="var(--fus-line)"/>
@@ -435,7 +459,7 @@ function acSvg(id, o = {}) {
     <ellipse cx="160" cy="${f(bot + 10.5)}" rx="${f(L * 0.42)}" ry="2.4" fill="#000" opacity=".1"/>
     ${gear}${prop ? '' : eng}
     <path d="${fin}" fill="${color}"/>
-    <path d="${fus}" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".9"/>
+    <path d="${fus}" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".9"/>${hump}
     <path d="M${f(x0 + h * 1.1)},${f(cy + h * 0.28)} L${f(tailX - 4)},${f(cy + h * 0.28)}" stroke="${color}" stroke-width="2.4" stroke-linecap="round"/>
     <path d="${stab}" fill="${prop ? color : 'var(--fus-line)'}"/>
     <g fill="var(--glass)">${win}</g>${doors}${shield}${wing}${prop ? eng : ''}${label}
@@ -619,8 +643,8 @@ const SECTIONS = [
   { key: 'karte', label: 'Karte', sub: 'Live-Lage und Überblick', icon: 'globe', tabs: [['dashboard', 'Dashboard'], ['cockpit', 'Übersicht'], ['departures', 'Abflüge'], ['news', 'Meldungen']] },
   { key: 'flotte', label: 'Flotte', sub: 'Jedes Flugzeug zählt', icon: 'plane', tabs: [['fleetOwn', 'Ihre Flotte'], ['fleetPlan', 'Einsatzplan'], ['fleetBuy', 'Beschaffung'], ['fleetAcmi', 'Charter']] },
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung']] },
-  { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating']] },
-  { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['rivals', 'Wettbewerb'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
+  { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['cfo', 'CFO-Beratung']] },
+  { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
   { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Meilensteine'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
 ];
 const TAB_ALIAS = { fleet: 'fleetOwn' };
@@ -1096,6 +1120,7 @@ function plannerForecast(p, opts = {}, fo, fi) {
 function updateForecast() {
   const p = ui.planner, box = $('#forecast'); if (!p || !box) return;
   const pl = W.player, base = p.base;
+  if (!SM.aptOk(base, p.dest, p.type)) { box.innerHTML = `<div class="callout crit">${esc(SM.aptWhy(base, p.dest, p.type))}</div>`; return; }
   if (!SM.rangeOk(base, p.dest, p.type)) { box.innerHTML = `<div class="callout crit">Die ${tl(p.type)} schafft ${n0(SM.gcDistanceKm(base, p.dest))} km nicht. Anderen Typ wählen.</div>`; return; }
   const band = W.forecastBand(pl), m = SM.monthOf(W.day);
   const r = plannerForecast(p, { nDraws: 4 });
@@ -1340,7 +1365,7 @@ VIEWS.fleetOwn = function viewFleetOwn() {
     const move = pl.bases.length > 1 ? `<select data-act-change="move" data-id="${a.id}" aria-label="Basis wechseln" style="width:auto">${pl.bases.map((b) => `<option ${b === a.base ? 'selected' : ''}>${b}</option>`).join('')}</select>` : '';
     return `<div class="fleet-row"><div style="min-width:0"><div class="acrow"><div class="thumb">${acSvg(a.type_id, { ...myAcColors(), code: pl.code })}</div><div style="min-width:0"><div class="row" style="gap:8px"><b class="mono">${acName(a.id)}</b> <span>${tlx(a.type_id)}</span> ${acStatus(pl, a)} ${acRoleChips(pl, a)}${acMode(a) !== 'auto' ? ` <span class="chip ${acMode(a) === 'manual' ? 'me' : 'warn'}">${MODE_LABEL[acMode(a)]}</span>` : ''}</div>
       <div class="small muted">${modeLabel(a)} · Basis ${a.base} · ${n1(age)} Jahre${a.cond && a.cond !== 1 && pl.oldAcExpert() ? ` · Zustand <span class="${condCls(a.cond) === 'crit' ? 'neg' : condCls(a.cond) === 'good' ? 'pos' : ''}">${condWord(a.cond)}</span>` : ''} · ${eur(acDayCost(a))} pro Tag${routes.length ? ' · fliegt ' + [...new Set(routes)].join(', ') : ''}${upcoming}</div>
-      <div class="small muted">Nächster C-Check in ${n0(Math.max(0, toC))} Flugstunden (dauert ${Math.max(4, P.CCHECK_DAYS - (pl.hangars.includes(a.base) ? P.HANGAR_CHECK_DAYS : 0) - pl.skill('tech'))} Tage)</div>
+      <div class="small muted">${toC > 0 ? `Nächster C-Check in ${n0(toC)} Flugstunden` : 'C-Check fällig – wartet, bis das andere Flugzeug gleichen Musters aus der Werft zurück ist'} (dauert ${Math.max(4, P.CCHECK_DAYS - (pl.hangars.includes(a.base) ? P.HANGAR_CHECK_DAYS : 0) - pl.skill('tech'))} Tage)</div>
       </div></div><div class="bar" style="margin-top:6px" title="Auslastung des 17-Stunden-Betriebsfensters"><i class="me" style="width:${Math.min(100, a.used_hours / P.OPERATING_WINDOW_H * 100).toFixed(0)}%"></i></div></div>
       <div class="stack" style="justify-items:end">${move}${c ? `<div class="stack small" style="justify-items:end"><span>${a.owned ? `Verkauf: ${eur(dc.cash)} Zufluss nach Kredittilgung` : a.flex ? 'Rückgabe ohne Kosten' : `Rückgabe kostet ${eur(-dc.pnl)}`}</span><div class="row"><button class="btn danger small" data-act="dispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button><button class="btn small" data-act="cancelconfirm">Abbrechen</button></div></div>`
       : `<button class="btn small" data-act="askdispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button>`}<button class="btn small" data-act="asgopen" data-id="${a.id}">Einsatz planen</button>${a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day) ? `<button class="btn small" data-act="dealac" data-id="${a.id}">An Airline abgeben</button>` : ''}</div></div>`;
@@ -1379,15 +1404,16 @@ VIEWS.fleetBuy = function viewFleetBuy() {
   html += `<h2 class="sec">Neu vom Leasinggeber oder ab Werk</h2><div class="types">${Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => !t.launch || W.day >= t.launch - 30).map(([id, t]) => {
     const known = pl.familyKnown(id), fam = P.TYPE_GROUPS[t.group];
     const stock = W.lessorStock && W.lessorStock[id] !== undefined ? W.lessorStock[id] : SM.stockCap(id), duty = SM.acTariff(W, pl, id), auctionOnly = t.launch && W.day < t.launch + 365;
-    const avail = auctionOnly ? `<span class="chip me">Neues Muster – im ersten Jahr nur per Auktion</span>` : `<span class="chip ${stock <= 0 ? 'crit' : stock <= 2 ? 'warn' : ''}">${stock <= 0 ? 'beim Leasinggeber ausverkauft' : `${stock} beim Leasinggeber`}</span> <span class="chip">Lieferung ${SM.leaseDelivery(W, id, 'lease')} T.</span>${duty ? ` <span class="chip crit">Zoll +${pct(duty)}</span>` : ''}`;
+    const usedOnly = t.stock === 0;
+    const avail = usedOnly ? `<span class="chip warn">Nur gebraucht – selten auf dem Gebrauchtmarkt${t.maxPerAirline ? `, höchstens ${t.maxPerAirline} je Airline` : ''}</span>${t.worldMax ? ` <span class="chip">weltweit ${W.typeCount(id)} von ${t.worldMax} im Einsatz</span>` : ''}` : auctionOnly ? `<span class="chip me">Neues Muster – im ersten Jahr nur per Auktion</span>` : `<span class="chip ${stock <= 0 ? 'crit' : stock <= 2 ? 'warn' : ''}">${stock <= 0 ? 'beim Leasinggeber ausverkauft' : `${stock} beim Leasinggeber`}</span> <span class="chip">Lieferung ${SM.leaseDelivery(W, id, 'lease')} T.</span>${duty ? ` <span class="chip crit">Zoll +${pct(duty)}</span>` : ''}`;
     const intro = known ? `Familie ${fam} schon in der Flotte, Piloten können wechseln` : `neue Familie ${fam}: ${eur(P.TYPE_INTRO_COST)} Einführung${pl.typesIntroduced.length ? ` + ${eur(P.TYPE_COMPLEXITY_DAY)} pro Tag Komplexität, eigene Musterberechtigung für Piloten` : ''}`;
-    return `<div class="type"><div class="type-h"><b>${tlx(id)}</b><span class="small muted">${esc(t.maker)} · ${t.cls}${t.age >= 10 ? ` · ${t.age} J. alt` : ''}</span></div>
+    return `<div class="type${ui.buyFocus === id ? ' hl' : ''}" id="type-${id}"><div class="type-h"><b>${tlx(id)}</b><span class="small muted">${esc(t.maker)} · ${t.cls}${t.age >= 10 ? ` · ${t.age} J. alt` : ''}</span></div>
       <div class="acv-box">${acSvg(id, { ...myAcColors(), code: pl.code })}</div>
-      <div class="specs"><div><span>Sitze</span><b>${t.seats.basic}/${t.seats.standard}/${t.seats.premium}</b></div><div><span>Reichweite</span><b>${n0(t.range_km)} km</b></div><div><span>Verbrauch</span><b>${n0(t.fuel_bh_kg)} kg/h</b></div><div><span>Crew</span><b>2 + ${t.cabin}</b></div></div>
+      <div class="specs"><div><span>Sitze</span><b>${t.seats.basic}/${t.seats.standard}/${t.seats.premium}</b></div><div><span>Reichweite</span><b>${n0(t.range_km)} km</b></div><div><span>Verbrauch</span><b>${n0(t.fuel_bh_kg)} kg/h</b></div><div><span>Crew</span><b>${t.cockpit || 2} + ${t.cabin}</b></div></div>
       <div class="small ink2">${esc(t.note)}. ${esc(t.engines)}.</div>
       <div class="row" style="gap:6px">${avail}</div>
-      <div class="small muted">Leasing ${eur(t.lease_month * (1 + duty) * pl.oldAcFactor(t.age) * P.EURUSD / W.macro.eurusd)}/Monat · Flex ${eur(t.lease_month * (1 + duty) * pl.oldAcFactor(t.age) * (1 + P.FLEX_LEASE_PREMIUM) * P.EURUSD / W.macro.eurusd)}/Monat${pl.oldAcFactor(t.age) < 1 ? ' (−10 % durch Luis)' : ''} · ${t.age >= 10 ? `Kauf ${eur(t.value_eur * (1 + duty) * pl.oldAcFactor(t.age))}` : `ab Werk ${eur(t.value_eur * 1.08 * (1 + duty))} in ${SM.leaseDelivery(W, id, 'factory')} Tagen`} · ${intro}</div>
-      ${auctionOnly ? '' : `<div class="row">${stock > 0 ? btn(id, 'lease', 'Leasen, 36 Monate', null, true) + btn(id, 'flex', 'Flex-Leasing') : '<span class="small neg">Leasing derzeit nicht möglich</span>'}${t.age >= 10 ? '' : btn(id, 'factory', 'Ab Werk bestellen')}</div>`}</div>`;
+      ${usedOnly ? `<div class="small muted">Gebraucht um ${eur(t.value_eur * (1 + duty))} Kaufpreis · Betrieb: ${n0(t.fuel_bh_kg)} kg Kerosin und ${eur(t.maint_bh)} Wartung je Blockstunde · ${known ? '' : `neue Familie ${fam}: ${eur(P.TYPE_INTRO_COST)} Einführung`}</div>` : `<div class="small muted">Leasing ${eur(t.lease_month * (1 + duty) * pl.oldAcFactor(t.age) * P.EURUSD / W.macro.eurusd)}/Monat · Flex ${eur(t.lease_month * (1 + duty) * pl.oldAcFactor(t.age) * (1 + P.FLEX_LEASE_PREMIUM) * P.EURUSD / W.macro.eurusd)}/Monat${pl.oldAcFactor(t.age) < 1 ? ' (−10 % durch Luis)' : ''} · ${t.age >= 10 ? `Kauf ${eur(t.value_eur * (1 + duty) * pl.oldAcFactor(t.age))}` : `ab Werk ${eur(t.value_eur * 1.08 * (1 + duty))} in ${SM.leaseDelivery(W, id, 'factory')} Tagen`} · ${intro}</div>`}
+      ${auctionOnly || usedOnly ? '' : `<div class="row">${stock > 0 ? btn(id, 'lease', 'Leasen, 36 Monate', null, true) + btn(id, 'flex', 'Flex-Leasing') : '<span class="small neg">Leasing derzeit nicht möglich</span>'}${t.age >= 10 || t.noFactory ? '' : btn(id, 'factory', 'Ab Werk bestellen')}</div>`}${t.minAptPax ? `<div class="small warnc">Nur zwischen Flughäfen ab ${t.minAptPax} Mio. Passagieren im Jahr (Code F).</div>` : ''}</div>`;
   }).join('')}</div>
   <p class="small muted">Leasinggeber haben nur begrenzten Bestand, den sich alle Airlines teilen; viele Bestellungen verlängern die Lieferzeiten. Flugzeuge kosten jeden Tag, auch wenn sie stehen.</p>`;
   return html;
@@ -1483,7 +1509,7 @@ VIEWS.stations = function viewStations() {
     <p class="small ink2">An jedem Flughafen mieten Sie Schalter und Gates und kaufen die Abfertigung ein. Billige Bereiche sparen Miete und Entgelte, kosten aber Bodenzeit und Geschäftsreisende.</p>${cards.join('')}`;
   const cand = SM.AP_CODES.filter((c) => !pl.bases.includes(c));
   html += `<div class="card pad stack"><h3>Neue Basis eröffnen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Einmalig ${eur(P.BASE_SETUP_COST * cpi())}, danach ${eur(P.BASE_FIXED_DAY * cpi())} pro Tag für Leitung und Crewräume. Flugzeuge lassen sich im Tab Flotte umstationieren.</p>
-    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)); return `<option value="${c}">${c} · ${apName(c)}${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase">Basis eröffnen</button></div></div>`;
+    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)); return `<option value="${c}" ${c === ui.newBasePick ? 'selected' : ''}>${c} · ${apName(c)}${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase">Basis eröffnen</button></div></div>`;
   const slotApts = SM.AP_CODES.filter((c) => isFinite(W.slotsFree(c)));
   html += `<div class="stack"><h2 class="sec">Slots <small>koordinierte Flughäfen</small></h2><table class="t"><thead><tr><th>Flughafen</th><th class="r">für Sie frei</th><th class="r">Entgelt je Bewegung</th></tr></thead><tbody>${slotApts.map((c) => `<tr><td>${c} · ${apName(c)}</td><td class="r">${slotTxt(c)}</td><td class="r">${eur(SM.apx(c).slotFee * cpi())}</td></tr>`).join('')}</tbody></table>
     <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Im April und Oktober (Sommer- und Winterflugplan) kommen neue Slots dazu; wer eine Strecke einstellt, gibt seine frei.</p></div>`;
@@ -1523,7 +1549,7 @@ VIEWS.supply = function viewSupply() {
 // ---------- Datenblatt Flugzeugmuster ----------
 function showAcInfo(id) {
   const t = P.AIRCRAFT_TYPES[id]; if (!t) return;
-  const pl = W.player, base = pl.bases[0], mine = pl.fleet.filter((a) => a.type_id === id), fam = P.TYPE_GROUPS[t.group];
+  const pl = W.player, base = curBase(), mine = pl.fleet.filter((a) => a.type_id === id), fam = P.TYPE_GROUPS[t.group];
   const reach = SM.AP_CODES.filter((c) => c !== base && SM.routeKmOk(base, c) && SM.rangeOk(base, c, id));
   const sample = reach.map((c) => ({ c, km: SM.gcDistanceKm(base, c), pot: potOf(base, c).sum })).sort((a, b) => b.pot - a.pot).slice(0, 6);
   const bh1000 = SM.blockHours(base, sample[0] ? sample[0].c : base, id);
@@ -1555,24 +1581,38 @@ function showAcInfo(id) {
         ${row('Ihre Flotte', mine.length ? `${mine.length} Stück` : pl.familyKnown(id) ? 'Familie bekannt' : `noch keins · Einführung ${eur(P.TYPE_INTRO_COST)}`)}
       </tbody></table>
     </div>
-    ${sample.length ? `<div class="stack"><h3>Größte erreichbare Märkte ab ${base}</h3><table class="t"><thead><tr><th>Ziel</th><th class="r">Distanz</th><th class="r">Blockzeit</th><th class="r">Potenzial/Tag ⇄</th></tr></thead><tbody>${sample.map((x) => `<tr><td><b>${x.c}</b> <span class="small muted">${esc(apName(x.c))}</span></td><td class="r">${n0(x.km)} km</td><td class="r">${n1(SM.blockHours(base, x.c, id))} h</td><td class="r">${n0(x.pot)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${sample.length ? `<div class="stack"><h3>Größte erreichbare Märkte ab ${base}</h3>${baseSwitch(base, 'data-acbase')}<table class="t"><thead><tr><th>Ziel</th><th class="r">Distanz</th><th class="r">Blockzeit</th><th class="r">Potenzial/Tag ⇄</th></tr></thead><tbody>${sample.map((x) => `<tr><td><b>${x.c}</b> <span class="small muted">${esc(apName(x.c))}</span></td><td class="r">${n0(x.km)} km</td><td class="r">${n1(SM.blockHours(base, x.c, id))} h</td><td class="r">${n0(x.pot)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     <p class="small muted">Sitzplätze je nach Produkt (Basis, Standard, Komfort). Ab 9 Stunden Flugzeit fliegen drei, ab 13 Stunden vier Piloten.${void bh1000 || ''}</p>`, true);
   m.querySelector('#aiClose').addEventListener('click', () => { m.hidden = true; });
+  m.querySelectorAll('[data-acbase]').forEach((x) => x.addEventListener('click', () => { if (setSelBase(x.dataset.acbase)) showAcInfo(id); }));
   m.onclick = (e) => { if (e.target === m) m.hidden = true; };
+}
+
+// ---------- Gewählte Basis (bei mehreren Hubs) ----------
+const curBase = () => { const pl = W.player; return pl.bases.includes(ui.selBase) ? ui.selBase : pl.bases[0]; };
+/** Umschalter zwischen den eigenen Basen – nur bei mehr als einer Basis. attr: Datenattribut für den Klick. */
+function baseSwitch(base, attr, label = 'Ab Basis') {
+  const pl = W.player; if (pl.bases.length < 2) return '';
+  return `<div class="row baseswitch"><span class="small muted">${label}</span><div class="seg wrap" role="group" aria-label="Basis wählen">${pl.bases.map((b) => `<button type="button" ${attr}="${b}" aria-pressed="${b === base}" title="${esc(apName(b))}">${b}</button>`).join('')}</div></div>`;
+}
+function setSelBase(b) {
+  const pl = W.player; if (!pl.bases.includes(b)) return false;
+  if (!ui.selApt || pl.bases.includes(ui.selApt)) ui.selApt = b;   // stand eine Basis im Fokus, wechselt sie mit
+  ui.selBase = b; return true;
 }
 
 // ---------- Flughafen-Karte auf der Karte: Reisepotenzial auf einen Blick ----------
 function potOf(o, d) { const a = SM.qPot(o, d), b = SM.qPot(d, o); return { leisure: a.leisure + b.leisure, business: a.business + b.business, vfr: a.vfr + b.vfr, sum: a.leisure + a.business + a.vfr + b.leisure + b.business + b.vfr }; }
 function aptCardHtml(c) {
-  const pl = W.player, base = pl.bases.includes(ui.selBase) ? ui.selBase : pl.bases[0], a = P.AIRPORTS[c];
+  const pl = W.player, base = curBase(), a = P.AIRPORTS[c];
   const isBase = pl.bases.includes(c);
-  let body = '';
+  let body = isBase ? '' : baseSwitch(base, 'data-apcbase');
   if (!isBase && SM.routeKmOk(base, c)) {
     const p = potOf(base, c), km = SM.gcDistanceKm(base, c), rail = SM.railShare(base, c);
     const comp = W.competitorOffers(W.playerId, base, c), mine = pl.activeRoutes().find((r) => SM.pairKey(r.base, r.dest) === SM.pairKey(base, c));
     const months = Array.from({ length: 12 }, (_, m) => { const q = SM.qPot(base, c, m), r = SM.qPot(c, base, m); return q.leisure + q.business + q.vfr + r.leisure + r.business + r.vfr; });
     const mx = Math.max(...months);
-    body = `<div class="ac-pot"><span>Reisepotenzial ${base} ⇄ ${c}</span><b>${n0(p.sum)}</b><em>Menschen pro Tag, beide Richtungen</em></div>
+    body += `<div class="ac-pot"><span>Reisepotenzial ${base} ⇄ ${c}</span><b>${n0(p.sum)}</b><em>Menschen pro Tag, beide Richtungen</em></div>
       <div class="ac-mix"><span style="flex:${p.leisure}" title="Urlaub ${pct(p.leisure / p.sum)}" class="l"></span><span style="flex:${p.business}" title="Geschäft ${pct(p.business / p.sum)}" class="b"></span><span style="flex:${p.vfr}" title="Besuch ${pct(p.vfr / p.sum)}" class="v"></span></div>
       <div class="small muted">Urlaub ${pct(p.leisure / p.sum)} · Geschäft ${pct(p.business / p.sum)} · Besuch ${pct(p.vfr / p.sum)}</div>
       <div class="ac-season" title="Saison: Potenzial je Monat">${months.map((v, m) => `<i style="height:${(v / mx * 100).toFixed(0)}%" title="${MONTHS[m]}: ${n0(v)} pro Tag"></i>`).join('')}</div>
@@ -1603,9 +1643,9 @@ function selectAirport(c) {
   renderMapRoutes(true);
 }
 VIEWS.market = function viewMarket() {
-  const pl = W.player, base = pl.bases.includes(ui.selBase) ? ui.selBase : pl.bases[0], c = ui.selApt || base, a = P.AIRPORTS[c];
+  const pl = W.player, base = curBase(), c = ui.selApt || base, a = P.AIRPORTS[c];
   const based = W.list.filter((x) => x.bases.includes(c) && x.status !== 'insolvent');
-  let html = `<div class="spread"><h2 class="sec">${esc(a.name)} <small>${c} · ${SM.COUNTRY_NAMES[a.country].replace(/^den /, '')}</small></h2>${c !== base ? `<button class="btn primary" data-act="planfrom" data-apt="${c}">Strecke ${base}–${c} planen</button>` : '<span class="chip me">Ihre Basis</span>'}</div>`;
+  let html = baseSwitch(base, 'data-mktbase', 'Märkte ab Basis') + `<div class="spread"><h2 class="sec">${esc(a.name)} <small>${c} · ${SM.COUNTRY_NAMES[a.country].replace(/^den /, '')}</small></h2>${c !== base ? `<button class="btn primary" data-act="planfrom" data-apt="${c}">Strecke ${base}–${c} planen</button>` : '<span class="chip me">Ihre Basis</span>'}</div>`;
   const ev = W.activeEvents().concat(W.upcomingEvents()).filter((e) => W.eventAffects(e, c) && e.scope !== 'all');
   for (const e of ev) html += `<div class="callout ${e.severity === 'good' ? 'good' : 'warn'}">${e.start > W.day ? `Ab ${dateShort(e.start)}: ` : ''}${esc(e.text)}</div>`;
   if (c !== base && SM.routeKmOk(base, c)) { const p = potOf(base, c); html += `<div class="tiles"><div class="tile"><span>Reisepotenzial ${base} ⇄ ${c}</span><b>${n0(p.sum)} pro Tag</b><em>Urlaub ${pct(p.leisure / p.sum)} · Geschäft ${pct(p.business / p.sum)} · Besuch ${pct(p.vfr / p.sum)}</em></div><div class="tile"><span>Distanz</span><b>${n0(SM.gcDistanceKm(base, c))} km</b><em>${SM.railShare(base, c) > 0.05 ? `Bahn nimmt ${pct(SM.railShare(base, c))}` : 'keine Bahnkonkurrenz'}</em></div><div class="tile"><span>Konkurrenz</span><b>${W.competitorOffers(W.playerId, base, c).length || 'keine'}</b><em>Airlines auf ${base}–${c}</em></div></div>`; }
@@ -1617,7 +1657,7 @@ VIEWS.market = function viewMarket() {
     <div class="tile"><span>Ticketsteuer</span><b>${eur(W.taxAt(c))}</b><em>zahlt der Kunde</em></div>
     <div class="tile"><span>Kerosin</span><b>${NF3.format(W.fuelPrice * SM.apx(c).fuel)} €</b><em>je kg vor Ort</em></div>
   </div>`;
-  html += `<p class="small ink2">${based.length ? 'Basis von ' + based.map((x) => `<span class="sw" style="background:${colorOf(x)}"></span> ${esc(x.name)}`).join(', ') : 'Keine Airline hat hier eine Basis.'}${isFinite(W.slotsFree(c)) ? ` Koordinierter Flughafen: ${slotTxt(c)} Slots frei.` : ''}${P.LEISURE_SEASON_PROFILE[c] ? ` Ferienziel mit starker Saison (${P.LEISURE_SEASON_PROFILE[c] === 'island' ? 'Insel: Sommer etwa dreimal so stark wie Winter' : 'Sommer deutlich stärker'}).` : ''}</p>`;
+  html += `<p class="small ink2">${based.length ? 'Basis von ' + based.map((x) => `<span class="sw" style="background:${colorOf(x)}"></span> ${esc(x.name)}`).join(', ') + '.' : 'Keine Airline hat hier eine Basis.'}${isFinite(W.slotsFree(c)) ? ` Koordinierter Flughafen: ${slotTxt(c)} Slots frei.` : ''}${P.LEISURE_SEASON_PROFILE[c] ? ` Ferienziel mit starker Saison (${P.LEISURE_SEASON_PROFILE[c] === 'island' ? 'Insel: Sommer etwa dreimal so stark wie Winter' : 'Sommer deutlich stärker'}).` : ''}</p>`;
   // Marktstudie
   if (c !== base) {
     const k = SM.pairKey(base, c), s = pl.studies[k], lv = pl.skill('analyst');
@@ -1634,7 +1674,7 @@ VIEWS.market = function viewMarket() {
     return { d, sum, biz: pot.business / sum, dist: SM.gcDistanceKm(base, d), rail: SM.railShare(base, d), comp, mine, st };
   }).sort((x, y) => y.sum - x.sum);
   const rows = ui.marketAll ? allRows : allRows.slice(0, 25);
-  html += `<div class="stack"><h2 class="sec">Märkte ab ${base} <small>${ui.marketAll ? `alle ${allRows.length} Ziele` : 'die 25 größten'}, Potenzial pro Tag und Richtung</small></h2><div class="tw"><table class="t"><thead><tr><th>Ziel</th><th class="r">km</th><th class="r">Potenzial</th><th class="r">Geschäft</th><th>Angebot heute</th></tr></thead><tbody>
+  html += `<div class="stack"><h2 class="sec">Märkte ab ${base} <small>${ui.marketAll ? `alle ${allRows.length} Ziele` : 'die 25 größten'}, Potenzial pro Tag und Richtung</small></h2>${baseSwitch(base, 'data-mktbase', 'Andere Basis')}<div class="tw"><table class="t"><thead><tr><th>Ziel</th><th class="r">km</th><th class="r">Potenzial</th><th class="r">Geschäft</th><th>Angebot heute</th></tr></thead><tbody>
     ${rows.map((r) => `<tr><td><a href="#" data-act="selapt" data-apt="${r.d}">${r.d}</a> <span class="small muted">${apName(r.d)}</span>${r.rail > 0.1 ? ` <span class="chip">Bahn ${pct(r.rail)}</span>` : ''}${r.st && r.st.done ? ` <span class="chip ${r.st.est >= 1 ? 'good' : 'warn'}">Studie ${r.st.est >= 1 ? '+' : '−'}${pct(Math.abs(r.st.est - 1))}</span>` : ''}</td><td class="r">${n0(r.dist)}</td><td class="r">${n0(r.sum * (r.st && r.st.done ? r.st.est : 1))}</td><td class="r">${pct(r.biz)}</td>
       <td class="small">${r.mine ? `<span class="chip me">Sie ${r.mine.freq}x</span> ` : ''}${r.comp.length ? r.comp.map((o) => `<span class="sw" style="background:${colorOf(W.airlines[o.airline])}"></span> ${o.freq}x ${eur(o.fare)}`).join(' ') : (r.mine ? '' : '<span class="muted">frei</span>')}</td></tr>`).join('')}
   </tbody></table></div><button class="btn small" data-act="marketall">${ui.marketAll ? 'Nur die 25 größten zeigen' : `Alle ${allRows.length} Ziele zeigen`}</button><p class="small muted">Potenzial heißt: so viele Menschen würden zum Referenzpreis eine Reise erwägen (Jahresmittel, ohne Konjunktur und Ereignisse). Wie viele fliegen, hängt von Preis, Frequenz, Produkt, Pünktlichkeit, Marke und Konkurrenz ab.</p></div>`;
@@ -2621,7 +2661,7 @@ function assistantHints() {
   }
   for (const a of pl.fleet) {
     const toC = P.CCHECK_FH - (a.fh - a.lastC);
-    if (a.delivery_day <= W.day && toC < 120 && a.status !== 'ccheck') { add('cc' + a.id, 'info', 'ops', `C-Check für <b>${acName(a.id)}</b> in ${n0(Math.max(0, toC))} Flugstunden – dann fehlt das Flugzeug einige Tage.`, 'fleetOwn'); break; }
+    if (a.delivery_day <= W.day && toC < 120 && a.status !== 'ccheck') { add('cc' + a.id, 'info', 'ops', toC > 0 ? `C-Check für <b>${acName(a.id)}</b> in ${n0(toC)} Flugstunden – dann fehlt das Flugzeug einige Tage.` : `C-Check für <b>${acName(a.id)}</b> ist fällig und beginnt, sobald das andere Flugzeug gleichen Musters aus der Werft zurück ist.`, 'fleetOwn'); break; }
   }
   for (const a of pl.fleet) if (a.delivery_day > W.day && a.delivery_day - W.day <= 4 && !(a.assigned || []).length && !routes.some((r) => r.type_id === a.type_id && r.base === a.base)) { add('dlv' + a.id, 'info', 'net', `${tl(a.type_id)} kommt am ${dateShort(a.delivery_day)} – es gibt noch keine Strecke dafür.`, 'plan'); break; }
   let worst = null, spill = null, empty = null, cheap = null;
@@ -2649,7 +2689,7 @@ function assistantHints() {
   if (routes.length >= 3 && pl.brand < 0.45 && !pl.marketing) add('brand', 'info', 'strat', `Unsere Marke steht bei ${n0(pl.brand * 100)} von 100 – ein kleines Marketingbudget hilft bei der Buchungswahl.`, 'supply');
   if (!pl.logo && W.day > 3) add('logo', 'info', 'strat', 'Geben Sie Ihrer Airline ein Gesicht: Form, Symbol und Farben für Ihr <b>Logo</b> auswählen.', 'profile');
   if (routes.length && routes.length < 6 && pl.fleet.length) {
-    const base = pl.bases[0], d = bestFreeDest(base);
+    const base = curBase(), d = bestFreeDest(base);
     if (d) add('idea' + d, 'info', 'net', `Noch unbedient ab ${base}: <b>${esc(apName(d))} (${d})</b> hat viel Potenzial.`, null, { plan: d });
   }
   const order = { crit: 0, warn: 1, good: 2, info: 3 }, focus = asstP() ? asstP().focus : null;
@@ -2876,6 +2916,8 @@ function doAction(act) {
 }
 function refreshAll() { W.operableFreq(W.player); buildSchedules(); renderHeader(); renderTabs(); renderMapRoutes(true); renderPane(true); }
 function onPaneClick(e) {
+  const mb = e.target.closest('[data-mktbase]');
+  if (mb) { e.preventDefault(); if (setSelBase(mb.dataset.mktbase)) { renderPane(true); if (ui.aptCard) showAptCard(ui.aptCard); renderMapRoutes(true); } return; }
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.tagName === 'SELECT') return;
   e.preventDefault();
@@ -2886,6 +2928,8 @@ function onPaneClick(e) {
   if (act === 'plsort') { ui.plSort = b.dataset.v; renderPane(true); return; }
   if (act === 'plall') { ui.plAll = true; renderPane(); return; }
   if (act === 'chatto') { chat.to = b.dataset.al; toggleChat(true); return; }
+  if (/^st(kind|tier|order|plan|ac|base|basecheck|cfo)$/.test(act) && onStudyClick(act, b)) return;
+  if (act.startsWith('cfo') && onCfoClick(act, b)) return;
   if (act.startsWith('mkt') && onMarketClick(act, b)) return;
   if (act.startsWith('deal') && onDealClick(act, b)) return;
   if ((act.startsWith('asg') || act === 'retype') && onAssignClick(act, b)) return;
@@ -2964,9 +3008,472 @@ function bestFreeDest(base) {
   })[0];
 }
 let fcTimer = null;
+// ---------------------------------------------------------------------------
+// Marktstudien (Beratungsaufträge) – Auftrag, Status, Berichte
+// ---------------------------------------------------------------------------
+const STK = () => SM.P.STUDIES;
+const focusOpts = (t, v) => {
+  if (t === 'region') return SM.REGION_ORDER.map((r) => `<option value="${r}" ${r === v ? 'selected' : ''}>${r}</option>`).join('');
+  if (t === 'country') return SM.COUNTRIES.slice().sort((a, b) => (SM.COUNTRY_LABEL[a] || a).localeCompare(SM.COUNTRY_LABEL[b] || b)).map((c) => `<option value="${c}" ${c === v ? 'selected' : ''}>${esc(SM.COUNTRY_LABEL[c] || c)}</option>`).join('');
+  if (t === 'apt') return SM.AP_CODES.slice().sort((a, b) => apName(a).localeCompare(apName(b))).map((c) => `<option value="${c}" ${c === v ? 'selected' : ''}>${esc(apName(c))} (${c})</option>`).join('');
+  return '';
+};
+function studyForm() {
+  const S = STK(), pl = W.player, f = ui.study = ui.study || { kind: 'routes', tier: 'extended', ft: '', fv: '' };
+  if (f.ft && !f.fv) f.fv = f.ft === 'region' ? (P.AIRPORTS[pl.bases[0]].region) : f.ft === 'country' ? P.AIRPORTS[pl.bases[0]].country : pl.bases[0];
+  const price = W.studyPrice(pl, f.tier), free = pl.spendable(W.macro.bank ?? 1), running = (pl.reports || []).filter((r) => r.status === 'running').length;
+  const T = S.tiers[f.tier], lv = pl.skill('analyst');
+  const scope = { small: 'schnell, wenige Kandidaten, grobe Empfehlung', extended: 'mehrere Optionen, drei Tarifstufen', full: 'tiefgehend, alle Kandidaten, vier Tarifstufen, misst Nachfragetrends' };
+  return `<div class="card pad stack"><div class="spread"><b>Neue Studie beauftragen</b><span class="small muted">${running}/${S.maxRunning} laufen</span></div>
+    <div class="stack" style="gap:6px"><span class="small muted">Art der Studie</span><div class="opts st-opts">${Object.entries(S.kinds).map(([k, x]) => `<button data-act="stkind" data-v="${k}" aria-pressed="${f.kind === k}"><b>${esc(x.label)}</b><span>${esc(x.desc)}</span></button>`).join('')}</div></div>
+    <div class="stack" style="gap:6px"><span class="small muted">Paket</span><div class="opts st-opts st-tiers">${Object.entries(S.tiers).map(([k, x]) => { const pr = W.studyPrice(pl, k); return `<button data-act="sttier" data-v="${k}" aria-pressed="${f.tier === k}"><b>${esc(x.label)}</b><span class="mono">${eur(pr.cost)} · ${pr.days} Tage</span><span>${scope[k]} · ${x.top} Vorschläge</span></button>`; }).join('')}</div></div>
+    <div class="row" style="gap:8px"><label class="f" style="flex:1;min-width:150px"><span>Schwerpunkt</span><select id="st-ft"><option value="">weltweit / ab allen Basen</option><option value="region" ${f.ft === 'region' ? 'selected' : ''}>Region</option><option value="country" ${f.ft === 'country' ? 'selected' : ''}>Land</option><option value="apt" ${f.ft === 'apt' ? 'selected' : ''}>Flughafen</option></select></label>
+      ${f.ft ? `<label class="f" style="flex:2;min-width:180px"><span>${f.ft === 'region' ? 'Region' : f.ft === 'country' ? 'Land' : 'Flughafen'}</span><select id="st-fv">${focusOpts(f.ft, f.fv)}</select></label>` : ''}</div>
+    <p class="small muted">${f.kind === 'routes' ? 'Mit Flughafen als Schwerpunkt: ist es eine Ihrer Basen, werden Ziele ab dort gesucht, sonst Verbindungen von Ihren Basen dorthin.' : f.kind === 'base' ? 'Der Schwerpunkt grenzt die möglichen Standorte ein, etwa „Australien“ oder „Ozeanien“.' : f.kind === 'gaps' ? 'Der Schwerpunkt grenzt die untersuchten Märkte ein.' : 'Der Schwerpunkt grenzt die neuen Kandidaten-Strecken ein; Ihre eigenen Strecken sind immer dabei.'}${lv ? ` Ihre Marktanalyse (Stufe ${lv}) senkt Preis und Dauer.` : ''}</p>
+    <div class="spread"><span class="small">${esc(T.label)}: <b>${eur(price.cost)}</b> · Bericht am <b>${dateShort(W.day + price.days)}</b> · danach frei verfügbar ${eur(free - price.cost)}</span>
+      <button class="btn primary" data-act="storder" ${free < price.cost || running >= S.maxRunning ? 'disabled' : ''}>Studie beauftragen</button></div>
+    ${free < price.cost ? '<div class="callout warn">Für diese Studie reicht die Liquidität nicht – ein kleineres Paket wählen oder später beauftragen.</div>' : ''}</div>`;
+}
+const growthChip = (g) => `<span class="chip ${g === 'hoch' ? 'good' : g === 'mittel' ? 'warn' : ''}">Wachstumspotenzial ${g || '–'}</span>`;
+const sg0 = (x) => `<span class="${x < 0 ? 'neg' : x > 0 ? 'pos' : ''}">${eur(x, { plus: true })}</span>`;
+function studyRec(rep) {
+  const r = rep.res.rec; if (!r) return '';
+  const a = r.act; let btns = '';
+  if (a && a.t === 'route') btns = `<button class="btn small primary" data-act="stplan" data-o="${a.o}" data-d="${a.d}" data-type="${a.type}" data-fare="${a.fare}">Strecke planen</button><button class="btn small" data-act="stcfo" data-k="route" data-o="${a.o}" data-d="${a.d}" data-type="${a.type}" data-fare="${a.fare}">CFO fragen</button>`;
+  else if (a && a.t === 'aircraft') btns = `<button class="btn small primary" data-act="stac" data-type="${a.type}">Zur Beschaffung</button><button class="btn small" data-act="stcfo" data-k="aircraft" data-type="${a.type}">CFO fragen</button>`;
+  else if (a && a.t === 'base') btns = `<button class="btn small primary" data-act="stbase" data-apt="${a.apt}">Basis eröffnen …</button><button class="btn small" data-act="stcfo" data-k="base" data-apt="${a.apt}" data-net="${a.net}">CFO fragen</button>`;
+  else if (a && a.t === 'basecheck') btns = `<button class="btn small" data-act="stbasecheck" data-apt="${a.apt}">Basisanalyse für ${esc(P.AIRPORTS[a.apt].country)} vorbereiten</button>`;
+  return `<div class="callout good stack" style="gap:6px"><b>Empfehlung</b><span>${esc(r.text)}</span><span class="small ink2">${esc(r.why || '')}</span>${btns ? `<div class="row" style="gap:6px">${btns}</div>` : ''}</div>`;
+}
+function studyBody(rep) {
+  const R = rep.res, k = rep.kind; let h = '';
+  if (k === 'routes') {
+    h += `<div class="tw"><table class="t"><thead><tr><th>Strecke</th><th>Muster</th><th class="r">Tarif</th><th class="r">Pax/Tag</th><th class="r">Auslastung</th><th class="r">Erlös/Tag</th><th class="r">Kosten/Tag</th><th class="r">DB2/Tag</th><th></th></tr></thead><tbody>
+      ${R.rows.map((x) => `<tr><td><b>${x.o}–${x.d}</b> <span class="small muted">${n0(x.km)} km · ${esc(apName(x.d))}</span></td><td>${tlx(x.type)}${x.nAc > 1 ? ` <span class="small muted">× ${x.nAc}</span>` : ''}</td><td class="r">${eur(x.fare)}</td><td class="r">${n0(x.pax)}</td><td class="r">${pct(x.lf)}</td><td class="r">${eur(x.rev)}</td><td class="r">${eur(x.cost)}</td><td class="r"><b>${sg0(x.db2)}</b></td>
+        <td class="r"><button class="btn small" data-act="stplan" data-o="${x.o}" data-d="${x.d}" data-type="${x.type}" data-fare="${x.fare}">Planen</button></td></tr>
+        <tr class="sub"><td colspan="9" class="small muted">Investition: ${x.nAc > 1 ? `${x.nAc} Flugzeuge, ` : ''}Kaution ${eur(x.invest)}, Leasing ${eur(x.leaseMonth)}/Monat${x.risks.length ? ' · Risiken: ' + esc(x.risks.join('; ')) : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  } else if (k === 'fleet') {
+    h += `<div class="tw"><table class="t"><thead><tr><th>Muster</th><th class="r">Sitze</th><th class="r">Reichweite</th><th class="r">DB2/Tag gesamt</th><th>Bester Einsatz</th><th class="r">Kosten je Sitz-h</th><th class="r">Leasing/Monat</th><th class="r">Kaution</th><th class="r">Kauf</th></tr></thead><tbody>
+      ${R.rows.map((x) => `<tr><td>${tlx(x.type)}${x.known ? '' : ' <span class="chip">neue Familie</span>'}</td><td class="r">${x.seats}</td><td class="r">${n0(x.range)} km</td><td class="r"><b>${eur(x.sumPos)}</b> <span class="small muted">${x.fits} Str.</span></td><td>${x.best ? `${x.best.o}–${x.best.d} ${sg0(x.best.db2)}` : '–'}</td><td class="r">${eur(x.costSeatH)}</td><td class="r">${eur(x.leaseMonth)}</td><td class="r">${eur(x.deposit)}</td><td class="r">${eur(x.buy)} <span class="small muted">${x.mode}</span></td></tr>`).join('')}</tbody></table></div>`;
+    if (R.swaps && R.swaps.length) h += `<div class="stack"><h3>Typwechsel auf Ihren Strecken</h3><div class="tw"><table class="t"><tbody>${R.swaps.map((x) => `<tr><td><b>${x.o}–${x.d}</b></td><td>${tlx(x.from)} → ${tlx(x.to)}</td><td class="r">${sg0(x.gain)} pro Tag</td></tr>`).join('')}</tbody></table></div></div>`;
+  } else if (k === 'base') {
+    h += `<div class="tw"><table class="t"><thead><tr><th>Standort</th><th class="r">Netzwert/Tag</th><th>Beste Strecken (DB2/Tag)</th><th class="r">Einmalig</th><th class="r">laufend/Tag</th><th>Konkurrenz</th><th></th></tr></thead><tbody>
+      ${R.rows.map((x) => `<tr><td><b>${x.apt}</b> ${esc(x.name)} <span class="small muted">${x.pax} Mio. Pax · ${x.reach} Ziele${x.slots !== null ? ` · ${x.slots} Slots frei` : ''}</span></td><td class="r"><b>${sg0(x.net)}</b></td><td class="small">${x.routes.length ? x.routes.map((q) => `${q.d} ${eur(q.db2)}`).join(' · ') : '<span class="muted">keine trägt sich</span>'}</td><td class="r">${eur(x.setup)}</td><td class="r">${eur(x.fixedDay)}</td><td class="small">${x.rivals.length ? esc(x.rivals.slice(0, 2).join(', ')) : '<span class="muted">keine Basis</span>'}</td>
+        <td class="r"><button class="btn small" data-act="stcfo" data-k="base" data-apt="${x.apt}" data-net="${x.net}">CFO</button></td></tr>`).join('')}</tbody></table></div>`;
+  } else {
+    const gapRow = (x) => `<tr><td><b>${x.o}–${x.d}</b> <span class="small muted">${esc(apName(x.o))} – ${esc(apName(x.d))}</span></td><td><span class="chip ${x.cat === 'unbedient' ? 'good' : x.cat === 'voll ausgelastet' ? 'warn' : ''}">${x.cat}</span></td><td class="r">${n0(x.pot)}</td><td class="r">${n0(x.seats)}</td>
+      <td class="small">${x.ops.length ? x.ops.map((q) => `${esc(q.name)} ${q.freq}× ${q.lf !== null ? pct(q.lf) : ''}`).join(', ') : '<span class="muted">niemand</span>'}</td>
+      <td class="r small">${x.entry ? `${tlx(x.entry.type)} ${sg0(x.entry.db2)}${x.entry.db2 > 0 ? ` <button class="btn small" data-act="stplan" data-o="${x.entry.from}" data-d="${x.entry.to}" data-type="${x.entry.type}" data-fare="${x.entry.fare}">Planen</button>` : ''}` : `<span class="muted">Basis in ${x.needBase || x.o} nötig</span>`}</td></tr>`;
+    const head = '<thead><tr><th>Markt</th><th>Lücke</th><th class="r">Potenzial/Tag</th><th class="r">Sitze heute</th><th>Konkurrenz (Auslastung)</th><th class="r">Ihr Einstieg (DB2/Tag)</th></tr></thead>';
+    h += `<div class="stack"><h3>An Ihren Basen <small class="muted">${R.countMine ?? R.rows.length} gefunden</small></h3>${R.rows.length ? `<div class="tw"><table class="t">${head}<tbody>${R.rows.map(gapRow).join('')}</tbody></table></div>` : '<p class="small muted">Keine Lücke an Ihren Basen.</p>'}</div>`;
+    if (R.others && R.others.length) h += `<div class="stack"><h3>Anderswo <small class="muted">${R.countOther} gefunden – brauchen eine Basis</small></h3><div class="tw"><table class="t">${head}<tbody>${R.others.map(gapRow).join('')}</tbody></table></div></div>`;
+    if (R.mine && R.mine.length) h += `<div class="stack"><h3>Ihre Strecken im Wettbewerb</h3><div class="tw"><table class="t"><thead><tr><th>Strecke</th><th class="r">Ihr Tarif / Auslastung</th><th>Konkurrenz: Flüge, Tarif, Auslastung</th></tr></thead><tbody>${R.mine.map((x) => `<tr><td><b>${x.o}–${x.d}</b></td><td class="r">${eur(x.myFare)} · ${x.myLf !== null ? pct(x.myLf) : '–'}</td><td class="small">${x.ops.map((q) => `${esc(q.name)}: ${q.freq}× ${eur(q.fare)} ${q.lf !== null ? pct(q.lf) : ''}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div></div>`;
+  }
+  return h;
+}
+function studyReport(rep, open) {
+  const S = STK(), R = rep.res || {};
+  return `<details class="fcx st-rep" ${open ? 'open' : ''}><summary><b>${esc(S.kinds[rep.kind].label)}</b> · ${esc(S.tiers[rep.tier].label)} · ${esc(R.focus || 'weltweit')} <span class="small muted">· ${dateShort(rep.ready)}</span><br><span class="small">${esc(R.title || '')}</span></summary>
+    <div class="stack" style="gap:10px;margin-top:8px"><p class="small ink2">${esc(R.summary || '')}</p>${studyRec(rep)}${studyBody(rep)}
+      <div class="row" style="gap:6px">${growthChip(R.growth)}<span class="chip">Kosten der Studie ${eur(rep.cost || 0)}</span></div>
+      ${R.risks && R.risks.length ? `<div class="small"><b>Risiken und Unsicherheiten:</b> ${esc(R.risks.join(' '))}</div>` : ''}
+      ${(R.notes || []).map((x) => `<p class="small muted">${esc(x)}</p>`).join('')}
+      <p class="small muted"><b>Annahmen:</b> ${esc((R.assumptions || []).join(' '))}</p></div></details>`;
+}
+VIEWS.studies = function viewStudies() {
+  const pl = W.player, reps = (pl.reports || []).slice().reverse();
+  const run = reps.filter((r) => r.status === 'running'), done = reps.filter((r) => r.status !== 'running');
+  let html = `<h2 class="sec">Marktstudien <small>externe Beratung · Berichte aus Ihren Spieldaten</small></h2>
+    <p class="small ink2">Die Beratung rechnet Kandidaten mit derselben Prognose durch wie die Streckenplanung – nur viele auf einmal, sortiert und mit Empfehlung. Finanzieren Sie eine Empfehlung? Fragen Sie danach die CFO.</p>`;
+  html += studyForm();
+  if (run.length) html += `<div class="stack"><h3>In Arbeit</h3>${run.map((r) => { const tot = Math.max(1, r.ready - r.day), el = Math.min(tot, W.day - r.day); return `<div class="st-run"><div class="spread"><span><b>${esc(STK().kinds[r.kind].label)}</b> · ${esc(STK().tiers[r.tier].label)} · ${esc(SM.focusLabel(r.focus))}</span><span class="small muted">fertig am ${dateShort(r.ready)}</span></div><div class="bar"><i class="me" style="width:${(el / tot * 100).toFixed(0)}%"></i></div></div>`; }).join('')}</div>`;
+  html += `<div class="stack"><h3>Berichte <small class="muted">${done.length}</small></h3>${done.length ? done.map((r, i) => studyReport(r, i === 0 && ui.studyOpen !== false)).join('') : '<p class="small muted">Noch keine Berichte. Eine kleine Streckenanalyse ist günstig und in wenigen Tagen fertig.</p>'}</div>`;
+  return html;
+};
+function onStudyClick(act, b) {
+  const f = ui.study = ui.study || { kind: 'routes', tier: 'extended', ft: '', fv: '' };
+  if (act === 'stkind') { f.kind = b.dataset.v; renderPane(true); return true; }
+  if (act === 'sttier') { f.tier = b.dataset.v; renderPane(true); return true; }
+  if (act === 'storder') {
+    const focus = f.ft ? { t: f.ft, v: f.fv } : null;
+    const r = doAction({ type: 'orderStudy', kind: f.kind, tier: f.tier, focus });
+    if (r.ok) toast(`Studie beauftragt – Bericht in ${r.days} Tagen.`);
+    refreshAll(); return true;
+  }
+  if (act === 'stplan') {
+    const o = b.dataset.o, d = b.dataset.d, fare = Number(b.dataset.fare) || 0;
+    ui.planner = defaultPlanner(d, o); ui.planner.type = b.dataset.type; if (fare) { ui.planner.fo = fare; ui.planner.fi = fare; ui.planner.auto = false; }
+    setTab('plan'); renderMapRoutes(true); return true;
+  }
+  if (act === 'stac') { ui.buyFocus = b.dataset.type; setTab('fleetBuy'); setTimeout(() => { const el = $('#type-' + b.dataset.type); if (el) el.scrollIntoView({ block: 'center' }); }, 60); return true; }
+  if (act === 'stbase') { ui.newBasePick = b.dataset.apt; setTab('stations'); setTimeout(() => { const el = $('#newbase'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 60); toast(`${apName(b.dataset.apt)} ist vorausgewählt – mit „Basis eröffnen“ bestätigen.`); return true; }
+  if (act === 'stbasecheck') { ui.study = { kind: 'base', tier: 'extended', ft: 'country', fv: P.AIRPORTS[b.dataset.apt].country }; renderPane(true); $('#pane').scrollTop = 0; window.scrollTo && isPhone() && phoneScroll('markt', false); return true; }
+  if (act === 'stcfo') {
+    const d = b.dataset;
+    ui.cfo = ui.cfo || {};
+    ui.cfo.scen = d.k === 'route' ? { k: 'route', o: d.o, d: d.d, type: d.type, fare: Number(d.fare), freq: 1, newAc: true }
+      : d.k === 'aircraft' ? { k: 'aircraft', type: d.type, mode: 'lease', n: 1, db1: null }
+      : { k: 'base', apt: d.apt, net: Number(d.net) || 0 };
+    ui.cfo.from = 'study';
+    setTab('cfo'); return true;
+  }
+  return false;
+}
+function onStudyChange(t) {
+  const f = ui.study = ui.study || { kind: 'routes', tier: 'extended', ft: '', fv: '' };
+  if (t.id === 'st-ft') { f.ft = t.value; f.fv = ''; renderPane(true); return true; }
+  if (t.id === 'st-fv') { f.fv = t.value; renderPane(true); return true; }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// CFO: Finanzlage erklären, Fragen beantworten, Szenarien rechnen
+// ---------------------------------------------------------------------------
+const CFO = { name: 'Katrin Vogel', role: 'Finanzvorständin (CFO)' };
+const CFO_Q = [
+  ['lage', 'Wie steht unser Unternehmen finanziell da?'],
+  ['flugzeug', 'Können wir uns ein weiteres Flugzeug leisten?'],
+  ['basis', 'Sollten wir eine neue Basis eröffnen?'],
+  ['strecken', 'Welche unserer Strecken sind unrentabel?'],
+  ['kosten', 'Wo können wir Kosten senken?'],
+  ['reserve', 'Wie viel Liquiditätsreserve sollten wir halten?'],
+  ['invest', 'Welche Investition ist gerade am sinnvollsten?'],
+  ['flotte', 'Wie wirken sich neue Flugzeuge auf unsere Finanzen aus?'],
+  ['schulden', 'Können wir uns zusätzliche Schulden leisten?'],
+  ['trend', 'Wie entwickeln sich Einnahmen und Ausgaben?'],
+  ['gewinn', 'Was würde unseren Gewinn verbessern?'],
+];
+const CFO_TAG = { grow: ['Wachstum', 'good'], careful: ['Vorsicht', 'warn'], cost: ['Kostenoptimierung', 'me'], invest: ['Investitionsprüfung', ''], risk: ['Risikowarnung', 'crit'], info: ['Lagebild', ''] };
+/** Kennzahlen für die CFO aus Ledger, Tagesreihe, Strecken und Flotte (alles aus dem Spielstand). */
+function cfoData() {
+  const pl = W.player, L = pl.ledger, bs = SM.balanceSheet(pl), c = cpi();
+  const h = (pl.dayHist || []).slice(-30), hp = (pl.dayHist || []).slice(-60, -30);
+  const sum = (arr, k) => arr.reduce((a, x) => a + (x[k] || 0), 0);
+  const net30 = sum(h, 'net'), rev30 = sum(h, 'rev'), pax30 = sum(h, 'pax'), netP = sum(hp, 'net'), revP = sum(hp, 'rev');
+  const nh = netHistOf(pl), cf30 = nh.length > 30 ? nh[nh.length - 1] - nh[nh.length - 31] : null;
+  // Kostenblöcke: laufender Monat auf 30 Tage hochgerechnet, sonst Vormonat
+  const dim = Math.max(1, dateParts(W.day).d);
+  const useCur = dim >= 10 || !L.months.length, acc = useCur ? L.month : L.months.at(-1).acc, scale = useCur ? 30.4 / dim : 1;
+  const v = (k) => -(acc[k] || 0) / 100 * scale;
+  const FIX = ['lease', 'staff_cockpit', 'staff_cabin', 'staff_tech', 'stations', 'experts', 'insurance', 'overhead', 'slots', 'marketing', 'interest'];
+  const fixedM = FIX.reduce((s, k) => s + Math.max(0, v(k)), 0);
+  const loanM = pl.loans.reduce((s, l) => s + l.annuity, 0);
+  const costKeys = SM.PNL_ACCOUNTS.filter((k) => !k.startsWith('rev_') && k !== 'tax' && k !== 'hedge');
+  const costs = costKeys.map((k) => [k, v(k)]).filter(([, x]) => x > 0).sort((a, b) => b[1] - a[1]);
+  const costTot = costs.reduce((s, [, x]) => s + x, 0);
+  const routes = pl.activeRoutes().filter((r) => r.opened_day <= W.day).map((r) => { const s = rstats(r, 30); return { r, n: s.n, db1: s.n ? s.db1 / s.n : 0, db2: s.n ? s.db2 / s.n : 0, lf: s.lf, age: W.day - r.opened_day, spill: s.n ? s.spill / s.n : 0 }; });
+  const flying = pl.fleet.filter((a) => a.delivery_day <= W.day);
+  const idle = flying.filter((a) => !(a.used_hours > 0) && !(a.acmi && a.acmi.end > W.day) && a.status !== 'ccheck' && a.status !== 'aog');
+  const db1Ac = flying.length ? routes.reduce((s, x) => s + x.db1, 0) / Math.max(1, flying.length - idle.length) : 0;
+  const cash = netCash(pl), free = pl.spendable(W.macro.bank ?? 1), line = pl.creditLimit(W.macro.bank ?? 1);
+  const reserve = Math.max(1e6 * c, 2 * fixedM);
+  return { pl, bs, c, net30, rev30, pax30, netP, revP, days: h.length, cf30, fixedM, loanM, costs, costTot, v, routes, flying, idle, db1Ac, cash, free, line, reserve,
+    runway: (() => { const flow = cf30 !== null ? cf30 : h.length >= 20 ? net30 : null; if (flow === null) return pl.runway; return flow >= 0 ? Infinity : Math.max(0, free / (-flow / 30.4)); })(), margin: rev30 > 0 ? net30 / rev30 : null, loanLimit: W.loanLimit(pl), loanRate: W.loanRate(pl), debt: bs.loans + bs.bank + bs.credit, leaseLiab: bs.leaseLiab,
+    fuelShare: costTot > 0 ? v('fuel') / costTot : 0, hedge: pl.hedge };
+}
+const COST_LBL = { fuel: 'Kerosin', crew: 'Crew-Spesen', staff_cockpit: 'Gehälter Cockpit', staff_cabin: 'Gehälter Kabine', staff_tech: 'Gehälter Technik', staff_extra: 'Agentur, Überstunden, Einstellung', maintenance: 'Wartung', navigation: 'Flugsicherung', landing: 'Landeentgelte', handling: 'Abfertigung', pax_fees: 'Passagierentgelte', pax_service: 'Bordservice', distribution: 'Vertrieb', cargo_cost: 'Fracht', disruption: 'Störungen, Entschädigungen', stations: 'Stationen', slots: 'Slots', lease: 'Leasing', depreciation: 'Abschreibung', insurance: 'Versicherung', experts: 'Fachkräfte', marketing: 'Marketing', overhead: 'Verwaltung', one_off: 'Einmalkosten', trade: 'Handel', interest: 'Zinsen' };
+/** Laufende Monatskosten eines zusätzlichen Flugzeugs (ohne direkte Flugkosten, die stecken im DB1). */
+function acMonthly(type, mode, bh = 10) {
+  const t = P.AIRCRAFT_TYPES[type], c = cpi(), S = P.STAFF, pl = W.player;
+  const own = mode === 'buy';
+  const lease = own ? 0 : t.lease_month * (P.EURUSD / W.macro.eurusd) * (mode === 'flex' ? 1 + P.FLEX_LEASE_PREMIUM : 1);
+  const price = t.value_eur, loan = price * (1 - P.PURCHASE_DOWNPAYMENT), rate = W.macro.rate + 0.025, rm = rate / 12, n = P.LOAN_TERM_YEARS * 12;
+  const annuity = own ? loan * rm / (1 - (1 + rm) ** -n) : 0;
+  const crew = SM.crewFor(t.cockpit || 2, t.cabin, bh), pay = pl.staff ? pl.staff.pay : 1;
+  const staff = (crew.pil * S.pilotSalary[t.group] + crew.cab * S.cabinSalary + S.techPerAc * S.techSalary) * pay * c;
+  const other = (P.OVERHEAD_PER_AIRCRAFT_DAY * c + price * P.INSURANCE[pl.insurance].rate / 365) * 30.4 + (pl.familyKnown(type) ? 0 : P.TYPE_COMPLEXITY_DAY * 30.4 * c);
+  return { lease, annuity, staff, other, total: lease + annuity + staff + other, oneTime: SM.acquireCost(pl, type, mode === 'flex' ? 'flex' : mode, null, W.macro.eurusd, W), price };
+}
+function cfoAnswer(key, D) {
+  const pl = D.pl, ttl = (k) => CFO_TAG[k];
+  const out = (tag, html, acts = '') => ({ tag, html, acts });
+  const res = (x) => `${eur(x)}`;
+  const freeAfter = (x) => D.free - x;
+  if (key === 'lage') {
+    const red = (D.runway !== undefined && isFinite(D.runway) && D.runway < 90) || D.free < D.reserve * 0.5, yellow = D.net30 < 0 || D.free < D.reserve;
+    const tag = red ? 'risk' : yellow ? 'careful' : 'grow';
+    return out(tag, `<p>Wir haben <b>${res(D.cash)}</b> auf dem Konto und insgesamt <b>${res(D.free)}</b> verfügbar, wenn ich den freien Dispo von ${res(Math.max(0, D.line - (pl.creditUsed || 0)))} mitrechne. ${D.days ? `In den letzten ${D.days} Tagen haben wir ${D.net30 >= 0 ? 'verdient' : 'verloren'}: <b>${sg0(D.net30)}</b>${D.margin !== null ? ` bei ${res(D.rev30)} Umsatz, also ${pct(D.margin)} Marge` : ''}.` : 'Für eine Ergebnisbewertung fehlen noch Flugtage.'}${D.days >= 30 && D.netP ? ` Davor waren es ${sg0(D.netP)} – ${D.net30 > D.netP ? 'es geht aufwärts' : 'es geht abwärts'}.` : ''}</p>
+      <p>Unsere festen Kosten liegen bei rund <b>${res(D.fixedM)}</b> im Monat (Leasing, Gehälter, Stationen, Verwaltung). ${D.runway !== undefined && isFinite(D.runway) && D.runway > 0 ? `Beim heutigen Mittelabfluss reicht das Geld noch etwa <b>${n0(D.runway)} Tage</b>.` : D.net30 >= 0 ? 'Wir verbrennen derzeit kein Geld.' : ''} Eigenkapital ${res(D.bs.equity)}, Rating ${pl.rating}, Schulden ${res(D.debt)}${D.leaseLiab ? ` plus Leasingverpflichtungen von rund ${res(D.leaseLiab)}` : ''}.</p>
+      <p><b>Meine Einschätzung:</b> ${red ? 'Die Liquidität ist kritisch. Keine neuen Investitionen, Verlustbringer prüfen, notfalls einen Kredit aufnehmen.' : yellow ? `${D.net30 < 0 ? `Wir haben Zeit, verlieren aber Geld${D.runway !== undefined && isFinite(D.runway) ? ` – die Liquidität reicht beim heutigen Abfluss noch rund ${n0(D.runway / 30.4)} Monate` : ''}` : 'Wir verdienen Geld, liegen aber unter der Reserve, die ich halten möchte'}. Investitionen nur, wenn sie sich schnell tragen.` : 'Solide aufgestellt – wir haben Spielraum für gezieltes Wachstum.'}</p>`);
+  }
+  if (key === 'reserve') {
+    const gap = D.free - D.reserve;
+    return out(gap < 0 ? 'careful' : 'info', `<p>Ich halte <b>zwei Monate Fixkosten</b> als Reserve für richtig, mindestens ${res(1e6 * D.c)}: bei uns derzeit <b>${res(D.reserve)}</b>. Damit überstehen wir einen schwachen Monat, einen Ölpreisschock oder einen Streik, ohne in die Insolvenzgefahr zu laufen (30 Tage über dem Dispo = Insolvenz).</p>
+      <p>Verfügbar sind ${res(D.free)} – ${gap >= 0 ? `also <b>${res(gap)}</b> über der Reserve. Das ist unser Investitionsspielraum.` : `<b>${res(-gap)} zu wenig</b>. Bitte erst Liquidität aufbauen.`}</p>
+      <p class="small muted">Den Dispo rechne ich mit, plane ihn aber nicht dauerhaft ein: Er kostet ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zinsen und kann bei schlechterem Rating sinken.</p>`);
+  }
+  if (key === 'flugzeug' || key === 'flotte') {
+    const type = (() => { const cnt = {}; for (const a of pl.fleet) cnt[a.type_id] = (cnt[a.type_id] || 0) + 1; return Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]?.[0] || 'A20N'; })();
+    const L = acMonthly(type, 'lease'), B = acMonthly(type, 'buy'), contrib = Math.max(0, D.db1Ac) * 30.4;
+    const after = freeAfter(L.oneTime), netM = contrib - L.total;
+    const tag = after < D.reserve * 0.5 ? 'risk' : after < D.reserve ? 'careful' : netM > 0 ? 'grow' : 'invest';
+    const ownLine = `Ein weiteres Flugzeug wie unsere ${tl(type)} kostet im Leasing einmalig <b>${res(L.oneTime)}</b> (Kaution${pl.familyKnown(type) ? '' : ' und Einführung'}) und laufend rund <b>${res(L.total)}</b> im Monat: ${res(L.lease)} Leasing, ${res(L.staff)} Crew und Technik bei 10 Blockstunden am Tag, ${res(L.other)} Versicherung und Verwaltung.`;
+    const buyLine = `Kaufen hieße ${res(B.oneTime)} Anzahlung, dann ${res(B.annuity)} Kreditrate im Monat statt Leasing – günstiger im Monat, bindet aber Kapital und bringt Abschreibung.`;
+    const earn = D.db1Ac > 0 ? `Unsere Flugzeuge erwirtschaften im Schnitt <b>${res(D.db1Ac)}</b> DB1 pro Tag (${res(contrib)} im Monat). Fliegt das neue genauso, bleiben ${sg0(netM)} im Monat.` : 'Unsere Flugzeuge decken derzeit im Schnitt nicht einmal die direkten Kosten – ein weiteres würde die Lage verschlechtern, solange das Netz nicht trägt.';
+    if (key === 'flotte') {
+      const rows = D.flying.map((a) => `<tr><td><b class="mono">${acName(a.id)}</b> ${tlx(a.type_id)}</td><td class="r">${n1(a.used_hours || 0)} h/Tag</td><td class="r">${eur(acDayCost(a))}</td></tr>`).join('');
+      return out(tag, `<p>${ownLine}</p><p>${buyLine}</p><p>${earn}</p>${rows ? `<div class="tw"><table class="t"><thead><tr><th>Flugzeug</th><th class="r">Einsatz</th><th class="r">Fixkosten/Tag</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}${D.idle.length ? `<p class="neg">${D.idle.length} Flugzeug${D.idle.length > 1 ? 'e stehen' : ' steht'} ohne Einsatz und kosten trotzdem.</p>` : ''}`, `<button class="btn small" data-act="cfoscen" data-k="aircraft" data-type="${type}">Im Szenario rechnen</button>`);
+    }
+    return out(tag, `<p>${ownLine}</p><p>${earn}</p><p><b>Meine Einschätzung:</b> ${after < D.reserve * 0.5 ? `Nein – danach blieben nur ${res(after)} verfügbar, weit unter der Reserve von ${res(D.reserve)}.` : after < D.reserve ? `Machbar, aber knapp: danach ${res(after)} verfügbar, unter der Reserve von ${res(D.reserve)}. Nur mit einer Strecke, die sicher trägt.` : netM > 0 ? `Ja. Danach bleiben ${res(after)} verfügbar, und bei heutiger Leistung trägt sich das Flugzeug.` : `Finanziell ja (${res(after)} verbleiben), wirtschaftlich nur mit einer besseren Strecke als im Schnitt – vorher eine Streckenanalyse beauftragen.`}</p>`,
+      `<button class="btn small" data-act="cfoscen" data-k="aircraft" data-type="${type}">Im Szenario rechnen</button>`);
+  }
+  if (key === 'basis') {
+    const setup = P.BASE_SETUP_COST * D.c, fixedM = P.BASE_FIXED_DAY * 30.4 * D.c;
+    const study = (pl.reports || []).filter((r) => r.status === 'done' && r.kind === 'base' && r.res && r.res.rows.length).at(-1);
+    const best = study ? study.res.rows[0] : null;
+    const after = freeAfter(setup);
+    const tag = after < D.reserve ? 'careful' : D.net30 < 0 ? 'careful' : best && best.net > 0 ? 'grow' : 'invest';
+    return out(tag, `<p>Eine Basis kostet einmalig <b>${res(setup)}</b> und dann rund <b>${res(fixedM)}</b> im Monat für Leitung und Crewräume, dazu die Terminalmiete. Sie braucht außerdem Flugzeuge und Personal vor Ort – das ist die eigentliche Investition.</p>
+      <p>${best ? `Laut unserer Standortanalyse vom ${dateShort(study.ready)} ist <b>${esc(best.name)} (${best.apt})</b> am stärksten: rund ${sg0(best.net)} pro Tag nach den Basiskosten, mit Flugzeugen gerechnet.` : 'Eine Standortanalyse haben wir noch nicht – ohne sie würde ich nicht entscheiden.'}</p>
+      <p><b>Meine Einschätzung:</b> ${D.net30 < 0 ? 'Erst das bestehende Netz profitabel machen. Eine zweite Basis verteilt Fixkosten, löst aber kein Ertragsproblem.' : after < D.reserve ? `Die Einrichtung selbst wäre bezahlbar, aber mit Flugzeugen wird es knapp (danach ${res(after)} verfügbar, Reserve ${res(D.reserve)}).` : best && best.net > 0 ? `Ja, ${esc(best.name)} ist aussichtsreich und finanzierbar. Ich würde mit zwei bis drei Flugzeugen starten.` : 'Finanziell möglich – aber nur mit einem Standort, dessen Strecken sich klar tragen.'}</p>`,
+      `${best ? `<button class="btn small" data-act="cfoscen" data-k="base" data-apt="${best.apt}" data-net="${best.net}">Im Szenario rechnen</button>` : ''}<button class="btn small" data-act="tab" data-tab="studies">Standortanalyse beauftragen</button>`);
+  }
+  if (key === 'strecken') {
+    const bad = D.routes.filter((x) => x.n >= 7 && x.db2 < 0).sort((a, b) => a.db2 - b.db2);
+    if (!D.routes.length) return out('info', '<p>Wir fliegen noch keine Strecke mit genug Daten. Sobald die ersten Wochen gelaufen sind, kann ich das bewerten.</p>');
+    if (!bad.length) return out('grow', `<p>Alle ${D.routes.length} Strecken mit mindestens einer Woche Betrieb tragen ihre Kosten einschließlich Flugzeug (DB2 positiv). Sehr gut.</p>`);
+    const rows = bad.map((x) => `<tr><td><b>${x.r.base}–${x.r.dest}</b> <span class="small muted">${x.age < 30 ? 'Anlaufphase' : `${x.r.freq}× ${tl(x.r.type_id)}`}</span></td><td class="r">${pct(x.lf)}</td><td class="r">${sg0(x.db1)}</td><td class="r">${sg0(x.db2)}</td><td class="small">${x.age < 30 ? 'abwarten, Nachfrage baut sich auf' : x.db1 < 0 ? 'deckt nicht einmal die direkten Kosten – einstellen prüfen' : x.lf < 0.65 ? 'zu große Kapazität – kleineres Muster oder weniger Flüge' : 'Preis anheben oder Muster wechseln'}</td></tr>`).join('');
+    const save = bad.filter((x) => x.age >= 30).reduce((s, x) => s - x.db2, 0) * 30.4;
+    return out('cost', `<p>${bad.length} von ${D.routes.length} Strecken verdienen das eingesetzte Flugzeug nicht (DB2 negativ, Schnitt der letzten 30 Tage):</p><div class="tw"><table class="t"><thead><tr><th>Strecke</th><th class="r">Auslastung</th><th class="r">DB1/Tag</th><th class="r">DB2/Tag</th><th>Was ich tun würde</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p>${save > 0 ? `Würden wir die eingeschwungenen Verlustbringer einstellen und die Flugzeuge zurückgeben oder besser einsetzen, verbessert das das Ergebnis um rund <b>${res(save)}</b> im Monat.` : ''} Achtung: Strecken mit positivem DB1 tragen zu den Fixkosten bei – solange kein besserer Einsatz für das Flugzeug da ist, kann es sinnvoll sein, sie zu behalten.</p>`,
+      bad[0] && bad[0].age >= 30 ? `<button class="btn small" data-act="cfoscen" data-k="close" data-id="${bad[0].r.id}">Einstellen von ${bad[0].r.base}–${bad[0].r.dest} rechnen</button>` : '');
+  }
+  if (key === 'kosten' || key === 'gewinn') {
+    const lev = [];
+    const agency = D.v('staff_extra'); if (agency > 50000 * D.c) lev.push([agency * 0.7, `Agentur, Überstunden und Einstellungen kosten ${res(agency)} im Monat – eigenes Personal einstellen spart rund 70 % davon.`, 'staff']);
+    const idleC = D.idle.reduce((s, a) => s + acDayCost(a), 0) * 30.4; if (idleC > 0) lev.push([idleC, `${D.idle.length} Flugzeug${D.idle.length > 1 ? 'e stehen' : ' steht'} ungenutzt (${res(idleC)} im Monat) – einsetzen, verchartern oder zurückgeben.`, 'fleetOwn']);
+    const lossR = D.routes.filter((x) => x.age >= 30 && x.db1 < 0).reduce((s, x) => s - x.db1, 0) * 30.4; if (lossR > 0) lev.push([lossR, `Strecken mit negativem DB1 kosten ${res(lossR)} im Monat mehr, als sie einbringen.`, 'routes']);
+    const fuel = D.v('fuel'); if (fuel > 0 && !(D.hedge && D.hedge.share > 0.2)) lev.push([fuel * 0.03, `Kerosin ist mit ${pct(D.fuelShare)} der größte Block (${res(fuel)}/Monat). Eine Absicherung glättet Preissprünge; neuere Muster sparen 15–25 %.`, 'purchasing']);
+    const fam = new Set(pl.fleet.map((a) => P.AIRCRAFT_TYPES[a.type_id].group)).size; if (fam > 2) lev.push([(fam - 1) * P.TYPE_COMPLEXITY_DAY * 30.4 * D.c, `${fam} Musterfamilien kosten ${res((fam - 1) * P.TYPE_COMPLEXITY_DAY * 30.4 * D.c)} Komplexität im Monat – eine schlankere Flotte spart das.`, 'fleetOwn']);
+    const mk = D.v('marketing'); if (mk > 0 && pl.brand > 0.75) lev.push([mk * 0.3, `Marketing (${res(mk)}/Monat) bei bereits starker Marke (${n0(pl.brand * 100)}) – hier lässt sich etwas zurückfahren.`, 'purchasing']);
+    if (key === 'gewinn') {
+      const full = D.routes.filter((x) => x.n >= 7 && x.lf > 0.92); if (full.length) lev.push([full.reduce((s, x) => s + x.db1 * 0.08, 0) * 30.4, `${full.length} Strecke${full.length > 1 ? 'n sind' : ' ist'} über 92 % ausgelastet (${full.slice(0, 3).map((x) => x.r.base + '–' + x.r.dest).join(', ')}): Tarife um 5–10 % anheben oder Frequenz erhöhen.`, 'routes']);
+      const spill = D.routes.filter((x) => x.spill > 30); if (spill.length) lev.push([spill.reduce((s, x) => s + x.spill, 0) * 60 * 30.4 * 0.3, `Auf ${spill.length} Strecke${spill.length > 1 ? 'n' : ''} bleiben täglich Reisende ohne Platz – ein größeres Muster oder ein weiterer Umlauf holt sie.`, 'routes']);
+    }
+    lev.sort((a, b) => b[0] - a[0]);
+    const top = D.costs.slice(0, 5).map(([k, x]) => `<tr><td>${COST_LBL[k] || k}</td><td class="r">${eur(x)}</td><td class="r">${pct(x / Math.max(1, D.costTot))}</td></tr>`).join('');
+    return out(key === 'kosten' ? 'cost' : 'grow', `${key === 'kosten' ? `<p>Unsere größten Kostenblöcke (hochgerechnet auf einen Monat):</p><div class="tw"><table class="t"><tbody>${top}</tbody></table></div>` : ''}
+      <p>${lev.length ? 'Wo ich ansetzen würde, nach Wirkung sortiert:' : 'Ich sehe gerade keinen großen Hebel – das Unternehmen arbeitet effizient.'}</p>${lev.length ? `<ol class="glist-num">${lev.slice(0, 6).map(([x, t, tab]) => `<li>${t} <span class="small muted">· Wirkung bis ${res(x)}/Monat</span> <a href="#" data-act="tab" data-tab="${tab}">öffnen</a></li>`).join('')}</ol>` : ''}
+      <p class="small muted">Geschätzte Wirkung aus den Zahlen der letzten 30 Tage, keine Garantie.</p>`);
+  }
+  if (key === 'schulden') {
+    const opCF = D.net30 + D.v('depreciation');   // Abschreibung kostet kein Geld
+    const roomM = Math.max(0, opCF * 0.3 - D.loanM);
+    const rm = D.loanRate / 12, n = 60, maxByCF = roomM > 0 ? roomM * (1 - (1 + rm) ** -n) / rm : 0;
+    const maxNew = Math.min(D.loanLimit, maxByCF);
+    const tag = opCF <= 0 ? 'risk' : maxNew < 1e6 ? 'careful' : 'invest';
+    return out(tag, `<p>Bankkredite: ${pl.loans.length ? `${pl.loans.length} laufend, Rest ${res(pl.loans.reduce((s, l) => s + l.balance, 0))}, Raten ${res(D.loanM)} im Monat` : 'keine'}. Flugzeugkredite ${res(D.bs.loans)}, Dispo genutzt ${res(pl.creditUsed || 0)}. Die Bank gibt uns bei Rating ${pl.rating} höchstens <b>${res(D.loanLimit)}</b> zu etwa <b>${pct(D.loanRate, 1)}</b>.</p>
+      <p>Unser operativer Mittelzufluss liegt bei rund ${sg0(opCF)} im Monat (Ergebnis plus Abschreibung). Ich würde höchstens 30 % davon für Kreditraten verwenden – ${opCF > 0 ? `das trägt zusätzlich etwa <b>${res(maxNew)}</b> über 5 Jahre.` : 'derzeit also nichts.'}</p>
+      <p><b>Meine Einschätzung:</b> ${opCF <= 0 ? 'Schulden würden nur Zeit kaufen. Sinnvoll höchstens als Überbrückung, wenn ein klarer Plan zur Profitabilität steht.' : maxNew < 1e6 ? 'Kaum Spielraum für neue Schulden – lieber aus dem laufenden Ergebnis finanzieren.' : 'Ein Kredit ist vertretbar, wenn er eine Investition finanziert, die sich innerhalb der Laufzeit trägt.'}</p>`,
+      `<button class="btn small" data-act="cfoscen" data-k="loan" data-amount="${Math.round(Math.max(1e6, Math.min(maxNew || D.loanLimit, D.loanLimit)) / 1e5) * 1e5}">Kredit im Szenario rechnen</button>`);
+  }
+  if (key === 'trend') {
+    const ms = pl.ledger.months.slice(-4).map((m) => ({ label: `${MONTHS[m.label.m]} ${String(2027 + m.label.y).slice(2)}`, ...pnlCol(m.acc) }));
+    const rows = ms.map((m) => `<tr><td>${m.label}</td><td class="r">${eur(m.rev)}</td><td class="r">${eur(m.rev - m.net)}</td><td class="r">${sg0(m.net)}</td></tr>`).join('');
+    const dRev = D.revP ? D.rev30 / D.revP - 1 : null;
+    return out('info', `<p>Die letzten 30 Tage: Umsatz ${res(D.rev30)}${dRev !== null ? ` (${dRev >= 0 ? '+' : ''}${pct(dRev)} gegenüber den 30 Tagen davor)` : ''}, Ergebnis ${sg0(D.net30)}, ${n0(D.pax30)} Passagiere.</p>
+      ${rows ? `<div class="tw"><table class="t"><thead><tr><th>Monat</th><th class="r">Umsatz</th><th class="r">Kosten</th><th class="r">Ergebnis</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="small muted">Noch kein abgeschlossener Monat.</p>'}
+      <p>${D.cf30 !== null ? `Der Kontostand hat sich in 30 Tagen um ${sg0(D.cf30)} verändert – darin stecken auch Kautionen, Anzahlungen und Tilgungen, nicht nur das Ergebnis.` : ''}</p>`);
+  }
+  if (key === 'invest') {
+    const opts = [];
+    const lastOf = (k) => (pl.reports || []).filter((r) => r.status === 'done' && r.kind === k && r.res && r.res.rec && r.res.rec.act).at(-1);
+    const rs = lastOf('routes'); if (rs) { const a = rs.res.rows.find((x) => x.db2 > 0); if (a) opts.push([a.db2 * 30.4, a.invest, `Strecke ${a.o}–${a.d} (Streckenanalyse): rund ${res(a.db2 * 30.4)} DB2 im Monat, Kaution ${res(a.invest)}.`, `<button class="btn small" data-act="cfoscen" data-k="route" data-o="${a.o}" data-d="${a.d}" data-type="${a.type}" data-fare="${a.fare}">rechnen</button>`]); }
+    const bs2 = lastOf('base'); if (bs2) { const b = bs2.res.rows[0]; if (b && b.net > 0) opts.push([b.net * 30.4, b.setup, `Basis ${b.name}: rund ${res(b.net * 30.4)} im Monat nach Basiskosten, einmalig ${res(b.setup)} plus Flugzeuge.`, `<button class="btn small" data-act="cfoscen" data-k="base" data-apt="${b.apt}" data-net="${b.net}">rechnen</button>`]); }
+    const loss = D.routes.filter((x) => x.age >= 30 && x.db2 < 0).sort((a, b) => a.db2 - b.db2)[0]; if (loss) opts.push([-loss.db2 * 30.4, 0, `Verlustbringer ${loss.r.base}–${loss.r.dest} einstellen: ${res(-loss.db2 * 30.4)} im Monat besser, keine Investition.`, `<button class="btn small" data-act="cfoscen" data-k="close" data-id="${loss.r.id}">rechnen</button>`]);
+    if (D.idle.length) opts.push([D.idle.reduce((s, a) => s + acDayCost(a), 0) * 30.4, 0, `Ungenutzte Flugzeuge einsetzen: sie kosten ohnehin – jede Strecke mit positivem DB1 hilft sofort.`, '<button class="btn small" data-act="tab" data-tab="plan">Strecke planen</button>']);
+    opts.sort((a, b) => (b[0] / Math.max(1, b[1] / 12)) - (a[0] / Math.max(1, a[1] / 12)));
+    return out(opts.length ? 'invest' : 'info', opts.length ? `<p>Nach Wirkung im Verhältnis zum Kapitaleinsatz:</p><ol class="glist-num">${opts.map(([m, inv, t, b]) => `<li>${t} ${b}</li>`).join('')}</ol><p>${D.free - D.reserve > 0 ? `Investitionsspielraum über der Reserve: <b>${res(D.free - D.reserve)}</b>.` : `<span class="neg">Wir liegen unter der Reserve</span> – zuerst Maßnahmen ohne Kapitaleinsatz.`}</p>`
+      : '<p>Mir fehlen konkrete Vorschläge. Eine Strecken- oder Standortanalyse liefert sie – ich bewerte sie dann finanziell.</p>', '<button class="btn small" data-act="tab" data-tab="studies">Marktstudie beauftragen</button>');
+  }
+  return out('info', '<p>Dazu habe ich gerade keine Zahlen.</p>');
+}
+// ---------- Szenarien ----------
+function cfoScenario(sc, D) {
+  const pl = D.pl, c = D.c;
+  let one = 0, month = 0, title = '', lines = [], notes = [];
+  if (sc.k === 'aircraft') {
+    if (P.AIRCRAFT_TYPES[sc.type] && P.AIRCRAFT_TYPES[sc.type].supersonic) sc.mode = 'buy';   // Concorde gibt es nur gebraucht zu kaufen
+    const t = P.AIRCRAFT_TYPES[sc.type] || P.AIRCRAFT_TYPES.A20N, n = Math.max(1, Math.min(10, sc.n || 1)), M = acMonthly(sc.type, sc.mode || 'lease', sc.bh || 10);
+    const db1 = sc.db1 !== null && sc.db1 !== undefined && sc.db1 !== '' ? Number(sc.db1) : Math.max(0, Math.round(D.db1Ac));
+    one = M.oneTime * n; month = (db1 * 30.4 - M.total) * n;
+    title = `${n} × ${t.label} (${sc.mode === 'buy' ? 'Kauf' : sc.mode === 'flex' ? 'Flex-Leasing' : 'Leasing'})`;
+    lines = [['Einmalig', -one, sc.mode === 'buy' ? 'Anzahlung' : 'Kaution und Einführung'], ['Laufende Kosten', -M.total * n, `${sc.mode === 'buy' ? 'Kreditrate' : 'Leasing'}, Crew bei ${sc.bh || 10} h/Tag, Technik, Versicherung`], ['Erwarteter DB1', db1 * 30.4 * n, `${eur(db1)} pro Flugzeug und Tag`]];
+    if (!pl.familyKnown(sc.type)) notes.push(`Neue Familie: ${eur(P.TYPE_INTRO_COST)} Einführung und eigene Piloten.`);
+    if (t.supersonic) notes.push('Concorde: nur gebraucht zu kaufen (höchstens 2 je Airline). Kerosin und Wartung stecken im DB1 – den Durchschnitt Ihrer Flotte erreicht sie nur auf langen Geschäftsreise-Strecken wie London–New York; auf der falschen Strecke wird der DB1 tief negativ. Erst eine Strecke im Szenario „Neue Strecke“ rechnen und deren DB1 hier eintragen.');
+  } else if (sc.k === 'base') {
+    const fixedD = (P.BASE_FIXED_DAY + P.TERMINALS.std.rent * SM.apx(sc.apt).cost / 30.4) * c;
+    // Strecken und Flugzeuge aus der jüngsten Standortanalyse, falls sie diesen Standort enthält
+    const st = (pl.reports || []).filter((r) => r.kind === 'base' && r.status === 'done' && r.res && r.res.rows).reverse().map((r) => r.res.rows.find((x) => x.apt === sc.apt)).find(Boolean);
+    let routesD = (Number(sc.net) || 0) + fixedD; if (Math.abs(routesD) < 5) routesD = 0;
+    const deps = st && routesD > 0 ? st.routes.filter((x) => x.db2 > 0).slice(0, 5).map((x) => SM.acquireCost(pl, x.type, 'lease', null, W.macro.eurusd, W)) : [];
+    const dep = deps.reduce((a, x) => a + x, 0);
+    one = P.BASE_SETUP_COST * c + dep; month = (routesD - fixedD) * 30.4;
+    title = `Neue Basis ${apName(sc.apt)} (${sc.apt})`;
+    lines = [['Einrichtung', -P.BASE_SETUP_COST * c, 'einmalig'], ...(dep ? [['Kautionen', -dep, `${deps.length} Leasingflugzeug${deps.length > 1 ? 'e' : ''} für die Strecken der Studie`]] : []),
+      ['Basiskosten', -fixedD * 30.4, 'Leitung, Crewräume, Terminal je Monat'],
+      ['Strecken ab der Basis', routesD * 30.4, st ? 'laut Standortanalyse, nach Flugzeug- und Crewkosten' : routesD ? 'Ihr Eintrag' : 'noch keine eingerechnet – Wert eintragen oder Standortanalyse beauftragen']];
+    if (!st && !(routesD > 0)) notes.push('Ohne Strecken zeigt das Szenario nur die Kosten der Basis. Eine Standortanalyse rechnet die besten Strecken ab diesem Flughafen durch.');
+    notes.push('Personal vor Ort und rund 30 Tage Anlaufzeit kommen hinzu; die Konkurrenz reagiert auf neue Angebote.');
+  } else if (sc.k === 'route') {
+    const spec = { airline: pl.id, base: sc.o, dest: sc.d, type_id: sc.type, freq: sc.freq || 1, fare_out: sc.fare, fare_in: sc.fare, service: 'standard', buffer: 'normal' };
+    const x = SM.rangeOk(sc.o, sc.d, sc.type) ? W.forecastFor(pl, spec, { nDraws: 3 }) : null;
+    title = `Strecke ${sc.o}–${sc.d}, ${sc.freq || 1}× täglich ${tl(sc.type)} zu ${eur(sc.fare)}`;
+    if (!x) { notes.push(SM.aptOk(sc.o, sc.d, sc.type) ? 'Außerhalb der Reichweite dieses Musters.' : SM.aptWhy(sc.o, sc.d, sc.type)); }
+    else {
+      const nAc = Math.max(1, Math.ceil(x.aircraftShare - 0.05)), M = acMonthly(sc.type, 'lease', x.rotationH * 0 + 10);
+      one = sc.newAc ? M.oneTime * nAc : 0;
+      month = sc.newAc ? (x.db1 * 30.4 - M.total * nAc) : x.db1 * 30.4;
+      lines = [['Erlöse', x.revenue * 30.4, `${n0(x.pax)} Passagiere/Tag, ${pct(x.lf)} Auslastung`], ['Direkte Kosten', -(x.revenue - x.db1) * 30.4, 'Kerosin, Crew, Gebühren, Wartung'], ...(sc.newAc ? [['Flugzeug(e) neu', -M.total * nAc, `${nAc} × Leasing, Crew, Technik`], ['Einmalig', -one, 'Kaution']] : [['Flugzeugkosten', 0, 'vorhandenes Flugzeug (fällt ohnehin an)']])];
+      notes.push('Prognose ohne Reaktion der Konkurrenz; neue Strecken brauchen etwa 30 Tage Anlauf.');
+    }
+  } else if (sc.k === 'close') {
+    const x = D.routes.find((q) => q.r.id === sc.id);
+    if (x) { title = `Strecke ${x.r.base}–${x.r.dest} einstellen`; month = -x.db1 * 30.4; lines = [['Wegfallender DB1', -x.db1 * 30.4, 'Erlöse minus direkte Kosten'], ['Flugzeug frei', 0, 'kostet weiter, bis es eingesetzt oder zurückgegeben ist']];
+      if (x.db1 > 0) notes.push('Die Strecke deckt ihre direkten Kosten – einstellen lohnt nur, wenn das Flugzeug besser eingesetzt oder zurückgegeben wird.');
+      const ac = pl.fleet.filter((a) => (a.assigned || []).includes(x.r.id)); if (ac.length) { const save = ac.reduce((s, a) => s + acDayCost(a), 0) * 30.4; lines.push(['Rückgabe der Flugzeuge (optional)', save, `${ac.length} Flugzeug${ac.length > 1 ? 'e' : ''}, Rückgabekosten beachten`]); notes.push(`Werden die Flugzeuge zurückgegeben, kommen ${eur(save)} im Monat hinzu (abzüglich einmaliger Rückgabekosten).`); }
+    } else title = 'Strecke nicht gefunden';
+  } else if (sc.k === 'fuel') {
+    const p = (Number(sc.pct) || 0) / 100, fuel = D.v('fuel'), hedged = pl.hedge && pl.hedge.share ? Math.min(1, pl.hedge.share) : 0;
+    title = `Kerosinpreis ${p >= 0 ? '+' : ''}${Math.round(p * 100)} %`; month = -fuel * p * (1 - hedged);
+    lines = [['Kerosinkosten heute', -fuel, 'pro Monat'], ['Veränderung', month, hedged ? `${pct(hedged)} abgesichert` : 'ohne Absicherung']];
+  } else if (sc.k === 'loan') {
+    const amt = Math.max(0, Number(sc.amount) || 0), yrs = [3, 5, 8].includes(Number(sc.years)) ? Number(sc.years) : 5, rm = D.loanRate / 12, nn = yrs * 12, ann = amt ? amt * rm / (1 - (1 + rm) ** -nn) : 0;
+    title = `Kredit ${eur(amt)} über ${yrs} Jahre`; one = -amt; month = -ann;
+    lines = [['Auszahlung', amt, `${pct(D.loanRate, 1)} Zins`], ['Rate', -ann, 'Zins und Tilgung pro Monat'], ['Zinsen gesamt', -(ann * nn - amt), 'über die Laufzeit']];
+    if (amt > D.loanLimit + 1) notes.push(`Die Bank gibt bei Rating ${pl.rating} höchstens ${eur(D.loanLimit)}.`);
+  }
+  const base = D.cf30 !== null ? D.cf30 : D.net30;
+  const after = D.free - one, proj = [], projB = [];
+  for (let m = 0; m <= 6; m++) { projB.push(D.free + base * m); proj.push(after + (base + month) * m); }
+  const minP = Math.min(...proj), payback = one > 0 && month > 0 ? one / month : null;
+  const firstNeg = (arr) => { const i = arr.findIndex((x) => x < 0); return i < 0 ? null : i; }, mB = firstNeg(projB), mS = firstNeg(proj);
+  let tag, verdict;
+  if (sc.k === 'loan') { tag = month + base < 0 ? 'risk' : 'invest'; verdict = base <= 0 ? 'Der Kredit verschafft Luft, löst aber kein Ertragsproblem – nur mit Plan zur Profitabilität.' : `Tragbar: die Rate entspricht ${pct(-month / Math.max(1, base))} des heutigen Mittelzuflusses.`; }
+  else if (after < 0) { tag = 'risk'; verdict = 'Nicht finanzierbar: schon die Einmalkosten übersteigen die verfügbare Liquidität.'; }
+  else if (minP < 0 && mB !== null && month > 0) { tag = 'invest'; verdict = `Hilft, reicht aber allein nicht: Ohne Maßnahme wäre das Geld beim heutigen Abfluss in rund ${mB} Monaten aufgebraucht, mit ihr ${mS !== null ? `in ${mS}` : 'erst später'}. Das Ergebnis muss sich zusätzlich verbessern.`; }
+  else if (minP < 0 && mB !== null) { tag = 'risk'; verdict = `Schon ohne diese Entscheidung reicht das Geld beim heutigen Abfluss nur rund ${mB} Monate – mit ihr ${mS !== null && mS < mB ? `nur noch ${mS}` : `ebenfalls rund ${mS ?? mB}`}. Erst das Ergebnis verbessern.`; }
+  else if (minP < 0) { tag = 'risk'; verdict = `Nicht finanzierbar: in ${mS} Monaten wäre die Liquidität aufgebraucht.`; }
+  else if (after < D.reserve) { tag = 'careful'; verdict = `Finanzierbar, aber danach unter der Reserve von ${eur(D.reserve)} (${eur(after)} verfügbar).`; }
+  else if (month < 0 && sc.k !== 'close') { tag = 'careful'; verdict = `Belastet das Ergebnis mit ${eur(-month)} im Monat – nur strategisch sinnvoll.`; }
+  else if (sc.k === 'close' || sc.k === 'fuel') { tag = month >= 0 ? 'cost' : 'risk'; verdict = month >= 0 ? `Verbessert das Monatsergebnis um ${eur(month)}.` : `Verschlechtert das Monatsergebnis um ${eur(-month)}.`; }
+  else if (one > 0 && month <= 0) { tag = 'careful'; verdict = `Kostet einmalig ${eur(one)} und bringt nach dieser Rechnung (noch) keinen laufenden Überschuss – nur mit belastbarem Ertragsplan.`; }
+  else if (payback !== null) { tag = payback <= 12 ? 'grow' : 'invest'; verdict = `Amortisiert sich nach rund ${n1(payback)} Monaten, die Reserve bleibt gewahrt.`; }
+  else if (month > 0) { tag = 'grow'; verdict = `Verbessert das Monatsergebnis um ${eur(month)} ohne Einmalkosten.`; }
+  else { tag = 'info'; verdict = 'Keine messbare Wirkung auf Liquidität und Ergebnis.'; }
+  if (sc.k === 'route' && !lines.length) { tag = 'careful'; verdict = notes[0] || 'Diese Strecke lässt sich so nicht rechnen.'; }
+  return { title, one, month, after, proj, projB, minP, payback, tag, verdict, lines, notes };
+}
+function projChart(a, b) {
+  const all = a.concat(b), lo = Math.min(0, ...all), hi = Math.max(...all), W0 = 320, H0 = 90, px = (i) => 10 + i * (W0 - 20) / 6, py = (v) => H0 - 12 - (v - lo) / Math.max(1, hi - lo) * (H0 - 24);
+  const path = (arr) => arr.map((v, i) => `${i ? 'L' : 'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join('');
+  return `<svg viewBox="0 0 ${W0} ${H0}" class="cfo-chart" role="img" aria-label="Liquidität in den nächsten 6 Monaten"><line x1="10" x2="${W0 - 10}" y1="${py(0).toFixed(1)}" y2="${py(0).toFixed(1)}" class="zero"/>
+    <path d="${path(b)}" class="base"/><path d="${path(a)}" class="scen"/>${a.map((v, i) => `<circle cx="${px(i).toFixed(1)}" cy="${py(v).toFixed(1)}" r="2.4" class="scen"/>`).join('')}
+    <text x="10" y="10" class="lbl">verfügbar heute bis in 6 Monaten</text></svg>`;
+}
+function scenForm(sc) {
+  const pl = W.player, k = sc.k || 'aircraft';
+  const types = Object.keys(P.AIRCRAFT_TYPES).filter((t) => !P.AIRCRAFT_TYPES[t].launch || W.day >= P.AIRCRAFT_TYPES[t].launch + 365);
+  let f = '';
+  if (k === 'aircraft') f = `<label class="f"><span>Muster</span><select id="cs-type">${types.map((t) => `<option value="${t}" ${t === sc.type ? 'selected' : ''}>${esc(tl(t))}</option>`).join('')}</select></label>
+    <label class="f"><span>Art</span><select id="cs-mode"><option value="lease" ${sc.mode === 'lease' ? 'selected' : ''}>Leasing</option><option value="flex" ${sc.mode === 'flex' ? 'selected' : ''}>Flex-Leasing</option><option value="buy" ${sc.mode === 'buy' ? 'selected' : ''}>Kauf</option></select></label>
+    <label class="f"><span>Anzahl</span><input type="number" id="cs-n" min="1" max="10" value="${sc.n || 1}"></label>
+    <label class="f"><span>Erwarteter DB1 je Flugzeug und Tag (€)</span><input type="number" id="cs-db1" step="500" value="${sc.db1 ?? Math.max(0, Math.round(cfoData().db1Ac))}"></label>`;
+  else if (k === 'base') f = `<label class="f"><span>Standort</span><select id="cs-apt">${SM.AP_CODES.filter((c) => !pl.bases.includes(c)).sort((a, b) => apName(a).localeCompare(apName(b))).map((c) => `<option value="${c}" ${c === sc.apt ? 'selected' : ''}>${esc(apName(c))} (${c})</option>`).join('')}</select></label>
+    <label class="f"><span>Netzwert der Basis pro Tag, nach Basiskosten (€)</span><input type="number" id="cs-net" step="500" value="${sc.net ?? 0}"></label>`;
+  else if (k === 'route') f = `<label class="f"><span>Von</span><select id="cs-o">${pl.bases.map((b) => `<option ${b === sc.o ? 'selected' : ''}>${b}</option>`).join('')}</select></label>
+    <label class="f"><span>Nach</span><select id="cs-d">${SM.AP_CODES.filter((c) => c !== sc.o).sort((a, b) => apName(a).localeCompare(apName(b))).map((c) => `<option value="${c}" ${c === sc.d ? 'selected' : ''}>${esc(apName(c))} (${c})</option>`).join('')}</select></label>
+    <label class="f"><span>Muster</span><select id="cs-type">${types.map((t) => `<option value="${t}" ${t === sc.type ? 'selected' : ''} ${SM.rangeOk(sc.o, sc.d, t) ? '' : 'disabled'}>${esc(tl(t))}</option>`).join('')}</select></label>
+    <label class="f"><span>Flüge/Tag</span><input type="number" id="cs-freq" min="1" max="6" value="${sc.freq || 1}"></label>
+    <label class="f"><span>Tarif (€)</span><input type="number" id="cs-fare" min="10" step="5" value="${sc.fare || Math.round(SM.refPrice(sc.o, sc.d, cpi()))}"></label>
+    <label class="chk" style="align-self:end"><input type="checkbox" id="cs-newac" ${sc.newAc ? 'checked' : ''}> <span>mit neuem Flugzeug</span></label>`;
+  else if (k === 'close') f = `<label class="f"><span>Strecke</span><select id="cs-id">${pl.activeRoutes().map((r) => `<option value="${r.id}" ${r.id === sc.id ? 'selected' : ''}>${r.base}–${r.dest} ${r.freq}× ${tl(r.type_id)}</option>`).join('')}</select></label>`;
+  else if (k === 'fuel') f = `<label class="f"><span>Veränderung Kerosinpreis (%)</span><input type="number" id="cs-pct" step="5" value="${sc.pct ?? 20}"></label>`;
+  else if (k === 'loan') f = `<label class="f"><span>Betrag (€)</span><input type="number" id="cs-amount" step="100000" min="0" value="${sc.amount ?? 5000000}"></label>
+    <label class="f"><span>Laufzeit</span><select id="cs-years">${[3, 5, 8].map((y) => `<option ${y === (sc.years || 5) ? 'selected' : ''}>${y}</option>`).join('')}</select></label>`;
+  return f;
+}
+const SCEN_K = [['aircraft', 'Flugzeug kaufen/leasen'], ['base', 'Neue Basis'], ['route', 'Neue Strecke'], ['close', 'Strecke einstellen'], ['fuel', 'Kerosinpreis'], ['loan', 'Kredit']];
+function readScen() {
+  const sc = ui.cfo.scen, g = (id) => $(id), num = (id) => (g(id) && g(id).value !== '' ? Number(g(id).value) : null);
+  if (!sc) return;
+  if (g('#cs-type')) sc.type = g('#cs-type').value; if (g('#cs-mode')) sc.mode = g('#cs-mode').value; if (g('#cs-n')) sc.n = num('#cs-n') || 1;
+  if (g('#cs-db1')) sc.db1 = num('#cs-db1'); if (g('#cs-apt')) sc.apt = g('#cs-apt').value; if (g('#cs-net')) sc.net = num('#cs-net');
+  if (g('#cs-o')) sc.o = g('#cs-o').value; if (g('#cs-d')) sc.d = g('#cs-d').value; if (g('#cs-freq')) sc.freq = num('#cs-freq') || 1; if (g('#cs-fare')) sc.fare = num('#cs-fare');
+  if (g('#cs-newac')) sc.newAc = g('#cs-newac').checked; if (g('#cs-id')) sc.id = g('#cs-id').value; if (g('#cs-pct')) sc.pct = num('#cs-pct');
+  if (g('#cs-amount')) sc.amount = num('#cs-amount'); if (g('#cs-years')) sc.years = num('#cs-years');
+}
+function defaultScen(k) {
+  const pl = W.player, D = cfoData();
+  if (k === 'aircraft') return { k, type: pl.fleet[0] ? pl.fleet[0].type_id : 'A20N', mode: 'lease', n: 1, db1: null };
+  if (k === 'base') { const apt = SM.AP_CODES.find((c) => !pl.bases.includes(c) && (P.AIRPORTS[c].pax || 0) > 20);
+    // ohne Studie: nur die Basiskosten (noch keine Strecken eingerechnet)
+    return { k, apt, net: -Math.round((P.BASE_FIXED_DAY + P.TERMINALS.std.rent * SM.apx(apt).cost / 30.4) * cpi()) }; }
+  if (k === 'route') { const o = curBase(), d = bestFreeDest(o); return { k, o, d, type: 'A20N', freq: 1, fare: Math.round(SM.refPrice(o, d, cpi())), newAc: !D.idle.length }; }
+  if (k === 'close') return { k, id: pl.activeRoutes()[0] ? pl.activeRoutes()[0].id : '' };
+  if (k === 'fuel') return { k, pct: 20 };
+  return { k: 'loan', amount: Math.round(Math.min(5e6, D.loanLimit) / 1e5) * 1e5, years: 5 };
+}
+VIEWS.cfo = function viewCfo() {
+  const D = cfoData(), pl = D.pl;
+  ui.cfo = ui.cfo || {};
+  const C = ui.cfo;
+  if (!C.scen) C.scen = defaultScen('aircraft');
+  const amp = (D.runway !== undefined && isFinite(D.runway) && D.runway < 90) || D.free < D.reserve * 0.5 ? 'crit' : D.net30 < 0 || D.free < D.reserve ? 'warn' : 'good';
+  const tile = (l, v, e = '', cls = '') => `<div class="tile"><span>${l}</span><b class="${cls}">${v}</b>${e ? `<em>${e}</em>` : ''}</div>`;
+  let html = `<div class="cfo-head"><div class="cfo-av">KV</div><div><b>${CFO.name}</b><span>${CFO.role} · rechnet mit Ihren echten Zahlen</span></div><span class="chip ${amp}" style="margin-left:auto">${amp === 'good' ? 'Lage stabil' : amp === 'warn' ? (D.free < D.reserve ? 'Reserve knapp' : 'im Minus, Polster vorhanden') : 'Liquidität kritisch'}</span></div>
+    <div class="tiles">${tile('Verfügbar', eur(D.free), `Konto ${eur(D.cash)} + freier Dispo`)}${tile('Reserve-Ziel', eur(D.reserve), D.free >= D.reserve ? 'erfüllt' : 'unterschritten', D.free >= D.reserve ? 'pos' : 'neg')}${tile('Ergebnis 30 Tage', D.days ? sg0(D.net30) : '–', D.margin !== null ? `Marge ${pct(D.margin)}` : 'noch keine Erlöse')}
+      ${tile('Fixkosten/Monat', eur(D.fixedM), 'Leasing, Gehälter, Stationen, Verwaltung')}${tile('Reichweite', D.runway !== undefined && isFinite(D.runway) && D.runway > 0 ? `${n0(D.runway)} Tage` : 'stabil', 'beim heutigen Abfluss')}${tile('Schulden', eur(D.debt), `Rating ${pl.rating} · Rahmen ${eur(D.loanLimit)}`)}</div>`;
+  // Fragen
+  html += `<div class="stack"><h2 class="sec">Fragen an die CFO</h2><div class="cfo-qs">${CFO_Q.map(([k, q]) => `<button class="btn small ${C.q === k ? 'primary' : ''}" data-act="cfoq" data-k="${k}">${esc(q)}</button>`).join('')}</div>`;
+  if (C.q) { const a = cfoAnswer(C.q, D), [lbl, cls] = CFO_TAG[a.tag]; html += `<div class="cfo-chat"><div class="cfo-q">${esc(CFO_Q.find((x) => x[0] === C.q)[1])}</div><div class="cfo-a"><div class="spread"><b>${CFO.name}</b><span class="chip ${cls}">${lbl}</span></div>${a.html}${a.acts ? `<div class="row" style="gap:6px">${a.acts}</div>` : ''}<p class="small muted">Stand ${dateShort(W.day)} · Berechnungen aus Ihren Daten, keine Gewinngarantie.</p></div></div>`; }
+  html += '</div>';
+  // Szenarien
+  const S = cfoScenario(C.scen, D), [lbl, cls] = CFO_TAG[S.tag];
+  html += `<div class="stack"><h2 class="sec">Szenario-Rechner <small>was eine Entscheidung mit Liquidität und Ergebnis macht</small></h2>
+    ${C.from === 'study' ? '<div class="callout info">Aus einer Marktstudie übernommen – Werte können Sie anpassen.</div>' : ''}
+    <div class="seg">${SCEN_K.map(([k, l]) => `<button data-act="cfok" data-k="${k}" aria-pressed="${C.scen.k === k}">${l}</button>`).join('')}</div>
+    <div class="grid3 cfo-form">${scenForm(C.scen)}</div>
+    <div class="card pad stack cfo-res"><div class="spread"><b>${esc(S.title)}</b><span class="chip ${cls}">${lbl}</span></div>
+      <div class="tiles">${tile('Einmalig', S.one ? eur(-S.one, { plus: true }) : '–', S.one < 0 ? 'Zufluss' : 'Abfluss')}${tile('Je Monat', sg0(S.month), 'Ergebniswirkung')}${tile('Danach verfügbar', eur(S.after), S.after < D.reserve ? 'unter der Reserve' : 'Reserve gewahrt', S.after < D.reserve ? 'neg' : 'pos')}${S.payback !== null ? tile('Amortisation', `${n1(S.payback)} Monate`) : ''}</div>
+      ${S.lines.length ? `<div class="tw"><table class="t"><tbody>${S.lines.map(([l, x, e]) => `<tr><td>${esc(l)} <span class="small muted">${esc(e)}</span></td><td class="r">${sg0(x)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${projChart(S.proj, S.projB)}<div class="small muted"><span class="cfo-key scen"></span> mit Szenario · <span class="cfo-key base"></span> ohne (heutiger Mittelzufluss ${sg0(D.cf30 !== null ? D.cf30 : D.net30)} im Monat)</div>
+      <p><b>Einschätzung:</b> ${esc(S.verdict)}</p>${S.notes.map((x) => `<p class="small muted">${esc(x)}</p>`).join('')}
+      <div class="row" style="gap:6px"><button class="btn small" data-act="cfosave">Szenario merken</button>${(C.saved || []).length ? '<button class="btn small" data-act="cfoclear">Vergleich leeren</button>' : ''}</div></div>`;
+  if ((C.saved || []).length) {
+    const rows = C.saved.map((sc) => ({ sc, r: cfoScenario(sc, D) }));
+    html += `<div class="tw"><table class="t"><thead><tr><th>Vergleich</th><th class="r">Einmalig</th><th class="r">Je Monat</th><th class="r">Danach verfügbar</th><th class="r">Tiefster Stand (6 M.)</th><th>Urteil</th></tr></thead><tbody>${rows.map(({ r }) => `<tr><td>${esc(r.title)}</td><td class="r">${r.one ? eur(-r.one, { plus: true }) : '–'}</td><td class="r">${sg0(r.month)}</td><td class="r ${r.after < D.reserve ? 'neg' : ''}">${eur(r.after)}</td><td class="r ${r.minP < 0 ? 'neg' : ''}">${eur(r.minP)}</td><td><span class="chip ${CFO_TAG[r.tag][1]}">${CFO_TAG[r.tag][0]}</span></td></tr>`).join('')}</tbody></table></div>`;
+  }
+  html += '</div><p class="small muted">Die CFO trifft keine Entscheidungen und führt nichts aus – sie rechnet und empfiehlt. Prognosen beruhen auf den letzten 30 Tagen und dem Prognosemodell der Streckenplanung.</p>';
+  return html;
+};
+function onCfoClick(act, b) {
+  ui.cfo = ui.cfo || {};
+  const C = ui.cfo;
+  if (act === 'cfoq') { C.q = C.q === b.dataset.k ? null : b.dataset.k; renderPane(true); return true; }
+  if (act === 'cfok') { readScen(); C.scen = defaultScen(b.dataset.k); C.from = null; renderPane(true); return true; }
+  if (act === 'cfoscen') {
+    const d = b.dataset, k = d.k;
+    C.scen = k === 'aircraft' ? { k, type: d.type, mode: 'lease', n: 1, db1: null } : k === 'base' ? { k, apt: d.apt, net: Number(d.net) || 0 } : k === 'route' ? { k, o: d.o, d: d.d, type: d.type, fare: Number(d.fare), freq: 1, newAc: true } : k === 'close' ? { k, id: d.id } : k === 'loan' ? { k, amount: Number(d.amount), years: 5 } : defaultScen(k);
+    C.from = null; renderPane(true);
+    const el = document.querySelector('.cfo-res'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+    return true;
+  }
+  if (act === 'cfosave') { readScen(); C.saved = (C.saved || []).concat([{ ...C.scen }]).slice(-4); renderPane(true); toast('Szenario für den Vergleich gemerkt.'); return true; }
+  if (act === 'cfoclear') { C.saved = []; renderPane(true); return true; }
+  return false;
+}
+function onCfoChange(t) {
+  if (!/^cs-/.test(t.id)) return false;
+  readScen();
+  const sc = ui.cfo.scen;
+  if (sc.k === 'route' && (t.id === 'cs-o' || t.id === 'cs-d')) { if (!SM.rangeOk(sc.o, sc.d, sc.type)) sc.type = ['A20N', 'A21N', 'B789', 'A359'].find((x) => SM.rangeOk(sc.o, sc.d, x)) || sc.type; sc.fare = Math.round(SM.refPrice(sc.o, sc.d, cpi())); }
+  renderPane(true); return true;
+}
+
 function onPaneChange(e) {
   const t = e.target, pl = W.player;
-  if (onMarketChange(t) || onDealChange(t) || onAssignChange(t) || onLogoChange(t) || onHardChange(t)) return;
+  if (onMarketChange(t) || onDealChange(t) || onAssignChange(t) || onLogoChange(t) || onHardChange(t) || onStudyChange(t) || onCfoChange(t)) return;
   if (t.dataset.actChange === 'move') { if (doAction({ type: 'move', acId: t.dataset.id, base: t.value }).ok) toast(`Umstationiert nach ${t.value} (12.000 € Überführung).`); refreshAll(); return; }
   if (t.id === 'acq-base') { ui.acqBase = t.value; return; }
   if (t.id === 'agency') { doAction({ type: 'agency', on: t.checked }); refreshAll(); return; }
@@ -2992,14 +3499,14 @@ async function showStart(canClose = false) {
   const sel = { base: 'HAM', diff: 'normal', rivals: 'normal', asst: 'lena', speed: 'x1' };
   const m = $('#modal');
   m.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgT">
-    <div><h1 id="dlgT">Sky<span>market</span></h1><p class="ink2">Gründen Sie eine Airline und bauen Sie ein Netz über 118 Flughäfen weltweit auf. Sie beschaffen Flugzeuge, Personal, Kerosin und Terminalflächen selbst. 24 Konkurrenten, die auf jeden Ihrer Schritte reagieren, Konjunkturzyklen, Ölkrisen, Handelskriege, Streiks und Wetter machen es Ihnen schwer.</p></div>
+    <div><h1 id="dlgT">Sky<span>market</span></h1><p class="ink2">Gründen Sie eine Airline und bauen Sie ein Netz über ${SM.AP_CODES.length} Flughäfen auf allen Kontinenten auf. Sie beschaffen Flugzeuge, Personal, Kerosin und Terminalflächen selbst. ${Object.keys(SM.AI_SETUP).length} Konkurrenten, die auf jeden Ihrer Schritte reagieren, Konjunkturzyklen, Ölkrisen, Handelskriege, Streiks und Wetter machen es Ihnen schwer.</p></div>
     ${usable ? `<div class="callout info"><b>Gespeichertes Spiel: ${esc(save.name)}</b><span>${dateLong(save.day)} · ${save.where}</span><div class="row"><button class="btn primary" id="dlgLoad">Weiterspielen</button></div></div>` : ''}
     ${save && !usable ? `<div class="callout warn">Ihr Spielstand stammt aus einer älteren Version und passt nicht mehr zur neuen Weltkarte. Bitte neu gründen.</div>` : ''}
     <div class="grid2"><label class="f"><span>Name der Airline</span><input type="text" id="ngName" maxlength="28" value="Hanse Air"></label>
       <label class="f"><span>Kürzel (2 Zeichen)</span><input type="text" id="ngCode" maxlength="2" value="HX" style="text-transform:uppercase"></label></div>
     <div class="stack"><span class="small muted" style="text-transform:uppercase;letter-spacing:.07em;font-size:10.5px">Heimatbasis</span><div class="basegroups">${byRegion(SM.AP_CODES).map(([rg, l]) => `<details ${rg === 'Europa' ? 'open' : ''}><summary>${esc(rg)} <span class="muted">${l.length}</span></summary><div class="basepick">
       ${l.map((c) => `<button type="button" data-base="${c}" aria-pressed="${c === sel.base}"><b>${c}</b><span>${esc(apName(c))}${aiBase[c] ? ' · Basis ' + aiBase[c].split(' ')[0] : ''}</span></button>`).join('')}</div></details>`).join('')}</div>
-      <p class="small muted">118 Flughäfen weltweit: die 100 größten nach Passagieren, 14 Flughäfen in Afrika sowie Hamburg, Berlin, Düsseldorf und Wien. Hamburg ist unterversorgt und ein guter Start. In einer KI-Basis treffen Sie vom ersten Tag auf starke Konkurrenz.</p></div>
+      <p class="small muted">${SM.AP_CODES.length} Flughäfen: die größten der Welt plus Regional- und Ferienflughäfen in Europa, Afrika, Nord- und Südamerika, Russland und Ozeanien. Hamburg ist unterversorgt und ein guter Start. In einer KI-Basis treffen Sie vom ersten Tag auf starke Konkurrenz; in Afrika sind die Märkte klein, dort lohnen sich nur wenige Strecken.</p></div>
     <div class="stack"><span class="small muted" style="text-transform:uppercase;letter-spacing:.07em;font-size:10.5px">Schwierigkeit</span><div class="seg wrap" id="ngDiff">
       ${Object.entries(SM.DIFFICULTY).map(([k, d]) => `<button type="button" data-diff="${k}" aria-pressed="${k === sel.diff}">${d.label} · ${n0(d.equity / 1e6)} Mio. €</button>`).join('')}</div>
       <p class="small muted">Zugänglich: mehr Kapital, mildere Zyklen. Realistisch: knappes Kapital, spürbare Krisen. Experte: wenig Kapital, tiefe Krisen.</p></div>
@@ -3140,23 +3647,32 @@ function modal(html, wide = true) {
 function formError(msg) { const e = $('#formErr'); if (e) { e.textContent = msg; e.hidden = !msg; } else toast(msg); }
 
 // ---------- Anleitung (nach der Registrierung, später über „Anleitung“) ----------
-const GUIDE = [
+const GUIDE_ALL = [
   { t: 'Willkommen bei Skymarket', html: () => `
     <div class="acv-box">${acSvg('A20N', { color: 'var(--accent)', code: (mpState.user && mpState.user.name ? mpState.user.name.slice(0, 2).toUpperCase() : 'SM') })}</div>
-    <p>Sie gründen eine Airline und bauen ein Streckennetz über 118 Flughäfen weltweit auf. Sie beschaffen Flugzeuge, Personal, Kerosin und Terminalflächen selbst und treten gegen 24 KI-Airlines und bis zu drei Mitspielende an. Märkte, Arbeitskräfte, Leasingflugzeuge und Kerosin teilen sich alle – jede Entscheidung trifft die anderen.</p>
+    <p>Sie gründen eine Airline und bauen ein Streckennetz über ${SM.AP_CODES.length} Flughäfen auf allen Kontinenten auf. Sie beschaffen Flugzeuge, Personal, Kerosin und Terminalflächen selbst und treten gegen ${Object.keys(SM.AI_SETUP).length} KI-Airlines an${ONLINE ? ' – online auch gegen andere Spielende, in der dauerhaften Hauptwelt oder in einer privaten Runde mit bis zu vier Personen' : ''}. Märkte, Arbeitskräfte, Leasingflugzeuge und Kerosin teilen sich alle – jede Entscheidung trifft die anderen.</p>
     <div class="gsteps">
       <div><b>Ziel</b><span>Wachsen und Gewinn machen, ohne dass das Geld ausgeht.</span></div>
-      <div><b>Gefahr</b><span>Das Konto darf bis zur Kreditlinie ins Minus (Dispo). Ist auch der Dispo 30 Tage lang überzogen, ist die Airline insolvent.</span></div>
+      <div><b>Gefahr</b><span>Das Konto darf bis zur Kreditlinie ins Minus (Dispo). Ist auch der Dispo 30 Tage lang überzogen, ist die Airline insolvent. Danach gründen Sie in derselben Welt eine neue Airline.</span></div>
       <div><b>Wichtig</b><span>Kontostand und Gewinn sind zweierlei: Kautionen und Käufe kosten sofort Geld, wirken aber nicht als Verlust.</span></div>
       <div><b>Meilensteine</b><span>Erstflug, Passagierzahlen, Gewinnserien, Krisenfest … Unter Unternehmen → Meilensteine sehen alle, wer vorn liegt.</span></div>
     </div>` },
-  { t: 'Gemeinsam spielen', html: () => `
+  { t: 'Die Hauptwelt', online: true, html: () => `
+    <div class="gsteps">
+      <div><b>Für alle</b><span>In der Lobby oben die Karte „Hauptwelt“: Mit einem Klick gründen Sie dort Ihre Airline. Bis zu 60 Airlines teilen sich eine Welt.</span></div>
+      <div><b>Läuft immer</b><span>Ein Spieltag dauert 30 Minuten – also rund 48 Spieltage pro echtem Tag, auch wenn Sie offline sind. Planen Sie so, dass Ihre Airline ein paar Tage ohne Sie auskommt.</span></div>
+      <div><b>Täglich vorbeischauen</b><span>Beim Öffnen zeigt ein Tagesbericht, was seit Ihrem letzten Besuch passiert ist: Kontostand, Ergebnis, Passagiere, Meldungen.</span></div>
+      <div><b>Mitspielende</b><span>Unter Markt → Mitspielende sehen Sie alle Airlines mit Spielername, Kontostand, Ergebnis und Wachstum.</span></div>
+      <div><b>Pleite?</b><span>Kein Ende: Nach einer Insolvenz gründen Sie in derselben Welt eine neue Airline mit frischem Startkapital.</span></div>
+    </div>` },
+  { t: 'Private Runden', online: true, html: () => `
     <ol class="glist-num">
       <li><b>Spiel anlegen:</b> In der Lobby auf „Neues Spiel“. Name, optional ein Passwort, Schwierigkeit und Tempo wählen, dann die eigene Airline mit Kürzel und Heimatbasis gründen.</li>
-      <li><b>Einladen:</b> Im Spiel oben rechts auf Ihr Kürzel und dann „Mitspielende einladen“. Der <b>Link</b> funktioniert ohne Passwort, der <b>6-stellige Code</b> mit Passwort. Bis zu vier Airlines pro Spiel.</li>
+      <li><b>Einladen:</b> Im Spiel oben rechts auf Ihr Kürzel und dann „Mitspielende einladen“. Der <b>Link</b> funktioniert ohne Passwort, der <b>6-stellige Code</b> mit Passwort. Bis zu vier Airlines pro privater Runde.</li>
       <li><b>Beitreten:</b> Link öffnen oder in der Lobby Code eingeben bzw. nach dem Spielnamen suchen.</li>
       <li><b>Chat:</b> Über das Sprechblasen-Symbol oben schreiben Sie allen oder privat an eine Airline – zum Verhandeln, Verabreden oder Sticheln.</li>
-      <li><b>Zeit:</b> Wer das Spiel anlegt, leitet es und wählt oben das Tempo. Langsame Stufen: 1 Stunde, 10 Minuten oder 1 Minute pro Spieltag – sie laufen auch weiter, wenn niemand online ist, ideal für Partien über Tage. Dazu die schnellen Stufen (1 Tag in 12, 6 oder 3 Sekunden).</li>
+      <li><b>Zeit:</b> Wer das Spiel anlegt, leitet es und wählt oben das Tempo. Langsame Stufen: 1 Stunde, 30 Minuten, 10 Minuten oder 1 Minute pro Spieltag – sie laufen auch weiter, wenn niemand online ist, ideal für Partien über Tage. Dazu die schnellen Stufen (1 Tag in 12, 6 oder 3 Sekunden).</li>
+      <li><b>Neustart:</b> Geht eine Airline pleite, gründet die Person direkt eine neue – das Spiel läuft für alle weiter.</li>
     </ol>` },
   { t: 'Die ersten zehn Minuten', html: () => `
     <ol class="glist-num">
@@ -3177,8 +3693,8 @@ const GUIDE = [
       <div style="border-left:4px solid var(--c-karte)"><b>Karte</b>Dashboard (Auslastung, Profitabilität, Personal, Flotte auf einen Blick), Übersicht, Abflugtafel, Meldungen</div>
       <div style="border-left:4px solid var(--c-flotte)"><b>Flotte</b>Ihre Flugzeuge, Einsatzplan (Flugzeuge festen Strecken zuweisen), Beschaffung, Charter</div>
       <div style="border-left:4px solid var(--c-strecken)"><b>Strecken</b>Ihr Netz mit Preisen und Frequenzen, Planung neuer Strecken</div>
-      <div style="border-left:4px solid var(--c-finanzen)"><b>Finanzen</b>Gewinn und Verlust, Bilanz, Kredite und Rating</div>
-      <div style="border-left:4px solid var(--c-markt)"><b>Markt</b>Nachfrage und Marktstudien, Wettbewerb, Handel und Kooperationen mit Airlines und Mitspielenden, Marktplatz für Anzeigen an alle, Weltlage mit Konjunktur, Zöllen, Bankenstimmung und Leasingbestand</div>
+      <div style="border-left:4px solid var(--c-finanzen)"><b>Finanzen</b>Gewinn und Verlust, Bilanz, Kredite und Rating, CFO-Beratung mit Antworten zu Liquidität und Kosten und einem Szenario-Rechner für Entscheidungen</div>
+      <div style="border-left:4px solid var(--c-markt)"><b>Markt</b>Nachfrage, bezahlte Marktstudien (Strecken, Flotte, Basis, Marktlücken), Wettbewerb, Mitspielende, Handel und Kooperationen, Marktplatz für Anzeigen an alle, Weltlage mit Konjunktur, Zöllen, Bankenstimmung und Leasingbestand</div>
       <div style="border-left:4px solid var(--c-unternehmen)"><b>Unternehmen</b>Profil und Logo, Meilensteine, Personal (Arbeitsmarkt, Akademien, Abwerben), Stationen, Einkauf (Kerosin, Versicherung, Marketing), Assistenz</div>
     </div>
     <p class="small muted">Links sehen Sie Kontostand, Tagesergebnis, Auslastung und Pünktlichkeit auf einen Blick, darunter die Hinweise Ihrer Assistenz.</p>` },
@@ -3189,7 +3705,7 @@ const GUIDE = [
       <li><b>Erfolg lockt Konkurrenz:</b> Läuft eine Strecke gut, kommen KI-Airlines mit Kampfpreisen und mehr Flügen. Rechnen Sie damit und bauen Sie Kosten- oder Markenvorteile auf.</li>
       <li><b>Alle teilen sich die Märkte:</b> Arbeitsmarkt, Slots, Lieferzeiten und Kerosin – was andere tun, trifft auch Sie. Gehalt unter Marktniveau lädt zum Abwerben ein.</li>
       <li><b>Unter 600 km gewinnt oft die Bahn,</b> und große Flugzeuge auf kleinen Märkten fliegen leer.</li>
-      <li><b>Agenturpersonal kostet das 1,6-Fache.</b> Rechtzeitig einstellen, Einstellungen dauern 6–21 Tage, in den ersten 60 Tagen höchstens 5.</li>
+      <li><b>Agenturpersonal kostet das 1,6-Fache.</b> Rechtzeitig einstellen: Neue Leute fangen je nach Beruf und Arbeitsmarkt nach 3 bis 21 Tagen an, in den ersten 60 Tagen nach Gründung nach höchstens 5 Tagen.</li>
       <li><b>Reserve halten:</b> Ölpreisschocks, Streiks und Stürme kommen. Kerosin unter Unternehmen → Einkauf absichern, Kreditlinie im Blick behalten.</li>
       <li><b>Handeln statt warten:</b> Unter Markt → Handel kaufen Sie Flugzeuge sofort einsatzbereit, übernehmen Crews ohne Wartezeit, kaufen Slots oder bezahlen Konkurrenten für den Rückzug von Ihrer Strecke – mit KI-Airlines und Mitspielenden.</li>
       <li><b>Zölle und Konjunktur:</b> Handelskriege drücken Geschäftsreisen zwischen den Blöcken und verteuern Flugzeuge vom anderen Block. Die Regionen laufen zeitversetzt – ein Netz über mehrere Regionen streut das Risiko.</li>
@@ -3197,9 +3713,11 @@ const GUIDE = [
       <li><b>Eigener Nachwuchs:</b> Eine geförderte Flugschule oder Kabinenakademie liefert jeden Monat Personal am Arbeitsmarkt vorbei – teuer, aber in knappen Zeiten Gold wert.</li>
       <li><b>Berater mit Profil:</b> Tim Kaminski ist der Beste und kostet entsprechend. Luis Perez ist günstiger und erkennt, welches gebrauchte Flugzeug ein Schnäppchen ist und welches eine Gurke. Beide gibt es nur einmal – wer zuerst zugreift.</li>
       <li><b>Neue Muster per Auktion:</b> Frische Typen wie der A321XLR gibt es im ersten Jahr nur über verdeckte Gebote. Wer am meisten bietet, fliegt sie zuerst.</li>
-      <li><b>Langstrecke erst später:</b> Großraumjets kosten rund 1 Mio. € Leasing im Monat und brauchen große Märkte.</li>
+      <li><b>Langstrecke erst später:</b> Großraumjets kosten rund 1 Mio. € Leasing im Monat und brauchen große Märkte. A380 und 747-8 gibt es nur geleast oder gebraucht, der A380 landet nur an Großflughäfen. Die Concorde ist ein seltenes Liebhaberstück vom Gebrauchtmarkt: schnell, teuer, gut fürs Image.</li>
+      <li><b>Erst prüfen, dann zahlen:</b> Marktstudien (Markt → Marktstudien) liefern Empfehlungen mit Zahlen, die CFO-Beratung (Finanzen) rechnet Kauf, Leasing, neue Basis oder Strecke vorher durch – inklusive Liquidität danach.</li>
     </ul>` },
 ];
+const GUIDE = GUIDE_ALL.filter((g) => !g.online || ONLINE);
 function showGuide(onDone = null, page = 0) {
   const g = GUIDE[page], last = page === GUIDE.length - 1;
   const m = modal(`<div class="spread"><span class="small muted">Anleitung · ${page + 1} von ${GUIDE.length}</span><button class="btn small" id="gdSkip">${last ? 'Schließen' : 'Überspringen'}</button></div>
@@ -3476,7 +3994,7 @@ async function mpSetSpeed(k) {
 function showInvite() {
   const link = `${location.origin}${location.pathname}?join=${encodeURIComponent(ui.mp.code)}&t=${encodeURIComponent(ui.mp.invite)}`;
   const m = modal(`<h1>Mitspielende einladen</h1>
-    <p class="ink2">Bis zu vier Airlines pro Spiel. Wer den Link öffnet und sich anmeldet, kommt ohne Passwort hinein. Mit dem Code allein ist das Passwort nötig, falls Sie eines gesetzt haben.</p>
+    <p class="ink2">${ui.mp.main ? `Die Hauptwelt ist für alle offen (bis zu ${mpState.info && mpState.info.max || 60} Airlines). Wer den Link öffnet und sich anmeldet, kann direkt eine eigene Airline gründen.` : 'Bis zu vier Airlines pro Spiel. Wer den Link öffnet und sich anmeldet, kommt ohne Passwort hinein. Mit dem Code allein ist das Passwort nötig, falls Sie eines gesetzt haben.'}</p>
     <label class="f"><span>Einladungslink</span><input type="text" id="invLink" readonly value="${esc(link)}"></label>
     <label class="f"><span>Code</span><input type="text" readonly value="${esc(ui.mp.code)}" style="font-family:var(--f-mono);font-size:18px;letter-spacing:.15em"></label>
     <div class="stack small"><b>Im Spiel</b>${mpState.players.map((p) => `<div class="row"><span class="sw" style="background:${colorOfId(p.airlineId)}"></span> ${esc(p.airlineName)} <span class="muted">(${esc(p.name)})</span>${p.online ? ' <span class="chip good">online</span>' : ''}${p.host ? ' <span class="chip me">Spielleitung</span>' : ''}</div>`).join('')}</div>
@@ -3712,6 +4230,7 @@ function boot(hotData) {
   document.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const b = e.target.closest && e.target.closest('[data-acinfo]'); if (!b) return; e.preventDefault(); e.stopPropagation(); showAcInfo(b.dataset.acinfo); }, true);
   $('#aptCard').addEventListener('click', (e) => {
     const sel = e.target.closest('[data-aptsel]'); if (sel) { e.preventDefault(); selectAirport(sel.dataset.aptsel); return; }
+    const sb = e.target.closest('[data-apcbase]'); if (sb) { e.preventDefault(); if (setSelBase(sb.dataset.apcbase)) { showAptCard(ui.aptCard); if (ui.tab === 'market') renderPane(true); renderMapRoutes(true); } return; }
     const b = e.target.closest('[data-apc]'); if (!b) return;
     const k = b.dataset.apc;
     if (k === 'close') { $('#aptCard').hidden = true; ui.aptCard = null; return; }

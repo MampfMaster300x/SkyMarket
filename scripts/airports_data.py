@@ -121,8 +121,105 @@ DSS|Dakar|14.67|-17.07|SN|3.5|0.8|0.9|3
 DAR|Daressalam|-6.88|39.20|TZ|7|0.8|1.0|3
 HRG|Hurghada|27.18|33.80|EG|0.3|0.2|2.6|9
 MRU|Mauritius|-20.43|57.68|MU|1.3|0.6|2.6|4
+BNE|Brisbane|-27.38|153.12|AU|2.6|1.0|1.4|23
+PER|Perth|-31.94|115.97|AU|2.2|1.1|1.1|16
+ADL|Adelaide|-34.95|138.53|AU|1.4|0.9|1.0|8.5
+OOL|Gold Coast|-28.16|153.50|AU|0.7|0.3|2.4|6.5
+CBR|Canberra|-35.31|149.20|AU|0.5|1.3|0.6|3.0
+CNS|Cairns|-16.88|145.75|AU|0.25|0.3|2.6|5.0
+HBA|Hobart|-42.84|147.51|AU|0.25|0.6|1.6|2.8
+DRW|Darwin|-12.41|130.88|AU|0.15|0.7|1.2|2.0
+TSV|Townsville|-19.25|146.77|AU|0.2|0.6|0.9|1.6
+NTL|Newcastle (Australien)|-32.80|151.83|AU|0.6|0.7|0.8|1.3
+MCY|Sunshine Coast|-26.60|153.09|AU|0.4|0.3|1.8|1.6
+LST|Launceston|-41.55|147.21|AU|0.12|0.4|1.2|1.3
+ASP|Alice Springs|-23.81|133.90|AU|0.03|0.3|1.8|0.6
+AKL|Auckland|-37.01|174.79|NZ|1.7|1.1|1.4|19
+WLG|Wellington|-41.33|174.81|NZ|0.45|1.2|0.9|5.5
+CHC|Christchurch|-43.49|172.53|NZ|0.5|0.8|1.2|6.5
+ZQN|Queenstown|-45.02|168.74|NZ|0.05|0.2|2.8|2.4
+NAN|Nadi (Fidschi)|-17.76|177.44|FJ|0.3|0.3|2.6|2.3
+NOU|Nouméa|-22.01|166.21|NC|0.27|0.6|1.4|0.5
+PPT|Papeete (Tahiti)|-17.55|-149.61|PF|0.28|0.4|2.4|1.4
+POM|Port Moresby|-9.44|147.22|PG|0.4|0.6|0.2|1.5
+DPS|Bali|-8.75|115.17|ID|4.4|0.3|3.0|21
+LED|Sankt Petersburg|59.80|30.26|RU|5.4|1.1|1.5|20
+AER|Sotschi|43.45|39.96|RU|0.5|0.4|2.4|10
+KZN|Kasan|55.61|49.28|RU|1.3|0.9|1.0|4.5
+SVX|Jekaterinburg|56.74|60.80|RU|1.5|1.0|0.6|7
+OVB|Nowosibirsk|55.01|82.65|RU|1.6|1.0|0.6|7.5
+IKT|Irkutsk|52.27|104.39|RU|0.6|0.7|1.2|2.4
+VVO|Wladiwostok|43.40|132.15|RU|0.6|0.8|1.0|2.5
+KGD|Kaliningrad|54.89|20.59|RU|1.0|0.8|1.0|2.5
+UFA|Ufa|54.56|55.87|RU|1.1|0.8|0.5|3.5
+KJA|Krasnojarsk|56.17|92.49|RU|1.1|0.8|0.5|3.3
+KHV|Chabarowsk|48.53|135.19|RU|0.6|0.7|0.5|2.3
+MMK|Murmansk|68.78|32.75|RU|0.3|0.6|0.8|1.0
+YKS|Jakutsk|62.09|129.77|RU|0.35|0.6|0.4|1.2
+MRV|Mineralnyje Wody|44.23|43.08|RU|0.9|0.4|1.4|3.5
+DUR|Durban|-29.61|31.12|ZA|3.5|0.9|1.4|6
+ZNZ|Sansibar|-6.22|39.22|TZ|0.9|0.2|2.6|1.8
+JRO|Kilimandscharo|-3.43|37.07|TZ|1.0|0.3|2.2|1.0
+MBA|Mombasa|-4.03|39.59|KE|1.3|0.5|1.8|1.6
+KGL|Kigali|-1.97|30.14|RW|1.6|0.8|0.9|1.0
+EBB|Entebbe|0.04|32.44|UG|3.5|0.7|0.8|2.0
+LUN|Lusaka|-15.33|28.45|ZM|3.0|0.7|0.5|1.5
+HRE|Harare|-17.93|31.09|ZW|2.4|0.7|0.5|1.2
+VFA|Victoria Falls|-18.10|25.84|ZW|0.05|0.1|3.0|0.4
+MPM|Maputo|-25.92|32.57|MZ|2.5|0.7|0.8|1.0
+WDH|Windhuk|-22.48|17.47|NA|0.5|0.7|1.6|1.0
+LAD|Luanda|-8.86|13.23|AO|8.5|1.0|0.3|2.5
+ABJ|Abidjan|5.26|-3.93|CI|5.5|1.0|0.6|2.5
+DLA|Douala|4.01|9.72|CM|3.5|0.9|0.3|1.2
+ABV|Abuja|9.01|7.26|NG|3.5|1.1|0.3|5
+SEZ|Seychellen|-4.67|55.52|SC|0.1|0.3|2.8|1.0
+TNR|Antananarivo|-18.80|47.48|MG|3.5|0.6|0.9|1.2
+SSH|Scharm El-Scheich|27.98|34.39|EG|0.1|0.1|3.0|8
+LXR|Luxor|25.67|32.71|EG|0.5|0.2|2.4|2.0
+AGA|Agadir|30.38|-9.55|MA|1.0|0.3|2.4|2.5
+GIG|Rio de Janeiro|-22.81|-43.25|BR|13|1.1|2.0|15
+BSB|Brasília|-15.87|-47.92|BR|4.7|1.2|0.5|15
+CNF|Belo Horizonte|-19.62|-43.97|BR|6|0.9|0.5|10
+SSA|Salvador|-12.91|-38.33|BR|4|0.6|1.6|8
+REC|Recife|-8.13|-34.92|BR|4|0.7|1.4|9
+FOR|Fortaleza|-3.78|-38.53|BR|4|0.6|1.5|7
+POA|Porto Alegre|-29.99|-51.17|BR|4.3|0.9|0.6|6.5
+FLN|Florianópolis|-27.67|-48.55|BR|1.2|0.5|1.8|4.5
+MAO|Manaus|-3.04|-60.05|BR|2.3|0.7|1.0|3.5
+EZE|Buenos Aires|-34.82|-58.54|AR|15|1.2|1.6|13
+COR|Córdoba (Argentinien)|-31.32|-64.21|AR|1.8|0.8|0.8|3.5
+MDZ|Mendoza|-32.83|-68.79|AR|1.2|0.6|1.6|2.3
+BRC|Bariloche|-41.15|-71.16|AR|0.15|0.2|2.6|2.0
+MVD|Montevideo|-34.84|-56.03|UY|1.8|0.9|1.2|2.2
+UIO|Quito|-0.13|-78.36|EC|2.8|0.9|1.2|5
+GYE|Guayaquil|-2.16|-79.88|EC|3.0|0.9|0.9|4
+MDE|Medellín|6.16|-75.42|CO|4.0|0.9|1.2|11
+CTG|Cartagena|10.44|-75.51|CO|1.0|0.4|2.2|6
+CLO|Cali|3.54|-76.38|CO|2.8|0.8|0.7|5.5
+CUZ|Cusco|-13.54|-71.94|PE|0.5|0.2|2.8|3.5
+ASU|Asunción|-25.24|-57.52|PY|2.5|0.8|0.4|1.2
+VVI|Santa Cruz de la Sierra|-17.64|-63.14|BO|2.0|0.8|0.4|3.0
+PTY|Panama-Stadt|9.07|-79.38|PA|2.0|1.1|1.0|18
+YUL|Montréal|45.47|-73.74|CA|4.3|1.1|1.3|21
+YYC|Calgary|51.13|-114.01|CA|1.6|1.1|0.9|18
+YEG|Edmonton|53.31|-113.58|CA|1.5|1.0|0.6|8
+YOW|Ottawa|45.32|-75.67|CA|1.5|1.3|0.8|5
+YWG|Winnipeg|49.91|-97.24|CA|0.85|0.9|0.6|4.5
+YHZ|Halifax|44.88|-63.51|CA|0.45|0.9|0.9|4.2
+YQB|Québec|46.79|-71.39|CA|0.85|0.8|1.2|1.8
+YYJ|Victoria (Kanada)|48.65|-123.43|CA|0.4|0.8|1.3|2.0
+YXE|Saskatoon|52.17|-106.70|CA|0.33|0.8|0.4|1.5
+YQR|Regina|50.43|-104.67|CA|0.26|0.8|0.3|1.2
+YYT|St. John's|47.62|-52.75|CA|0.21|0.8|0.9|1.5
+YXY|Whitehorse|60.71|-135.07|CA|0.04|0.5|1.4|0.4
+YZF|Yellowknife|62.46|-114.44|CA|0.02|0.6|0.8|0.5
+YFB|Iqaluit|63.76|-68.56|CA|0.008|0.6|0.4|0.15
 """
 EXTRA = {'VIE', 'BER', 'DUS', 'HAM'} | {'JNB','CPT','ADD','NBO','LOS','ACC','CMN','RAK','ALG','TUN','DSS','DAR','HRG','MRU'}   # nicht in den Top 100, aus der Europa-Version übernommen
+# v0.12: Erweiterung Australien/Ozeanien, Russland, Afrika, Südamerika, Kanada (Passagiere Mio./Jahr gerundet, Stand 2019/2024)
+EXTRA |= {l.split('|')[0] for l in AIRPORTS.strip().splitlines()[AIRPORTS.strip().splitlines().index(next(x for x in AIRPORTS.strip().splitlines() if x.startswith('BNE|'))):]}
+# Asiatisches Russland: eigene Region (Inlandsflüge bleiben trotzdem Inland, siehe INTERCONT im Kern)
+REGION_OVERRIDE = {'OVB': 'Asien', 'IKT': 'Asien', 'VVO': 'Asien', 'KJA': 'Asien', 'KHV': 'Asien', 'YKS': 'Asien'}
 
 # Land: Dativ-Name, Kurzname, Region, Einkommen, Landeentgelt €/t, Pax-Entgelt €, Ticketsteuer €, Steuer Langstrecke €, Kerosin-Faktor, Kosten-Faktor, Abfertigungs-Faktor
 COUNTRIES = {
@@ -174,7 +271,29 @@ COUNTRIES = {
  'ID': ('Indonesien', 'Indonesien', 'Asien', 0.25, 4, 10, 4, 8, 1.08, 0.6, 0.6),
  'PH': ('den Philippinen', 'Philippinen', 'Asien', 0.22, 4, 12, 4, 25, 1.08, 0.6, 0.6),
  'VN': ('Vietnam', 'Vietnam', 'Asien', 0.25, 4, 12, 4, 8, 1.05, 0.6, 0.6),
- 'AU': ('Australien', 'Australien', 'Ozeanien', 1.25, 8, 25, 35, 40, 1.05, 1.3, 1.2),
+ 'AU': ('Australien', 'Australien', 'Ozeanien', 1.25, 8, 25, 10, 40, 1.05, 1.3, 1.2),
+ 'NZ': ('Neuseeland', 'Neuseeland', 'Ozeanien', 1.05, 7, 22, 12, 20, 1.08, 1.2, 1.1),
+ 'FJ': ('Fidschi', 'Fidschi', 'Ozeanien', 0.25, 6, 25, 30, 30, 1.15, 0.8, 0.8),
+ 'NC': ('Neukaledonien', 'Neukaledonien', 'Ozeanien', 0.90, 8, 25, 10, 10, 1.15, 1.2, 1.1),
+ 'PF': ('Französisch-Polynesien', 'Franz.-Polynesien', 'Ozeanien', 0.80, 8, 25, 10, 10, 1.15, 1.2, 1.1),
+ 'PG': ('Papua-Neuguinea', 'Papua-Neuguinea', 'Ozeanien', 0.12, 6, 20, 10, 15, 1.20, 0.8, 0.8),
+ 'AR': ('Argentinien', 'Argentinien', 'Lateinamerika', 0.45, 5, 20, 15, 40, 1.10, 0.8, 0.8),
+ 'UY': ('Uruguay', 'Uruguay', 'Lateinamerika', 0.60, 5, 25, 15, 30, 1.10, 0.85, 0.85),
+ 'EC': ('Ecuador', 'Ecuador', 'Lateinamerika', 0.35, 4, 25, 12, 30, 1.05, 0.75, 0.8),
+ 'PY': ('Paraguay', 'Paraguay', 'Lateinamerika', 0.30, 4, 20, 10, 20, 1.10, 0.7, 0.75),
+ 'BO': ('Bolivien', 'Bolivien', 'Lateinamerika', 0.20, 4, 15, 8, 20, 1.10, 0.65, 0.7),
+ 'PA': ('Panama', 'Panama', 'Lateinamerika', 0.60, 5, 20, 10, 40, 1.05, 0.85, 0.85),
+ 'AO': ('Angola', 'Angola', 'Afrika', 0.15, 6, 25, 10, 20, 1.00, 0.75, 0.8),
+ 'RW': ('Ruanda', 'Ruanda', 'Afrika', 0.08, 5, 20, 8, 15, 1.15, 0.6, 0.65),
+ 'UG': ('Uganda', 'Uganda', 'Afrika', 0.07, 5, 20, 8, 15, 1.15, 0.6, 0.65),
+ 'ZM': ('Sambia', 'Sambia', 'Afrika', 0.10, 5, 20, 8, 15, 1.20, 0.6, 0.65),
+ 'ZW': ('Simbabwe', 'Simbabwe', 'Afrika', 0.10, 5, 25, 10, 15, 1.20, 0.65, 0.7),
+ 'MZ': ('Mosambik', 'Mosambik', 'Afrika', 0.06, 5, 20, 8, 15, 1.20, 0.6, 0.65),
+ 'NA': ('Namibia', 'Namibia', 'Afrika', 0.30, 5, 20, 8, 15, 1.15, 0.7, 0.75),
+ 'CI': ('der Elfenbeinküste', 'Elfenbeinküste', 'Afrika', 0.12, 5, 22, 10, 20, 1.15, 0.65, 0.7),
+ 'CM': ('Kamerun', 'Kamerun', 'Afrika', 0.08, 5, 22, 10, 20, 1.20, 0.65, 0.7),
+ 'SC': ('den Seychellen', 'Seychellen', 'Afrika', 0.70, 6, 25, 10, 15, 1.15, 0.9, 0.9),
+ 'MG': ('Madagaskar', 'Madagaskar', 'Afrika', 0.05, 5, 20, 8, 15, 1.20, 0.6, 0.65),
 }
 # Slotkoordinierte Flughäfen: (zusätzliche Slots, Entgelt je Bewegung)
 SLOTS = {
@@ -188,7 +307,8 @@ SLOTS = {
 SEASON = {'PMI': 'island', 'BCN': 'sun', 'FCO': 'sun', 'LIS': 'sun', 'AYT': 'island', 'CJU': 'sun', 'ATH': 'sun',
           'CUN': 'winter_sun', 'MCO': 'winter_sun', 'MIA': 'winter_sun', 'FLL': 'winter_sun', 'TPA': 'winter_sun', 'LAS': 'city',
           'BKK': 'winter_sun', 'DMK': 'winter_sun', 'DXB': 'winter_sun', 'AUH': 'winter_sun', 'SYD': 'sun', 'MEL': 'sun', 'SAN': 'sun', 'CAI': 'winter_sun',
-          'HRG': 'winter_sun', 'RAK': 'winter_sun', 'MRU': 'winter_sun', 'CPT': 'winter_sun', 'TUN': 'sun'}
+          'HRG': 'winter_sun', 'RAK': 'winter_sun', 'MRU': 'winter_sun', 'CPT': 'winter_sun', 'TUN': 'sun',
+          'OOL': 'sun', 'HBA': 'sun', 'GIG': 'sun', 'FLN': 'sun', 'AER': 'sun', 'SSH': 'winter_sun', 'LXR': 'winter_sun', 'AGA': 'winter_sun', 'CTG': 'winter_sun'}
 # Europa-Flughäfen aus v0.1–v0.3 behalten ihre kalibrierten Werte
 OLD = {
  'HAM': dict(pop=3.2, income=1.10, biz=1.00, tour=0.90, land=7, paxfee=17, tax=15, taxi=0.00, cost=1.00, fuel=1.00, hand=1.00, slots=None, slotFee=0),
@@ -228,7 +348,7 @@ def build():
             x = dict(cost=round(C[9] * (1 + max(0, min(0.4, (pax - 30) / 150))), 2), fuel=C[8], hand=round(C[10] * hub, 2), slots=sl[0] if sl else None, slotFee=sl[1] if sl else 0)
         ap['rank'] = None if c in EXTRA else rank
         ap['pax'] = pax
-        ap['region'] = C[2]
+        ap['region'] = REGION_OVERRIDE.get(c, C[2])
         aps[c] = ap; xs[c] = x
     countries = {k: dict(dat=v[0], nom=v[1], region=v[2], taxLong=v[7]) for k, v in COUNTRIES.items()}
     return aps, xs, countries
@@ -243,3 +363,10 @@ if __name__ == '__main__':
     js += '  const REGION_ORDER = ' + json.dumps(REGION_ORDER, ensure_ascii=False) + ';\n'
     js += '  // @@AIRPORTS-END\n'
     open('airports_block.js', 'w').write(js)
+    # direkt in den Kern einsetzen (zwischen den Markern)
+    import re, os
+    eng = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared', 'engine.cjs')
+    src = open(eng).read()
+    a, b = src.index('  // @@AIRPORTS-BEGIN'), src.index('  // @@AIRPORTS-END\n') + len('  // @@AIRPORTS-END\n')
+    open(eng, 'w').write(src[:a] + js + src[b:])
+    print('engine.cjs aktualisiert')

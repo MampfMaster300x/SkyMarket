@@ -413,7 +413,7 @@ export async function handle(req, { store }) {
           md.speed = speed; md.lastTick = now;
           if (speed === 'rt') md.carry = dayMsLocal(tz, now);
           else if (was !== speed) { const pw = speedInfo(was).ms, pn = speedInfo(speed).ms; md.carry = pw && pn ? Math.min(pn * 0.999, (md.carry || 0) / pw * pn) : 0; }
-          if (was !== speed && w.humans.length) w.pushNews(w.day, `Die Spielleitung stellt das Tempo auf „${SM.SPEEDS[speed].label}“`, 'info', null);
+          if (was !== speed && w.humans.length) w.pushNews(w.day, meta.main ? `Die Hauptwelt läuft jetzt mit „${SM.SPEEDS[speed].label}“` : `Die Spielleitung stellt das Tempo auf „${SM.SPEEDS[speed].label}“`, 'info', null);
         });
         return json({ ok: true, clock: JSON.parse(clockHeader(r.md)) });
       }

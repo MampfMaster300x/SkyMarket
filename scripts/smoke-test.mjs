@@ -185,5 +185,32 @@ assert.equal((await call('tim', 'POST', '/games/main/control', { speed: 'm10' })
 ok(await call('tim', 'POST', '/games/main/control', { speed: 'm30' }), 'Admin zurück auf 30 Min.');
 // private Runde: Neustart auch dort
 ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: { name: 'Anna Zwei', code: 'A2', base: 'DUS' } }), 'Neustart in privater Runde');
+// Marktstudie über den Server: beauftragen, Zeit vergehen lassen, Bericht liegt im Spielstand
+{ const r = ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'orderStudy', kind: 'routes', tier: 'small', focus: { t: 'region', v: 'Europa' } } }), 'Studie beauftragen');
+  assert.equal(r.ok, true, 'Studie angenommen: ' + JSON.stringify(r));
+  const bad = ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'orderStudy', kind: 'routes', tier: 'riesig' } }), 'ungültiges Paket');
+  assert.equal(bad.ok, false);
+  const m2 = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' });
+  await store.set('games/main/state', m2.data, { metadata: { ...m2.metadata, lastTick: Date.now() - 4 * 1800000 - 1000 }, onlyIfMatch: m2.etag });
+  await tickMain(store);
+  const sa = await call('anna', 'GET', '/games/main/state?v=x');
+  const ws = JSON.parse(gunzipSync(Buffer.from(sa.data)).toString());
+  const ann = ws.airlines.find((a) => a.name === 'Hanse Air' && a.owner === 'anna');
+  const rep = ann.reports.find((x) => x.kind === 'routes');
+  assert.equal(rep.status, 'done', 'Bericht fertig'); assert.ok(rep.res.rows.length > 0, 'Bericht hat Vorschläge');
+  console.log('Marktstudie ok:', rep.res.title, '·', rep.res.rec ? rep.res.rec.text.slice(0, 80) : '–'); }
+// Manipulierte Aktionen dürfen den Spielstand nicht beschädigen (sonst stürzt die Welt für alle ab)
+{ const evil = [{ type: 'terminal', apt: 'HAM', v: 'constructor' }, { type: 'terminal', apt: 'HAM', v: '__proto__' }, { type: 'hire', role: 'xyz', count: 5 },
+    { type: 'hire', role: 'pilot', group: 'toString', count: 3 }, { type: 'train', from: 'A32F', to: 'hasOwnProperty', count: 1 }, { type: 'insurance', v: 'valueOf' },
+    { type: 'openRoute', base: 'HAM', dest: 'CDG', typeId: 'A20N', term: 'constructor', service: '__proto__', buffer: 'toString', freq: 1, fo: 99, fi: 99 },
+    { type: 'academy', role: 'constructor', level: 2 }, { type: 'repay', id: 'nix' }, { type: 'openBase', apt: 'constructor' }];
+  for (const action of evil) { const r = await call('anna', 'POST', '/games/main/action', { action }); assert.ok(r.status < 500, 'kein Serverfehler bei ' + JSON.stringify(action)); }
+  const m3 = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' });
+  await store.set('games/main/state', m3.data, { metadata: { ...m3.metadata, lastTick: Date.now() - 3 * 1800000 - 1000 }, onlyIfMatch: m3.etag });
+  const t3 = await tickMain(store);
+  assert.ok(t3.days >= 3, 'Welt läuft nach manipulierten Aktionen weiter: ' + JSON.stringify(t3));
+  const rp = ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' } }), 'Kredit fehlt');
+  assert.equal(rp.ok, false); assert.ok(rp.msg, 'Meldung beim fehlenden Kredit');
+  console.log('Robust ok: 10 manipulierte Aktionen abgewiesen, Welt läuft weiter (+' + t3.days + ' Tage)'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 console.log('Alle Prüfungen bestanden.');
