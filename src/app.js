@@ -1996,8 +1996,9 @@ VIEWS.profile = function viewProfile() {
     <div class="stack"><h3>Symbol</h3><div class="logo-grid">${Object.keys(LOGO_SYM).map((k) => `<button data-act="lg" data-k="sym" data-v="${k}" aria-pressed="${L.sym === k}" title="${k === 'code' ? 'Kürzel' : k}">${logoSvg(demo, 44, { ...L, sym: k })}</button>`).join('')}</div></div>
     <div class="stack"><h3>Farben</h3><div class="logo-grid">${LOGO_PALETTES.map(([a, b]) => `<button data-act="lgpal" data-a="${a}" data-b="${b}" aria-pressed="${L.c1 === a && L.c2 === b}" title="${a} / ${b}">${logoSvg(demo, 44, { ...L, c1: a, c2: b })}</button>`).join('')}</div>
       <div class="row small"><label class="row" style="gap:6px">Grundfarbe <input type="color" id="lg-c1" value="${L.c1}"></label><label class="row" style="gap:6px">Symbolfarbe <input type="color" id="lg-c2" value="${L.c2}"></label></div></div>
-    <div class="row"><button class="btn primary" data-act="lgsave">Logo übernehmen</button><button class="btn" data-act="lgreset">Zurücksetzen</button></div>
-    <p class="small muted">Ihre Farben erscheinen auch auf dem Leitwerk Ihrer Flugzeuge. Das Logo können Sie jederzeit ändern.</p>
+    ${(() => { const tk = SM.logoTaken(W, pl, L); return tk ? `<div class="callout warn"><b>Schon vergeben</b><span class="small">Genau diese Kombination trägt bereits <span class="lgi">${logoSvg(tk, 18)}</span> ${esc(tk.name)}. Ändern Sie Form, Symbol oder eine Farbe.</span></div>` : ''; })()}
+    <div class="row"><button class="btn primary" data-act="lgsave" ${SM.logoTaken(W, pl, L) ? 'disabled' : ''}>Logo übernehmen</button><button class="btn" data-act="lgreset">Zurücksetzen</button></div>
+    <p class="small muted">Ihre Farben erscheinen auch auf dem Leitwerk Ihrer Flugzeuge. Das Logo können Sie jederzeit ändern. Jede Kombination aus Form, Symbol und Farben gibt es pro Welt nur einmal.</p>
     ${pl.past && pl.past.length ? `<div class="stack"><h2 class="sec">Frühere Airlines <small>${pl.past.length} Neustart${pl.past.length > 1 ? 's' : ''}</small></h2><div class="tw"><table class="t"><thead><tr><th>Airline</th><th class="r">Zeitraum</th><th class="r">Passagiere</th><th class="r">Eigenkapital am Ende</th></tr></thead><tbody>${pl.past.slice().reverse().map((x) => `<tr><td>${esc(x.name)} <span class="small muted">${esc(x.code || '')}</span>${x.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ' <span class="chip">aufgegeben</span>'}</td><td class="r">${dateShort(x.from)} – ${dateShort(x.to)}</td><td class="r">${n0(x.pax)}</td><td class="r ${x.equity < 0 ? 'neg' : ''}">${eur(x.equity)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="callout warn stack"><b>Neu anfangen</b><span class="small">Läuft es gar nicht mehr, können Sie ${esc(pl.name)} aufgeben und ${ui.mp ? 'in derselben Welt' : 'in dieser Welt'} eine neue Airline mit vollem Startkapital gründen. Flugzeuge, Strecken, Personal und Slots gehen dabei verloren.</span><div class="row"><button class="btn small danger" data-act="restartvol">Airline aufgeben und neu gründen</button></div></div>`;
 };
@@ -3646,91 +3647,153 @@ function modal(html, wide = true) {
 }
 function formError(msg) { const e = $('#formErr'); if (e) { e.textContent = msg; e.hidden = !msg; } else toast(msg); }
 
-// ---------- Anleitung (nach der Registrierung, später über „Anleitung“) ----------
+// ---------- Anleitung als bebilderter Durchlauf (nach der Registrierung, später über „Anleitung“) ----------
+// Jeder Schritt: ein Bild (animiert, hell/dunkel über Design-Variablen), eine Überschrift, ein Satz, bis zu drei Stichworte.
+const GI = {
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.6-4.6"/>',
+  calc: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7M8.5 12h1M12 12h1M15.5 12h0M8.5 15.5h1M12 15.5h1M8.5 18.5h1M12 18.5h1"/>',
+  pin: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  users: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20.5c0-3.4 2.7-6.2 6-6.2s6 2.8 6 6.2"/><circle cx="17" cy="9" r="2.5"/><path d="M15.6 14.4c3 .3 5.4 2.7 5.4 6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/>',
+  alert: '<path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.2M12 17.2v.3"/>',
+  coin: '<circle cx="12" cy="12" r="8.5"/><path d="M15 9a3.6 3.6 0 1 0 0 6M7.8 11h5.4M7.8 13.2h5"/>',
+  up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
+  tag: '<path d="M3.5 12.5V4h8.5l9 9-8.5 8.5z"/><circle cx="8" cy="8.5" r="1.6"/>',
+  fuel: '<path d="M5 21V5.5A2.5 2.5 0 0 1 7.5 3h5A2.5 2.5 0 0 1 15 5.5V21M3.5 21h13M15 9.5h2l2 2v6.5a1.5 1.5 0 0 1-3 0v-3h-2"/><path d="M8 7.5h4"/>',
+  rail: '<rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10.5h12M8.5 20l-1.5 2M15.5 20l1.5 2M9 16l-1 4h8l-1-4"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 1 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 1 0 5.7 5.7l1-1"/>',
+  restart: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4v4h4"/>',
+  space: '<rect x="3" y="8" width="18" height="8" rx="2"/><path d="M7 12h10"/>',
+  bolt: '<path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/>',
+};
+const gIc = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${GI[k] || IC[k] || ''}</svg>`;
+const gChip = (ic, txt) => `<span class="gv-chip">${gIc(ic)}${txt}</span>`;
+const gMotion = () => !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+/** Flugzeug-Symbol, das einem Pfad folgt (SMIL; bei „weniger Bewegung“ steht es still auf halber Strecke). */
+function gPlaneOn(path, dur = 4, color = 'var(--accent)', scale = 1.1) {
+  const glyph = `<g transform="rotate(90) scale(${scale}) translate(-12,-12)"><path d="${IC.plane.match(/d="([^"]+)"/)[1]}" fill="${color}" stroke="var(--panel)" stroke-width="1"/></g>`;
+  return gMotion() ? `<g>${glyph}<animateMotion dur="${dur}s" repeatCount="indefinite" rotate="auto" path="${path}"/></g>`
+    : `<g><animateMotion dur="0.01s" fill="freeze" keyPoints="0.5;0.5" keyTimes="0;1" calcMode="linear" rotate="auto" path="${path}"/>${glyph}</g>`;
+}
+const gHome = () => (W && W.player ? W.player.bases[0] : 'HAM');
+const gArc = (a, b, lift = 0.35) => { const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, d = Math.hypot(b[0] - a[0], b[1] - a[1]); return `M${a[0]} ${a[1]} Q${mx} ${my - d * lift} ${b[0]} ${b[1]}`; };
+const gApt = (p, label, home = false) => `<g class="gv-apt${home ? ' home' : ''}"><circle cx="${p[0]}" cy="${p[1]}" r="${home ? 7 : 4.5}"/>${home ? `<circle class="ring" cx="${p[0]}" cy="${p[1]}" r="7"/>` : ''}${label ? `<text x="${p[0]}" y="${p[1] + (home ? 22 : 17)}">${label}</text>` : ''}</g>`;
+const gPerson = (cls, cap, delay) => `<svg class="gv-person ${cls}" viewBox="0 0 24 32" style="animation-delay:${delay}s" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M3 31c0-7 4-12 9-12s9 5 9 12z"/>${cap ? '<path class="cap" d="M5.5 5.2h13L16.6 1.8H7.4z"/>' : ''}</svg>`;
+
+const SCENES = {
+  welcome() {
+    const H = [250, 112], pts = [[78, 62], [132, 158], [196, 44], [372, 46], [430, 132], [318, 172]];
+    const arcs = pts.map((p, i) => `<path class="gv-arc" style="animation-delay:${0.15 * i}s" d="${gArc(H, p, 0.28)}"/>`).join('');
+    return `<svg class="gv-svg" viewBox="0 0 500 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${arcs}
+      ${pts.map((p) => gApt(p, '')).join('')}${gApt(H, gHome(), true)}${gPlaneOn(gArc(H, pts[3], 0.28), 4.5)}${gPlaneOn(gArc(pts[1], H, 0.28), 5.5, 'var(--plane-ai)', 0.9)}</svg>`;
+  },
+  aircraft() {
+    const t = P.AIRCRAFT_TYPES.A20N, cp = (W && W.macro.cpi) || 1, lease = t.lease_month * P.EURUSD / ((W && W.macro.eurusd) || P.EURUSD) * cp;
+    return `<div class="gv-ac">${acSvg('A20N', { ...(W && W.player ? myAcColors() : { color: 'var(--accent)' }), code: W && W.player ? W.player.code : 'SM' })}</div>
+      <div class="gv-tags"><div class="gv-tag on"><b>Leasen</b><span>${eur(lease)} im Monat</span><em>+ ${P.LEASE_DEPOSIT_MONTHS} Monatsraten Kaution</em></div>
+      <div class="gv-tag"><b>Kaufen</b><span>${eur(t.value_eur * cp)}</span><em>bindet viel Kapital</em></div></div>`;
+  },
+  route() {
+    const A = [92, 146], B = [408, 70], arc = gArc(A, B, 0.3);
+    return `<svg class="gv-svg" viewBox="0 0 500 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><path class="gv-arc solid" d="${arc}"/>${gApt(A, gHome(), true)}${gApt(B, 'CDG')}${gPlaneOn(arc, 3.6)}</svg>
+      <div class="gv-card gv-pop" style="animation-delay:.5s"><span class="small muted">Prognose ${gHome()}–CDG</span><div class="gv-lf"><i style="width:82%"></i></div><div class="spread small"><span>Auslastung <b>82 %</b></span><b class="pos">+4.300 € / Tag</b></div></div>
+      <div class="gv-tap gv-pop" style="animation-delay:.2s">${gIc('target')}<span>antippen</span></div>`;
+  },
+  crew() {
+    const pil = Array.from({ length: 4 }, (_, i) => gPerson('pil', true, 0.12 * i)).join(''), cab = Array.from({ length: 7 }, (_, i) => gPerson('cab', false, 0.5 + 0.1 * i)).join('');
+    return `<div class="gv-crew"><div class="gv-crew-ac">${acSvg('A20N', { ...(W && W.player ? myAcColors() : { color: 'var(--accent)' }), code: W && W.player ? W.player.code : 'SM' })}<span class="small muted">A320neo · 5 Std. am Tag</span></div>
+      <div class="gv-crew-rows"><div><span class="gv-n">4</span><div class="gv-people">${pil}</div><span class="small muted">Piloten</span></div>
+      <div><span class="gv-n">7</span><div class="gv-people">${cab}</div><span class="small muted">Kabine</span></div></div></div>`;
+  },
+  time() {
+    const days = Array.from({ length: 8 }, (_, i) => `<span>${i + 1}. Jan</span>`).join('');
+    return `<div class="gv-time"><div class="gv-speed"><span class="b">${icon('pause')}</span><span class="b on">${icon('play')}</span><span class="b sp">1×</span></div>
+      <div class="gv-arrow">→</div><div class="gv-cal"><div class="gv-cal-roll">${days}</div></div>
+      <div class="gv-ticks">${['+12.400 €', '+9.800 €', '−2.100 €', '+15.300 €'].map((x, i) => `<span class="${x.startsWith('−') ? 'neg' : 'pos'}" style="animation-delay:${0.6 * i}s">${x}</span>`).join('')}</div></div>`;
+  },
+  prices() {
+    return `<div class="gv-price"><div class="gv-scale"><span class="z red" style="flex:65"><b>zu teuer</b></span><span class="z green" style="flex:27"><b>passt</b></span><span class="z yellow" style="flex:8"></span>
+      <i class="gv-needle"></i></div><div class="gv-scale-l small muted"><span>0 %</span><span>Auslastung</span><span>100 %</span></div>
+      <div class="gv-pa"><div class="neg">${gIc('down')}<span>leer → Preis runter</span></div><div class="pos">${gIc('up')}<span>immer voll → Preis rauf</span></div></div></div>`;
+  },
+  grow() {
+    return `<div class="gv-stairs">${[['search', 'Marktstudie', 'Wo lohnt es sich?'], ['calc', 'CFO rechnet', 'Kann ich mir das leisten?'], ['plane', 'Investieren', 'Flugzeug, Strecke, Basis']]
+      .map(([ic, a, b], i) => `<div class="gv-stair gv-pop" style="--h:${40 + i * 22}%;animation-delay:${0.25 * i}s"><span class="gv-sn">${i + 1}</span>${gIc(ic)}<b>${a}</b><em>${b}</em></div>`).join('')}</div>`;
+  },
+  money() {
+    return `<div class="gv-money"><div class="gv-acct"><span class="z red">Dispo</span><span class="z mid"></span><span class="z ok">Guthaben</span><i class="gv-dot"></i></div>
+      <div class="gv-chain"><span class="c warn">${gIc('clock')}30 Tage über Dispo</span><span class="ar">→</span><span class="c crit">${gIc('alert')}Insolvenz</span><span class="ar">→</span><span class="c">${gIc('restart')}Neustart</span></div>
+      <div class="gv-hz">${[['fuel', 'Ölkrise'], ['bolt', 'Streik'], ['users', 'Konkurrenz']].map(([ic, l], i) => `<span class="gv-pop" style="animation-delay:${0.2 + 0.2 * i}s">${gIc(ic)}${l}</span>`).join('')}</div></div>`;
+  },
+  online() {
+    return `<div class="gv-two"><div class="gv-mode gv-pop">${gIc('globe')}<b>Hauptwelt</b><span>bis 60 Airlines</span><span>1 Tag = 30 Min.</span><span>läuft immer weiter</span></div>
+      <div class="gv-mode gv-pop" style="animation-delay:.2s">${gIc('users')}<b>Private Runde</b><span>bis 4 Personen</span><span>Link oder Code</span><span>eigenes Tempo</span></div></div>`;
+  },
+  areas() {
+    const d = { karte: 'Lage & Dashboard', flotte: 'Flugzeuge', strecken: 'Netz & Planung', finanzen: 'Zahlen & CFO', markt: 'Nachfrage & Handel', unternehmen: 'Personal & Einkauf' };
+    return `<div class="gv-areas">${SECTIONS.map((s, i) => `<div class="gv-area gv-pop" style="--c:var(--c-${s.key});animation-delay:${0.07 * i}s">${icon(s.icon)}<b>${s.short || s.label}</b><span>${d[s.key]}</span></div>`).join('')}</div>`;
+  },
+};
 const GUIDE_ALL = [
-  { t: 'Willkommen bei Skymarket', html: () => `
-    <div class="acv-box">${acSvg('A20N', { color: 'var(--accent)', code: (mpState.user && mpState.user.name ? mpState.user.name.slice(0, 2).toUpperCase() : 'SM') })}</div>
-    <p>Sie gründen eine Airline und bauen ein Streckennetz über ${SM.AP_CODES.length} Flughäfen auf allen Kontinenten auf. Sie beschaffen Flugzeuge, Personal, Kerosin und Terminalflächen selbst und treten gegen ${Object.keys(SM.AI_SETUP).length} KI-Airlines an${ONLINE ? ' – online auch gegen andere Spielende, in der dauerhaften Hauptwelt oder in einer privaten Runde mit bis zu vier Personen' : ''}. Märkte, Arbeitskräfte, Leasingflugzeuge und Kerosin teilen sich alle – jede Entscheidung trifft die anderen.</p>
-    <div class="gsteps">
-      <div><b>Ziel</b><span>Wachsen und Gewinn machen, ohne dass das Geld ausgeht.</span></div>
-      <div><b>Gefahr</b><span>Das Konto darf bis zur Kreditlinie ins Minus (Dispo). Ist auch der Dispo 30 Tage lang überzogen, ist die Airline insolvent. Danach gründen Sie in derselben Welt eine neue Airline.</span></div>
-      <div><b>Wichtig</b><span>Kontostand und Gewinn sind zweierlei: Kautionen und Käufe kosten sofort Geld, wirken aber nicht als Verlust.</span></div>
-      <div><b>Meilensteine</b><span>Erstflug, Passagierzahlen, Gewinnserien, Krisenfest … Unter Unternehmen → Meilensteine sehen alle, wer vorn liegt.</span></div>
-    </div>` },
-  { t: 'Die Hauptwelt', online: true, html: () => `
-    <div class="gsteps">
-      <div><b>Für alle</b><span>In der Lobby oben die Karte „Hauptwelt“: Mit einem Klick gründen Sie dort Ihre Airline. Bis zu 60 Airlines teilen sich eine Welt.</span></div>
-      <div><b>Läuft immer</b><span>Ein Spieltag dauert 30 Minuten – also rund 48 Spieltage pro echtem Tag, auch wenn Sie offline sind. Planen Sie so, dass Ihre Airline ein paar Tage ohne Sie auskommt.</span></div>
-      <div><b>Täglich vorbeischauen</b><span>Beim Öffnen zeigt ein Tagesbericht, was seit Ihrem letzten Besuch passiert ist: Kontostand, Ergebnis, Passagiere, Meldungen.</span></div>
-      <div><b>Mitspielende</b><span>Unter Markt → Mitspielende sehen Sie alle Airlines mit Spielername, Kontostand, Ergebnis und Wachstum.</span></div>
-      <div><b>Pleite?</b><span>Kein Ende: Nach einer Insolvenz gründen Sie in derselben Welt eine neue Airline mit frischem Startkapital.</span></div>
-    </div>` },
-  { t: 'Private Runden', online: true, html: () => `
-    <ol class="glist-num">
-      <li><b>Spiel anlegen:</b> In der Lobby auf „Neues Spiel“. Name, optional ein Passwort, Schwierigkeit und Tempo wählen, dann die eigene Airline mit Kürzel und Heimatbasis gründen.</li>
-      <li><b>Einladen:</b> Im Spiel oben rechts auf Ihr Kürzel und dann „Mitspielende einladen“. Der <b>Link</b> funktioniert ohne Passwort, der <b>6-stellige Code</b> mit Passwort. Bis zu vier Airlines pro privater Runde.</li>
-      <li><b>Beitreten:</b> Link öffnen oder in der Lobby Code eingeben bzw. nach dem Spielnamen suchen.</li>
-      <li><b>Chat:</b> Über das Sprechblasen-Symbol oben schreiben Sie allen oder privat an eine Airline – zum Verhandeln, Verabreden oder Sticheln.</li>
-      <li><b>Zeit:</b> Wer das Spiel anlegt, leitet es und wählt oben das Tempo. Langsame Stufen: 1 Stunde, 30 Minuten, 10 Minuten oder 1 Minute pro Spieltag – sie laufen auch weiter, wenn niemand online ist, ideal für Partien über Tage. Dazu die schnellen Stufen (1 Tag in 12, 6 oder 3 Sekunden).</li>
-      <li><b>Neustart:</b> Geht eine Airline pleite, gründet die Person direkt eine neue – das Spiel läuft für alle weiter.</li>
-    </ol>` },
-  { t: 'Die ersten zehn Minuten', html: () => `
-    <ol class="glist-num">
-      <li><b>Strecke planen:</b> <b>Strecken → Planung</b> oder einen Flughafen auf der Karte antippen. Die Prognose zeigt Passagiere, Umsatz und den Streckenbeitrag (DB2) – „So rechnet die Prognose“ erklärt jede Zahl.</li>
-      <li><b>Startpaket:</b> Fehlt ein Flugzeug, schlägt die Planung vor, es gleich mit zu leasen oder gebraucht zu übernehmen; der Einsatz wird automatisch geplant. Personal stellen Sie selbst unter Unternehmen → Personal ein – oder setzen im Startpaket das Häkchen.</li>
-      <li><b>Zeit laufen lassen</b> und unter <b>Karte → Dashboard</b> sehen, was verdient, was voll ist und wo Personal fehlt. Ihre Assistenz meldet sich, wenn etwas ansteht.</li>
-    </ol>
-    <p class="small muted">Gute erste Ziele ab Hamburg: Paris, Barcelona, Wien, Rom, London – jeweils einmal täglich.</p>` },
-  { t: 'Karte und Bedienung', html: () => `
-    <div class="gsteps">
-      <div><b>Zoomen und verschieben</b><span>Mausrad oder zwei Finger, Karte mit gedrückter Maus ziehen. Die Knöpfe rechts springen zu Ihrem Netz oder zur ganzen Welt und blenden die Konkurrenz aus.</span></div>
-      <div><b>Flugzeug antippen</b><span>Zeigt Flugnummer, Route, Fortschritt, Passagiere und Tarif. Ihre Flugzeuge sind gelb, Mitspielende farbig, die KI grau.</span></div>
-      <div><b>Flughafen antippen</b><span>Öffnet den Markt: Einzugsgebiet, Entgelte, Konkurrenz und die größten Ziele ab Ihrer Basis.</span></div>
-      <div><b>Gestrichelte Kreise</b><span>Rot: Streik, Sturm oder Sperrung. Grün: Großereignis mit mehr Nachfrage.</span></div>
-    </div>` },
-  { t: 'Die Bereiche im Überblick', html: () => `
-    <div class="gtabs">
-      <div style="border-left:4px solid var(--c-karte)"><b>Karte</b>Dashboard (Auslastung, Profitabilität, Personal, Flotte auf einen Blick), Übersicht, Abflugtafel, Meldungen</div>
-      <div style="border-left:4px solid var(--c-flotte)"><b>Flotte</b>Ihre Flugzeuge, Einsatzplan (Flugzeuge festen Strecken zuweisen), Beschaffung, Charter</div>
-      <div style="border-left:4px solid var(--c-strecken)"><b>Strecken</b>Ihr Netz mit Preisen und Frequenzen, Planung neuer Strecken</div>
-      <div style="border-left:4px solid var(--c-finanzen)"><b>Finanzen</b>Gewinn und Verlust, Bilanz, Kredite und Rating, CFO-Beratung mit Antworten zu Liquidität und Kosten und einem Szenario-Rechner für Entscheidungen</div>
-      <div style="border-left:4px solid var(--c-markt)"><b>Markt</b>Nachfrage, bezahlte Marktstudien (Strecken, Flotte, Basis, Marktlücken), Wettbewerb, Mitspielende, Handel und Kooperationen, Marktplatz für Anzeigen an alle, Weltlage mit Konjunktur, Zöllen, Bankenstimmung und Leasingbestand</div>
-      <div style="border-left:4px solid var(--c-unternehmen)"><b>Unternehmen</b>Profil und Logo, Meilensteine, Personal (Arbeitsmarkt, Akademien, Abwerben), Stationen, Einkauf (Kerosin, Versicherung, Marketing), Assistenz</div>
-    </div>
-    <p class="small muted">Links sehen Sie Kontostand, Tagesergebnis, Auslastung und Pünktlichkeit auf einen Blick, darunter die Hinweise Ihrer Assistenz.</p>` },
-  { t: 'Tipps für den Erfolg', html: () => `
-    <ul class="glist-num tips">
-      <li><b>Klein anfangen:</b> zwei Flugzeuge, vier bis fünf Strecken mit einem Flug am Tag. Mehr Flugzeuge erst, wenn die Strecken grün sind.</li>
-      <li><b>Preise selbst führen:</b> Es gibt keine Preisautomatik. Ist die Maschine dauerhaft voll, ist der Preis zu niedrig; unter 65 % zu hoch oder die Konkurrenz zu stark.</li>
-      <li><b>Erfolg lockt Konkurrenz:</b> Läuft eine Strecke gut, kommen KI-Airlines mit Kampfpreisen und mehr Flügen. Rechnen Sie damit und bauen Sie Kosten- oder Markenvorteile auf.</li>
-      <li><b>Alle teilen sich die Märkte:</b> Arbeitsmarkt, Slots, Lieferzeiten und Kerosin – was andere tun, trifft auch Sie. Gehalt unter Marktniveau lädt zum Abwerben ein.</li>
-      <li><b>Unter 600 km gewinnt oft die Bahn,</b> und große Flugzeuge auf kleinen Märkten fliegen leer.</li>
-      <li><b>Agenturpersonal kostet das 1,6-Fache.</b> Rechtzeitig einstellen: Neue Leute fangen je nach Beruf und Arbeitsmarkt nach 3 bis 21 Tagen an, in den ersten 60 Tagen nach Gründung nach höchstens 5 Tagen.</li>
-      <li><b>Reserve halten:</b> Ölpreisschocks, Streiks und Stürme kommen. Kerosin unter Unternehmen → Einkauf absichern, Kreditlinie im Blick behalten.</li>
-      <li><b>Handeln statt warten:</b> Unter Markt → Handel kaufen Sie Flugzeuge sofort einsatzbereit, übernehmen Crews ohne Wartezeit, kaufen Slots oder bezahlen Konkurrenten für den Rückzug von Ihrer Strecke – mit KI-Airlines und Mitspielenden.</li>
-      <li><b>Zölle und Konjunktur:</b> Handelskriege drücken Geschäftsreisen zwischen den Blöcken und verteuern Flugzeuge vom anderen Block. Die Regionen laufen zeitversetzt – ein Netz über mehrere Regionen streut das Risiko.</li>
-      <li><b>Banken sind launisch:</b> Im Abschwung kürzen sie Kreditlinien, der Überhang wird sofort eingezogen. Nicht auf Kante planen.</li>
-      <li><b>Eigener Nachwuchs:</b> Eine geförderte Flugschule oder Kabinenakademie liefert jeden Monat Personal am Arbeitsmarkt vorbei – teuer, aber in knappen Zeiten Gold wert.</li>
-      <li><b>Berater mit Profil:</b> Tim Kaminski ist der Beste und kostet entsprechend. Luis Perez ist günstiger und erkennt, welches gebrauchte Flugzeug ein Schnäppchen ist und welches eine Gurke. Beide gibt es nur einmal – wer zuerst zugreift.</li>
-      <li><b>Neue Muster per Auktion:</b> Frische Typen wie der A321XLR gibt es im ersten Jahr nur über verdeckte Gebote. Wer am meisten bietet, fliegt sie zuerst.</li>
-      <li><b>Langstrecke erst später:</b> Großraumjets kosten rund 1 Mio. € Leasing im Monat und brauchen große Märkte. A380 und 747-8 gibt es nur geleast oder gebraucht, der A380 landet nur an Großflughäfen. Die Concorde ist ein seltenes Liebhaberstück vom Gebrauchtmarkt: schnell, teuer, gut fürs Image.</li>
-      <li><b>Erst prüfen, dann zahlen:</b> Marktstudien (Markt → Marktstudien) liefern Empfehlungen mit Zahlen, die CFO-Beratung (Finanzen) rechnet Kauf, Leasing, neue Basis oder Strecke vorher durch – inklusive Liquidität danach.</li>
-    </ul>` },
+  { k: 'welcome', t: 'Ihre Airline', lead: 'Sie bauen ein Streckennetz auf und verdienen Geld – ohne dass das Konto leerläuft.',
+    chips: () => [gChip('globe', `${SM.AP_CODES.length} Flughäfen`), gChip('users', `${Object.keys(SM.AI_SETUP).length} KI-Airlines`), gChip('coin', `Start: ${n0(SM.DIFFICULTY.hard.equity / 1e6)}–${n0(SM.DIFFICULTY.easy.equity / 1e6)} Mio. €`)] },
+  { k: 'aircraft', t: 'Flugzeug holen', lead: 'Leasen schont die Kasse. Zwei A320neo sind ein guter Start.', tab: 'fleetBuy', go: 'Zur Beschaffung',
+    chips: () => [gChip('plane', 'Flotte → Beschaffung'), gChip('tag', 'Leasing = nur Kaution')] },
+  { k: 'route', t: 'Strecke planen', lead: 'Flughafen auf der Karte antippen und „Strecke planen“ wählen. Grüne Prognose heißt: lohnt sich.', tab: 'plan', go: 'Zur Planung',
+    chips: () => [gChip('route', 'Ein Flug am Tag reicht'), gChip('rail', 'Unter 600 km: Bahn')] },
+  { k: 'crew', t: 'Crew einstellen', lead: 'Ohne Crew bleibt das Flugzeug am Boden. Neue Leute fangen nach ein paar Tagen an.', tab: 'staff', go: 'Zum Personal',
+    chips: () => [gChip('building', 'Firma → Personal'), gChip('clock', 'Anfangs max. 5 Tage'), gChip('coin', 'Agentur: 1,6× teurer')] },
+  { k: 'time', t: 'Zeit starten', lead: 'Auf Play drücken. Jeder Tag bringt Passagiere, Kosten und Meldungen.', tab: 'dashboard', go: 'Zum Dashboard',
+    chips: () => [gChip('space', 'Leertaste = Pause'), gChip('chart', 'Dashboard zeigt alles'), gChip('bell', 'Assistenz meldet sich')] },
+  { k: 'prices', t: 'Preise führen', lead: 'Es gibt keine Preisautomatik. Sie stellen die Preise je Strecke selbst ein.', tab: 'routes', go: 'Zum Netz',
+    chips: () => [gChip('route', 'Strecken → Netz'), gChip('target', 'Ziel: 70–90 %')] },
+  { k: 'grow', t: 'Klug wachsen', lead: 'Erst prüfen, dann zahlen. So wird aus zwei Flugzeugen ein Netz.', tab: 'studies', go: 'Zu den Studien',
+    chips: () => [gChip('search', 'Markt → Marktstudien'), gChip('calc', 'Finanzen → CFO'), gChip('pin', 'Mehr Basen')] },
+  { k: 'money', t: 'Geld im Blick', lead: 'Kontostand ist nicht Gewinn: Kautionen und Käufe kosten sofort Geld. Halten Sie Reserve.', tab: 'finance', go: 'Zu den Finanzen',
+    chips: () => [gChip('fuel', 'Kerosin absichern'), gChip('coin', 'Kreditlinie beachten')] },
+  { k: 'online', t: 'Online spielen', online: true, lead: 'In der Hauptwelt mit allen – oder privat mit Freunden.', tab: 'players', go: 'Mitspielende ansehen',
+    chips: () => [gChip('link', 'Einladen per Link'), gChip('restart', 'Pleite? Neu gründen')] },
+  { k: 'areas', t: 'Los geht’s', lead: 'Alles Weitere finden Sie in diesen sechs Bereichen.', final: true, chips: () => [] },
 ];
 const GUIDE = GUIDE_ALL.filter((g) => !g.online || ONLINE);
+const GUIDE_TIPS = ['Klein anfangen: zwei Flugzeuge, vier bis fünf Strecken.', 'Erfolg lockt Konkurrenz mit Kampfpreisen.', 'Gehalt unter Marktniveau lädt zum Abwerben ein.',
+  'Banken kürzen im Abschwung die Kreditlinie.', 'Markt → Handel: Flugzeuge, Crews und Slots sofort.', 'Neue Muster gibt es im ersten Jahr nur per Auktion.',
+  'Großraumjets erst für große Märkte; A380 nur an Großflughäfen.', 'Akademien liefern jeden Monat eigenen Nachwuchs.',
+  'Karte: rote Kreise = Streik, Sturm, Sperrung; grüne = Großereignis.', 'Zoomen mit Mausrad oder zwei Fingern.'];
 function showGuide(onDone = null, page = 0) {
-  const g = GUIDE[page], last = page === GUIDE.length - 1;
-  const m = modal(`<div class="spread"><span class="small muted">Anleitung · ${page + 1} von ${GUIDE.length}</span><button class="btn small" id="gdSkip">${last ? 'Schließen' : 'Überspringen'}</button></div>
-    <h1 class="gtitle">${g.t}</h1>
-    <div class="guide">${g.html()}</div>
-    <div class="gdots">${GUIDE.map((_, i) => `<button data-gp="${i}" aria-label="Seite ${i + 1}" aria-current="${i === page}"></button>`).join('')}</div>
-    <div class="row">${page > 0 ? '<button class="btn" id="gdBack">Zurück</button>' : ''}<button class="btn primary" id="gdNext" style="margin-left:auto">${last ? 'Los geht’s' : 'Weiter'}</button></div>`);
-  const done = () => { try { localStorage.setItem('skymarket-guide-seen', '1'); } catch (e) { /* egal */ } if (onDone) onDone(); else m.hidden = true; };
+  page = Math.max(0, Math.min(GUIDE.length - 1, page));
+  const g = GUIDE[page], last = page === GUIDE.length - 1, inGame = !onDone && W && W.player;
+  const canGo = inGame && g.tab && VIEWS[g.tab] && (g.tab !== 'players' || ui.mp);
+  const m = modal(`<div class="gv">
+    <div class="gv-top"><div class="gv-prog">${GUIDE.map((x, i) => `<button data-gp="${i}" class="${i < page ? 'done' : ''}" aria-current="${i === page}" aria-label="${esc(x.t)}" title="${esc(x.t)}"></button>`).join('')}</div>
+      <button class="btn small ghost" id="gdSkip">${last ? 'Schließen' : 'Überspringen'}</button></div>
+    <div class="gv-stage gv-${g.k}">${SCENES[g.k]()}</div>
+    <div class="gv-body"><span class="gv-step">Schritt ${page + 1} von ${GUIDE.length}</span><h1 class="gv-title">${g.t}</h1><p class="gv-lead">${g.lead}</p>
+      ${g.chips().length ? `<div class="gv-chips">${g.chips().join('')}</div>` : ''}
+      ${g.final ? `<details class="gv-more"><summary>Profi-Tipps</summary><ul>${GUIDE_TIPS.map((x) => `<li>${x}</li>`).join('')}</ul></details>` : ''}</div>
+    <div class="gv-foot">${page > 0 ? '<button class="btn" id="gdBack">Zurück</button>' : ''}${canGo ? `<button class="btn ghost" id="gdGo">${g.go} ↗</button>` : ''}${last && inGame ? '<button class="btn" id="gdTour">Rundgang durch die Oberfläche</button>' : ''}
+      <button class="btn primary" id="gdNext" style="margin-left:auto">${last ? 'Los geht’s' : 'Weiter'}</button></div></div>`, false);
+  const seen = () => { try { localStorage.setItem('skymarket-guide-seen', '1'); } catch (e) { /* egal */ } };
+  const done = () => { seen(); ui.guidePage = null; if (onDone) onDone(); else m.hidden = true; };
+  ui.guidePage = { page, onDone };
   $('#gdSkip').addEventListener('click', done);
   $('#gdNext').addEventListener('click', () => (last ? done() : showGuide(onDone, page + 1)));
   if (page > 0) $('#gdBack').addEventListener('click', () => showGuide(onDone, page - 1));
+  if (canGo) $('#gdGo').addEventListener('click', () => { seen(); ui.guidePage = null; m.hidden = true; setTab(g.tab); });
+  if (last && inGame) $('#gdTour').addEventListener('click', () => { seen(); ui.guidePage = null; m.hidden = true; startTour(); });
   m.querySelectorAll('[data-gp]').forEach((b) => b.addEventListener('click', () => showGuide(onDone, Number(b.dataset.gp))));
+  // Wischen auf dem Handy
+  const st = m.querySelector('.gv'); let x0 = null;
+  st.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  st.addEventListener('touchend', (e) => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) < 50) return; if (dx < 0 && !last) showGuide(onDone, page + 1); else if (dx > 0 && page > 0) showGuide(onDone, page - 1); }, { passive: true });
 }
+// Pfeiltasten blättern im Durchlauf
+document.addEventListener('keydown', (e) => {
+  const G = ui.guidePage; if (!G || $('#modal').hidden || !$('#modal .gv')) return;
+  if (e.key === 'ArrowRight' && G.page < GUIDE.length - 1) { e.preventDefault(); showGuide(G.onDone, G.page + 1); }
+  else if (e.key === 'ArrowLeft' && G.page > 0) { e.preventDefault(); showGuide(G.onDone, G.page - 1); }
+});
 
 // ---------- Anmeldung ----------
 function showAuth(mode = 'login') {

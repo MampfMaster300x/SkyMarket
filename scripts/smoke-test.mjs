@@ -212,5 +212,11 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const rp = ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' } }), 'Kredit fehlt');
   assert.equal(rp.ok, false); assert.ok(rp.msg, 'Meldung beim fehlenden Kredit');
   console.log('Robust ok: 10 manipulierte Aktionen abgewiesen, Welt läuft weiter (+' + t3.days + ' Tage)'); }
+{ const L = { type: 'setLogo', shape: 'hex', sym: 'eagle', c1: '#0b3d91', c2: '#ffcc00' };
+  assert.equal(ok(await call('anna', 'POST', '/games/main/action', { action: L }), 'Logo Anna').ok, true);
+  const dup = ok(await call('ben', 'POST', '/games/main/action', { action: L }), 'Logo Ben gleich');
+  assert.equal(dup.ok, false, 'gleiches Logo gesperrt'); assert.ok(/schon/.test(dup.msg));
+  assert.equal(ok(await call('ben', 'POST', '/games/main/action', { action: { ...L, c2: '#ffffff' } }), 'Logo Ben anders').ok, true);
+  console.log('Logo ok: gleiche Kombination gesperrt –', dup.msg); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 console.log('Alle Prüfungen bestanden.');

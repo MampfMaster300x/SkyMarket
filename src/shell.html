@@ -422,6 +422,132 @@ table.t td b { white-space: nowrap; }
 .gtabs > div { border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; font-size: 12.5px; color: var(--ink-2); display: grid; gap: 2px; }
 .gtabs b { color: var(--ink); font-size: 13px; }
 @media (max-width: 600px) { .gtabs { grid-template-columns: 1fr; } }
+/* Anleitung als bebilderter Durchlauf */
+.dialog:has(.gv) { width: min(640px, 100%); padding: 0; gap: 0; }
+.gv { display: grid; }
+.gv-top { display: flex; align-items: center; gap: 12px; padding: 14px 18px 12px; }
+.gv-prog { display: flex; gap: 4px; flex: 1; }
+.gv-prog button { flex: 1; height: 5px; border-radius: 3px; border: 0; padding: 0; background: var(--line-2); transition: background .2s; }
+.gv-prog button.done { background: color-mix(in srgb, var(--accent) 55%, var(--line-2)); }
+.gv-prog button[aria-current="true"] { background: var(--accent); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn.ghost:hover { color: var(--ink); background: var(--panel-2); }
+.gv-stage { position: relative; aspect-ratio: 5 / 2; margin: 0 18px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
+  background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink-3) 28%, transparent) 1px, transparent 1.6px) 0 0 / 18px 18px, linear-gradient(160deg, var(--sky), var(--panel-2));
+  display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; }
+.gv-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gv-arc { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 420; stroke-dashoffset: 420; opacity: .75; animation: gvDraw 1.2s ease-out forwards; }
+.gv-arc.solid { stroke-dasharray: 6 7; stroke-dashoffset: 0; opacity: .9; animation: gvDash 1.4s linear infinite; }
+.gv-apt circle { fill: var(--panel); stroke: var(--ink-3); stroke-width: 2; }
+.gv-apt.home circle { fill: var(--accent); stroke: var(--panel); stroke-width: 2.5; }
+.gv-apt .ring { fill: none !important; stroke: var(--accent) !important; stroke-width: 2 !important; transform-box: fill-box; transform-origin: center; animation: gvRing 2s ease-out infinite; }
+.gv-apt text { font: 600 13px var(--f-mono); fill: var(--ink); text-anchor: middle; letter-spacing: .06em; }
+@keyframes gvDraw { to { stroke-dashoffset: 0; } }
+@keyframes gvDash { to { stroke-dashoffset: -26; } }
+@keyframes gvRing { from { transform: scale(1); opacity: .9; } to { transform: scale(2.6); opacity: 0; } }
+@keyframes gvPop { from { transform: translateY(10px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes gvFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.gv-pop { animation: gvPop .5s cubic-bezier(.2,.8,.3,1.2) both; }
+.gv-card { position: absolute; right: 4%; bottom: 8%; width: min(46%, 230px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; box-shadow: var(--shadow); display: grid; gap: 5px; }
+.gv-lf { height: 7px; border-radius: 4px; background: var(--panel-2); overflow: hidden; } .gv-lf i { display: block; height: 100%; background: var(--good); border-radius: 4px; }
+.gv-tap { position: absolute; left: 12%; top: 16%; display: flex; align-items: center; gap: 5px; font: 600 12px var(--f-body); color: var(--accent-ink); }
+.gv-tap svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; }
+.gv-ac { width: 56%; max-width: 300px; animation: gvFloat 3.2s ease-in-out infinite; }
+.gv-aircraft { grid-template-columns: 1.2fr 1fr; gap: 4%; padding: 0 5%; }
+.gv-tags { display: grid; gap: 8px; }
+.gv-tag { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; display: grid; gap: 1px; opacity: .75; }
+.gv-tag.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); opacity: 1; }
+.gv-tag b { font-size: 14px; } .gv-tag span { font: 600 13px var(--f-mono); } .gv-tag em { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+.gv-aircraft .gv-ac { width: 100%; }
+.gv-crew { display: grid; grid-template-columns: minmax(150px, 1fr) auto; gap: 6%; align-items: center; width: 86%; }
+.gv-crew-ac svg { width: 100%; max-width: 240px; }
+.gv-crew-ac { display: grid; gap: 4px; justify-items: center; text-align: center; }
+.gv-crew-rows { display: grid; gap: 10px; }
+.gv-crew-rows > div { display: grid; grid-template-columns: 30px max-content; column-gap: 8px; align-items: center; }
+.gv-crew-rows .small { grid-column: 2; }
+.gv-n { font: 800 24px var(--f-mono); grid-row: span 2; color: var(--ink); }
+.gv-people { display: flex; gap: 4px; flex-wrap: nowrap; }
+.gv-person { width: 20px; height: 27px; animation: gvPop .45s cubic-bezier(.2,.8,.3,1.3) both; }
+.gv-person.pil { fill: var(--c-strecken); } .gv-person.pil .cap { fill: var(--accent); }
+.gv-person.cab { fill: var(--c-unternehmen); }
+.gv-time { display: flex; align-items: center; justify-content: center; gap: 22px; width: 90%; }
+.gv-time > * { flex: none; }
+.gv-speed { display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px; box-shadow: var(--shadow); }
+.gv-speed .b { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); }
+.gv-speed .b svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.4; fill: none; }
+.gv-speed .b.on { background: var(--accent); color: var(--on-accent); animation: gvPulse 1.6s ease-in-out infinite; }
+.gv-speed .b.sp { font: 700 13px var(--f-mono); width: 44px; }
+@keyframes gvPulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); } 50% { box-shadow: 0 0 0 9px transparent; } }
+.gv-arrow { font-size: 26px; color: var(--ink-3); }
+.gv-cal { width: 92px; height: 72px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; box-shadow: var(--shadow); position: relative; }
+.gv-cal::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 16px; background: var(--c-markt); z-index: 1; }
+.gv-cal-roll { display: grid; padding-top: 16px; animation: gvRoll 8s steps(7) infinite; }
+.gv-cal-roll span { height: 56px; display: grid; place-items: center; font: 800 18px var(--f-mono); }
+@keyframes gvRoll { to { transform: translateY(-392px); } }
+.gv-ticks { display: grid; gap: 3px; font: 600 13px var(--f-mono); white-space: nowrap; }
+.gv-ticks span { animation: gvPop .5s both; }
+.gv-price { width: 86%; display: grid; gap: 8px; }
+.gv-scale { position: relative; display: flex; height: 34px; border-radius: 10px; overflow: visible; }
+.gv-scale .z { display: grid; place-items: center; font-size: 12px; color: var(--ink); }
+.gv-scale .z:first-child { border-radius: 10px 0 0 10px; } .gv-scale .z:nth-child(3) { border-radius: 0 10px 10px 0; }
+.gv-scale .red { background: var(--crit-soft); } .gv-scale .green { background: var(--good-soft); outline: 2px solid var(--good); outline-offset: -2px; } .gv-scale .yellow { background: var(--warn-soft); }
+.gv-needle { position: absolute; top: -9px; bottom: -9px; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 3px var(--panel); left: 40%; animation: gvNeedle 6s ease-in-out infinite; }
+@keyframes gvNeedle { 0%, 12% { left: 40%; } 30%, 45% { left: 80%; } 63%, 78% { left: 98%; } 96%, 100% { left: 40%; } }
+.gv-scale-l { display: flex; justify-content: space-between; }
+.gv-pa { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gv-pa > div { display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 12.5px; color: var(--ink); }
+.gv-pa svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 2.4; }
+.gv-pa .neg svg { color: var(--crit); } .gv-pa .pos svg { color: var(--good); }
+.gv-stairs { display: flex; align-items: flex-end; gap: 4%; height: 82%; width: 86%; }
+.gv-stair { flex: 1; height: var(--h); min-height: 74px; background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 12px 12px 6px 6px; padding: 8px 10px; display: grid; align-content: start; gap: 2px; position: relative; box-shadow: var(--shadow); }
+.gv-stair svg { width: 22px; height: 22px; stroke: var(--accent-ink); fill: none; stroke-width: 2; }
+.gv-stair b { font-size: 13px; } .gv-stair em { font-style: normal; font-size: 11.5px; color: var(--ink-3); line-height: 1.3; }
+.gv-sn { position: absolute; top: 6px; right: 9px; font: 700 12px var(--f-mono); color: var(--ink-3); }
+.gv-money { width: 88%; display: grid; gap: 12px; }
+.gv-acct { position: relative; display: flex; height: 22px; border-radius: 11px; overflow: hidden; }
+.gv-acct .z { display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.gv-acct .red { flex: 30; background: var(--crit-soft); color: var(--crit); } .gv-acct .mid { flex: 6; background: var(--line); } .gv-acct .ok { flex: 64; background: var(--good-soft); color: var(--good); }
+.gv-dot { position: absolute; top: 3px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px var(--panel); left: 75%; animation: gvCash 6s ease-in-out infinite; }
+@keyframes gvCash { 0%, 10% { left: 75%; } 45%, 60% { left: 14%; } 90%, 100% { left: 75%; } }
+.gv-chain { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.gv-chain .c { display: inline-flex; align-items: center; gap: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; font-size: 12px; }
+.gv-chain .c.warn { color: var(--warn); } .gv-chain .c.crit { color: var(--crit); border-color: var(--crit); }
+.gv-chain svg, .gv-hz svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+.gv-chain .ar { color: var(--ink-3); }
+.gv-hz { display: flex; justify-content: center; gap: 14px; font-size: 12px; color: var(--ink-2); }
+.gv-hz span { display: inline-flex; align-items: center; gap: 4px; }
+.gv-two { display: grid; grid-template-columns: 1fr 1fr; gap: 5%; width: 84%; }
+.gv-mode { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 2px; box-shadow: var(--shadow); }
+.gv-mode svg { width: 30px; height: 30px; stroke: var(--accent-ink); fill: none; stroke-width: 1.8; margin-bottom: 4px; }
+.gv-mode b { font-size: 15px; } .gv-mode span { font-size: 12px; color: var(--ink-2); }
+.gv-areas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 90%; }
+.gv-area { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 10px; padding: 8px 10px; display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; }
+.gv-area svg { grid-row: span 2; width: 22px; height: 22px; stroke: var(--c); fill: none; stroke-width: 2; }
+.gv-area b { font-size: 13px; } .gv-area span { font-size: 11.5px; color: var(--ink-3); }
+.gv-body { padding: 16px 22px 4px; display: grid; gap: 7px; }
+.gv-step { font: 600 11px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent-ink); }
+.dialog .gv-title { font: 800 26px/1.1 var(--f-body); margin: 0; letter-spacing: -.015em; }
+.gv-lead { font-size: 15px; line-height: 1.45; color: var(--ink-2); margin: 0; max-width: 48ch; }
+.gv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.gv-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px 5px 9px; font-size: 12.5px; color: var(--ink); }
+.gv-chip svg { width: 15px; height: 15px; stroke: var(--accent-ink); fill: none; stroke-width: 2; flex: none; }
+.gv-more { font-size: 13px; color: var(--ink-2); } .gv-more summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+.gv-more ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+.gv-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 18px 18px; }
+@media (max-width: 760px) {
+  .dialog:has(.gv) { padding: 0 0 env(safe-area-inset-bottom, 0px); }
+  .gv-stage { aspect-ratio: 4 / 3; margin: 0 14px; }
+  .gv-body { padding: 14px 16px 2px; min-height: 178px; align-content: start; } .gv-foot { padding: 12px 14px 16px; } .gv-top { padding: 12px 14px 10px; }
+  .dialog .gv-title { font-size: 23px; } .gv-lead { font-size: 14.5px; }
+  .gv-aircraft { grid-template-columns: 1fr; padding: 6% 8%; align-content: center; } .gv-aircraft .gv-ac { width: 78%; justify-self: center; }
+  .gv-tags { grid-template-columns: 1fr 1fr; }
+  .gv-crew { grid-template-columns: 1fr; width: 86%; } .gv-crew-ac svg { max-width: 190px; }
+  .gv-time { flex-wrap: wrap; justify-content: center; row-gap: 10px; } .gv-ticks { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; width: 100%; }
+  .gv-stairs { height: 78%; width: 92%; } .gv-stair { padding: 7px 8px; } .gv-stair em { font-size: 11px; }
+  .gv-two { width: 90%; gap: 10px; } .gv-areas { grid-template-columns: 1fr 1fr; width: 92%; gap: 6px; }
+  .gv-card { width: 58%; }
+  .gv-pa { grid-template-columns: 1fr; }
+}
 .gdots { display: flex; gap: 6px; justify-content: center; }
 .gdots button { width: 8px; height: 8px; border-radius: 50%; border: 0; padding: 0; background: var(--line-2); }
 .gdots button[aria-current="true"] { background: var(--accent); width: 22px; border-radius: 4px; }

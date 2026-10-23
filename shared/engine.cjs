@@ -3360,6 +3360,12 @@ const SM = (() => {
   const num = (x, d = 0) => (Number.isFinite(Number(x)) ? Number(x) : d);
   const LOGO_SHAPES = ['circle', 'square', 'shield', 'hex', 'diamond', 'tail', 'none'];
   const LOGO_SYMBOLS = ['paper', 'jet', 'eagle', 'star', 'globe', 'wing', 'crown', 'wave', 'sun', 'mountain', 'leaf', 'arrow', 'compass', 'bolt', 'code'];
+  /** Gleiches Logo (Form, Symbol, beide Farben) darf in einer Welt nur eine aktive Airline tragen. Beim Symbol „Kürzel“ zählt das Kürzel mit. */
+  function logoTaken(w, al, L) {
+    const key = (x, code) => x && [x.shape, x.sym, String(x.c1).toLowerCase(), String(x.c2).toLowerCase(), x.sym === 'code' ? code : ''].join('|');
+    const k = key(L, al.code);
+    return w.list.find((o) => o !== al && o.status !== 'insolvent' && o.logo && key(o.logo, o.code) === k) || null;
+  }
   /** Feste Zuweisung eines Flugzeugs zu Strecken, mit allen Grenzen: Basis, Typ, Betriebsfenster, Frequenz. */
   function assignAircraft(w, al, a) {
     const ac = al.fleet.find((x) => x.id === a.acId);
@@ -3561,7 +3567,9 @@ const SM = (() => {
       case 'setLogo': {
         const hex = (c) => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : null);
         if (!LOGO_SHAPES.includes(a.shape) || !LOGO_SYMBOLS.includes(a.sym) || !hex(a.c1) || !hex(a.c2)) return { ok: false, msg: 'Ungültiges Logo.' };
-        al.logo = { shape: a.shape, sym: a.sym, c1: hex(a.c1), c2: hex(a.c2) };
+        const nl = { shape: a.shape, sym: a.sym, c1: hex(a.c1), c2: hex(a.c2) }, taken = logoTaken(w, al, nl);
+        if (taken) return { ok: false, msg: `Genau dieses Logo trägt schon ${taken.name}. Bitte Form, Symbol oder eine Farbe ändern.` };
+        al.logo = nl;
         al.log(day, 'Neues Logo eingeführt', 'info');
         return { ok: true };
       }
@@ -3660,7 +3668,7 @@ const SM = (() => {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
-    RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
+    RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();

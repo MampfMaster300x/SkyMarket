@@ -1,4 +1,4 @@
-# SKYMARKET Online (Testversion 0.13.1)
+# SKYMARKET Online (Testversion 0.13.2)
 
 Airline-Wirtschaftssimulation im Browser: 211 Flughäfen auf allen Kontinenten, 30 KI-Airlines, eine dauerhafte Hauptwelt für alle (bis 60 Airlines) und private Runden mit bis zu vier Personen.
 
@@ -172,6 +172,15 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 ```
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
+
+## Neu in 0.13.2: Anleitung als Bild-Durchlauf, eindeutige Logos
+
+- **Anleitung neu als Durchlauf in 10 Schritten** (online; offline 9): Ihre Airline → Flugzeug holen → Strecke planen → Crew einstellen → Zeit starten → Preise führen → Klug wachsen → Geld im Blick → Online spielen → Los geht's.
+  - Jeder Schritt hat ein großes, animiertes Bild (Flugzeuge auf Strecken, Prognosekarte, Crew-Figuren, Tempo-Knopf mit Kalender, Auslastungsskala mit Zeiger, Stufen „Studie → CFO → Investieren“, Konto mit Dispo-Zone, die sechs Bereiche), dazu eine Überschrift, einen Satz und zwei bis drei Stichworte.
+  - Fortschrittsbalken oben (antippbar), Wischen auf dem Handy, Pfeiltasten am Rechner. Bei „weniger Bewegung“ im System stehen die Animationen still.
+  - Im laufenden Spiel springt „Zur Beschaffung ↗“, „Zur Planung ↗“ usw. direkt an die passende Stelle; am Ende geht es auf Wunsch in den Rundgang durch die Oberfläche. Die ausführlichen Tipps stehen eingeklappt unter „Profi-Tipps“.
+  - Hell und dunkel, Handy und Desktop geprüft.
+- **Logos sind eindeutig:** Dieselbe Kombination aus Form, Symbol, Grund- und Symbolfarbe darf in einer Welt nur eine aktive Airline tragen. Der Logo-Editor zeigt sofort „Schon vergeben – trägt bereits …“ und sperrt „Logo übernehmen“; der Server prüft es zusätzlich. Eine andere Form, ein anderes Symbol oder eine andere Farbe genügt. Beim Symbol „Kürzel“ zählt das Kürzel mit, weil zwei Kürzel nie gleich aussehen. Insolvente Airlines geben ihr Logo frei. Bereits doppelt vorhandene Logos aus älteren Spielständen bleiben, bis jemand sein Logo ändert.
 
 ## Neu in 0.13.1: Mehrere Hubs
 
