@@ -276,6 +276,29 @@ const SM = (() => {
     CCHECK_FH: 4500, CCHECK_DAYS: 10, AOG_MONTHLY: 0.008, AOG_DAYS: [4, 12], AOG_COST: [250e3, 900e3],
     CARGO: { k: 120, yield: 1.2, handling: 0.20, commission: 0.15, gsaMonth: 8000, loadMax: 0.8 },
     MARKETING_K: 0.04, BRAND_DECAY: 0.015,
+    // Marketing als Anteil am Umsatz mit Sättigung: Wirkung ~ 1 − e^(−Anteil/MKT_SAT)
+    MKT_PCT_MAX: 0.08, MKT_SAT: 0.03, MKT_K2: 0.06,
+    // Kabinen: Fläche je Sitz (Economy = 1), Preisfaktor auf den Economy-Tarif, Anteil der Geschäftsreisenden, die die Klasse buchen
+    CABIN: {
+      short: { bizArea: 1.5, firstArea: 0, bizMult: 2.1, firstMult: 0, qBiz: 0.42, qFirst: 0, leisB: 0.012, leisF: 0, costB: 12, costF: 0, maxB: 0.5, maxF: 0 },
+      long: { bizArea: 3.4, firstArea: 6, bizMult: 3.4, firstMult: 6.0, qBiz: 0.55, qFirst: 0.10, leisB: 0.025, leisF: 0.004, costB: 70, costF: 220, maxB: 0.7, maxF: 0.3 },
+      bizU: 0.25, refit: { short: 120000, long: 600000 },
+      ai: { short: { f: 0, b: 0.12 }, long: { f: 0.04, b: 0.26 } },
+    },
+    LOYALTY: [
+      { label: 'Kein Programm', desc: 'Keine Meilen, keine Kosten.' },
+      { label: 'Meilenprogramm', desc: 'Meilen sammeln und einlösen', setup: 600000, fixed: 25000, cost: 0.010, partner: 0.004, u: { leisure: 0.03, business: 0.10, vfr: 0.03 } },
+      { label: 'Statusprogramm', desc: 'Silber und Gold, Priority, Lounges', setup: 2000000, fixed: 80000, cost: 0.018, partner: 0.008, u: { leisure: 0.06, business: 0.22, vfr: 0.05 } },
+      { label: 'Premium-Programm', desc: 'Statusstufen, Kreditkarte, Partner weltweit', setup: 5000000, fixed: 200000, cost: 0.026, partner: 0.012, u: { leisure: 0.09, business: 0.34, vfr: 0.07 } },
+    ],
+    HUB: [
+      { label: 'Basis', desc: 'Umsteigen möglich, aber ohne abgestimmten Flugplan' },
+      { label: 'Umsteigeknoten', setup: 1.5e6, monthly: 80000, minRoutes: 4, desc: 'Abgestimmte Anschlüsse, kürzere Umsteigezeit' },
+      { label: 'Drehkreuz', setup: 4e6, monthly: 250000, minRoutes: 8, desc: 'Umsteigewellen, Transferschalter, eigenes Gepäcksystem' },
+      { label: 'Mega-Hub', setup: 10e6, monthly: 600000, minRoutes: 15, desc: 'Mehrere Wellen am Tag, Lounges, schnelle Wege' },
+    ],
+    GATE_LOCK: { perMioPax: 900000, monthlyRate: 0.015, maxPax: 25 },
+    SLOT_HOLD_FEE: 1.0,
     AI_ARCHETYPES: {
       lcc: { label: 'Low-Cost', service: 'basic', buffer: 'tight', target_lf: 0.90, price_vs_ref: 0.80, undercut: 0.10, pref_types: ['A20N'], min_margin: 0.00, forecast_sigma: 0.20, brand: 0.6, cargo: false },
       premium: { label: 'Premium-Netz', service: 'premium', buffer: 'robust', target_lf: 0.78, price_vs_ref: 1.15, undercut: 0.00, pref_types: ['A20N', 'E295'], min_margin: 0.03, forecast_sigma: 0.15, brand: 0.7, cargo: true },
@@ -548,10 +571,10 @@ const SM = (() => {
   function evaluateRoute(spec, compsOut = [], compsIn = [], opts = {}) {
     const month = opts.month ?? null, nDraws = opts.nDraws ?? 6, fuel = opts.fuelPrice ?? P.FUEL_USD_KG / P.EURUSD, cpi = opts.cpi ?? 1;
     const scale = opts.demandScale ?? 1, rng = new Rng(opts.seed ?? 1);
-    const seats = P.AIRCRAFT_TYPES[spec.type_id].seats[spec.service];
+    const seats = cabinSeats(spec.type_id, spec.service, spec.cab).total;
     const res = { dirs: {} }, totals = {};
     for (const [dir, o, d, comps, fare] of [['out', spec.base, spec.dest, compsOut, spec.fare_out], ['in', spec.dest, spec.base, compsIn, spec.fare_in]]) {
-      const ex = (opts.offerExtra && opts.offerExtra[dir]) || {};
+      const ex = withCabin((opts.offerExtra && opts.offerExtra[dir]) || {}, spec.type_id, spec.service, spec.cab);
       const own = offer(spec.airline, fare, spec.freq, seats, spec.service, spec.otp ?? P.BUFFER_POLICY[spec.buffer].otp, spec.ramp ?? 1, spec.airline, ex);
       const offers = withIndirect(o, d, [own].concat(comps), cpi);
       const ss = opts.segScale ? opts.segScale[dir] : null;
@@ -559,13 +582,15 @@ const SM = (() => {
       const me = acc[spec.airline];
       const pax = me.pax, perFlight = pax / spec.freq;
       const prem = ex.bizPrem || 0;
-      const fareRev = (pax + me.seg.business * prem) * fare * (P.AIRCRAFT_TYPES[spec.type_id].yieldF || 1);
+      const cr = cabinRevenue(spec.type_id, spec.service, spec.cab, spec.freq, fare, me.seg.business, pax - me.seg.business);
+      const fareRev = ((pax + me.seg.business * prem) * fare + cr.extra) * (P.AIRCRAFT_TYPES[spec.type_id].yieldF || 1);
       const c = opts.costFn ? opts.costFn(o, d, perFlight, fareRev / spec.freq, dir) : legCosts(o, d, spec.type_id, spec.service, spec.buffer, perFlight, fareRev / spec.freq, fuel, cpi);
       const costs = {};
+      c.pax_service = (c.pax_service || 0) + cr.cost * cpi / spec.freq;
       for (const k of COST_KEYS.concat(['disruption_expected'])) { costs[k] = (c[k] || 0) * spec.freq; totals[k] = (totals[k] || 0) + costs[k]; }
       const comp = {};
       for (const key in acc) { if (key === spec.airline || key === INDIRECT_ID) continue; comp[acc[key].airline] = (comp[acc[key].airline] || 0) + acc[key].pax; }
-      res.dirs[dir] = { o, d, pax, seg: me.seg, unconstrained: me.unc, seats: spec.freq * seats, lf: pax / (spec.freq * seats),
+      res.dirs[dir] = { o, d, pax, seg: me.seg, unconstrained: me.unc, seats: spec.freq * seats, lf: pax / (spec.freq * seats), prem: cr.f + cr.b, premRev: cr.extra,
         fareRev, ancRev: pax * P.SERVICE[spec.service].ancillary * cpi, costs, market, competitors: comp, indirect: acc[INDIRECT_ID] ? acc[INDIRECT_ID].pax : 0, bh: c._bh };
     }
     const O = res.dirs.out, I = res.dirs.in;
@@ -589,8 +614,50 @@ const SM = (() => {
   // ===========================================================================
   function monthOf(day) { const doy = ((day % 365) + 365) % 365; for (let m = 0; m < 12; m++) if (doy < MONTH_STARTS[m + 1]) return m; return 11; }
   const PNL_ACCOUNTS = ['rev_ticket', 'rev_ancillary', 'rev_cargo', 'rev_acmi', 'fuel', 'hedge', 'crew', 'staff_cockpit', 'staff_cabin', 'staff_tech', 'staff_extra', 'maintenance', 'navigation', 'landing', 'handling',
-    'pax_fees', 'pax_service', 'distribution', 'cargo_cost', 'disruption', 'stations', 'slots', 'lease', 'depreciation', 'insurance', 'experts', 'marketing', 'overhead', 'one_off', 'trade', 'interest', 'tax'];
+    'pax_fees', 'pax_service', 'distribution', 'cargo_cost', 'disruption', 'stations', 'slots', 'lease', 'depreciation', 'insurance', 'experts', 'marketing', 'loyalty', 'overhead', 'one_off', 'trade', 'interest', 'tax'];
   const cents = (x) => Math.round(x * 100);
+  // ---------- Kabinen: First / Business / Economy ----------
+  function haulOf(typeId) { const k = P.AIRCRAFT_TYPES[typeId].ill.kind; return k === 'wide' ? 'long' : k === 'sst' ? null : 'short'; }
+  function cabinShares(typeId, cab) {
+    const h = haulOf(typeId); if (!h || !cab || !cab[h]) return null;
+    const C = P.CABIN[h], f = h === 'long' ? clamp(Number(cab[h].f) || 0, 0, C.maxF) : 0, b = clamp(Number(cab[h].b) || 0, 0, Math.min(C.maxB, 1 - f));
+    return f || b ? { h, f, b } : null;
+  }
+  /** Sitze je Klasse; cab = { short: {f, b}, long: {f, b} } (Flächenanteile), Economy ist der Rest. */
+  function cabinSeats(typeId, service, cab) {
+    const base = P.AIRCRAFT_TYPES[typeId].seats[service], sh = cabinShares(typeId, cab);
+    if (!sh) return { f: 0, b: 0, e: base, total: base };
+    const C = P.CABIN[sh.h], f = sh.f ? Math.floor(base * sh.f / C.firstArea) : 0, b = Math.floor(base * sh.b / C.bizArea), e = Math.max(0, Math.round(base * (1 - sh.f - sh.b)));
+    return { f, b, e, total: Math.max(1, f + b + e) };
+  }
+  /** Mehrerlös aus Premiumklassen an einem Tag: Geschäftsreisende (und wenige Urlauber) zahlen den Klassenaufschlag, solange Plätze frei sind. */
+  function cabinRevenue(typeId, service, cab, flights, fare, bizPax, othPax) {
+    const s = cabinSeats(typeId, service, cab);
+    if (!(s.f || s.b) || flights <= 0 || !(fare > 0)) return { extra: 0, cost: 0, f: 0, b: 0 };
+    const C = P.CABIN[haulOf(typeId)];
+    const dF = bizPax * C.qFirst + othPax * C.leisF, dB = bizPax * C.qBiz + othPax * C.leisB;
+    const sf = Math.min(s.f * flights, dF), sb = Math.min(s.b * flights, dB + (dF - sf) * 0.6);
+    return { extra: fare * (sf * (C.firstMult - 1) + sb * (C.bizMult - 1)), cost: sf * C.costF + sb * C.costB, f: sf, b: sb };
+  }
+  /** Geschäftsreisende bevorzugen Airlines mit Premiumkabine (Nutzenaufschlag, sättigt bei ~15 % Premiumsitzen). */
+  function withCabin(extra, typeId, service, cab) {
+    const s = cabinSeats(typeId, service, cab); if (!(s.f || s.b)) return extra;
+    const bonus = P.CABIN.bizU * Math.min(1, ((2 * s.f + s.b) / s.total) / 0.15), u = (extra && extra.extraU) || {};
+    return { ...(extra || {}), extraU: { leisure: (u.leisure || 0) + 0.04 * bonus, business: (u.business || 0) + bonus, vfr: (u.vfr || 0) + 0.03 * bonus } };
+  }
+  const cabClone = (c) => (c ? { short: { f: 0, b: +(c.short && c.short.b) || 0 }, long: { f: +(c.long && c.long.f) || 0, b: +(c.long && c.long.b) || 0 } } : null);
+
+  /** Tagesverlauf: Konten zu acht Gruppen zusammengefasst (Euro, gerundet). Reihenfolge = DAY_GROUPS. */
+  const DAY_GROUPS = ['Erlöse', 'Kerosin', 'Flugbetrieb', 'Personal', 'Flugzeuge & Standorte', 'Verwaltung & Marketing', 'Einmalkosten', 'Zinsen & Steuern'];
+  const DAY_GROUP_OF = (k) => (k.startsWith('rev_') ? 0 : k === 'fuel' || k === 'hedge' ? 1
+    : ['crew', 'maintenance', 'navigation', 'landing', 'handling', 'pax_fees', 'pax_service', 'distribution', 'cargo_cost', 'disruption'].includes(k) ? 2
+      : k.startsWith('staff_') || k === 'experts' ? 3 : ['lease', 'depreciation', 'insurance', 'stations', 'slots'].includes(k) ? 4
+        : k === 'one_off' ? 6 : k === 'interest' || k === 'tax' ? 7 : 5);
+  function dayGroupsOf(acc) {
+    const g = DAY_GROUPS.map(() => 0);
+    for (const k in acc || {}) if (!k.startsWith('cf_')) g[DAY_GROUP_OF(k)] += acc[k] / 100;
+    return g.map((x) => Math.round(x));
+  }
   class Ledger {
     constructor(startCash) { this.pnl = {}; this.cash = cents(startCash); this.equityContrib = cents(startCash); this.month = {}; this.months = []; this.cashHist = []; this.today = {}; }
     post(acc, amount, cash = true) {
@@ -612,7 +679,7 @@ const SM = (() => {
   }
   class Route {
     constructor(o) { Object.assign(this, { pending: [], autoPrice: true, targetLf: 0.85, hist: [], closed: false, reviewNeg: 0, lastChange: -999, closedDay: null, flyingToday: 0 }, o); }
-    seats() { return P.AIRCRAFT_TYPES[this.type_id].seats[this.service]; }
+    seats() { return this.cab ? cabinSeats(this.type_id, this.service, this.cab).total : P.AIRCRAFT_TYPES[this.type_id].seats[this.service]; }
     ramp(day, T = P.RAMP_T_DAYS) { const t = Math.max(0, day - this.opened_day); return P.RAMP_R0 + (1 - P.RAMP_R0) * (1 - Math.exp(-t / T)); }
     setFares(day, out, inn) { this.pending.push([day + P.PRICE_CHANGE_LAG_DAYS, out, inn]); }
     applyPending(day) { const keep = []; for (const [d, o, i] of this.pending) { if (d <= day) { this.fare_out = o; this.fare_in = i; } else keep.push([d, o, i]); } this.pending = keep; }
@@ -674,9 +741,22 @@ const SM = (() => {
     extraU(o, d) {
       if (!this.isPlayer) return null;
       const a = P.TERMINALS[this.terminalAt(o)].u, b = P.TERMINALS[this.terminalAt(d)].u;
-      return { leisure: (a.leisure + b.leisure) / 2, business: (a.business + b.business) / 2, vfr: (a.vfr + b.vfr) / 2 };
+      const u = { leisure: (a.leisure + b.leisure) / 2, business: (a.business + b.business) / 2, vfr: (a.vfr + b.vfr) / 2 };
+      const hl = this.hubs ? Math.max(this.hubs[o] || 0, this.hubs[d] || 0) : 0;
+      if (hl) { u.business += 0.06 * hl; u.leisure += 0.01 * hl; }   // Heimvorteil am Drehkreuz: Netz, Anschlüsse, Lounges
+      const lv = this.loyalty && this.loyalty.lv, lf = lv ? this.loyaltyFactor(this._day ?? 0) : 0;
+      if (lf > 0) { const LU = P.LOYALTY[lv].u; u.leisure += LU.leisure * lf; u.business += LU.business * lf; u.vfr += LU.vfr * lf; }
+      return u;
     }
     bizPrem() { return lv3([0, 0.08, 0.15, 0.22], this.skill('revenue')); }
+    /** Kabinenaufteilung der Airline (Spielende: Strategie; Premium-KI: Standard mit Business, auf Langstrecke auch First). */
+    cabinCfg() { return this.cabin || (this.archetype === 'premium' ? P.CABIN.ai : null); }
+    /** Wirkung des Vielfliegerprogramms (0…1): wächst über 6 Monate und mit der Größe des Netzes. */
+    loyaltyFactor(day) {
+      const L = this.loyalty; if (!L || !L.lv) return 0;
+      const mat = clamp((day - (L.since ?? day)) / 180, 0.15, 1), n = this.activeRoutes().length;
+      return mat * clamp(0.35 + 0.65 * Math.log(1 + n) / Math.log(41), 0.35, 1);
+    }
     rampT() { return lv3([30, 24, 20, 16], this.skill('marketing')); }
     ratingInfo() { return P.RATINGS.find((x) => x.r === this.rating) || P.RATINGS[2]; }
     creditLimit(bank = 1) {
@@ -763,6 +843,7 @@ const SM = (() => {
       this.routeCounter++;
       const r = new Route({ id: `${this.id}-R${this.routeCounter}`, airline: this.id, base, dest, type_id: typeId, freq, fare_out: fareOut,
         fare_in: fareIn, service, buffer, opened_day: day, targetLf, autoPrice });
+      const cab = cabClone(this.cabinCfg()); if (cab) r.cab = cab;
       this.routes.push(r);
       if (this.isPlayer) { this.station(base); this.station(dest); }
       if (logIt) this.log(day, `Strecke ${base}–${dest} eröffnet: ${freq}x täglich, ${P.AIRCRAFT_TYPES[typeId].label}, ${Math.round(fareOut)}/${Math.round(fareIn)} EUR`, 'route');
@@ -1222,7 +1303,10 @@ const SM = (() => {
       for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) n += r.freq; n += al.heldAt(apt, this.day); }
       return n;
     }
-    slotsFreeFor(al, apt) { const f = this.slotsFree(apt); return f === Infinity ? f : f + al.heldAt(apt, this.day); }
+    slotsFreeFor(al, apt) { if (this.lockedFor(al, apt)) return 0; const f = this.slotsFree(apt); return f === Infinity ? f : f + al.heldAt(apt, this.day); }
+    /** Exklusivvertrag (alle Gates) an einem Flughafen ohne Slotkoordination: Inhaber oder null. */
+    lockOwner(apt) { for (const x of this.list) if (x.status !== 'insolvent' && x.gateLock && x.gateLock[apt]) return x; return null; }
+    lockedFor(al, apt) { const o = this.lockOwner(apt); return !!o && o !== al; }
     slotsOkFor(al, o, d, extra) { return this.slotsFreeFor(al, o) >= extra && this.slotsFreeFor(al, d) >= extra; }
     takeSlots(al, o, d, n) { for (const x of [o, d]) if (apx(x).slots !== null) al.useHeld(x, n, this.day); }
     slotsFree(apt) { if (apx(apt).slots === null) return Infinity; return (this.slotCap[apt] ?? 0) - this.slotUse(apt); }
@@ -1286,6 +1370,7 @@ const SM = (() => {
     }
     /** Prognose für den Spieler mit seiner Kostenstruktur (Personal als Stundensatz, Stationen, Marke, Studien). */
     forecastFor(al, spec, opts = {}) {
+      if (spec.cab === undefined) spec = { ...spec, cab: cabClone(al.cabinCfg()) };
       const co = this.competitorOffers(al.id, spec.base, spec.dest), ci = this.competitorOffers(al.id, spec.dest, spec.base);
       const trend = this.knownTrend(al, spec.base, spec.dest);
       const r = { ...spec, age: opts.age };
@@ -1348,22 +1433,26 @@ const SM = (() => {
           if (f <= 0) continue;
           const otp = al.otp(r.buffer);
           for (const [dir, o, d, fare] of [['out', r.base, r.dest, r.fare_out], ['in', r.dest, r.base, r.fare_in]]) {
-            const of = offer(al.id, fare, f, r.seats(), r.service, otp, r.ramp(this.day, T), r.id, withSst(this.offerExtra(al, o, d), o, d, r.type_id));
+            const of = offer(al.id, fare, f, r.seats(), r.service, otp, r.ramp(this.day, T), r.id, withCabin(withSst(this.offerExtra(al, o, d), o, d, r.type_id), r.type_id, r.service, r.cab));
             if (this.coops && this.coops.length) { const cs = this.codeshareFreq(al, pairKey(o, d)); if (cs) { of.freqU = f + 0.5 * cs; of.brand = Math.min(0.95, of.brand + 0.02); } }
             get(o + '-' + d).direct.push([of, r, dir]);
           }
         }
         for (const H of al.bases) {
           const spokes = al.activeRoutes().filter((r) => r.base === H && r.flyingToday > 0);
+          // Drehkreuz-Ausbau: abgestimmte Wellen, kürzere Umsteigezeit, mehr sinnvolle Verbindungen
+          const lv = (al.hubs && al.hubs[H]) || 0, detour = P.TRANSFER.max_detour + 0.1 * lv, pf = 1 - 0.25 * lv, disc = P.TRANSFER.discount + 0.03 * lv;
+          const pen = lv ? { leisure: P.TRANSFER.penalty.leisure * pf, business: P.TRANSFER.penalty.business * pf, vfr: P.TRANSFER.penalty.vfr * pf } : P.TRANSFER.penalty;
           for (const r1 of spokes) for (const r2 of spokes) {
             if (r1 === r2 || r1.dest === r2.dest) continue;
             const a = r1.dest, b = r2.dest, dab = gcDistanceKm(a, b);
             if (dab < P.TRANSFER.min_dist_km) continue;
-            if ((gcDistanceKm(a, H) + gcDistanceKm(H, b)) / dab > P.TRANSFER.max_detour) continue;
-            const of = offer(al.id, P.TRANSFER.discount * (r1.fare_in + r2.fare_out), Math.min(r1.flyingToday, r2.flyingToday), 0, r2.service,
+            if ((gcDistanceKm(a, H) + gcDistanceKm(H, b)) / dab > detour) continue;
+            const of = offer(al.id, disc * (r1.fare_in + r2.fare_out), Math.min(r1.flyingToday, r2.flyingToday), 0, r2.service,
               al.otp(r1.buffer) ** 1.5, Math.min(r1.ramp(this.day, T), r2.ramp(this.day, T)), `${r1.id}>${r2.id}`, this.offerExtra(al, a, b));
+            if (lv) of.freqU = of.freq * (1 + 0.25 * lv);
             of.conn = { r1, r2, hub: H };
-            of.penalty = P.TRANSFER.penalty;
+            of.penalty = pen;
             get(a + '-' + b).conn.push(of);
           }
         }
@@ -1408,8 +1497,8 @@ const SM = (() => {
         const d1 = gcDistanceKm(r1.dest, r1.base), d2 = gcDistanceKm(r2.base, r2.dest);
         const rev = pax * c.of.fare + c.biz * s * c.of.fare * c.of.bizPrem;
         for (const [k, share, first] of [[legKey(r1, 'in'), d1 / (d1 + d2), true], [legKey(r2, 'out'), d2 / (d1 + d2), false]]) {
-          if (!transfer[k]) transfer[k] = { pax: 0, rev: 0, anc: 0 };
-          transfer[k].pax += pax; transfer[k].rev += rev * share; if (first) transfer[k].anc += pax;
+          if (!transfer[k]) transfer[k] = { pax: 0, rev: 0, anc: 0, biz: 0 };
+          transfer[k].pax += pax; transfer[k].rev += rev * share; transfer[k].biz += c.biz * s; if (first) transfer[k].anc += pax;
         }
       }
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.staffCoverage(al);
@@ -1417,7 +1506,7 @@ const SM = (() => {
         if (al.status === 'insolvent') continue;
         for (const r of al.activeRoutes()) {
           if (!r.flyingToday) continue;
-          const st = { flights: 0, seats: 0, cancelled: 0, cost: 0, block_h: 0, pax: 0, rev: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, late: 0,
+          const st = { d: this.day, flights: 0, seats: 0, cancelled: 0, cost: 0, block_h: 0, pax: 0, rev: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, late: 0,
             demand_out: 0, demand_in: 0, spill_out: 0, spill_in: 0, tr_out: 0, tr_in: 0, cargo: 0 };
           for (const dir of ['out', 'in']) {
             const [o, d] = dir === 'out' ? [r.base, r.dest] : [r.dest, r.base];
@@ -1438,11 +1527,12 @@ const SM = (() => {
         if (al.status === 'insolvent') continue;
         this.dailyFixed(al);
         this.liquidity(al);
+        const dayG = al.isPlayer ? dayGroupsOf(al.ledger.today) : null;
         al.ledger.closeDay();
         if (al.isPlayer) {
           // Tagesreihe für das Dashboard (90 Tage)
           const t = al._today || { pax: 0, seats: 0, rev: 0, cost: 0, flights: 0, late: 0, canc: 0 }; al._today = null;
-          al.dayHist = al.dayHist || []; al.dayHist.push({ d: day, net: Math.round(al.ledger.lastDay || 0), pax: t.pax, seats: t.seats, rev: Math.round(t.rev), db1: Math.round(t.rev - t.cost), fl: t.flights, late: t.late, canc: t.canc });
+          al.dayHist = al.dayHist || []; al.dayHist.push({ d: day, net: Math.round(al.ledger.lastDay || 0), pax: t.pax, seats: t.seats, rev: Math.round(t.rev), db1: Math.round(t.rev - t.cost), fl: t.flights, late: t.late, canc: t.canc, g: dayG, cash: Math.round(al.ledger.cash / 100) });
           if (al.dayHist.length > 90) al.dayHist.shift();
         }
       }
@@ -1517,7 +1607,15 @@ const SM = (() => {
       }
       const locShare = l.pax > 0 ? flownLocal / l.pax : 0, trShare = t.pax > 0 ? flownTr / t.pax : 0;
       const yf = ty.yieldF || 1;
-      const rev = (flownLocal * l.fare + l.biz * locShare * l.fare * al.bizPrem() + t.rev * trShare) * yf;
+      let rev = (flownLocal * l.fare + l.biz * locShare * l.fare * al.bizPrem() + t.rev * trShare) * yf;
+      if (r.cab) {
+        const allF = flownLocal + flownTr, bizF = l.biz * locShare + (t.biz || 0) * trShare;
+        const fareAvg = allF > 0 ? (flownLocal * l.fare + t.rev * trShare) / allF : l.fare;
+        const cr = cabinRevenue(r.type_id, r.service, r.cab, f - cancelledHere, fareAvg, bizF, Math.max(0, allF - bizF));
+        if (cr.extra) rev += cr.extra * yf;
+        if (cr.cost) { L.post('pax_service', -cr.cost * cpi); st.cost += cr.cost * cpi; }
+        st.prem = (st.prem || 0) + cr.f + cr.b;
+      }
       const anc = (flownLocal + t.anc * trShare) * P.SERVICE[r.service].ancillary * cpi;
       L.post('rev_ticket', rev); L.post('rev_ancillary', anc);
       if (al.cargo && f > cancelledHere) {
@@ -1644,7 +1742,20 @@ const SM = (() => {
       for (const h of al.hangars) stations += P.HANGAR_MONTH * apx(h).cost * cpi * proc / 30.4;
       L.post('stations', -stations);
       L.post('experts', -al.experts.reduce((s, e) => s + e.salary, 0) * cpi / 30.4);
-      if (al.marketing > 0) L.post('marketing', -al.marketing / 30.4);
+      const tick = (L.today.rev_ticket || 0) / 100, anc0 = (L.today.rev_ancillary || 0) / 100;
+      if (al.mktPct > 0) L.post('marketing', -al.mktPct * (tick + anc0));
+      else if (al.marketing > 0) L.post('marketing', -al.marketing / 30.4);   // ältere Stände: fester Betrag
+      if (al.loyalty && al.loyalty.lv) {
+        const LP = P.LOYALTY[al.loyalty.lv];
+        L.post('loyalty', -(LP.fixed * cpi / 30.4 + LP.cost * tick));
+        L.post('rev_ancillary', LP.partner * tick * clamp((this.day - (al.loyalty.since ?? this.day)) / 180, 0.15, 1));
+      }
+      let hubCost = 0; for (const [apt, lv] of Object.entries(al.hubs || {})) if (lv && al.bases.includes(apt)) hubCost += P.HUB[lv].monthly * apx(apt).cost * cpi / 30.4;
+      if (hubCost) L.post('stations', -hubCost);
+      let lockCost = 0; for (const apt of Object.keys(al.gateLock || {})) lockCost += al.gateLock[apt].price * P.GATE_LOCK.monthlyRate / 30.4;
+      if (lockCost) L.post('stations', -lockCost);
+      let holdFee = 0; for (const [apt, hs] of Object.entries(al.slotHold || {})) for (const h of hs) if (h.buy && h.until > this.day) holdFee += h.n * apx(apt).slotFee * P.SLOT_HOLD_FEE;
+      if (holdFee) L.post('slots', -holdFee * cpi);
       if (al.cargo) L.post('overhead', -P.CARGO.gsaMonth * cpi / 30.4);
     }
     liquidity(al) {
@@ -1713,8 +1824,8 @@ const SM = (() => {
       for (const al of this.list) {
         if (al.id === aid || al.status === 'insolvent') continue;
         for (const r of al.activeRoutes()) {
-          if (r.base === o && r.dest === d) out.push(offer(al.id, r.fare_out, r.freq, r.seats(), r.service, al.otp(r.buffer), r.ramp(this.day, al.rampT()), r.id, this.offerExtra(al, o, d)));
-          else if (r.dest === o && r.base === d) out.push(offer(al.id, r.fare_in, r.freq, r.seats(), r.service, al.otp(r.buffer), r.ramp(this.day, al.rampT()), r.id, this.offerExtra(al, o, d)));
+          if (r.base === o && r.dest === d) out.push(offer(al.id, r.fare_out, r.freq, r.seats(), r.service, al.otp(r.buffer), r.ramp(this.day, al.rampT()), r.id, withCabin(withSst(this.offerExtra(al, o, d), o, d, r.type_id), r.type_id, r.service, r.cab)));
+          else if (r.dest === o && r.base === d) out.push(offer(al.id, r.fare_in, r.freq, r.seats(), r.service, al.otp(r.buffer), r.ramp(this.day, al.rampT()), r.id, withCabin(withSst(this.offerExtra(al, o, d), o, d, r.type_id), r.type_id, r.service, r.cab)));
         }
       }
       return out;
@@ -1774,7 +1885,8 @@ const SM = (() => {
         if (al.isPlayer) {
           const otp = al.otpHist.length ? al.otpHist.reduce((a, b) => a + b, 0) / al.otpHist.length : 0.8;
           const k = P.MARKETING_K * lv3([1, 1.3, 1.6, 2], al.skill('marketing'));
-          const grow = k * Math.sqrt(Math.max(0, al.marketing) / 100000) * (1 - al.brand);
+          const grow = al.mktPct > 0 ? (P.MKT_K2 / P.MARKETING_K) * k * (1 - Math.exp(-al.mktPct / P.MKT_SAT)) * (1 - al.brand)
+            : k * Math.sqrt(Math.max(0, al.marketing) / 100000) * (1 - al.brand);
           const sst = al.activeRoutes().some((r) => P.AIRCRAFT_TYPES[r.type_id].supersonic && r.opened_day <= this.day) ? 0.015 * (1 - al.brand) : 0;   // Prestige
           al.brand = clamp(al.brand + grow + sst - P.BRAND_DECAY * al.brand * 0.5 - (otp < 0.7 ? 0.01 : 0) + (al.activeRoutes().length ? 0.004 : 0), 0.05, 0.95);
           this.playerMonthly(al);
@@ -2243,6 +2355,99 @@ const SM = (() => {
       al.log(this.day, `Neue Basis ${ap(apt).name} eröffnet`, 'route');
       return { ok: true };
     }
+    // ---------- Strategie: Kabinen, Kundenbindung, Drehkreuze, Slots ----------
+    setCabin(al, haul, f, b) {
+      if (!P.CABIN[haul]) return { ok: false, msg: 'Unbekannte Streckenart.' };
+      const C = P.CABIN[haul];
+      f = haul === 'long' ? clamp(Math.round((Number(f) || 0) * 100) / 100, 0, C.maxF) : 0;
+      b = clamp(Math.round((Number(b) || 0) * 100) / 100, 0, C.maxB);
+      if (f + b > 1) return { ok: false, msg: 'First und Business zusammen dürfen höchstens 100 % der Kabine belegen.' };
+      const cur = cabClone(al.cabin) || { short: { f: 0, b: 0 }, long: { f: 0, b: 0 } }, was = cur[haul];
+      const delta = Math.abs(was.f - f) + Math.abs(was.b - b);
+      if (delta < 0.005) return { ok: true, msg: 'Keine Änderung.' };
+      const n = al.fleet.filter((a) => haulOf(a.type_id) === haul && a.delivery_day <= this.day).length;
+      const cost = n * P.CABIN.refit[haul] * Math.min(1, delta / 0.3) * this.macro.cpi;
+      if (cost > 0 && al.spendable(this.macro.bank ?? 1) < cost) return { ok: false, msg: `Der Umbau von ${n} Flugzeugen kostet ${Math.round(cost / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
+      cur[haul] = { f, b }; al.cabin = cur;
+      if (cost > 0) al.ledger.post('one_off', -cost);
+      for (const r of al.routes) if (!r.closed) r.cab = cabClone(cur);
+      al.log(this.day, `Kabinen ${haul === 'long' ? 'Langstrecke' : 'Kurz- und Mittelstrecke'}: ${Math.round(f * 100)} % First, ${Math.round(b * 100)} % Business, ${Math.round((1 - f - b) * 100)} % Economy${cost ? ` (Umbau ${n} Flugzeuge: ${Math.round(cost / 1000)} Tsd. EUR)` : ''}`, 'fleet');
+      this.operableFreq(al);
+      return { ok: true, cost };
+    }
+    setLoyalty(al, lv) {
+      lv = clamp(Math.round(Number(lv) || 0), 0, P.LOYALTY.length - 1);
+      const cur = (al.loyalty && al.loyalty.lv) || 0; if (lv === cur) return { ok: true };
+      const cost = lv > cur ? (P.LOYALTY[lv].setup - (cur ? P.LOYALTY[cur].setup : 0)) * this.macro.cpi : 0;
+      if (cost > 0 && al.spendable(this.macro.bank ?? 1) < cost) return { ok: false, msg: `Die Einführung kostet ${Math.round(cost / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
+      if (cost > 0) al.ledger.post('one_off', -cost);
+      al.loyalty = lv ? { lv, since: cur ? al.loyalty.since : this.day } : null;
+      al.log(this.day, lv ? `Kundenbindung: ${P.LOYALTY[lv].label} ${cur ? 'eingeführt (Wechsel)' : 'gestartet'}${cost ? ` – Einführung ${Math.round(cost / 1000)} Tsd. EUR` : ''}` : 'Vielfliegerprogramm eingestellt – die Mitglieder wandern ab', 'info');
+      return { ok: true, cost };
+    }
+    setHub(al, apt, lv) {
+      if (!al.bases.includes(apt)) return { ok: false, msg: 'Drehkreuze gibt es nur an eigenen Basen.' };
+      lv = clamp(Math.round(Number(lv) || 0), 0, P.HUB.length - 1);
+      al.hubs = al.hubs || {}; const cur = al.hubs[apt] || 0; if (lv === cur) return { ok: true };
+      const spokes = al.activeRoutes().filter((r) => r.base === apt).length;
+      if (lv > cur && spokes < P.HUB[lv].minRoutes) return { ok: false, msg: `${P.HUB[lv].label} braucht mindestens ${P.HUB[lv].minRoutes} Strecken ab ${apt} (bisher ${spokes}).` };
+      const cost = lv > cur ? (P.HUB[lv].setup - (cur ? P.HUB[cur].setup : 0)) * apx(apt).cost * this.macro.cpi : 0;
+      if (cost > 0 && al.spendable(this.macro.bank ?? 1) < cost) return { ok: false, msg: `Der Ausbau kostet ${Math.round(cost / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
+      if (cost > 0) al.ledger.post('one_off', -cost);
+      if (lv) al.hubs[apt] = lv; else delete al.hubs[apt];
+      al.log(this.day, `${ap(apt).name}: ${lv ? P.HUB[lv].label : 'kein Drehkreuz mehr'}${cost ? ` (Ausbau ${Math.round(cost / 1000)} Tsd. EUR)` : ''}`, 'route');
+      if (lv > cur && w_isMulti(this)) this.pushNews(this.day, `${al.name} baut ${ap(apt).name} zum ${P.HUB[lv].label} aus`, 'ai', al.id);
+      return { ok: true, cost };
+    }
+    slotPrice(apt) { return slotValue(this, apt); }
+    /** Kaufpreis für n freie Slots: je knapper der Rest, desto teurer (der letzte freie Slot kostet das Vierfache). */
+    slotBuyPrice(apt, n) {
+      const F = this.slotsFree(apt), base = this.slotPrice(apt); let sum = 0;
+      for (let j = 0; j < n; j++) sum += base * (1 + 3 * j / Math.max(1, F - 1));
+      return sum;
+    }
+    buySlots(al, apt, n) {
+      if (!P.AIRPORTS[apt] || apx(apt).slots === null) return { ok: false, msg: 'Slots gibt es nur an koordinierten Flughäfen.' };
+      const free = this.slotsFree(apt); n = n === 'all' ? free : Math.round(Number(n) || 0);
+      if (!(n > 0)) return { ok: false, msg: free > 0 ? 'Bitte eine Anzahl angeben.' : `In ${apt} ist kein Slot mehr frei.` };
+      if (n > free) return { ok: false, msg: `In ${apt} sind nur noch ${free} Slots frei.` };
+      const price = this.slotBuyPrice(apt, n);
+      if (al.spendable(this.macro.bank ?? 1) < price) return { ok: false, msg: `${n} Slots kosten ${Math.round(price / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
+      al.ledger.post('one_off', -price);
+      (al.slotHold[apt] = al.slotHold[apt] || []).push({ n, until: 1e9, buy: true });
+      al.log(this.day, `${n} Slot${n === 1 ? '' : 's'} in ${ap(apt).name} gekauft (${Math.round(price / 1000)} Tsd. EUR)${this.slotsFree(apt) <= 0 ? ' – der Flughafen ist jetzt voll, ohne Sie kommt dort niemand mehr dazu' : ''}`, 'route');
+      if (w_isMulti(this) || this.slotsFree(apt) <= 0) this.pushNews(this.day, `${al.name} kauft ${n} Slots in ${ap(apt).name}${this.slotsFree(apt) <= 0 ? ' – keine freien Slots mehr' : ''}`, 'ai', al.id);
+      return { ok: true, n, price };
+    }
+    sellSlots(al, apt, n) {
+      const have = (al.slotHold[apt] || []).filter((h) => h.buy && h.until > this.day).reduce((s, h) => s + h.n, 0);
+      n = n === 'all' ? have : Math.min(have, Math.round(Number(n) || 0));
+      if (!(n > 0)) return { ok: false, msg: 'Keine gekauften, ungenutzten Slots dort.' };
+      let left = n; for (const h of al.slotHold[apt]) { if (!h.buy) continue; const k = Math.min(h.n, left); h.n -= k; left -= k; if (!left) break; }
+      al.cleanHolds(this.day);
+      const back = this.slotPrice(apt) * n * 0.5;
+      al.ledger.post('one_off', back);
+      al.log(this.day, `${n} Slots in ${ap(apt).name} zurückgegeben (Erlös ${Math.round(back / 1000)} Tsd. EUR)`, 'route');
+      return { ok: true, n, back };
+    }
+    gateLockPrice(apt) { return Math.max(1, ap(apt).pax || 1) * P.GATE_LOCK.perMioPax * this.macro.cpi; }
+    setGateLock(al, apt, on) {
+      if (!P.AIRPORTS[apt]) return { ok: false, msg: 'Ungültig.' };
+      al.gateLock = al.gateLock || {};
+      if (!on) { if (!al.gateLock[apt]) return { ok: true }; delete al.gateLock[apt]; al.log(this.day, `Exklusivvertrag in ${ap(apt).name} gekündigt`, 'route'); return { ok: true }; }
+      if (al.gateLock[apt]) return { ok: true };
+      if (apx(apt).slots !== null) return { ok: false, msg: `${apt} ist slotkoordiniert – dort kaufen Sie die freien Slots.` };
+      if (!al.bases.includes(apt)) return { ok: false, msg: 'Ein Exklusivvertrag geht nur an einer eigenen Basis.' };
+      if ((ap(apt).pax || 0) > P.GATE_LOCK.maxPax) return { ok: false, msg: `${ap(apt).name} ist zu groß für einen Exklusivvertrag (über ${P.GATE_LOCK.maxPax} Mio. Passagiere).` };
+      const o = this.lockOwner(apt); if (o) return { ok: false, msg: `${o.name} hat dort schon alle Gates.` };
+      const price = this.gateLockPrice(apt);
+      if (al.spendable(this.macro.bank ?? 1) < price) return { ok: false, msg: `Der Vertrag kostet ${Math.round(price / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
+      al.ledger.post('one_off', -price);
+      al.gateLock[apt] = { since: this.day, price };
+      al.log(this.day, `Exklusivvertrag in ${ap(apt).name}: alle freien Gates gehören Ihnen. Andere Airlines können dort keine neuen Flüge mehr anbieten.`, 'route');
+      this.pushNews(this.day, `${al.name} sichert sich alle Gates in ${ap(apt).name}`, 'ai', al.id);
+      return { ok: true, price };
+    }
     /** Basis schließen: Strecken ab dort werden eingestellt (nur mit force), Flugzeuge ziehen an eine andere Basis um. */
     closeBase(al, apt, to, force) {
       if (!al.bases.includes(apt)) return { ok: false, msg: 'Dort ist keine Basis.' };
@@ -2294,7 +2499,7 @@ const SM = (() => {
     const cfg = al.cfg, cpi = w.macro.cpi;
     const co = w.competitorOffers(al.id, base, dest), ci = w.competitorOffers(al.id, dest, base);
     return { co, ci, spec: { airline: al.id, base, dest, type_id: typeId, freq, fare_out: aiRulePrice(base, dest, cfg, co.map((c) => c.fare), cpi),
-      fare_in: aiRulePrice(dest, base, cfg, ci.map((c) => c.fare), cpi), service: cfg.service, buffer: cfg.buffer } };
+      fare_in: aiRulePrice(dest, base, cfg, ci.map((c) => c.fare), cpi), service: cfg.service, buffer: cfg.buffer, cab: cabClone(al.cabinCfg()) } };
   }
   function aiEval(w, al, x, month, nDraws) {
     const noise = Math.exp(al.rngForecast.gauss(0, al.cfg.forecast_sigma));
@@ -2313,7 +2518,7 @@ const SM = (() => {
     for (const nb of near) {
       if (al.bases.includes(nb)) continue;
       if (al.archetype === 'premium' && ap(nb).biz < 1.0) continue;
-      if (w.slotsFree(nb) < 2) continue;
+      if (w.slotsFree(nb) < 2 || w.lockedFor(al, nb)) continue;
       const cands = [];
       for (const dest of aiCandidates(al, nb, new Set(), 8)) {
         if (!rangeOk(nb, dest, typeId) || served.has(pairKey(nb, dest)) || !w.slotsOkFor(al, nb, dest, 1) || barred(w, al.id, nb, dest)) continue;
@@ -2672,7 +2877,7 @@ const SM = (() => {
     const names = ['Aurora Air', 'Zephyr Airways', 'Horizon Express', 'Polaris Jet', 'Meridia', 'Skyline Connect', 'Falcon Wings', 'Coral Air', 'Sirocco Airlines', 'Northwind', 'Altair Airways', 'Equator Air', 'Halcyon', 'Vega Jet'];
     const used = new Set(w.list.map((a) => a.name)), name = names.find((n) => !used.has(n)); if (!name) return;
     const taken = new Set(active.flatMap((a) => a.bases));
-    let bases = AP_CODES.filter((c) => !taken.has(c) && (ap(c).pax || 0) >= 15 && !(apx(c).slots !== null && w.slotsFree(c) < 3));
+    let bases = AP_CODES.filter((c) => !taken.has(c) && (ap(c).pax || 0) >= 15 && !(apx(c).slots !== null && w.slotsFree(c) < 3) && !w.lockOwner(c));
     if (!bases.length) return;
     // Neue Konkurrenz entsteht bevorzugt dort, wo noch kaum KI-Airlines sitzen (Länder ohne eigene KI-Basis)
     const aiCountries = new Set([...taken].map((c) => ap(c).country));
@@ -2911,6 +3116,7 @@ const SM = (() => {
   function acBookValue(ac) { return (ac.owned ? ac.nbv - ac.loan : 0) + (ac.deposit || 0); }
   /** Wert einer Flugzeugübernahme für einen neutralen Käufer: Eigentum = Marktwert minus übernommener Kredit; Leasing = Kaution plus halbe Monatsrate (sofort verfügbar). */
   function acDealValue(w, ac) { return ac.owned ? acFairValue(w, ac) - ac.loan : (ac.deposit || 0) + (ac.flex ? 0.25 : 0.5) * (ac.leaseMonth || 0); }
+  const w_isMulti = (w) => w.humans && w.humans.length > 1;
   function slotValue(w, apt) { if (!coordinated(apt)) return 0; const scarce = w.slotsFree(apt) <= 0 ? 2 : 1; return (apx(apt).slotFee * 600 + 40000) * scarce * w.macro.cpi; }
   function staffUnitCost(role, group) { const S = P.STAFF; const sal = role === 'pilot' ? S.pilotSalary[group] : role === 'cabin' ? S.cabinSalary : S.techSalary; return S.recruit[role] + sal; }
   const pairRoute = (al, pair) => al.activeRoutes().find((r) => pairKey(r.base, r.dest) === pair);
@@ -3535,7 +3741,17 @@ const SM = (() => {
       case 'hedge': { const share = clamp(num(a.share), 0, P.FUEL_HEDGE.maxShare), months = [3, 6, 12].includes(num(a.months)) ? num(a.months) : 6; return w.setHedge(al, share, months); }
       case 'unhedge': return w.setHedge(al, 0, 0);
       case 'insurance': if (!P.INSURANCE[a.v]) return { ok: false, msg: 'Ungültig.' }; al.insurance = a.v; al.log(day, `Versicherung: ${P.INSURANCE[a.v].label}`, 'info'); return { ok: true };
-      case 'marketing': al.marketing = clamp(Math.round(num(a.v)), 0, 1e6); return { ok: true };
+      case 'marketing': {   // ältere Oberfläche: fester Monatsbetrag → Anteil am Umsatz
+        const v = clamp(Math.round(num(a.v)), 0, 1e6), m = al.ledger.months.at(-1), rv = m ? ((m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0)) / 100 : 0;
+        al.mktPct = v ? clamp(rv > 0 ? v / rv : 0.03, 0.005, P.MKT_PCT_MAX) : 0; al.marketing = 0; return { ok: true };
+      }
+      case 'marketingPct': al.mktPct = clamp(Math.round(num(a.v) * 1000) / 1000, 0, P.MKT_PCT_MAX); al.marketing = 0; return { ok: true };
+      case 'setCabin': return w.setCabin(al, String(a.haul || ''), num(a.f), num(a.b));
+      case 'loyalty': return w.setLoyalty(al, num(a.lv));
+      case 'hubLevel': return w.setHub(al, String(a.apt || ''), num(a.lv));
+      case 'buySlots': return w.buySlots(al, String(a.apt || ''), a.n === 'all' ? 'all' : num(a.n));
+      case 'sellSlots': return w.sellSlots(al, String(a.apt || ''), a.n === 'all' ? 'all' : num(a.n));
+      case 'gateLock': return w.setGateLock(al, String(a.apt || ''), !!a.on);
       case 'cargo': al.cargo = !!a.on; al.log(day, al.cargo ? 'Frachtagent beauftragt: Beiladefracht wird vermarktet' : 'Frachtvermarktung beendet', 'info'); return { ok: true };
       case 'study': if (!P.AIRPORTS[a.a] || !P.AIRPORTS[a.b]) return { ok: false, msg: 'Ungültig.' }; return w.commissionStudy(al, a.a, a.b);
       case 'orderStudy': return w.orderStudy(al, String(a.kind || ''), String(a.tier || ''), a.focus || null);
@@ -3592,7 +3808,7 @@ const SM = (() => {
   // ===========================================================================
   // Spielstand (kompakt)
   // ===========================================================================
-  const HIST_KEYS = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo'];
+  const HIST_KEYS = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd'];
   const AI_HIST_KEYS = ['seats', 'pax', 'rev', 'cost', 'pax_out', 'pax_in', 'seats_out', 'seats_in'];
   const r1 = (x) => Math.round(x * 10) / 10;
   function serialize(w, opt = {}) {
@@ -3610,13 +3826,13 @@ const SM = (() => {
         routes: al.routes.filter((r) => !r.closed || (al.isPlayer && (w.day - (r.closedDay ?? w.day)) < 60)).map((r) => ({
           id: r.id, airline: r.airline, base: r.base, dest: r.dest, type_id: r.type_id, freq: r.freq, fare_out: r.fare_out, fare_in: r.fare_in,
           service: r.service, buffer: r.buffer, opened_day: r.opened_day, pending: r.pending, autoPrice: r.autoPrice, targetLf: r.targetLf,
-          closed: r.closed, closedDay: r.closedDay, reviewNeg: r.reviewNeg, lastChange: r.lastChange, hk: al.isPlayer ? 0 : 1,
+          closed: r.closed, closedDay: r.closedDay, reviewNeg: r.reviewNeg, lastChange: r.lastChange, hk: al.isPlayer ? 0 : 1, cab: r.cab || undefined,
           hist: (al.isPlayer ? r.hist.slice(plH) : r.hist.slice(aiH)).map((h) => (al.isPlayer ? HIST_KEYS : AI_HIST_KEYS).map((k) => (k === 'block_h' ? r1(h[k] || 0) : Math.round(h[k] || 0)))),
         })),
         typesIntroduced: al.typesIntroduced, creditUsed: al.creditUsed, lossCarry: al.lossCarry, monthPnlStart: al.monthPnlStart,
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
-        assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
+        assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
         experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
@@ -3647,6 +3863,7 @@ const SM = (() => {
       if (!al.academy) delete al.academy;
       if (!al.past) delete al.past;
       if (!al.reports) delete al.reports;
+      for (const k of ['cabin', 'loyalty', 'hubs', 'gateLock']) if (!al[k]) delete al[k];
       if (al.staff && al.staff.pil) for (const g of STAFF_GROUPS) if (typeof al.staff.pil[g] !== 'number') al.staff.pil[g] = 0;
       // ältere Stände: Einstellungen mit sehr langer Wartezeit (früher bis 100 Tage) auf die heutige Höchstdauer kappen
       if (al.staff && al.staff.pipeline) for (const p of al.staff.pipeline) if (p.kind === 'hire' && P.STAFF.lead[p.role]) { const mx = s.day + Math.round(P.STAFF.lead[p.role] * P.STAFF.leadMaxFactor); if (p.ready > mx) p.ready = mx; }
@@ -3655,7 +3872,8 @@ const SM = (() => {
         const { hist, hk, ...rr } = r;
         const rt = new Route({ ...rr, hist: [] });
         if (!a.archetype) rt.autoPrice = false;
-        rt.hist = hist.map((arr) => { const o = Object.fromEntries(HIST_KEYS.map((k) => [k, 0])); keys.forEach((k, i) => { o[k] = arr[i]; }); return o; });
+        rt.hist = hist.map((arr) => { const o = Object.fromEntries(HIST_KEYS.map((k) => [k, 0])); keys.forEach((k, i) => { o[k] = arr[i] ?? 0; }); return o; });
+        if (!rt.cab) { delete rt.cab; if (a.archetype === 'premium' && !rt.closed) rt.cab = cabClone(P.CABIN.ai); }   // ältere Welten: Premium-KI bekommt Business
         return rt;
       });
       w.add(al);
@@ -3668,7 +3886,7 @@ const SM = (() => {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
-    RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
+    RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();

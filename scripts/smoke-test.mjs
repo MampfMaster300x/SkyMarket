@@ -218,5 +218,15 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.equal(dup.ok, false, 'gleiches Logo gesperrt'); assert.ok(/schon/.test(dup.msg));
   assert.equal(ok(await call('ben', 'POST', '/games/main/action', { action: { ...L, c2: '#ffffff' } }), 'Logo Ben anders').ok, true);
   console.log('Logo ok: gleiche Kombination gesperrt –', dup.msg); }
+{ const act = async (action) => ok(await call('anna', 'POST', '/games/main/action', { action }), action.type);
+  const r1 = await act({ type: 'setCabin', haul: 'short', f: 0, b: 0.12 }); assert.equal(r1.ok, true, 'Kabine');
+  const r2 = await act({ type: 'marketingPct', v: 0.03 }); assert.equal(r2.ok, true, 'Marketing %');
+  const r3 = await act({ type: 'loyalty', lv: 1 }); assert.equal(r3.ok, true, 'Vielflieger');
+  const r4 = await act({ type: 'buySlots', apt: 'LHR', n: 1 }); assert.ok(r4.ok || /Slot|Dispo/.test(r4.msg || ''), 'Slots: ' + JSON.stringify(r4));
+  const r5 = await act({ type: 'hubLevel', apt: 'HAM', lv: 1 }); assert.equal(r5.ok, false, 'Drehkreuz braucht Strecken');
+  const st2 = await call('anna', 'GET', '/games/main/state?v=x'), w2 = JSON.parse(gunzipSync(Buffer.from(st2.data)).toString());
+  const an = w2.airlines.find((a) => a.owner === 'anna');
+  assert.equal(an.cabin.short.b, 0.12); assert.equal(an.mktPct, 0.03); assert.equal(an.loyalty.lv, 1);
+  console.log('Strategie ok: Kabine, Marketing 3 %, Meilenprogramm, Slotkauf', r4.ok ? 'gekauft' : 'abgelehnt (' + r4.msg + ')', '· Drehkreuz:', r5.msg); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 console.log('Alle Prüfungen bestanden.');

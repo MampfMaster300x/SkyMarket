@@ -1,4 +1,4 @@
-# SKYMARKET Online (Testversion 0.13.2)
+# SKYMARKET Online (Testversion 0.14)
 
 Airline-Wirtschaftssimulation im Browser: 211 Flughäfen auf allen Kontinenten, 30 KI-Airlines, eine dauerhafte Hauptwelt für alle (bis 60 Airlines) und private Runden mit bis zu vier Personen.
 
@@ -172,6 +172,36 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 ```
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
+
+## Neu in 0.14: Strategie-Hub, Kabinenklassen, Vielflieger, Drehkreuze, Marktkontrolle, Filter
+
+**Strategie-Hub (Karte → Strategie, Kurzfassung oben im Dashboard)**
+- **Kabinenaufteilung First / Business / Economy** – eine Einstellung für alle Strecken, getrennt für Kurz-/Mittelstrecke und Langstrecke (z. B. 30 % First, 50 % Business, 20 % Economy). Voreinstellungen oder Regler; das Bild zeigt sofort die Sitze je Klasse, darunter die **Prognose für Ihr ganzes Netz** (Streckenbeitrag pro Tag vorher/nachher) und die Umbaukosten.
+  - Modell: Premiumsitze brauchen Fläche (Business kurz 1,5, lang 3,4 Economy-Sitze; First 6, nur Langstrecke) und erzielen das 2,1- (Business kurz), 3,4- (Business lang) bzw. 6-Fache (First) des Economy-Tarifs. Gebucht werden sie vor allem von Geschäftsreisenden (kurz 42 %, lang 55 % für Business, 10 % First), kaum von Urlaubern. Airlines mit Premiumkabine sind für Geschäftsreisende attraktiver (sättigt bei etwa 15 % Premiumsitzen). Premiumgäste kosten mehr Bordservice.
+  - Ergebnis in Tests: Auf Geschäftsstrecken (London, Paris, Wien) bringen 10–20 % Business 15–40 % mehr Streckenbeitrag; zu viel Premium (50 % Business auf der Kurzstrecke) ist kaum besser oder sogar schlechter als reine Economy, weil die Plätze leer bleiben. Auf schwach ausgelasteten Strecken kostet Premium kaum etwas, auf vollen Ferienstrecken echte Plätze.
+  - Die bisherigen Produkte Basic/Standard/Premium bleiben als Bordprodukt je Strecke. Premium-KI-Airlines fliegen jetzt ebenfalls mit Business (12 % kurz, 26 % + 4 % First lang).
+  - Die Streckenliste zeigt die Sitze je Klasse (z. B. „14 B · 158 Y“).
+- **Marketing als Anteil am Umsatz** (0–8 %) statt fester Summe – mit **Sättigung**: die ersten 2–3 % wirken am stärksten, ab 5 % kommt kaum noch etwas dazu. Kurve, Kosten pro Monat und die langfristig erreichbare Marke stehen dabei. Alte feste Budgets laufen weiter, bis Sie umstellen.
+- **Vielfliegerprogramm** in drei Stufen (Meilen, Status mit Lounges, Premium mit Kreditkarte und Partnern): Einführung 0,6 / 2 / 5 Mio. €, Fixkosten plus 1,0–2,6 % der Ticketerlöse, dafür Partnererlöse und vor allem Bindung von Geschäftsreisenden. Die Wirkung baut sich über sechs Monate auf und wächst mit der Größe des Netzes. Neues GuV-Konto „Kundenbindung“.
+- **Drehkreuze**: Jede Basis lässt sich zum Umsteigeknoten (ab 4 Strecken), Drehkreuz (ab 8) und Mega-Hub (ab 15) ausbauen. Jede Stufe macht Umsteigen bequemer (weniger Umsteige-Malus, abgestimmte Wellen, mehr sinnvolle Umwege, weniger Rabatt nötig) und gibt Geschäftsreisenden am Drehkreuz einen Heimvorteil. Test mit 15 Strecken ab Hamburg: +6 % / +11 % / +15 % Umsteiger, rund +4 % / +8 % / +11 % Erlös. So wird auch Hannover ein Drehkreuz – ohne Umweg über London.
+- **Marktkontrolle über Slots**: An koordinierten Flughäfen kaufen Sie einzelne oder **alle freien Slots**. Danach kann dort niemand zusätzliche Flüge anbieten; bestehende Konkurrenzflüge bleiben (deren Slots gibt es im Handel). Je knapper der Rest, desto teurer der nächste Slot (der letzte kostet das Vierfache); ungenutzte gekaufte Slots kosten die übliche Slotgebühr, Rückgabe zum halben Preis.
+- **Gate-Exklusivvertrag** an eigenen Basen ohne Slotkoordination (bis 25 Mio. Passagiere, z. B. Hamburg, Hannover): Einmalpreis 0,9 Mio. € je Mio. Jahrespassagiere plus 1,5 % im Monat. Andere Airlines – KI und Mitspielende – können dort keine neuen Flüge mehr anbieten oder aufstocken.
+
+**Filter**
+- **Verlauf (Karte → Verlauf)**: neue Auswahl „Ansicht“ – ganze Airline, **je Basis, je Flugzeugmuster oder je Strecke**. Gefiltert zeigt der Verlauf Tag für Tag den Streckenbeitrag (Erlöse − direkte Flugkosten − Flugzeugzeit) mit Passagieren, Auslastung, Premiumgästen, Umsteigern, Flügen, Verspätungen und Ausfällen (bis 60 Tage).
+- **Strecken → Netz**: Filter nach Basis, Muster, Status (nur im Minus / voll / schwach) und Suche nach Ziel; die Summe passt sich an.
+- **Flotte → Ihre Flotte**: Filter nach Basis, Muster, Status (im Einsatz / ungenutzt / Wartung / Lieferung) und Suche nach Kennung.
+- **Dashboard**: Profitabilität und Auslastung je Strecke lassen sich nach Basis und Muster filtern.
+
+## Neu in 0.13.3: Verlauf Tag für Tag, Strecken der Mitspielenden, Suche in allen Auswahllisten
+
+- **Verlauf (Karte → Verlauf):** Ergebnis jedes einzelnen Tages der letzten 30 oder 90 Tage als Balken (grün/rot), dazu Summe, Tagesschnitt, bester und schwächster Tag.
+  - Ein Tipp auf einen Balken oder eine Tabellenzeile zeigt den Tag im Detail: Ergebnis, Passagiere, Auslastung, Flüge, Verspätungen, Ausfälle, Kontostand und die Aufschlüsselung in Erlöse, Kerosin, Flugbetrieb, Personal, Flugzeuge & Standorte, Verwaltung & Marketing, Einmalkosten, Zinsen & Steuern (mit Anteil an den Erlösen). Mit ‹ › blättern Sie Tag für Tag.
+  - Umschalter „Monate“: dasselbe je Monat für bis zu zwei Jahre, inklusive laufendem Monat.
+  - Hinkommen: Klick auf die Kachel „Ergebnis … (lfd.)“ im Dashboard (zeigt jetzt auch „gestern“), auf „Tagesergebnis“ in der Seitenleiste, auf „Ergebnis gestern“ unter Finanzen oder „Öffnen“ bei „Ergebnis je Monat“.
+  - Die Aufschlüsselung je Tag wird ab dieser Version gespeichert; ältere Tage zeigen Ergebnis, Passagiere und Kontostand.
+- **Mitspielende (Markt → Mitspielende):** Jede Karte hat „▸ Strecken, Flugzeuge und Preise“. Aufgeklappt: alle Strecken der Airline mit Flugzeugmuster (Datenblatt per Klick), Produkt, Flügen pro Tag sowie Preis hin und zurück; „auch Sie“ markiert Strecken, die Sie selbst fliegen. Ein Klick auf die Strecke öffnet den Markt des Ziels.
+- **Suche in Auswahllisten:** Jede Auswahlliste mit sieben oder mehr Einträgen (Ziel und Basis in der Streckenplanung, Flugzeugmuster, Airlines im Handel, Standorte in der CFO-Beratung, Marktstudien-Schwerpunkt, Arbeitsmarkt, Chat-Empfänger …) öffnet ein Suchfeld. Gesucht wird in Name, Code und Gruppe, ohne Rücksicht auf Akzente („sao“ findet São Paulo); ein exakter Flughafencode („jfk“) steht oben. Pfeiltasten, Enter und Esc funktionieren; auf dem Handy öffnet sich die Liste als großes Blatt von unten. Kürzere Listen (z. B. Tempo, Service, Puffer) bleiben normale Auswahllisten.
 
 ## Neu in 0.13.2: Anleitung als Bild-Durchlauf, eindeutige Logos
 
