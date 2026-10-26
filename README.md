@@ -179,23 +179,41 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
-## Neu in 0.15: Langstrecke nachgerechnet, Umsteiger, 175 neue Flughäfen, Preisautomatik, Verwaltung, Fachkräfte mit Ist-Leistung
+## Neu in 0.15: Langstrecke, Umsteiger, 175 neue Flughäfen, realistische Nachfrage je Standort, Slots mit Warteliste, Personal zum Termin, Preisautomatik, Verwaltung, Fachkräfte
 
 **Langstrecke**
 - **Ein Flugzeug reicht, solange der Umlauf (hin, Bodenzeit, zurück, Bodenzeit) höchstens 22 Stunden dauert** – das Flugzeug fliegt dann über Nacht genau diesen einen Umlauf. Beispiele: Frankfurt–New York 19,8 h, Frankfurt–Chicago 21,9 h, Frankfurt–Dubai 16,7 h, Singapur–Sydney 20 h. Das gilt jetzt auch für Schmalrumpfjets wie die A321neo auf dem Atlantik (vorher zählten dort 17 h, also zwei Flugzeuge). Grenze ab Frankfurt: etwa 7.200 km.
 - **Über 22 Stunden geht es physikalisch nicht mit einem Flugzeug täglich**: Frankfurt–Singapur 30 h, Frankfurt–Los Angeles 27,7 h, Sydney–Los Angeles 34,3 h. Ein Flugzeug ist dann zwei Tage unterwegs – mit zweien fliegt die Strecke täglich, mit einem jeden zweiten Tag. Die Streckenplanung sagt das jetzt ausdrücklich (grün: „Ein Flugzeug reicht“, gelb: „braucht 2 Flugzeuge“).
-- **Mehr Nachfrage auf langen Strecken** (ab 2.500 km steigend, ab 7.000 km doppelt so viel wie vorher) und ein **schwächerer Umsteige-Wettbewerb** über fremde Drehkreuze. Ergebnis zum Referenzpreis (Streckenbeitrag nach Flugzeugkosten): Frankfurt–Chicago B787-9 +11 %, Hamburg–New York A321neo +43 %, Frankfurt–Los Angeles +25 %, Sydney–Los Angeles +34 % (zwei Flugzeuge); auf umkämpften Strecken wie Frankfurt–New York mit Großraumjet nur knapp positiv, Frankfurt–Dubai gegen die Golf-Airlines klar negativ. In Langzeittests (540 Tage, mit Ölpreisschocks und Rezession) wachsen Langstrecken-Airlines aus Frankfurt und Hamburg auf das 7- bis 8-Fache ihres Startkapitals, aus Sydney (Australien–Amerika ohne KI-Konkurrenz) auf über das 20-Fache.
+- **Nachfrage neu kalibriert** (siehe „Nachfrage je Standort“ unten). Langstrecke lohnt sich vor allem zwischen großen Märkten (Frankfurt–Asien, Sydney–Asien, Dubai), auf umkämpften Strecken wie Frankfurt–New York braucht es Zubringer über ein eigenes Drehkreuz.
 - **Kerosinzuschlag im Markt**: Steigt Kerosin dauerhaft, ziehen die Marktpreise mit (gleitender Index über rund 45 Tage; Kurzstrecke gibt etwa 11 %, Langstrecke bis 30 % des Anstiegs weiter). Vorher konnte eine Ölkrise (+84 %) reine Langstrecken-Airlines in vier Monaten in die Insolvenz treiben, weil jede Preiserhöhung Kunden kostete. Die Weltlage zeigt den aktuellen Zuschlag.
 - Die Streckenliste rechnete die Flugzeugkosten bei Langstrecken bisher zu hoch (Umlauf ÷ 17 h statt tatsächlich gebundener Flugzeuge) – korrigiert.
 
 **Umsteigen**
-- **Sitzschutz für Umsteiger**: Ihre Flüge halten jetzt einen Teil der Plätze für Umsteiger frei, statt sie vorher vollständig an Direktreisende zu verkaufen (gelernt aus der Umsteigenachfrage der letzten Tage, höchstens die Hälfte der Sitze). Test „alle Verbindungen und alle Slots in Singapur“: vorher rund 60 Umsteiger je Strecke und 10 % Anteil, jetzt 120–310 je Strecke, gut 4.000 am Tag, 44 % aller Gäste.
+- **Sitzschutz für Umsteiger**: Ihre Flüge halten jetzt einen Teil der Plätze für Umsteiger frei, statt sie vorher vollständig an Direktreisende zu verkaufen (gelernt aus der Umsteigenachfrage der letzten Tage, höchstens die Hälfte der Sitze). Test „alle Verbindungen und alle Slots in Singapur“: vorher rund 60 Umsteiger je Strecke und 10 % Anteil, jetzt 130–300 je Strecke, rund 3.400 am Tag, 40 % aller Gäste (mit der neuen Nachfrage gerechnet).
 - Strecken → Bearbeiten und Strategie-Hub zeigen **gewünschte und tatsächlich beförderte Umsteiger** – so sieht man, ob Sitze fehlen.
 
 **Mehr Welt**
 - **175 neue Flughäfen, 50 neue Länder** (386 insgesamt): u. a. Hannover, Bremen, Nürnberg, Leipzig, Belgien, Skandinavien, Osteuropa, Baltikum, Balkan, Israel, Jordanien, Libanon, Golfstaaten, Iran, Sri Lanka, Malediven, Nepal, Bangladesch, Pakistan, Kambodscha, Myanmar, Macau, Mongolei, Zentralasien, Kaukasus, Karibik und Mittelamerika, Venezuela, weitere Städte in USA, Kanada, China, Indien, Japan, Brasilien, Australien und Afrika. Karte mit allen Ländern.
 - EU erweitert (Bulgarien, Kroatien, Baltikum, Malta, Zypern).
 - Leasinggeber haben mehr Flugzeuge, je mehr Menschen mitspielen (+20 % je weitere Airline).
+
+**Nachfrage je Standort – neu kalibriert**
+- Geprüft an allen 386 Flughäfen (reales Aufkommen) und rund 110 realen Märkten. Befund vorher: Kleine Ferien- und Exotikziele hatten ein Vielfaches ihrer echten Nachfrage (Victoria Falls 20-fach, Seychellen, Tahiti, Sansibar 8–10-fach), große Inlandsstrecken nur einen Bruchteil (Sydney–Melbourne, Tokio–Sapporo, Seoul–Jeju, Delhi–Mumbai 3–10 % des Realen). Zwei Drittel der Hamburger Nachfrage gingen auf über 4.000 km.
+- Neues Modell: Schwerkraft mit realistischerer Distanzabnahme, Grenzen (Inland > EU > Ausland > anderer Kontinent), Aufschlag zwischen großen Märkten auf der Langstrecke – und **Ausgleich je Flughafen**: Die Nachfrage jedes Flughafens entspricht seinem realen Aufkommen ohne Umsteiger, getrennt nach Inland und Ausland (z. B. USA 8 % international, New York-JFK 45 %, Deutschland 80 %). Fehlen einem Land im Spiel viele Inlandsziele (Norwegen), bleibt der Rest ungeflogen, statt eine Strecke aufzublähen.
+- **Bahn, Auto und Bus** auf kurzen Landstrecken ohne eigene Bahnangabe: bei 300 km fliegt rund ein Viertel, bei 400 km die Hälfte, ab 600 km fast alle. Inseln und Meerengen sind ausgenommen (Mallorca, Kanaren, Sizilien, Hawaii, Okinawa, Jeju, Bali, Tasmanien, Südinsel …).
+- Mindeststrecke 250 statt 300 km (Singapur–Kuala Lumpur, eine der meistgeflogenen Strecken der Welt, ist jetzt möglich).
+- Ergebnis: Die Märkte liegen im Mittel beim Realen (Faktor 1,05, Kurz- und Langstrecke gleich behandelt), typische Abweichung Faktor 2 (vorher 2,4 – und Kurzstrecken systematisch 3- bis 10-fach zu niedrig). Beispiele, Reisende pro Tag und Richtung (vorher): Sydney–Melbourne 10.500 (1.400), Hamburg–München 720 (620), Hamburg–Mallorca 710 (370), London–New York 2.600 (2.400), Frankfurt–New York 920 (1.120), Hamburg–Victoria Falls 6 (180).
+- Langzeittest (540 Tage, mit Krisen): Frankfurt rund das 10-Fache des Startkapitals (Asien-Langstrecke), Hamburg das 4-Fache (dichtes Europa-Netz), Sydney das 13-Fache.
+
+**Slots: kaufen, Warteliste, Strecken in Planung**
+- **Jeder Slot kostet**: Wer an einem koordinierten Flughafen eine Strecke eröffnet oder aufstockt, kauft die nötigen Slots zum Tagespreis (je knapper, desto teurer) – außer sie liegen schon in der eigenen Reserve. Die Planung zeigt den Betrag vorher. Gekaufte Slots gehören Ihnen: Schließen oder verkleinern Sie eine Strecke, bleiben sie in Ihrer Reserve (Slotgebühr läuft weiter, Rückgabe zum halben Preis). KI-Airlines bekommen weiter freie Slots vom Koordinator.
+- **Slots für später**: Im Strategie-Hub lassen sich Slots an jedem koordinierten Flughafen kaufen, auch an solchen, die Sie noch nicht anfliegen.
+- **Warteliste**: Ist ein Flughafen voll, tragen Sie sich ein. Frei werdende Slots (Sommer-/Winterflugplan, aufgegebene Strecken, Rückgaben) gehen jeden Tag **reihum** an die Wartenden – jeder bekommt einen, dann der Nächste – und werden beim Zuteilen bezahlt. Wer wartet, hat Vorrang: Andere können diese Slots nicht wegkaufen.
+- **Strecken in Planung**: Fehlen Slots, speichern Sie die Strecke (oder einen dritten, vierten … Flug auf einer bestehenden Strecke) als Plan. Er trägt Sie automatisch auf die Warteliste ein und wird umgesetzt, sobald alle Slots da sind (abschaltbar; sonst „Jetzt umsetzen“). Übersicht unter Strecken → In Planung.
+
+**Personal zum Termin**
+- Unter Unternehmen → Personal wählen Sie den **Antritt neuer Leute**: so früh wie möglich, zur Lieferung eines bestimmten Flugzeugs, zum Start einer angekündigten Strecke oder in X Tagen (bis 180). „Bedarf decken“ rechnet dann den Bedarf bis zu diesem Tag ein, auch die neue Strecke und das neue Flugzeug. Einstellungskosten fallen sofort an, das Gehalt erst ab Antritt.
+- In der Streckenplanung stellt „Personal gleich mit einstellen“ die Crew automatisch zum ersten Flug ein – least man ein Flugzeug mit 20 Tagen Lieferzeit, fangen die Leute an dem Tag an, an dem das Flugzeug kommt.
 
 **Preisautomatik** (Strategie-Hub für alle, Strecken → Bearbeiten je Strecke)
 - Einmal pro Woche kleine Schritte Richtung **Ziel-Auslastung** (75–95 %). Einstellbar: **Untergrenze** (nur Kostengrenze oder 70/85/100 % des Referenzpreises), **Obergrenze** (130/150/200/300 %), **Tempo** (vorsichtig ±1,5 %, normal ±3 %, zügig ±6 % pro Woche) und **Premiumpreise** (fest oder automatisch auf eine Ziel-Auslastung der Business/First-Sitze).

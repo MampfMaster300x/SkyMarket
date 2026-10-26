@@ -25,10 +25,23 @@ const SM = (() => {
     AIRPORT_X: AIRPORT_X_DATA,
     REGIONS: Object.fromEntries(REGION_ORDER.map((r) => [r, Object.keys(AIRPORT_DATA).filter((c) => AIRPORT_DATA[c].region === r)])),
     LEISURE_SEASON_PROFILE: SEASON_DATA,
-    INTERCONT: 0.6, MIN_ROUTE_KM: 300, LONGHAUL_TAX_KM: 3000,
+    INTERCONT: 0.6, MIN_ROUTE_KM: 250, LONGHAUL_TAX_KM: 3000,
+    // Nachfragemodell (kalibriert an rund 110 realen Märkten und am Aufkommen aller Flughäfen, siehe tripRaw)
+    DEMAND: { leisE: -0.8, bizE: -0.6, vfrE: -0.8, intercont: 0.25, border: 0.4, eu: 0.5, big: 0.4, bigLong: 1, bigFrom: 5, overDom: 1.2, overIntl: 2.9, kMax: 6, covN: 8,
+      // Anteil der Inlandsreisen, die zu Flughäfen im Spiel führen (Rest: Ziele, die es im Spiel nicht gibt)
+      cover: { DE: 0.95, GB: 0.85, FR: 0.8, ES: 0.85, IT: 0.8, PT: 0.95, GR: 0.5, NO: 0.25, SE: 0.4, JP: 0.6, AU: 0.85, NZ: 0.75, US: 0.75, CA: 0.8, MX: 0.75, CN: 0.65, IN: 0.7, BR: 0.75, RU: 0.6, TR: 0.7, KR: 0.8, AR: 0.6, CO: 0.6, ZA: 0.85, SA: 0.85, ID: 0.4, PH: 0.5, MY: 0.6, TH: 0.6, VN: 0.85, EG: 0.8, MA: 0.7 } },
+    // Anteil internationaler Reisender (Land, einzelne Flughäfen abweichend); große Flächenländer fliegen vor allem im Inland
+    INTL_SHARE: { def: 0.9,
+      country: { US: 0.08, CN: 0.08, IN: 0.12, BR: 0.07, RU: 0.15, JP: 0.12, AU: 0.15, CA: 0.25, ID: 0.12, MX: 0.2, AR: 0.15, CO: 0.2, TR: 0.35, SA: 0.4, IR: 0.3, ZA: 0.2, NG: 0.3, PH: 0.3, VN: 0.3, TH: 0.45, MY: 0.45, PK: 0.4, KR: 0.35, CL: 0.4, PE: 0.35, EG: 0.6, NZ: 0.3, NO: 0.5, SE: 0.6, ES: 0.7, IT: 0.65, FR: 0.65, DE: 0.75, GB: 0.85, GR: 0.7, PT: 0.85, KZ: 0.5, UZ: 0.6, EC: 0.4, VE: 0.4, BO: 0.4, KE: 0.6, TZ: 0.6, ET: 0.8, AO: 0.6, DZ: 0.6, MA: 0.8, PG: 0.4, FI: 0.75, AT: 0.95, CH: 0.97, NL: 0.99, BE: 0.99, DK: 0.9, PL: 0.85, CZ: 0.99, HU: 0.99, IE: 0.99, IL: 0.99, AE: 1, QA: 1, SG: 1, HK: 1, TW: 0.95, MO: 1, KW: 1, BH: 1, JO: 1, LB: 1, OM: 0.9, IS: 0.95, MT: 1, CY: 1, LK: 0.98, MV: 0.9, NP: 0.6, BD: 0.6, KH: 0.8, MM: 0.6, MN: 0.6, AZ: 0.9, GE: 0.95, AM: 1, UA: 0.9, RS: 1, HR: 0.9, BG: 0.95, RO: 0.85, LV: 1, LT: 1, EE: 1 },
+      ap: { FRA: 0.9, MUC: 0.85, JFK: 0.45, MIA: 0.45, EWR: 0.3, LAX: 0.3, SFO: 0.3, IAD: 0.3, ORD: 0.15, IAH: 0.2, BOS: 0.2, SEA: 0.15, ATL: 0.1, DFW: 0.1, FLL: 0.15, MCO: 0.12, HNL: 0.25, ANC: 0.15, DEN: 0.05, PHL: 0.1, CLT: 0.08,
+        NRT: 0.85, KIX: 0.6, HND: 0.25, NGO: 0.3, PVG: 0.35, PEK: 0.2, PKX: 0.15, CAN: 0.2, SZX: 0.1, SYD: 0.4, MEL: 0.3, BNE: 0.18, PER: 0.25, GRU: 0.3, GIG: 0.15, EZE: 0.6, YYZ: 0.5, YVR: 0.4, YUL: 0.5, MEX: 0.35, CUN: 0.7,
+        DEL: 0.25, BOM: 0.3, BLR: 0.12, COK: 0.3, SVO: 0.4, LED: 0.25, IST: 0.7, SAW: 0.35, AYT: 0.85, CGK: 0.25, DPS: 0.55, MNL: 0.4, JED: 0.5, RUH: 0.35, ICN: 0.98, GMP: 0.1, CJU: 0.05, PUS: 0.3, BKK: 0.6, HKT: 0.5, KUL: 0.5,
+        JNB: 0.35, CPT: 0.3, MAD: 0.75, BCN: 0.75, PMI: 0.85, AGP: 0.9, TFS: 0.75, LPA: 0.6, FCO: 0.6, MXP: 0.85, CTA: 0.2, PMO: 0.15, CDG: 0.9, ORY: 0.5, NCE: 0.6, AKL: 0.5, CAI: 0.9, LOS: 0.4, ADD: 0.9, NBO: 0.7, BOG: 0.35, LIM: 0.45, SCL: 0.5, SGN: 0.35, HAN: 0.35, OSL: 0.5, ARN: 0.7 } },
+    // Umsteigeanteil großer Drehkreuze (grob, Vor-Corona bis 2024): zählt nicht zur Nachfrage vor Ort
+    HUB_TRANSFER: { ATL: 0.6, DXB: 0.55, DOH: 0.7, IST: 0.45, FRA: 0.5, AMS: 0.37, CDG: 0.3, LHR: 0.3, MUC: 0.38, ZRH: 0.3, VIE: 0.25, HEL: 0.3, CPH: 0.2, SIN: 0.3, HKG: 0.3, ICN: 0.15, NRT: 0.25, DFW: 0.5, ORD: 0.45, DEN: 0.4, CLT: 0.7, IAH: 0.45, MSP: 0.4, DTW: 0.5, SLC: 0.45, PHX: 0.25, SEA: 0.2, SFO: 0.15, LAX: 0.15, JFK: 0.15, EWR: 0.2, MIA: 0.3, YYZ: 0.3, YVR: 0.2, PEK: 0.1, PKX: 0.1, PVG: 0.12, CAN: 0.15, KUL: 0.2, BKK: 0.15, ADD: 0.7, NBO: 0.3, JNB: 0.25, PTY: 0.7, BOG: 0.3, LIM: 0.25, GRU: 0.3, MEX: 0.15, AUH: 0.55, BAH: 0.4, MAD: 0.3, LIS: 0.35, AKL: 0.12, SYD: 0.1, DEL: 0.12, BOM: 0.1, CAI: 0.2, CMN: 0.2, ATH: 0.15, WAW: 0.2, SVO: 0.35, BRU: 0.15, DUB: 0.1, FCO: 0.15, KEF: 0.4, TPE: 0.2, MNL: 0.1, CGK: 0.1, RUH: 0.2, JED: 0.15, MCT: 0.3, AMM: 0.2, KWI: 0.15, PHL: 0.3, IAD: 0.35, ANC: 0.2, HNL: 0.1 },
     // Langstrecke: Fernreisen sind seltener, aber nicht so selten, wie die Schwerkraftformel allein sagt (Kalibrierung an realen Märkten wie FRA–JFK, LHR–JFK, SIN–SYD)
     LONG_WINDOW_H: 22,   // ein Flugzeug auf einem einzigen langen Umlauf pro Tag
-    LH_BOOST: 1.0, LH_FROM_KM: 2500, LH_FULL_KM: 7000,
+    LH_BOOST: 0, LH_FROM_KM: 2500, LH_FULL_KM: 7000,   // zusätzlicher Langstreckenaufschlag (im neuen Modell über den Großmarkt-Aufschlag abgedeckt)
     // Überschall: Nutzenaufschlag je eingesparter Stunde (Geschäftsreisende zahlen für Zeit, Urlauber kaum)
     SST: { bizPerH: 0.9, bizMax: 3.8, leisurePerH: 0.15, leisureMax: 0.6, vfrPerH: 0.05, vfrMax: 0.25 },
     RAIL_TIME_H: {
@@ -41,6 +54,12 @@ const SM = (() => {
       'HND-KIX': 2.8, 'NRT-KIX': 3.2, 'CKG-TFU': 1.4, 'CKG-CTU': 1.4, 'XIY-CTU': 3.5, 'XIY-TFU': 3.7, 'HGH-NKG': 1.5, 'BOS-LGA': 3.8, 'BOS-JFK': 3.9, 'BOS-EWR': 3.8, 'DCA-LGA': 3.1, 'DCA-JFK': 3.2, 'IAD-LGA': 3.4, 'BWI-LGA': 2.8, 'DCA-BOS': 6.5, 'PHL-BOS': 5.0, 'PHL-DCA': 1.9, 'PHL-IAD': 2.2, 'SEA-YVR': 4.0,
     },
     RAIL_SHARE_MAX: 0.90, RAIL_SHARE_SLOPE: 1.0, ACCESS_TIME_AIR_H: 2.5,
+    // Landverkehr ohne eigene Bahnangabe: bei 300 km fliegen rund 25 %, bei 400 km die Hälfte, ab 600 km fast alle
+    SURFACE: { max: 0.9, mid: 420, width: 80,
+      island: ['PMI', 'IBZ', 'TFS', 'LPA', 'ACE', 'FUE', 'CTA', 'PMO', 'HER', 'RHO', 'CFU', 'FNC', 'HNL', 'OGG', 'OKA', 'CJU', 'DPS', 'BKI', 'HAK', 'SYX', 'CEB', 'CTS', 'HBA', 'LST', 'CHC', 'ZQN', 'ZNZ'],
+      groups: { eu: ['DE', 'FR', 'NL', 'BE', 'CH', 'AT', 'IT', 'ES', 'PT', 'DK', 'SE', 'NO', 'PL', 'CZ', 'HU', 'RO', 'BG', 'RS', 'HR', 'GR', 'LV', 'LT', 'EE', 'TR'], na: ['US', 'CA', 'MX'],
+        sea: ['MY', 'TH', 'KH', 'MM', 'VN'], cn: ['CN', 'HK', 'MO'], gulf: ['AE', 'OM', 'SA', 'QA', 'KW', 'BH', 'JO'], sa: ['IN', 'NP', 'BD', 'PK'],
+        am: ['AR', 'BR', 'PY', 'UY', 'CL', 'PE', 'BO', 'EC', 'CO', 'VE'], ca: ['GT', 'SV', 'CR', 'PA'], ea: ['KE', 'TZ', 'UG', 'RW'], sf: ['ZA', 'NA', 'ZW', 'ZM', 'MZ'], cau: ['GE', 'AM', 'AZ'] } },
     VFR_TIES: { 'SYD-AKL': 1.6, 'MEL-AKL': 1.5, 'BNE-AKL': 1.5, 'SYD-CHC': 1.3, 'SYD-WLG': 1.3, 'PER-DPS': 1.4, 'SYD-NAN': 1.3, 'YYZ-YUL': 1.2, 'SVO-LED': 1.3, 'LHR-SYD': 1.3, 'LHR-AKL': 1.3, 'LIS-GRU': 1.4, 'LIS-GIG': 1.4, 'MAD-EZE': 1.4, 'CDG-YUL': 1.5, 'CDG-ABJ': 1.5, 'CDG-DLA': 1.4, 'LIS-LAD': 1.6, 'BER-FCO': 1.3, 'DUS-FCO': 1.3, 'FRA-FCO': 1.3, 'MUC-FCO': 1.4, 'LHR-LIS': 1.5, 'CDG-LIS': 1.8, 'DUS-LIS': 1.3, 'LHR-PMI': 1.2, 'BER-VIE': 1.2, 'MUC-VIE': 1.3 },
     ROUTE_DETOUR: 1.05,
     FUEL_USD_KG: 0.88, EURUSD: 1.10,
@@ -410,18 +429,109 @@ const SM = (() => {
     return P.RAIL_SHARE_MAX / (1 + Math.exp(P.RAIL_SHARE_SLOPE * (tr - ta)));
   }
   const _acc = {};
-  const accessibility = (o, d) => { const r = _acc[o] || (_acc[o] = {}); const v = r[d]; return v !== undefined ? v : (r[d] = 1 - railShare(o, d)); };
-  function tripGeneration(o, d) {
-    const A = ap(o), B = ap(d);
-    const dist = Math.max(gcDistanceKm(o, d), P.GRAVITY_MIN_DIST_KM) / 1000;
+  /** Auto, Bus und Bahn auf kurzen Landstrecken: Anteil, der nicht fliegt (Inseln und Meerengen ausgenommen). */
+  const _landGrp = {};
+  for (const [gname, cs] of Object.entries(P.SURFACE.groups)) for (const c of cs) _landGrp[c] = gname;
+  function surfaceShare(o, d) {
+    const A = ap(o), B = ap(d), S = P.SURFACE;
+    if (S.island.includes(o) || S.island.includes(d)) return 0;
+    if (A.country !== B.country && !(_landGrp[A.country] && _landGrp[A.country] === _landGrp[B.country])) return 0;
+    return S.max / (1 + Math.exp((gcDistanceKm(o, d) - S.mid) / S.width));
+  }
+  const accessibility = (o, d) => { const r = _acc[o] || (_acc[o] = {}); const v = r[d]; return v !== undefined ? v : (r[d] = railTime(o, d) !== null ? 1 - railShare(o, d) : 1 - surfaceShare(o, d)); };
+  /**
+   * Nachfrage (Reisende je Richtung und Tag, vor Bahn-Abzug) – doppelt beschränktes Schwerkraftmodell:
+   * 1) Rohstrom je Segment aus Einwohnern, Einkommen, Geschäft und Tourismus, Distanz (Exponent je Segment),
+   *    Grenzen (Inland > EU > andere Länder > anderer Kontinent) und einem Aufschlag für Strecken zwischen großen Märkten.
+   * 2) Ausgleichsfaktor je Flughafen: Die Summe aller Ströme entspricht dem realen Aufkommen ohne Umsteiger
+   *    (Passagiere × (1 − Umsteigeanteil)), so dass kleine Ferienflughäfen nicht mehr Nachfrage haben als Großstädte.
+   */
+  function tripRaw(o, d) {
+    const A = ap(o), B = ap(d), D = P.DEMAND;
+    const dk = gcDistanceKm(o, d), dist = Math.max(dk, P.GRAVITY_MIN_DIST_KM) / 1000;
     const ties = P.VFR_TIES[o + '-' + d] ?? P.VFR_TIES[d + '-' + o] ?? 1.0;
-    const lh = 1 + P.LH_BOOST * clamp((dist * 1000 - P.LH_FROM_KM) / (P.LH_FULL_KM - P.LH_FROM_KM), 0, 1);
-    const g = P.GRAVITY, ic = (A.region !== B.region && A.country !== B.country ? P.INTERCONT : 1) * lh;   // Inland bleibt Inland (z. B. Moskau–Wladiwostok)
+    const lh = 1 + P.LH_BOOST * clamp((dk - P.LH_FROM_KM) / (P.LH_FULL_KM - P.LH_FROM_KM), 0, 1);
+    const border = A.country === B.country ? 1 : A.region !== B.region ? D.intercont : EU.has(A.country) && EU.has(B.country) ? D.eu : D.border;
+    const g = P.GRAVITY, f = border * lh;
     return {
-      leisure: ic * g.leisure.K * A.pop ** 0.8 * A.income ** 1.5 * B.tour * B.pop ** 0.2 * dist ** g.leisure.e,
-      business: ic * g.business.K * (A.pop * B.pop) ** 0.5 * A.biz * B.biz * A.income ** 0.5 * dist ** g.business.e,
-      vfr: ic * g.vfr.K * (A.pop * B.pop) ** 0.5 * ties * dist ** g.vfr.e,
+      leisure: f * g.leisure.K * A.pop ** 0.8 * A.income ** 1.5 * B.tour * B.pop ** 0.2 * dist ** D.leisE,
+      business: f * g.business.K * (A.pop * B.pop) ** 0.5 * A.biz * B.biz * A.income ** 0.5 * dist ** D.bizE,
+      vfr: f * g.vfr.K * (A.pop * B.pop) ** 0.5 * ties * dist ** D.vfrE,
     };
+  }
+  /** Reales Aufkommen ohne Umsteiger (Mio. Passagiere im Jahr). */
+  const odVolume = (c) => Math.max(0.05, (ap(c).pax || 0.5) * (1 - (P.HUB_TRANSFER[c] || 0)));
+  /** Anteil internationaler Reisender am Flughafen (Rest: Inland). */
+  const intlShare = (c) => P.INTL_SHARE.ap[c] ?? P.INTL_SHARE.country[ap(c).country] ?? P.INTL_SHARE.def;
+  const isDom = (o, d) => ap(o).country === ap(d).country;
+  /** Aufschlag für Strecken zwischen zwei großen Märkten, auf Langstrecke stärker (London–New York statt Hamburg–Cusco). */
+  function bigPairV(va, vb, dk) {
+    const D = P.DEMAND, a = Math.max(0, Math.log(va / D.bigFrom)), b = Math.max(0, Math.log(vb / D.bigFrom));
+    return a && b ? Math.exp(D.big * a * b * (1 + D.bigLong * Math.min(1, dk / 6000))) : 1;
+  }
+  // Inland: Nur ein Teil der Inlandsreisen führt zu Flughäfen, die es im Spiel gibt (wenige Flughäfen im Land = kleiner Teil)
+  const _nCty = {}; for (const c of AP_CODES) _nCty[ap(c).country] = (_nCty[ap(c).country] || 0) + 1;
+  const domCover = (c) => (_nCty[ap(c).country] || 1) < 2 ? 0 : P.DEMAND.cover[ap(c).country] ?? 1 - Math.exp(-((_nCty[ap(c).country] || 1) - 1) / P.DEMAND.covN);
+  const layerVol = (c, dom) => odVolume(c) * (dom ? (1 - intlShare(c)) * domCover(c) : intlShare(c));
+  const bigPair = (o, d) => (isDom(o, d) ? 1 : bigPairV(layerVol(o, false), layerVol(d, false), gcDistanceKm(o, d)));
+  let _demK = null;
+  /**
+   * Ausgleichsfaktoren je Flughafen, getrennt für Inland und Ausland (einmal berechnet, deterministisch):
+   * Inlandsströme summieren sich zum Inlandsaufkommen, Auslandsströme zum Auslandsaufkommen. Faktoren sind gedeckelt –
+   * fehlen im Spiel die Inlandsziele (z. B. Norwegen), bleibt der Rest ungeflogen, statt eine einzige Strecke aufzublähen.
+   */
+  function demandK() {
+    if (_demK) return _demK;
+    // schneller Pfad über Felder (gleiche Formeln wie tripRaw, bigPair und accessibility)
+    const C = AP_CODES, N = C.length, D = P.DEMAND, g = P.GRAVITY, rad = Math.PI / 180, R = 6371;
+    const lat = new Float64Array(N), lon = new Float64Array(N), cl = new Float64Array(N), LO = new Float64Array(N), LD = new Float64Array(N), BO = new Float64Array(N), BD = new Float64Array(N), SP = new Float64Array(N);
+    const VD = new Float64Array(N), VI = new Float64Array(N), cty = [], reg = [], eu = [];
+    for (let i = 0; i < N; i++) {
+      const A = ap(C[i]); lat[i] = A.lat * rad; lon[i] = A.lon * rad; cl[i] = Math.cos(lat[i]);
+      LO[i] = A.pop ** 0.8 * A.income ** 1.5; LD[i] = A.tour * A.pop ** 0.2; BO[i] = A.pop ** 0.5 * A.biz * A.income ** 0.5; BD[i] = A.pop ** 0.5 * A.biz; SP[i] = A.pop ** 0.5;
+      VD[i] = layerVol(C[i], true); VI[i] = layerVol(C[i], false); cty.push(A.country); reg.push(A.region); eu.push(EU.has(A.country));
+    }
+    const special = new Set([...Object.keys(P.VFR_TIES), ...Object.keys(P.RAIL_TIME_H)]);
+    const pi = [], pj = [], pv = [], pd = [];
+    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+      const dp = lat[j] - lat[i], dl = lon[j] - lon[i], h = Math.sin(dp / 2) ** 2 + cl[i] * cl[j] * Math.sin(dl / 2) ** 2, dk = 2 * R * Math.asin(Math.sqrt(h));
+      if (dk < P.MIN_ROUTE_KM) continue;
+      const dom = cty[i] === cty[j];
+      let v;
+      if (special.has(C[i] + '-' + C[j]) || special.has(C[j] + '-' + C[i])) {
+        const a = tripRaw(C[i], C[j]), b = tripRaw(C[j], C[i]);
+        v = 0.5 * (a.leisure + b.leisure + a.business + b.business + a.vfr + b.vfr) * bigPair(C[i], C[j]) * accessibility(C[i], C[j]);
+      } else {
+        const ld = Math.log(Math.max(dk, P.GRAVITY_MIN_DIST_KM) / 1000);
+        const lh = 1 + P.LH_BOOST * clamp((dk - P.LH_FROM_KM) / (P.LH_FULL_KM - P.LH_FROM_KM), 0, 1);
+        const border = dom ? 1 : reg[i] !== reg[j] ? D.intercont : eu[i] && eu[j] ? D.eu : D.border;
+        const leis = g.leisure.K * (LO[i] * LD[j] + LO[j] * LD[i]) * Math.exp(D.leisE * ld);
+        const biz = g.business.K * (BO[i] * BD[j] + BO[j] * BD[i]) * Math.exp(D.bizE * ld);
+        const vfr = g.vfr.K * 2 * SP[i] * SP[j] * Math.exp(D.vfrE * ld);
+        v = 0.5 * border * lh * (leis + biz + vfr) * (dom ? 1 : bigPairV(VI[i], VI[j], dk)) * (dk < 900 ? accessibility(C[i], C[j]) : 1);
+      }
+      if (v > 0) { pi.push(i); pj.push(j); pv.push(v); pd.push(dom ? 1 : 0); }
+    }
+    const solve = (dom, vol) => {
+      const tgt = Array.from(vol, (x) => x * (dom ? D.overDom : D.overIntl) * 1e6 / 730);   // Reisende je Richtung und Tag
+      let k = new Float64Array(N).fill(1);
+      for (let it = 0; it < 50; it++) {
+        const sum = new Float64Array(N);
+        for (let n = 0; n < pv.length; n++) if (pd[n] === dom) { sum[pi[n]] += k[pj[n]] * pv[n]; sum[pj[n]] += k[pi[n]] * pv[n]; }
+        for (let i = 0; i < N; i++) k[i] = sum[i] > 0 ? Math.sqrt(k[i] * tgt[i] / sum[i]) : 0;
+        // Deckel: höchstens kMax-fach über dem typischen Faktor (Median), sonst bläht eine einzelne Strecke auf
+        const pos = Array.from(k).filter((x) => x > 0).sort((a, b) => a - b), med = pos.length ? pos[Math.floor(pos.length / 2)] : 1;
+        for (let i = 0; i < N; i++) if (k[i] > D.kMax * med) k[i] = D.kMax * med;
+      }
+      return k;
+    };
+    const kD = solve(1, VD), kI = solve(0, VI);
+    _demK = { dom: Object.fromEntries(C.map((c, i) => [c, kD[i]])), intl: Object.fromEntries(C.map((c, i) => [c, kI[i]])) };
+    return _demK;
+  }
+  function tripGeneration(o, d) {
+    const r = tripRaw(o, d), K = demandK(), L = isDom(o, d) ? K.dom : K.intl, f = (L[o] ?? 0) * (L[d] ?? 0) * bigPair(o, d);
+    return { leisure: r.leisure * f, business: r.business * f, vfr: r.vfr * f };
   }
   const _qb = {};
   function qBase(o, d) {
@@ -905,11 +1015,13 @@ const SM = (() => {
     closeRoute(day, r, why) {
       r.closed = true; r.closedDay = day; this.log(day, `Strecke ${r.base}–${r.dest} geschlossen (${why})`, 'route');
       for (const a of this.fleet) if (a.pins && a.pins.length) a.pins = a.pins.filter((p) => p.route !== r.id);
-      for (const x of [r.base, r.dest]) this.hold(x, r.freq, day + SLOT_HOLD_DAYS);
+      for (const x of [r.base, r.dest]) this.release(x, r.freq, day);
     }
     // Slot-Reserve: freigewordene Slots an koordinierten Flughäfen bleiben eine Zeit lang bei der Airline (handelbar, wiederverwendbar)
     heldAt(apt, day) { return (this.slotHold[apt] || []).reduce((s, h) => s + (h.until > day ? h.n : 0), 0); }
-    hold(apt, n, until) { if (!(n > 0) || !P.AIRPORTS[apt] || apx(apt).slots === null) return; (this.slotHold[apt] = this.slotHold[apt] || []).push({ n, until }); }
+    hold(apt, n, until, buy = false) { if (!(n > 0) || !P.AIRPORTS[apt] || apx(apt).slots === null) return; (this.slotHold[apt] = this.slotHold[apt] || []).push(buy ? { n, until: 1e9, buy: true } : { n, until }); }
+    /** Frei gewordene Slots: Spielende haben sie bezahlt und behalten sie (Reserve, Slotgebühr läuft weiter, Rückgabe zum halben Preis). */
+    release(apt, n, day) { if (this.isPlayer) this.hold(apt, n, 0, true); else this.hold(apt, n, day + SLOT_HOLD_DAYS); }
     useHeld(apt, n, day) {
       let left = n; const lst = (this.slotHold[apt] || []).filter((h) => h.until > day).sort((a, b) => a.until - b.until);
       for (const h of lst) { const k = Math.min(h.n, left); h.n -= k; left -= k; if (!left) break; }
@@ -1012,9 +1124,9 @@ const SM = (() => {
       need.cab = Math.ceil(need.cab - 1e-6);
       return need;
     }
-    staffNeedPlanned() {
-      // Bedarf an Köpfen für den aktuellen Flugplan (ohne Reserve), je Flugzeug gerechnet
-      const n = this.crewNeed(this._day ?? 0, null, P.LEASE_DELIVERY_DAYS);
+    staffNeedPlanned(horizon = P.LEASE_DELIVERY_DAYS, day = this._day ?? 0) {
+      // Bedarf an Köpfen für den aktuellen Flugplan (ohne Reserve), je Flugzeug gerechnet – inklusive Flugzeuge und Strecken, die bis zum Horizont starten
+      const n = this.crewNeed(day, null, Math.max(P.LEASE_DELIVERY_DAYS, horizon));
       return { pil: n.pil, cab: n.cab, tech: this.fleet.length * P.STAFF.techPerAc, perAc: n.perAc };
     }
   }
@@ -1405,7 +1517,110 @@ const SM = (() => {
       for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) n += r.freq; n += al.heldAt(apt, this.day); }
       return n;
     }
-    slotsFreeFor(al, apt) { if (this.lockedFor(al, apt)) return 0; const f = this.slotsFree(apt); return f === Infinity ? f : f + al.heldAt(apt, this.day); }
+    slotsFreeFor(al, apt) { if (this.lockedFor(al, apt)) return 0; const f = this.slotsFree(apt); return f === Infinity ? f : Math.max(0, f - this.waitBlock(apt, al)) + al.heldAt(apt, this.day); }
+    /** Freie Slots, auf die andere schon auf der Warteliste stehen (die bekommen sie zuerst). */
+    waitBlock(apt, al) { let n = 0; for (const e of this.slotWait || []) if (e.apt === apt && e.al !== (al && al.id)) n += e.n; return n; }
+    /** Was neue Slots für eine Strecke kosten: zuerst die eigene Reserve (schon bezahlt), der Rest zum Marktpreis. Nur Spielende zahlen. */
+    slotCost(al, o, d, n) {
+      if (!al.isPlayer || !(n > 0)) return { cost: 0, parts: [] };
+      let cost = 0; const parts = [];
+      for (const x of [o, d]) { if (apx(x).slots === null) continue; const need = Math.max(0, n - al.heldAt(x, this.day)); if (!need) continue; const c = this.slotBuyPrice(x, need); cost += c; parts.push({ apt: x, n: need, cost: c }); }
+      return { cost, parts };
+    }
+    /** Warteliste: Auf einen Platz für n Slots an einem vollen Flughafen warten. Frei werdende Slots gehen der Reihe nach je einer an jeden Wartenden. */
+    joinWait(al, apt, n, plan = null) {
+      if (!P.AIRPORTS[apt] || apx(apt).slots === null) return { ok: false, msg: 'Slots gibt es nur an koordinierten Flughäfen.' };
+      n = clamp(Math.round(Number(n) || 0), 1, 20);
+      this.slotWait = this.slotWait || [];
+      const mine = this.slotWait.find((e) => e.al === al.id && e.apt === apt && (e.plan || null) === plan);
+      if (mine) { mine.n = plan ? n : Math.min(20, mine.n + n); return { ok: true, id: mine.id, pos: this.waitPos(mine) }; }
+      if (this.slotWait.filter((e) => e.al === al.id).length >= 12) return { ok: false, msg: 'Höchstens zwölf Wartelisten-Einträge gleichzeitig.' };
+      const e = { id: 'W' + (this.waitCounter = (this.waitCounter || 0) + 1), al: al.id, apt, n, day: this.day, plan: plan || undefined };
+      this.slotWait.push(e);
+      al.log(this.day, `Warteliste ${ap(apt).name}: ${n} Slot${n > 1 ? 's' : ''} angefragt (Platz ${this.waitPos(e)})`, 'route');
+      return { ok: true, id: e.id, pos: this.waitPos(e) };
+    }
+    waitPos(e) { const q = (this.slotWait || []).filter((x) => x.apt === e.apt); return q.indexOf(e) + 1; }
+    leaveWait(al, id) { const before = (this.slotWait || []).length; this.slotWait = (this.slotWait || []).filter((e) => !(e.id === id && e.al === al.id)); return before !== this.slotWait.length ? { ok: true } : { ok: false, msg: 'Eintrag nicht gefunden.' }; }
+    /** Täglich: freie Slots fair an die Warteliste verteilen (reihum je einer, zum aktuellen Preis). */
+    allocateWaitlist() {
+      if (!this.slotWait || !this.slotWait.length) return;
+      this.slotWait = this.slotWait.filter((e) => this.airlines[e.al] && this.airlines[e.al].status !== 'insolvent' && e.n > 0);
+      for (const apt of [...new Set(this.slotWait.map((e) => e.apt))]) {
+        let free = this.slotsFree(apt), guard = 0;
+        while (free > 0 && guard++ < 50) {
+          const q = this.slotWait.filter((e) => e.apt === apt && e.n > 0 && !e.skip); if (!q.length) break;
+          let gave = false;
+          for (const e of q) {
+            if (free <= 0) break;
+            const al = this.airlines[e.al], price = this.slotBuyPrice(apt, 1);
+            if (al.spendable(this.macro.bank ?? 1) < price) { if (!e.warned) { al.log(this.day, `Warteliste ${ap(apt).name}: Ein Slot wäre frei, aber für ${Math.round(price / 1000)} Tsd. EUR reicht das Geld nicht – Sie bleiben auf der Liste`, 'warn'); e.warned = true; } e.skip = true; continue; }
+            al.ledger.post('one_off', -price); al.hold(apt, 1, 0, true); e.n--; free--; gave = true; delete e.warned;
+            al.log(this.day, `Warteliste ${ap(apt).name}: 1 Slot zugeteilt (${Math.round(price / 1000)} Tsd. EUR)${e.n ? `, ${e.n} noch offen` : ''}`, 'good');
+          }
+          if (!gave) break;
+        }
+        for (const e of this.slotWait) delete e.skip;
+      }
+      this.slotWait = this.slotWait.filter((e) => e.n > 0);
+    }
+    /** Geplante Strecken: fehlende Slots pro Flughafen. */
+    planMissing(al, pl) {
+      const r = pl.route ? al.routes.find((x) => x.id === pl.route && !x.closed) : null, n = r ? Math.max(0, pl.freq - r.freq) : pl.freq, out = {};
+      if (pl.route && !r) return null;
+      for (const x of [pl.base, pl.dest]) { if (apx(x).slots === null) continue; const have = this.slotsFreeFor(al, x); if (have < n) out[x] = n - have; }
+      return out;
+    }
+    /** Täglich: geplante Strecken prüfen und – wenn gewünscht – umsetzen, sobald die Slots da sind. */
+    checkPlans(al) {
+      if (!al.plans || !al.plans.length) return;
+      for (const pl of al.plans.slice()) {
+        const miss = this.planMissing(al, pl);
+        if (miss === null) { al.plans = al.plans.filter((x) => x !== pl); continue; }
+        if (Object.keys(miss).length) continue;
+        if (!pl.auto) { if (!pl.ready) { pl.ready = true; al.log(this.day, `Plan ${pl.base}–${pl.dest} (${pl.freq}x täglich) ist jetzt umsetzbar – die Slots sind da`, 'good'); } continue; }
+        const res = this.runPlan(al, pl.id);
+        if (!res.ok && !pl.failed) { pl.failed = true; al.log(this.day, `Plan ${pl.base}–${pl.dest}: Slots sind da, aber ${res.msg || 'die Umsetzung klappt noch nicht'}`, 'warn'); }
+      }
+    }
+    runPlan(al, id) {
+      const pl = (al.plans || []).find((x) => x.id === id); if (!pl) return { ok: false, msg: 'Plan nicht gefunden.' };
+      const res = pl.route ? applyAction(this, al.id, { type: 'editRoute', id: pl.route, freq: pl.freq })
+        : applyAction(this, al.id, { type: 'openRoute', base: pl.base, dest: pl.dest, typeId: pl.type, freq: pl.freq, fo: pl.fo, fi: pl.fi, service: pl.service, buffer: pl.buffer, term: pl.term });
+      const done = res.ok && !(pl.route && /Keine freien Slots/.test(res.msg || ''));
+      if (done) {
+        al.plans = al.plans.filter((x) => x !== pl); this.slotWait = (this.slotWait || []).filter((e) => e.plan !== pl.id);
+        al.log(this.day, `Plan umgesetzt: ${pl.base}–${pl.dest} ${pl.freq}x täglich`, 'route');
+        return { ...res, ok: true };
+      }
+      return { ok: false, msg: res.msg || 'Nicht möglich.' };
+    }
+    savePlan(al, a) {
+      al.plans = al.plans || [];
+      if (al.plans.length >= 12) return { ok: false, msg: 'Höchstens zwölf Pläne gleichzeitig.' };
+      const route = a.route ? al.routes.find((x) => x.id === a.route && !x.closed) : null;
+      if (a.route && !route) return { ok: false, msg: 'Strecke nicht gefunden.' };
+      const base = route ? route.base : String(a.base || ''), dest = route ? route.dest : String(a.dest || '');
+      const type = route ? route.type_id : String(a.typeId || ''), freq = clamp(Math.round(num(a.freq, 1)), 1, 8);
+      if (!al.bases.includes(base) || !P.AIRPORTS[dest] || base === dest || !P.AIRCRAFT_TYPES[type]) return { ok: false, msg: 'Ungültige Strecke.' };
+      if (!routeKmOk(base, dest) || !rangeOk(base, dest, type)) return { ok: false, msg: 'Diese Strecke geht mit dem Muster nicht.' };
+      if (route && freq <= route.freq) return { ok: false, msg: `Die Strecke fliegt schon ${route.freq}x täglich.` };
+      if (!route && al.activeRoutes().some((r) => pairKey(r.base, r.dest) === pairKey(base, dest))) return { ok: false, msg: 'Diese Strecke fliegen Sie schon – planen Sie dort eine höhere Frequenz.' };
+      if (al.plans.some((x) => pairKey(x.base, x.dest) === pairKey(base, dest))) return { ok: false, msg: 'Für diese Strecke gibt es schon einen Plan.' };
+      const pl = { id: 'PL' + (this.waitCounter = (this.waitCounter || 0) + 1), base, dest, type, freq, route: route ? route.id : undefined, day: this.day, auto: a.auto !== false,
+        fo: clamp(num(a.fo, refPrice(base, dest, this.macro.cpi)), 10, 5000), fi: clamp(num(a.fi, refPrice(dest, base, this.macro.cpi)), 10, 5000),
+        service: P.SERVICE[a.service] ? a.service : 'standard', buffer: P.BUFFER_POLICY[a.buffer] ? a.buffer : 'normal', term: P.TERMINALS[a.term] ? a.term : undefined };
+      al.plans.push(pl);
+      const miss = this.planMissing(al, pl), waits = [];
+      if (a.wait !== false) for (const [x, n] of Object.entries(miss || {})) { const r = this.joinWait(al, x, n, pl.id); if (r.ok) waits.push(`${x} Platz ${r.pos}`); }
+      al.log(this.day, `In Planung: ${base}–${dest} ${freq}x täglich${Object.keys(miss || {}).length ? ` – es fehlen Slots (${Object.entries(miss).map(([x, n]) => `${x}: ${n}`).join(', ')})${waits.length ? ', Warteliste ' + waits.join(', ') : ''}` : ''}`, 'route');
+      return { ok: true, id: pl.id, missing: miss, waits };
+    }
+    deletePlan(al, id) {
+      const pl = (al.plans || []).find((x) => x.id === id); if (!pl) return { ok: false, msg: 'Plan nicht gefunden.' };
+      al.plans = al.plans.filter((x) => x !== pl); this.slotWait = (this.slotWait || []).filter((e) => e.plan !== id);
+      return { ok: true };
+    }
     /** Exklusivvertrag (alle Gates) an einem Flughafen ohne Slotkoordination: Inhaber oder null. */
     lockOwner(apt) { for (const x of this.list) if (x.status !== 'insolvent' && x.gateLock && x.gateLock[apt]) return x; return null; }
     lockedFor(al, apt) { const o = this.lockOwner(apt); return !!o && o !== al; }
@@ -1568,6 +1783,9 @@ const SM = (() => {
     step() {
       setFuelX(this);
       for (const al of this.list) al._day = this.day;
+      // Warteliste und geplante Strecken: frei gewordene Slots fair verteilen, Pläne umsetzen
+      if (this.slotWait && this.slotWait.length) { for (const al of this.list) al.cleanHolds(this.day); this.allocateWaitlist(); }
+      for (const al of this.humans) if (al.status !== 'insolvent' && al.plans && al.plans.length) this.checkPlans(al);
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.completeDaily(al);
       expireDeals(this);
       const day = this.day, month = monthOf(day), dow = day % 7, cpi = this.macro.cpi;
@@ -2307,7 +2525,7 @@ const SM = (() => {
     }
 
     // Spieleraktionen
-    hire(al, role, group, count) {
+    hire(al, role, group, count, start = null) {
       const S = P.STAFF, st = al.staff;
       const tight = role === 'pilot' ? this.macro.laborTight : 1 + (this.macro.laborTight - 1) * 0.4;
       const lead = hireLead(this, al, role);
@@ -2323,9 +2541,11 @@ const SM = (() => {
       this.labor[role] = used + count;
       const cost = S.recruit[role] * count * this.macro.cpi * tight * (this.macro.wage || 1) * (1 + 0.6 * used / Math.max(1, pool));
       al.ledger.post('staff_extra', -cost);
-      st.pipeline.push({ kind: 'hire', role, group, count, ready: this.day + lead, month });
-      al.log(this.day, `${count} ${roleLabel(role, group)} eingestellt, Start in ${lead} Tagen`, 'staff');
-      return { ok: true, lead, cost };
+      // Antritt zum Termin (z. B. Lieferung eines Flugzeugs): früher als die Vorlaufzeit geht nicht, Gehalt erst ab Antritt
+      const ready = start > this.day + lead ? Math.min(Math.round(start), this.day + 180) : this.day + lead, sched = ready > this.day + lead;
+      st.pipeline.push(sched ? { kind: 'hire', role, group, count, ready, month, sched: true } : { kind: 'hire', role, group, count, ready, month });
+      al.log(this.day, `${count} ${roleLabel(role, group)} eingestellt, Start ${sched ? `zum Termin am Tag ${ready + 1}` : `in ${lead} Tagen`}`, 'staff');
+      return { ok: true, lead: ready - this.day, cost, ready, sched };
     }
     fire(al, role, group, count) {
       const S = P.STAFF, st = al.staff;
@@ -2619,8 +2839,8 @@ const SM = (() => {
     }
     buySlots(al, apt, n) {
       if (!P.AIRPORTS[apt] || apx(apt).slots === null) return { ok: false, msg: 'Slots gibt es nur an koordinierten Flughäfen.' };
-      const free = this.slotsFree(apt); n = n === 'all' ? free : Math.round(Number(n) || 0);
-      if (!(n > 0)) return { ok: false, msg: free > 0 ? 'Bitte eine Anzahl angeben.' : `In ${apt} ist kein Slot mehr frei.` };
+      const free = Math.max(0, this.slotsFree(apt) - this.waitBlock(apt, al)); n = n === 'all' ? free : Math.round(Number(n) || 0);
+      if (!(n > 0)) return { ok: false, msg: free > 0 ? 'Bitte eine Anzahl angeben.' : `In ${apt} ist kein Slot mehr frei${this.waitBlock(apt, al) ? ' (die frei werdenden gehen an die Warteliste)' : ''}. Tragen Sie sich auf die Warteliste ein.` };
       if (n > free) return { ok: false, msg: `In ${apt} sind nur noch ${free} Slots frei.` };
       const price = this.slotBuyPrice(apt, n);
       if (al.spendable(this.macro.bank ?? 1) < price) return { ok: false, msg: `${n} Slots kosten ${Math.round(price / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
@@ -3302,7 +3522,8 @@ const SM = (() => {
     for (const a of w.auctions || []) if (!a.done && a.bids) delete a.bids[id];
     for (const x of w.list) { if (x.grudge && x.grudge[id] !== undefined) delete x.grudge[id]; }
     for (const r of al.activeRoutes()) { r.closed = true; r.closedDay = day; }
-    al.fleet = []; al.slotHold = {}; al.experts = []; al.decisions = [];
+    al.fleet = []; al.slotHold = {}; al.experts = []; al.decisions = []; al.plans = [];
+    w.slotWait = (w.slotWait || []).filter((e) => e.al !== id);
     delete al.gateLock; delete al.hubs; delete al.loyalty;
     al.status = 'insolvent'; al.removed = true; al.removedDay = day; al.owner = null;
     al.log(day, `${by}: Die Airline wurde aus dem Spiel genommen`, 'crit');
@@ -3335,6 +3556,7 @@ const SM = (() => {
     w.agreements = (w.agreements || []).filter((g) => g.airline !== id && g.partner !== id);
     w.coops = (w.coops || []).filter((c) => c.a !== id && c.b !== id);
     for (const a of w.auctions || []) if (!a.done && a.bids) delete a.bids[id];
+    w.slotWait = (w.slotWait || []).filter((e) => e.al !== id);
     for (const al of w.list) { if (al.grudge && al.grudge[id] !== undefined) delete al.grudge[id]; }
     const past = [...(old.past || []), { name: old.name, code: old.code, from: old.joinedDay || 0, to: day, status: old.status, equity: Math.round(bs.equity), pax: Math.round(old.paxTotal || 0) }].slice(-10);
     const wasInsolvent = old.status === 'insolvent';
@@ -3806,8 +4028,8 @@ const SM = (() => {
     if (mode === 'flex') return intro;
     return P.LEASE_DEPOSIT_MONTHS * (offer ? offer.lease_month : t.lease_month) * duty * oldF * (P.EURUSD / eurusd) + intro;
   }
-  function staffPlanOf(al) {
-    const need = al.staffNeedPlanned(), st = al.staff;
+  function staffPlanOf(al, horizon, day) {
+    const need = al.staffNeedPlanned(horizon, day), st = al.staff;
     const pipe = (role, g) => st.pipeline.filter((p) => (p.kind === 'hire' && p.role === role && (role !== 'pilot' || p.group === g)) || (p.kind === 'train' && role === 'pilot' && p.to === g)).reduce((s, p) => s + p.count, 0);
     const rows = STAFF_GROUPS.map((g) => ({ key: g, role: 'pilot', group: g, label: roleLabel('pilot', g), have: st.pil[g], need: need.pil[g], pipe: pipe('pilot', g), salary: P.STAFF.pilotSalary[g] }))
       .filter((r) => r.have || r.need || r.pipe || al.fleet.some((a) => P.AIRCRAFT_TYPES[a.type_id].group === r.group));
@@ -3897,6 +4119,9 @@ const SM = (() => {
         if (!w.slotsOkFor(al, base, dest, freq)) { const bad = [base, dest].filter((x) => w.slotsFreeFor(al, x) < freq).map((x) => `${x}: ${Math.max(0, w.slotsFreeFor(al, x))} frei${al.heldAt(x, day) ? ` (davon ${al.heldAt(x, day)} aus Ihrer Reserve)` : ''}`); return { ok: false, msg: `Nicht genug Slots für ${freq} Flüge täglich – ${bad.join(', ')}.` }; }
         const service = P.SERVICE[a.service] ? a.service : 'standard', buffer = P.BUFFER_POLICY[a.buffer] ? a.buffer : 'normal';
         const fo = clamp(num(a.fo, refPrice(base, dest, cpiV)), 10, 5000), fi = clamp(num(a.fi, refPrice(dest, base, cpiV)), 10, 5000);
+        const sc = w.slotCost(al, base, dest, freq);
+        if (sc.cost > 0 && al.spendable(w.macro.bank ?? 1) < sc.cost) return { ok: false, msg: `Die Slots kosten ${Math.round(sc.cost / 1000)} Tsd. EUR (${sc.parts.map((x) => `${x.apt}: ${x.n}`).join(', ')}) – dafür reicht auch der Dispo nicht.` };
+        if (sc.cost > 0) { al.ledger.post('one_off', -sc.cost); al.log(day, `Slots für ${base}–${dest} gekauft: ${sc.parts.map((x) => `${x.n} in ${x.apt}`).join(', ')} (${Math.round(sc.cost / 1000)} Tsd. EUR)`, 'route'); }
         if (!al.stations[dest] && P.TERMINALS[a.term]) al.station(dest).terminal = a.term;
         const rot = rotationHours(base, dest, type, service, buffer, al.turnExtra(base), al.turnExtra(dest));
         const { used } = al.plan(day, null, 0), wnd = winOf(type);
@@ -3927,11 +4152,13 @@ const SM = (() => {
         if (fo > 0 && fi > 0 && (Math.round(fo) !== Math.round(r.fare_out) || Math.round(fi) !== Math.round(r.fare_in))) r.setFares(day, clamp(fo, 10, 5000), clamp(fi, 10, 5000));
         const nf = clamp(Math.round(num(a.freq, r.freq)), 1, 8), ns = P.SERVICE[a.service] ? a.service : r.service, nb = P.BUFFER_POLICY[a.buffer] ? a.buffer : r.buffer;
         if (nf > r.freq && !w.slotsOkFor(al, r.base, r.dest, nf - r.freq)) out.msg = `Keine freien Slots für ${nf - r.freq} weitere Flüge. Frequenz bleibt bei ${r.freq}.`;
+        else if (nf > r.freq && w.slotCost(al, r.base, r.dest, nf - r.freq).cost > al.spendable(w.macro.bank ?? 1)) out.msg = `Die zusätzlichen Slots kosten ${Math.round(w.slotCost(al, r.base, r.dest, nf - r.freq).cost / 1000)} Tsd. EUR – dafür reicht das Geld nicht. Frequenz bleibt bei ${r.freq}.`;
         else if (nf !== r.freq || ns !== r.service || nb !== r.buffer) {
           const old = [r.freq, r.service, r.buffer];
+          if (nf > old[0]) { const sc = w.slotCost(al, r.base, r.dest, nf - old[0]); if (sc.cost > 0) { al.ledger.post('one_off', -sc.cost); al.log(day, `Slots für ${r.base}–${r.dest} gekauft: ${sc.parts.map((x) => `${x.n} in ${x.apt}`).join(', ')} (${Math.round(sc.cost / 1000)} Tsd. EUR)`, 'route'); } }
           r.freq = nf; r.service = ns; r.buffer = nb;
           if (nf > old[0]) w.takeSlots(al, r.base, r.dest, nf - old[0]);
-          else if (nf < old[0]) for (const x of [r.base, r.dest]) al.hold(x, old[0] - nf, day + SLOT_HOLD_DAYS);
+          else if (nf < old[0]) for (const x of [r.base, r.dest]) al.release(x, old[0] - nf, day);
           const { unplaced } = al.plan(day, null, P.LEASE_DELIVERY_DAYS);
           if (unplaced[r.id]) out.msg = `Nicht genug Flugzeugzeit: ${unplaced[r.id]} Umlauf/Umläufe fliegen erst mit einem weiteren Flugzeug vom Typ ${P.AIRCRAFT_TYPES[r.type_id].label}.`;
           al.log(day, `${r.base}–${r.dest}: ${old[0]}x ${P.SERVICE[old[1]].label} ${P.BUFFER_POLICY[old[2]].label} → ${nf}x ${P.SERVICE[ns].label} ${P.BUFFER_POLICY[nb].label}`, 'route');
@@ -3962,15 +4189,16 @@ const SM = (() => {
       case 'move': { const r = w.moveAircraft(al, a.acId, a.base); if (r.ok) w.operableFreq(al); return r; }
       case 'hire': case 'fire': {
         if (!STAFF_ROLES.includes(a.role) || (a.role === 'pilot' && !STAFF_GROUPS.includes(a.group))) return { ok: false, msg: 'Ungültige Berufsgruppe.' };
-        const n = Math.floor(num(a.count));
-        return a.type === 'hire' ? w.hire(al, a.role, a.group || null, n) : w.fire(al, a.role, a.group || null, n);
+        const n = Math.floor(num(a.count)), start = a.start !== undefined && a.start !== null ? clamp(Math.round(num(a.start, 0)), 0, day + 180) : null;
+        return a.type === 'hire' ? w.hire(al, a.role, a.group || null, n, start) : w.fire(al, a.role, a.group || null, n);
       }
-      case 'fillStaff': {
+      case 'fillStaff': {   // start: Antrittstag (Bedarf bis dahin, Einstellung zum Termin)
         let n = 0; const msgs = [];
-        for (const r of staffPlanOf(al)) {
+        const start = a.start !== undefined && a.start !== null ? clamp(Math.round(num(a.start, 0)), day, day + 180) : null;
+        for (const r of staffPlanOf(al, start ? start - day : undefined, day)) {
           const want = Math.ceil(r.need * (r.role === 'tech' ? 1 : 1.1) - r.have - r.pipe);
           if (want <= 0) continue;
-          const k = Math.min(want, P.STAFF.maxHire[r.role]), res = w.hire(al, r.role, r.group, k);
+          const k = Math.min(want, P.STAFF.maxHire[r.role]), res = w.hire(al, r.role, r.group, k, start);
           if (res.ok) n += k; else msgs.push(res.msg);
         }
         return { ok: true, n, msg: n ? `${n} Personen eingestellt.${msgs.length ? ' ' + msgs[0] : ''}` : (msgs[0] || 'Der Bedarf ist gedeckt.') };
@@ -4031,6 +4259,12 @@ const SM = (() => {
       case 'hubLevel': return w.setHub(al, String(a.apt || ''), num(a.lv));
       case 'buySlots': return w.buySlots(al, String(a.apt || ''), a.n === 'all' ? 'all' : num(a.n));
       case 'sellSlots': return w.sellSlots(al, String(a.apt || ''), a.n === 'all' ? 'all' : num(a.n));
+      case 'slotWait': return w.joinWait(al, String(a.apt || ''), num(a.n, 1));
+      case 'slotWaitLeave': return w.leaveWait(al, String(a.id || ''));
+      case 'savePlan': return w.savePlan(al, a);
+      case 'deletePlan': return w.deletePlan(al, String(a.id || ''));
+      case 'runPlan': return w.runPlan(al, String(a.id || ''));
+      case 'planAuto': { const pl = (al.plans || []).find((x) => x.id === a.id); if (!pl) return { ok: false, msg: 'Plan nicht gefunden.' }; pl.auto = !!a.on; delete pl.failed; return { ok: true }; }
       case 'gateLock': return w.setGateLock(al, String(a.apt || ''), !!a.on);
       case 'cargo': al.cargo = !!a.on; al.log(day, al.cargo ? 'Frachtagent beauftragt: Beiladefracht wird vermarktet' : 'Frachtvermarktung beendet', 'info'); return { ok: true };
       case 'study': if (!P.AIRPORTS[a.a] || !P.AIRPORTS[a.b]) return { ok: false, msg: 'Ungültig.' }; return w.commissionStudy(al, a.a, a.b);
@@ -4098,7 +4332,7 @@ const SM = (() => {
       playerId: w.playerId, order: w.order, news: w.news.slice(-120), events: w.events.filter((e) => e.end + (e.recovery || 0) > w.day - 30), eventCounter: w.eventCounter,
       seed: w.seed, slotCap: w.slotCap, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
-      deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day),
+      deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
       entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
@@ -4113,7 +4347,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -4125,7 +4359,7 @@ const SM = (() => {
     const w = new World(1);
     Object.assign(w, { difficulty: s.difficulty || 'normal', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
-      entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], coops: s.coops || [], auctions: s.auctions || [],
+      entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
       lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
@@ -4147,7 +4381,7 @@ const SM = (() => {
       for (const k of ['cabin', 'loyalty', 'hubs', 'gateLock', 'apCfg']) if (!al[k]) delete al[k];
       if (al.staff && al.staff.pil) for (const g of STAFF_GROUPS) if (typeof al.staff.pil[g] !== 'number') al.staff.pil[g] = 0;
       // ältere Stände: Einstellungen mit sehr langer Wartezeit (früher bis 100 Tage) auf die heutige Höchstdauer kappen
-      if (al.staff && al.staff.pipeline) for (const p of al.staff.pipeline) if (p.kind === 'hire' && P.STAFF.lead[p.role]) { const mx = s.day + Math.round(P.STAFF.lead[p.role] * P.STAFF.leadMaxFactor); if (p.ready > mx) p.ready = mx; }
+      if (al.staff && al.staff.pipeline) for (const p of al.staff.pipeline) if (p.kind === 'hire' && P.STAFF.lead[p.role] && !p.sched) { const mx = s.day + Math.round(P.STAFF.lead[p.role] * P.STAFF.leadMaxFactor); if (p.ready > mx) p.ready = mx; }
       al.routes = routes.map((r) => {
         const keys = r.hk ? AI_HIST_KEYS : HIST_KEYS;
         const { hist, hk, ...rr } = r;

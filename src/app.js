@@ -30,7 +30,7 @@ const netCash = (al) => al.ledger.cash / 100 - (al.creditUsed || 0);
 const netHistOf = (al) => (al.netHist && al.netHist.length ? al.netHist : al.ledger.cashHist);
 /** Für Sie nutzbare Slots: frei am Markt plus Ihre eigene Slot-Reserve. */
 const slotsMine = (apt) => W.slotsFreeFor(W.player, apt);
-const slotTxt = (apt) => { const f = Math.max(0, W.slotsFree(apt)), h = W.player.heldAt(apt, W.day); return h ? `${f + h} (${h} aus Ihrer Reserve)` : String(f); };
+const slotTxt = (apt) => { const f = Math.max(0, W.slotsFree(apt) - W.waitBlock(apt, W.player)), h = W.player.heldAt(apt, W.day); return h ? `${f + h} (${h} aus Ihrer Reserve)` : String(f); };
 const sgn = (x) => (x > 0 ? 'pos' : x < 0 ? 'neg' : '');
 const n1 = (x) => NF1.format(x);
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -621,7 +621,7 @@ function depsAt(pl, apt) {
   }
   return { n, hand };
 }
-const staffPlan = (pl) => SM.staffPlanOf(pl);
+const staffPlan = (pl) => SM.staffPlanOf(pl, ui.tab === 'staff' && ui.hireStart ? ui.hireStart - W.day : undefined, W.day);
 
 // ---------------------------------------------------------------------------
 // Bereiche (farbcodiert) und Unter-Tabs
@@ -985,8 +985,22 @@ VIEWS.routes = function viewRoutes() {
     html += fltBar('routes') + (shown.length < routes.length ? `<p class="small muted">${shown.length} von ${routes.length} Strecken · DB2 ${eur(shown.map((r) => rstats(r, 30)).reduce((a, x) => a + x.db2 / Math.max(x.n, 1), 0), { plus: true })} pro Tag</p>` : '');
     html += shown.length ? `<div class="rlist">${shown.map(routeItem).join('')}</div>` : '<p class="small muted">Keine Strecke passt zum Filter.</p>';
   }
-  return html;
+  return plansHtml() + html;
 };
+/** Strecken in Planung: warten auf Slots (Warteliste), werden auf Wunsch automatisch eröffnet. */
+function plansHtml() {
+  const pl = W.player, plans = pl.plans || [];
+  if (!plans.length) return '';
+  const rows = plans.map((x) => {
+    const miss = W.planMissing(pl, x) || {}, r = x.route ? pl.routes.find((y) => y.id === x.route) : null, ready = !Object.keys(miss).length;
+    const waits = (W.slotWait || []).filter((e) => e.plan === x.id);
+    const st = ready ? '<span class="chip good">Slots da</span>' : Object.entries(miss).map(([a, n]) => { const e = waits.find((y) => y.apt === a); return `<span class="chip warn" title="${e ? `Warteliste Platz ${W.waitPos(e)}` : ''}">${a}: ${n} Slot${n > 1 ? 's' : ''} fehlen${e ? ` · Platz ${W.waitPos(e)}` : ''}</span>`; }).join(' ');
+    return `<div class="plan-row"><div style="min-width:0"><b class="mono">${x.base}–${x.dest}</b> <span class="small muted">${r ? `von ${r.freq}x auf ${x.freq}x täglich` : `${x.freq}x täglich · ${tlx(x.type)}`} · seit ${dateShort(x.day)}</span><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px">${st}</div></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><label class="chk small"><input type="checkbox" data-planauto="${x.id}" ${x.auto ? 'checked' : ''}> automatisch umsetzen</label><button class="btn small ${ready ? 'primary' : ''}" data-act="planrun" data-id="${x.id}" ${ready ? '' : 'disabled'}>Jetzt umsetzen</button><button class="btn small" data-act="plandel" data-id="${x.id}">Löschen</button></div></div>`;
+  }).join('');
+  return `<div class="stack"><h2 class="sec sm">In Planung <small>${plans.length} Strecke${plans.length > 1 ? 'n' : ''} warten auf Slots</small></h2><div class="card pad stack">${rows}
+    <p class="small muted">Frei werdende Slots (Sommer- und Winterflugplan, aufgegebene Strecken, zurückgegebene Slots) gehen reihum an die Warteliste – jeder Wartende bekommt einen, dann der Nächste. Der Slot wird beim Zuteilen bezahlt. Mit „automatisch“ geht die Strecke los, sobald alle Slots da sind.</p></div></div>`;
+}
 VIEWS.plan = function viewPlan() {
   if (!ui.planner) { const pl = W.player; ui.planner = defaultPlanner(ui.selApt && !pl.bases.includes(ui.selApt) ? ui.selApt : null); ui.selApt = ui.planner.dest; setTimeout(() => { renderDraft(); renderMapRoutes(true); }, 0); }
   return viewPlanner();
@@ -1053,6 +1067,14 @@ function routeBody(r, s7, s30) {
         <label class="f" style="flex:1"><span>Flugzeugtyp</span><select id="ef-ty-${r.id}">${[...new Set([r.type_id, ...W.player.fleet.filter((x) => x.base === r.base).map((x) => x.type_id)])].filter((t) => SM.rangeOk(r.base, r.dest, t)).map((t) => `<option value="${t}" ${t === r.type_id ? 'selected' : ''}>${t} · ${P.AIRCRAFT_TYPES[t].seats[r.service]} Sitze</option>`).join('')}</select></label>
         <label class="f" style="flex:1"><span>Puffer</span><select id="ef-b-${r.id}">${Object.keys(P.BUFFER_POLICY).map((b) => `<option value="${b}" ${b === r.buffer ? 'selected' : ''}>${bufLabel(b)}</option>`).join('')}</select></label>
       </div>
+      ${(() => {
+        const coordEnds = [r.base, r.dest].filter((x) => SM.apx(x).slots !== null); if (!coordEnds.length || r.freq >= 8) return '';
+        const lack = coordEnds.filter((x) => W.slotsFreeFor(W.player, x) < 1), planned = (W.player.plans || []).find((x) => x.route === r.id);
+        if (planned) return `<p class="small">In Planung: ${planned.freq}x täglich – wartet auf Slots (Strecken → In Planung).</p>`;
+        if (lack.length) return `<div class="row small" style="gap:8px;flex-wrap:wrap"><span class="warnc">Für mehr Flüge fehlen Slots in ${lack.join(' und ')}.</span><button class="btn small" data-act="planfreq" data-id="${r.id}" data-v="${r.freq + 1}">${r.freq + 1}x täglich in Planung speichern + Warteliste</button></div>`;
+        const sc = W.slotCost(W.player, r.base, r.dest, 1);
+        return sc.cost > 0 ? `<p class="small muted">Ein weiterer Flug täglich braucht ${sc.parts.map((x) => `einen Slot in ${x.apt}`).join(' und ')}: einmalig ${eur(sc.cost)}.</p>` : '';
+      })()}
       ${(() => {
         const cfg = SM.apCfgOf(r), hasPrem = (() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return !!(c.f || c.b); })(), ref = SM.refPrice(r.base, r.dest, W.macro.cpi);
         const C = P.CABIN[SM.haulOf(r.type_id)], pm = r.pm || 1;
@@ -1169,7 +1191,9 @@ function updateForecast() {
     <p class="small ink2">Jahresmittel bei ausgereifter Strecke, Marke ${n0(pl.brand * 100)}. Im ${MONTHS_L[m]}: Streckenbeitrag <b class="${sgn(cur.db2List)}">${eur(cur.db2List, { plus: true })}</b> pro Tag bei ${pct(cur.lf)} Auslastung. ${study && study.done ? `<b>Marktstudie liegt vor</b> (${esc(study.by)}): Nachfrage ${pct(study.est - 1, 0).replace(/^(?!-)/, '+')} gegenüber Modell, Unsicherheit ±${pct(study.err)}.` : `Ohne Marktstudie liegt die echte Nachfrage bis zu ±${pct(band)} daneben.`}</p>
     ${SM.haulOf(p.type) === 'long' || kLong ? `<p class="small ${kLong > 1 ? 'warnc' : 'pos'}">${kLong > 1 ? `Umlauf ${n1(rotH)} h (hin, Bodenzeit, zurück, Bodenzeit) – mehr als ${SM.P.LONG_WINDOW_H} h. Ein Flugzeug ist ${kLong} Tage unterwegs; für einen täglichen Flug braucht es ${kLong} Flugzeuge, mit einem fliegt die Strecke an jedem ${kLong}. Tag.` : kLong === 1 ? `Ein Flugzeug reicht für den täglichen Flug: Umlauf ${n1(rotH)} h – länger als der normale ${wnd}-Stunden-Tag, deshalb fliegt das Flugzeug nur diesen einen Umlauf (mit Nachtflug, bis ${SM.P.LONG_WINDOW_H} h).` : `Ein Flugzeug reicht für den täglichen Flug: Umlauf ${n1(rotH)} h, passt in das ${wnd}-Stunden-Fenster der Langstrecke (über Nacht).`}</p>` : ''}
     ${kitHtml(p, { acNeed, kLong, freeWhole, free, rotH, wnd, t })}
-    ${!slotOk ? `<div class="callout crit">Keine Slots: ${[base, p.dest].filter((x) => slotsMine(x) < p.freq).map((x) => `${x} hat für Sie nur ${slotTxt(x)} freie`).join(', ')}. Neue Slots kommen zum Sommer- und Winterflugplan (April, Oktober).</div>` : ''}
+    ${!slotOk ? `<div class="callout crit stack"><span>Keine Slots: ${[base, p.dest].filter((x) => slotsMine(x) < p.freq).map((x) => `${x} hat für Sie nur ${slotTxt(x)} freie`).join(', ')}. Neue Slots kommen zum Sommer- und Winterflugplan (April, Oktober) oder werden frei, wenn andere Strecken aufgeben.</span>
+      <span class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="plansave">In Planung speichern + Warteliste</button><span class="small">Sobald die Slots da sind, eröffnet SKYMARKET die Strecke automatisch (abschaltbar unter Strecken → In Planung). Wartende bekommen frei werdende Slots reihum.</span></span></div>`
+      : (() => { const sc = W.slotCost(pl, base, p.dest, p.freq); return sc.cost > 0 ? `<p class="small ink2">Slots: ${sc.parts.map((x) => `${x.n} in ${x.apt}`).join(', ')} kosten beim Eröffnen einmalig <b>${eur(sc.cost)}</b> (danach gehören sie Ihnen; schließen Sie die Strecke, bleiben sie in Ihrer Reserve).</p>` : ''; })()}
     <table class="t"><tbody>
       <tr><td>Reisepotenzial ${base}→${p.dest}</td><td class="r">${n0(potSum)} pro Tag</td></tr>
       <tr><td>Mix Ihrer Passagiere</td><td class="r">Urlaub ${pct(r.dirs.out.seg.leisure / segTot)} · Geschäft ${pct(r.dirs.out.seg.business / segTot)} · Besuch ${pct(r.dirs.out.seg.vfr / segTot)}</td></tr>
@@ -1179,7 +1203,7 @@ function updateForecast() {
       ${isFinite(slotsB) || isFinite(slotsD) ? `<tr><td>Freie Slots</td><td class="r">${[base, p.dest].filter((x) => isFinite(W.slotsFree(x))).map((x) => `${x} ${slotTxt(x)}`).join(' · ')}</td></tr>` : ''}
       <tr><td>Kosten je angebotenem Sitz-km</td><td class="r">${NF2.format(r.caskCt)} ct (Erlös ${NF2.format(r.raskCt)} ct)</td></tr>
     </tbody></table>
-    <button class="btn primary" data-act="openroute-new" ${slotOk ? '' : 'disabled'}>${kitLabel(p)}</button>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="openroute-new" ${slotOk ? '' : 'disabled'}>${kitLabel(p)}</button>${slotOk ? '' : '<button class="btn" data-act="plansave">In Planung speichern</button>'}</div>
   </div>`;
 }
 const rivalsPicker = (prefix, cur) => `<div class="stack"><span class="small muted" style="text-transform:uppercase;letter-spacing:.07em;font-size:10.5px">Konkurrenz</span><div class="seg wrap" id="${prefix}Rivals">
@@ -1269,7 +1293,7 @@ function kitHtml(p, x) {
       : row(true, x.kLong ? `Flugzeuge: ${x.kLong * p.freq} fliegen die Langstrecke im Wechsel` : `Flugzeug: passt auf ${x.free.length === 1 ? 'Ihr Flugzeug' : 'Ihre Flotte'}`, `${n1(x.rotH * p.freq)} h von ${n0(x.wnd)} h Betriebsfenster – wird automatisch eingeplant`)}
     ${staffShort ? row(false, `Crew: es fehlen ${[misPil ? `${misPil} ${SM.roleLabel('pilot', t.group)}` : '', misCab ? `${misCab} Flugbegleiterinnen` : '', misTech ? `${misTech} Techniker` : ''].filter(Boolean).join(', ')}`,
       `${esc(crewNote)} ${esc(crewHow)}${misPil > Math.ceil(addPil - 1e-6) || misCab > Math.ceil(addCab - 1e-6) ? ` <b>Diese Strecke braucht zusätzlich nur rund ${n1(Math.max(0, addPil))} Piloten und ${n1(Math.max(0, addCab))} Flugbegleiterinnen</b> – der Rest fehlt schon für Ihren bisherigen Flugplan.` : ''}
-      <label class="chk"><input type="checkbox" id="pl-hire" ${p.hire ? 'checked' : ''}> <span>Auf Wunsch gleich mit einstellen. Sonst selbst unter <b>Unternehmen → Personal</b> – bis dahin fliegt teures Agenturpersonal.</span></label>`)
+      <label class="chk"><input type="checkbox" id="pl-hire" ${p.hire ? 'checked' : ''}> <span>Auf Wunsch gleich mit einstellen – ${n ? `<b>Antritt zur Lieferung des Flugzeugs</b> (in rund ${P.LEASE_DELIVERY_DAYS} Tagen), Gehalt erst ab dann` : 'Antritt so früh wie möglich'}. Sonst selbst unter <b>Unternehmen → Personal</b> (dort auch mit Antrittstermin) – bis dahin fliegt teures Agenturpersonal.</span></label>`)
       : row(true, addPil > 0.05 || addCab > 0.05 ? 'Crew: vorhanden' : 'Crew: keine zusätzliche nötig', esc(crewNote ? crewNote + ' Ihre vorhandene Crew reicht dafür.' : 'Die vorhandenen Crews reichen.'))}
     ${row(true, 'Einsatz: automatisch', 'Der Einsatzplan teilt Flugzeuge selbst zu. Unter Flotte → Einsatzplan können Sie später feste Umläufe vorgeben – nötig ist das nicht.')}
   </div>`;
@@ -1311,7 +1335,7 @@ function openNewRoute() {
   const res = doAction({ type: 'openRoute', base, dest: p.dest, typeId: p.type, freq: p.freq, fo: p.fo, fi: p.fi, service: p.service, buffer: p.buffer, term: p.term });
   if (!res.ok) { refreshAll(); return; }
   // 3. Personal
-  if (kit.staffShort && p.hire) { const h = doAction({ type: 'fillStaff' }); if (h.ok && h.n) done.push(`${h.n} Personen eingestellt`); }
+  if (kit.staffShort && p.hire) { const late = res.start > W.day + 1, h = doAction({ type: 'fillStaff', start: late ? res.start : null }); if (h.ok && h.n) done.push(`${h.n} Personen eingestellt${late ? ` (Antritt zum ersten Flug am ${dateShort(res.start)})` : ''}`); }
   ui.planner = null; ui.plannerKit = null; ui.expanded = res.id; ui.selApt = null;
   toast(`${base}–${p.dest} ${res.start > W.day + 1 ? `angelegt, erster Flug am ${dateShort(res.start)}` : 'eröffnet, erster Flug morgen'}.${done.length ? ' ' + done.join(', ') + '.' : ''} Der Einsatz wird automatisch geplant.`);
   W.operableFreq(W.player); buildSchedules(); setTab('routes'); renderMapRoutes(true); renderHeader();
@@ -1456,6 +1480,19 @@ VIEWS.staff = function viewStaff() {
     if (canc.length) html += `<div class="callout crit">Heute fallen Flüge aus: Es fehlen Crews${st.agency ? '' : ', und Agenturpersonal ist abgeschaltet'}.</div>`;
     else if (cov.agencyH > 0) html += `<div class="callout warn">Heute ${n0(cov.agencyH)} Personen über Agenturen (1,6-facher Satz) und ${n0(cov.overtimeH)} in Überstunden. Mehrkosten ${eur(cov.extraCost)} pro Tag.</div>`;
     else if (cov.overtimeH > 0) html += `<div class="callout info">Heute ${n0(cov.overtimeH)} Personen in Überstunden (1,5-facher Satz). Dauerhafte Überlastung drückt die Stimmung.</div>`;
+  }
+  { // Antrittstermin: sofort, zur nächsten Flugzeuglieferung oder zum Start einer angekündigten Strecke
+    const opts = [];
+    for (const a of pl.fleet.filter((x) => x.delivery_day > W.day).sort((x, y) => x.delivery_day - y.delivery_day)) opts.push([a.delivery_day, `Lieferung ${acName(a.id)} (${tl(a.type_id)}) am ${dateShort(a.delivery_day)}`]);
+    for (const r of pl.activeRoutes().filter((x) => x.opened_day > W.day)) opts.push([r.opened_day, `Start ${r.base}–${r.dest} am ${dateShort(r.opened_day)}`]);
+    const seen = new Set(), list = opts.filter(([d, l]) => { const k = d + l; if (seen.has(k)) return false; seen.add(k); return true; }).sort((x, y) => x[0] - y[0]).slice(0, 10);
+    if (ui.hireStart && ui.hireStart <= W.day) ui.hireStart = null;
+    const cur = ui.hireStart || '', inList = list.some(([d]) => String(d) === String(cur));
+    html += `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><span class="small muted">Antritt neuer Leute</span><select id="hire-start" style="width:auto">
+      <option value="">so früh wie möglich</option>${list.map(([d, l]) => `<option value="${d}" ${String(d) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+      ${cur && !inList ? `<option value="${cur}" selected>am ${dateShort(Number(cur))}</option>` : ''}</select>
+      <span class="small muted">oder in</span><input type="number" id="hire-in" min="0" max="180" placeholder="Tagen" style="width:84px" value="${cur ? Number(cur) - W.day : ''}">
+      <span class="small muted">${cur ? `Bedarf bis ${dateShort(Number(cur))} eingerechnet · Gehalt erst ab Antritt · Einstellungskosten sofort` : 'Neue fangen nach der Vorlaufzeit an.'}</span></div>`;
   }
   html += `<div class="tw"><table class="t"><thead><tr><th>Gruppe</th><th class="r">Bestand</th><th class="r">Bedarf</th><th class="r">kommen</th><th class="r">Gehalt</th></tr></thead><tbody>
     ${rows.map((r) => { const gap = r.have + r.pipe - r.need;
@@ -1837,12 +1874,16 @@ VIEWS.strategy = function viewStrategy() {
     <div class="hub-lv">${P.HUB.slice(1).map((x, i) => `<div><b>${i + 1}. ${x.label}</b><span>${x.desc}</span><em>ab ${x.minRoutes} Strecken · ${eur(x.monthly * cpi())}/Monat</em></div>`).join('')}</div>
     <p class="small muted">Jede Stufe macht Umsteigen bequemer (kürzere Umsteigezeit, abgestimmte Wellen, mehr sinnvolle Verbindungen) und bringt Geschäftsreisenden am Drehkreuz einen Heimvorteil. So wird auch ein kleinerer Flughafen zum Drehkreuz – Sie sind nicht auf London oder Frankfurt angewiesen. Umsteiger füllen freie Plätze: Am meisten bringt der Ausbau, wenn Ihre Flüge nicht schon voll sind.</p></div>`;
   // Slots und Marktkontrolle
-  const net = [...new Set([...pl.bases, ...pl.activeRoutes().flatMap((r) => [r.base, r.dest])])];
-  const coord = net.filter((c) => SM.apx(c).slots !== null).sort();
+  const myWait = (W.slotWait || []).filter((e) => e.al === pl.id);
+  const net = [...new Set([...pl.bases, ...pl.activeRoutes().flatMap((r) => [r.base, r.dest]), ...(ui.slotExtra || []), ...myWait.map((e) => e.apt), ...Object.keys(pl.slotHold || {})])];
+  const coord = net.filter((c) => P.AIRPORTS[c] && SM.apx(c).slots !== null).sort();
   const slotRows = coord.map((c) => {
-    const free = W.slotsFree(c), bought = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day).reduce((a, h) => a + h.n, 0);
-    return `<tr><td><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}</span></td><td class="r ${free <= 0 ? 'neg' : ''}">${free}</td><td class="r">${bought || '–'}</td><td class="r">${free > 0 ? eur(W.slotBuyPrice(c, 1)) : '–'}</td>
-      <td>${free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen</button> <button class="btn small primary" data-act="slotbuy" data-apt="${c}" data-n="all">Alle ${free}: ${eur(W.slotBuyPrice(c, free))}</button>` : '<span class="small muted">voll</span>'}${bought ? ` <button class="btn small" data-act="slotsell" data-apt="${c}">zurückgeben</button>` : ''}</td></tr>`;
+    const free = Math.max(0, W.slotsFree(c) - W.waitBlock(c, pl)), bought = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day).reduce((a, h) => a + h.n, 0);
+    const mine = myWait.filter((e) => e.apt === c), q = (W.slotWait || []).filter((e) => e.apt === c), qn = q.reduce((a, e) => a + e.n, 0);
+    const waitTxt = mine.length ? mine.map((e) => `Platz ${W.waitPos(e)} · ${e.n} Slot${e.n > 1 ? 's' : ''}${e.plan ? ' (Plan)' : ''} <button class="btn small" data-act="slotleave" data-id="${e.id}" title="austragen">✕</button>`).join('<br>') : qn ? `<span class="small muted">${q.length} warten (${qn})</span>` : '–';
+    const served = pl.activeRoutes().some((r) => r.base === c || r.dest === c) || pl.bases.includes(c);
+    return `<tr><td><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}${served ? '' : ' · noch nicht im Netz'}</span></td><td class="r ${free <= 0 ? 'neg' : ''}">${free}</td><td class="r">${bought || '–'}</td><td class="small">${waitTxt}</td><td class="r">${free > 0 ? eur(W.slotBuyPrice(c, 1)) : '–'}</td>
+      <td>${free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen</button> <button class="btn small primary" data-act="slotbuy" data-apt="${c}" data-n="all">Alle ${free}: ${eur(W.slotBuyPrice(c, free))}</button>` : `<button class="btn small" data-act="slotwait" data-apt="${c}" title="Frei werdende Slots gehen reihum an die Wartenden">Warteliste +1</button>`}${bought ? ` <button class="btn small" data-act="slotsell" data-apt="${c}">zurückgeben</button>` : ''}</td></tr>`;
   }).join('');
   const lockRows = pl.bases.filter((c) => SM.apx(c).slots === null).map((c) => {
     const own = pl.gateLock && pl.gateLock[c], other = W.lockOwner(c), big = (P.AIRPORTS[c].pax || 0) > P.GATE_LOCK.maxPax, price = W.gateLockPrice(c);
@@ -1851,7 +1892,9 @@ VIEWS.strategy = function viewStrategy() {
       <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !big && !other ? `<button class="btn small primary" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag</button>` : ''}</td></tr>`;
   }).join('');
   html += `<div class="stack"><h2 class="sec sm">Slots und Marktkontrolle</h2>
-    ${coord.length ? `<div class="tw"><table class="t"><thead><tr><th>Koordinierter Flughafen</th><th class="r">frei</th><th class="r">Ihre Reserve</th><th class="r">Preis 1 Slot</th><th></th></tr></thead><tbody>${slotRows}</tbody></table></div>` : '<p class="small muted">In Ihrem Netz ist noch kein slotkoordinierter Flughafen.</p>'}
+    ${coord.length ? `<div class="tw"><table class="t"><thead><tr><th>Koordinierter Flughafen</th><th class="r">frei</th><th class="r">Ihre Reserve</th><th>Warteliste</th><th class="r">Preis 1 Slot</th><th></th></tr></thead><tbody>${slotRows}</tbody></table></div>` : '<p class="small muted">In Ihrem Netz ist noch kein slotkoordinierter Flughafen.</p>'}
+    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="small muted">Slots für später sichern – auch an Flughäfen, die Sie noch nicht anfliegen:</span><select id="slot-add" style="width:auto">${SM.AP_CODES.filter((c) => SM.apx(c).slots !== null && !coord.includes(c)).sort().map((c) => `<option value="${c}">${c} · ${esc(apName(c))} (${Math.max(0, W.slotsFree(c))} frei)</option>`).join('')}</select><button class="btn small" data-act="slotadd">Hinzufügen</button></div>
+    <p class="small muted">Jede neue Strecke und jeder zusätzliche Flug an einem koordinierten Flughafen kauft die nötigen Slots zum Tagespreis – außer Sie haben sie schon in Ihrer Reserve. Ist ein Flughafen voll, tragen Sie sich auf die Warteliste ein oder speichern die Strecke „in Planung“: Frei werdende Slots gehen reihum an die Wartenden (je einer, dann der Nächste) und werden beim Zuteilen bezahlt.</p>
     ${lockRows ? `<div class="tw"><table class="t"><thead><tr><th>Ihre Basis ohne Slotkoordination</th><th>Gate-Exklusivvertrag</th><th></th></tr></thead><tbody>${lockRows}</tbody></table></div>` : ''}
     <p class="small muted">Kaufen Sie alle freien Slots, kann niemand an dem Flughafen zusätzliche Flüge anbieten – bestehende Konkurrenzflüge bleiben, deren Slots gibt es nur im Handel. Je knapper der Rest, desto teurer der nächste Slot; ungenutzte gekaufte Slots kosten die übliche Slotgebühr. An Basen ohne Slotkoordination sichert ein Gate-Exklusivvertrag den Flughafen (bis ${P.GATE_LOCK.maxPax} Mio. Passagiere): Andere Airlines können dort keine neuen Flüge mehr anbieten.</p></div>`;
   return html;
@@ -1863,7 +1906,10 @@ function strategySummary(pl) {
     <span><em>Drehkreuze</em><b>${hubs.length ? hubs.map(([a, v]) => `${a} ${v}`).join(', ') : 'keins'}</b></span></div>`;
 }
 function onStrategyClick(act, b) {
-  if (!['cabpre', 'cabsave', 'cabreset', 'mktp', 'loyalty', 'hubup', 'slotbuy', 'slotsell', 'gatelock'].includes(act)) return false;
+  if (!['cabpre', 'cabsave', 'cabreset', 'mktp', 'loyalty', 'hubup', 'slotbuy', 'slotsell', 'gatelock', 'slotwait', 'slotleave', 'slotadd'].includes(act)) return false;
+  if (act === 'slotadd') { const v = $('#slot-add') && $('#slot-add').value; if (v) ui.slotExtra = [...new Set([...(ui.slotExtra || []), v])]; refreshAll(); return true; }
+  if (act === 'slotwait') { const r = doAction({ type: 'slotWait', apt: b.dataset.apt, n: 1 }); if (r.ok) toast(`Warteliste ${b.dataset.apt}: Platz ${r.pos}.`); refreshAll(); return true; }
+  if (act === 'slotleave') { doAction({ type: 'slotWaitLeave', id: b.dataset.id }); refreshAll(); return true; }
   const pl = W.player, h = b.dataset.h;
   if (act === 'cabpre') { ui.cabDraft = ui.cabDraft || cabCur(pl); ui.cabDraft[h] = { f: Number(b.dataset.f), b: Number(b.dataset.b) }; renderPane(true); return true; }
   if (act === 'cabreset') { ui.cabDraft = ui.cabDraft || cabCur(pl); ui.cabDraft[h] = cabCur(pl)[h]; renderPane(true); return true; }
@@ -3424,6 +3470,12 @@ function onPaneClick(e) {
     case 'closeplan': ui.planner = null; ui.selApt = null; setTab('routes'); renderMapRoutes(true); break;
     case 'suggest': suggestPrice(); break;
     case 'openroute-new': openNewRoute(); break;
+    case 'plansave': { readPlanner(); const p = ui.planner; const r = doAction({ type: 'savePlan', base: p.base, dest: p.dest, typeId: p.type, freq: p.freq, fo: p.fo, fi: p.fi, service: p.service, buffer: p.buffer, term: p.term, auto: true });
+      if (r.ok) toast(`${p.base}–${p.dest} ist in Planung${r.waits && r.waits.length ? ' · Warteliste ' + r.waits.join(', ') : ''}.`); refreshAll(); break; }
+    case 'planfreq': { const r = doAction({ type: 'savePlan', route: b.dataset.id, freq: Number(b.dataset.v), auto: true }); if (r.ok) toast(`Geplant: ${b.dataset.v}x täglich${r.waits && r.waits.length ? ' · Warteliste ' + r.waits.join(', ') : ''}.`); refreshAll(); break; }
+    case 'planrun': { const r = doAction({ type: 'runPlan', id: b.dataset.id }); if (r.ok) toast('Plan umgesetzt.'); refreshAll(); break; }
+    case 'plandel': doAction({ type: 'deletePlan', id: b.dataset.id }); toast('Plan gelöscht, Warteliste ausgetragen.'); refreshAll(); break;
+    case 'planauto': doAction({ type: 'planAuto', id: b.dataset.id, on: b.dataset.on === '1' }); refreshAll(); break;
     case 'quicklease': { const t = b.dataset.type; const res = doAction({ type: 'acquire', typeId: t, mode: 'lease', base: b.dataset.base }); if (res.ok) toast(`${tl(t)} geleast. Lieferung in ${P.LEASE_DELIVERY_DAYS} Tagen.`); renderHeader(); updateForecast(); break; }
     case 'toggle': ui.expanded = ui.expanded === b.dataset.id ? null : b.dataset.id; ui.confirm = null; ui.viewDirty = true; renderPane(true); renderMapRoutes(true); break;
     case 'openroute': ui.expanded = b.dataset.id; setTab('routes'); renderMapRoutes(true); break;
@@ -3445,10 +3497,10 @@ function onPaneClick(e) {
     case 'marketall': ui.marketAll = !ui.marketAll; renderPane(true); break;
     case 'hire': case 'fire': {
       const n = Math.floor(Number($(`#hire-${b.dataset.key}`).value));
-      const res = doAction({ type: act, role: b.dataset.role, group: b.dataset.group || null, count: n });
-      if (res.ok) toast(act === 'hire' ? `Eingestellt, Start in ${res.lead} Tagen. Kosten ${eur(res.cost)}.` : `Entlassen. Abfindung ${eur(res.cost)}.`); refreshAll(); break;
+      const res = doAction({ type: act, role: b.dataset.role, group: b.dataset.group || null, count: n, start: act === 'hire' && ui.hireStart ? ui.hireStart : null });
+      if (res.ok) toast(act === 'hire' ? `Eingestellt, Start ${res.sched ? `zum Termin am ${dateShort(res.ready)}` : `in ${res.lead} Tagen`}. Kosten ${eur(res.cost)}.` : `Entlassen. Abfindung ${eur(res.cost)}.`); refreshAll(); break;
     }
-    case 'fillstaff': { const res = doAction({ type: 'fillStaff' }); if (res.ok) toast(res.msg); refreshAll(); break; }
+    case 'fillstaff': { const res = doAction({ type: 'fillStaff', start: ui.tab === 'staff' && ui.hireStart ? ui.hireStart : null }); if (res.ok) toast(res.msg + (ui.tab === 'staff' && ui.hireStart && res.n ? ` Antritt am ${dateShort(ui.hireStart)}.` : '')); refreshAll(); break; }
     case 'train': { if (doAction({ type: 'train', from: $('#tr-from').value, to: $('#tr-to').value, count: Math.floor(Number($('#tr-n').value)) }).ok) toast('Umschulung gestartet.'); refreshAll(); break; }
     case 'pay': doAction({ type: 'pay', v: Number(b.dataset.v) }); refreshAll(); break;
     case 'hireexpert': { if (doAction({ type: 'hireExpert', cid: b.dataset.id }).ok) toast('Eingestellt. Nach rund 30 Tagen Einarbeitung wirkt die Person voll – wie gut, zeigt die Bewertung ab dem Monatswechsel.'); refreshAll(); break; }
@@ -3947,6 +3999,9 @@ function onCfoChange(t) {
 function onPaneChange(e) {
   const t = e.target, pl = W.player;
   if (onCabRange(e, true) || onFltChange(t)) return;
+  if (t.id === 'hire-start') { ui.hireStart = t.value ? Number(t.value) : null; renderPane(true); return; }
+  if (t.id === 'hire-in') { const v = Math.round(Number(t.value)); ui.hireStart = v > 0 ? W.day + Math.min(180, v) : null; renderPane(true); return; }
+  if (t.dataset && t.dataset.planauto) { doAction({ type: 'planAuto', id: t.dataset.planauto, on: t.checked }); refreshAll(); return; }
   if (t.dataset && t.dataset.exnca) { doAction({ type: 'expertContract', id: t.dataset.exnca, kind: 'nca', v: t.checked }); refreshAll(); return; }
   if (t.dataset && t.dataset.ap) { const pl = W.player; doAction({ type: 'autoPrice', id: t.dataset.ap, on: t.checked, lf: pl.apDefault || pl.apLf || 0.85, cfg: t.checked ? SM.apCfgOf(null, pl.apCfg) : undefined }); refreshAll(); return; }
   if (t.id === 'hist-view') { ui.hist = ui.hist || { mode: 'd30' }; ui.hist.view = t.value || null; ui.hist.sel = null; if (ui.hist.mode === 'm') ui.hist.mode = 'd30'; renderPane(true); return; }
