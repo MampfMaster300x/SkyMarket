@@ -27,7 +27,7 @@ const SM = (() => {
     LEISURE_SEASON_PROFILE: SEASON_DATA,
     INTERCONT: 0.6, MIN_ROUTE_KM: 250, LONGHAUL_TAX_KM: 3000,
     // Nachfragemodell (kalibriert an rund 110 realen Märkten und am Aufkommen aller Flughäfen, siehe tripRaw)
-    DEMAND: { leisE: -0.8, bizE: -0.6, vfrE: -0.8, intercont: 0.25, border: 0.4, eu: 0.5, big: 0.4, bigLong: 1, bigFrom: 5, overDom: 1.2, overIntl: 2.9, kMax: 6, covN: 8,
+    DEMAND: { leisE: -0.8, bizE: -0.6, vfrE: -0.8, intercont: 0.15, border: 0.4, eu: 0.5, big: 0.8, bigLong: 1, bigFrom: 10, overDom: 1.2, overIntl: 2.9, kMax: 6, covN: 8,
       // Anteil der Inlandsreisen, die zu Flughäfen im Spiel führen (Rest: Ziele, die es im Spiel nicht gibt)
       cover: { DE: 0.95, GB: 0.85, FR: 0.8, ES: 0.85, IT: 0.8, PT: 0.95, GR: 0.5, NO: 0.25, SE: 0.4, JP: 0.6, AU: 0.85, NZ: 0.75, US: 0.75, CA: 0.8, MX: 0.75, CN: 0.65, IN: 0.7, BR: 0.75, RU: 0.6, TR: 0.7, KR: 0.8, AR: 0.6, CO: 0.6, ZA: 0.85, SA: 0.85, ID: 0.4, PH: 0.5, MY: 0.6, TH: 0.6, VN: 0.85, EG: 0.8, MA: 0.7 } },
     // Anteil internationaler Reisender (Land, einzelne Flughäfen abweichend); große Flächenländer fliegen vor allem im Inland
