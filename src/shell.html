@@ -320,6 +320,12 @@ p { margin: 0; }
 .seg button:hover { color: var(--ink); }
 .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); font-weight: 600; }
 .seg.wrap { flex-wrap: wrap; }
+.ap-box { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); }
+.ap-box .seg { background: var(--panel); }
+.ap-row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 4px 10px; }
+.ap-row > .small.muted:last-child:not(:first-child) { grid-column: 2; }
+.ap-row > span[title] { cursor: help; }
+@media (max-width: 560px) { .ap-row { grid-template-columns: 1fr; } .ap-row > .small.muted:last-child:not(:first-child) { grid-column: 1; } }
 .baseswitch { gap: 8px; align-items: center; flex-wrap: wrap; margin: 2px 0 6px; }
 .baseswitch .seg button { font-family: var(--f-mono); letter-spacing: .04em; }
 #aptCard .baseswitch { margin: 0 0 8px; }
@@ -772,6 +778,16 @@ h2.sec small { margin-left: auto; text-align: right; }
 .pc-chips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .pc-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); opacity: .5; margin-right: 5px; vertical-align: 1px; font-style: normal; }
 .pc-dot.on { background: var(--good); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.news div:has(> .ev-x) { grid-template-columns: 64px 1fr auto; align-items: center; }
+.ev-x { padding: 3px 10px; }
+.adm-list { display: grid; gap: 8px; }
+.adm-p, .adm-e { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); }
+.adm-e { justify-content: flex-start; }
+.adm-e > div { flex: 1; }
+.adm-e.off { opacity: .55; }
+.adm-act { gap: 6px; flex-wrap: wrap; }
+.adm-act > span { flex-wrap: nowrap; }
+.adm-act input.adm-amt { width: 96px; min-width: 0; flex: none; padding: 6px 8px; }
 .pc-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .pc-kpis > div { background: var(--panel); border-radius: var(--r); padding: 7px 9px; display: grid; gap: 1px; min-width: 0; }
 .pc-kpis > div > span { font-size: 10.5px; color: var(--ink-3); } .pc-kpis b { font: 600 13.5px/1.25 var(--f-mono); overflow-wrap: anywhere; } .pc-kpis em { font-style: normal; font-size: 10.5px; color: var(--ink-3); }

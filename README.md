@@ -105,6 +105,12 @@ Airline-Wirtschaftssimulation im Browser: 211 Flughäfen auf allen Kontinenten, 
 
 Der Benutzer **Tim** (Groß-/Kleinschreibung egal) ist Admin. In der Lobby sieht er unter „Verwaltung · alle Spiele“ jedes Spiel, auch passwortgeschützte und volle. Er kann jedem offenen Spiel ohne Passwort beitreten und jedes Spiel löschen.
 
+**Verwalten** (Lobby: Knopf „Verwalten“ an der Hauptwelt und an jedem Spiel; im Spiel: Mitspielende → „Verwaltung“) – auch ohne eigene Airline in der Welt:
+- **Airline entfernen** – sofort: Strecken enden, Leasingflugzeuge gehen an die Leasinggeber zurück, Slots, Gates, Handelsangebote, Kooperationen und Gebote verfallen. Die Person kann neu beitreten – außer mit **„Entfernen + sperren“**. Gesperrte stehen in einer Liste mit „Sperre aufheben“.
+- **Ereignisse annullieren** – in der Liste aller laufenden und angekündigten Ereignisse oder direkt an der Meldung („Annullieren“, nur für Admins sichtbar, mit Rückfrage). Angekündigte fallen aus, laufende enden sofort; Ticketsteuer, Entgelte, CO₂-Abgabe, Leitzins, Wechselkurs und Kerosinsprung werden zurückgenommen, Zölle neu berechnet, die Konjunktur nach einer Rezession entsprechend angehoben. Alle sehen eine Meldung „Spielleitung annulliert: …“.
+- **Kapital buchen** – ± bis 100 Mio. € je Airline, z. B. um einen Fehler auszugleichen (als Eigenkapitalbewegung).
+- In privaten Spielen kann auch die **Spielleitung** (wer das Spiel angelegt hat) Airlines entfernen, sperren, Ereignisse annullieren und Kapital buchen.
+
 - **Wichtig:** Das Konto „Tim“ gleich nach dem Deploy registrieren. Wer den Namen zuerst anlegt, hat die Rechte.
 - **Andere Admins:** In Netlify unter *Site configuration → Environment variables* `ADMIN_USERS` setzen, z. B. `tim,anna`. Danach neu deployen. Die Variable ersetzt die Vorgabe, „tim“ muss also mit drinstehen.
 
@@ -172,6 +178,36 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 ```
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
+
+## Neu in 0.15: Langstrecke nachgerechnet, Umsteiger, 175 neue Flughäfen, Preisautomatik, Verwaltung, Fachkräfte mit Ist-Leistung
+
+**Langstrecke**
+- **Ein Flugzeug reicht, solange der Umlauf (hin, Bodenzeit, zurück, Bodenzeit) höchstens 22 Stunden dauert** – das Flugzeug fliegt dann über Nacht genau diesen einen Umlauf. Beispiele: Frankfurt–New York 19,8 h, Frankfurt–Chicago 21,9 h, Frankfurt–Dubai 16,7 h, Singapur–Sydney 20 h. Das gilt jetzt auch für Schmalrumpfjets wie die A321neo auf dem Atlantik (vorher zählten dort 17 h, also zwei Flugzeuge). Grenze ab Frankfurt: etwa 7.200 km.
+- **Über 22 Stunden geht es physikalisch nicht mit einem Flugzeug täglich**: Frankfurt–Singapur 30 h, Frankfurt–Los Angeles 27,7 h, Sydney–Los Angeles 34,3 h. Ein Flugzeug ist dann zwei Tage unterwegs – mit zweien fliegt die Strecke täglich, mit einem jeden zweiten Tag. Die Streckenplanung sagt das jetzt ausdrücklich (grün: „Ein Flugzeug reicht“, gelb: „braucht 2 Flugzeuge“).
+- **Mehr Nachfrage auf langen Strecken** (ab 2.500 km steigend, ab 7.000 km doppelt so viel wie vorher) und ein **schwächerer Umsteige-Wettbewerb** über fremde Drehkreuze. Ergebnis zum Referenzpreis (Streckenbeitrag nach Flugzeugkosten): Frankfurt–Chicago B787-9 +11 %, Hamburg–New York A321neo +43 %, Frankfurt–Los Angeles +25 %, Sydney–Los Angeles +34 % (zwei Flugzeuge); auf umkämpften Strecken wie Frankfurt–New York mit Großraumjet nur knapp positiv, Frankfurt–Dubai gegen die Golf-Airlines klar negativ. In Langzeittests (540 Tage, mit Ölpreisschocks und Rezession) wachsen Langstrecken-Airlines aus Frankfurt und Hamburg auf das 7- bis 8-Fache ihres Startkapitals, aus Sydney (Australien–Amerika ohne KI-Konkurrenz) auf über das 20-Fache.
+- **Kerosinzuschlag im Markt**: Steigt Kerosin dauerhaft, ziehen die Marktpreise mit (gleitender Index über rund 45 Tage; Kurzstrecke gibt etwa 11 %, Langstrecke bis 30 % des Anstiegs weiter). Vorher konnte eine Ölkrise (+84 %) reine Langstrecken-Airlines in vier Monaten in die Insolvenz treiben, weil jede Preiserhöhung Kunden kostete. Die Weltlage zeigt den aktuellen Zuschlag.
+- Die Streckenliste rechnete die Flugzeugkosten bei Langstrecken bisher zu hoch (Umlauf ÷ 17 h statt tatsächlich gebundener Flugzeuge) – korrigiert.
+
+**Umsteigen**
+- **Sitzschutz für Umsteiger**: Ihre Flüge halten jetzt einen Teil der Plätze für Umsteiger frei, statt sie vorher vollständig an Direktreisende zu verkaufen (gelernt aus der Umsteigenachfrage der letzten Tage, höchstens die Hälfte der Sitze). Test „alle Verbindungen und alle Slots in Singapur“: vorher rund 60 Umsteiger je Strecke und 10 % Anteil, jetzt 120–310 je Strecke, gut 4.000 am Tag, 44 % aller Gäste.
+- Strecken → Bearbeiten und Strategie-Hub zeigen **gewünschte und tatsächlich beförderte Umsteiger** – so sieht man, ob Sitze fehlen.
+
+**Mehr Welt**
+- **175 neue Flughäfen, 50 neue Länder** (386 insgesamt): u. a. Hannover, Bremen, Nürnberg, Leipzig, Belgien, Skandinavien, Osteuropa, Baltikum, Balkan, Israel, Jordanien, Libanon, Golfstaaten, Iran, Sri Lanka, Malediven, Nepal, Bangladesch, Pakistan, Kambodscha, Myanmar, Macau, Mongolei, Zentralasien, Kaukasus, Karibik und Mittelamerika, Venezuela, weitere Städte in USA, Kanada, China, Indien, Japan, Brasilien, Australien und Afrika. Karte mit allen Ländern.
+- EU erweitert (Bulgarien, Kroatien, Baltikum, Malta, Zypern).
+- Leasinggeber haben mehr Flugzeuge, je mehr Menschen mitspielen (+20 % je weitere Airline).
+
+**Preisautomatik** (Strategie-Hub für alle, Strecken → Bearbeiten je Strecke)
+- Einmal pro Woche kleine Schritte Richtung **Ziel-Auslastung** (75–95 %). Einstellbar: **Untergrenze** (nur Kostengrenze oder 70/85/100 % des Referenzpreises), **Obergrenze** (130/150/200/300 %), **Tempo** (vorsichtig ±1,5 %, normal ±3 %, zügig ±6 % pro Woche) und **Premiumpreise** (fest oder automatisch auf eine Ziel-Auslastung der Business/First-Sitze).
+- Standard im Strategie-Hub gilt für alle Strecken mit Automatik (und auf Wunsch für neue); einzelne Strecken lassen sich abweichend einstellen oder mit „Standard übernehmen“ zurücksetzen. Preise außerhalb des Bands wandern schrittweise zurück, nie sprunghaft; die Automatik startet zwei Wochen nach Eröffnung.
+- **Premiumaufschlag je Strecke** (70–140 % des Standards) auch von Hand. Höherer Aufschlag = mehr Erlös je Premiumgast, aber weniger Premiumgäste.
+
+**Verwaltung für Admins** – Airlines entfernen und sperren, Ereignisse annullieren, Kapital buchen (siehe Abschnitt Admin).
+
+**Fachkräfte: Versprechen und Ist-Leistung, Schutz vor Abwerbung**
+- Jede Fachkraft hat ein verborgenes Talent und eine **Passung zum Arbeitgeber**. Nach rund 30 Tagen Einarbeitung leistet sie zwischen etwa 50 % und 140 % der zugesagten Wirkung. Jeden Monat schwankt das ein wenig; gelegentlich gibt es einen **Fehlgriff** („Marktprognose daneben – nur 35 % diesen Monat“) oder einen **Glücksgriff**.
+- **Bewertung „Ist / Zusage“** in Prozent an jeder Fachkraft (gleitender Schnitt, mit Balken). Wer freigestellt wird, sucht neu und bringt die Bewertung als **Referenz** mit – bei einem neuen Arbeitgeber wird die Passung neu ausgewürfelt, dort kann es besser (oder schlechter) laufen. Auch abgeworbene Fachkräfte nehmen ihre Referenz mit.
+- **Schutz vor Abwerbung**: **Halteprämie** (drei Monatsgehälter, zwölf Monate Bindung mit Kündigungsschutz – Abwerbung gelingt nur noch selten), **Wettbewerbsverbot** (+15 % Gehalt; wer abwirbt, zahlt sechs Monatsgehälter Ablöse an Sie, und die Person darf erst nach 30 Tagen anfangen) und **Gehalt nachverhandeln** (+10 %, bis 30 % über Markt; über Markt bezahlte Leute wechseln seltener). Auch die Betriebszugehörigkeit bindet. Die Anzeige „Schutz vor Abwerbung: hoch/mittel/gering“ fasst das zusammen; beim Abwerben sieht man Bewertung, Wettbewerbsverbot und Bindung der anderen.
 
 ## Neu in 0.14: Strategie-Hub, Kabinenklassen, Vielflieger, Drehkreuze, Marktkontrolle, Filter
 

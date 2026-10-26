@@ -358,7 +358,7 @@ function distLabelHtml() {
 function renderLegend() {
   const n = W.list.filter((al) => al.archetype && al.status !== 'insolvent').length;
   const items = [`<span><i style="background:var(--accent);box-shadow:0 0 8px var(--accent)"></i>${esc(W.player.name)}</span>`]
-    .concat(ui.flightFilter === 'mine' ? [] : W.humans.filter((h) => h.id !== W.playerId).map((h) => `<span><i style="background:${colorOf(h)};box-shadow:0 0 8px ${colorOf(h)}"></i>${esc(h.name)}</span>`));
+    .concat(ui.flightFilter === 'mine' ? [] : W.humans.filter((h) => h.id !== W.playerId && !h.removed).map((h) => `<span><i style="background:${colorOf(h)};box-shadow:0 0 8px ${colorOf(h)}"></i>${esc(h.name)}</span>`));
   if (ui.showAi && ui.flightFilter === 'all') items.push(`<span><i style="background:var(--plane-ai)"></i>${n} Konkurrenten</span>`);
   if (SM.AP_CODES.some((c) => aptEventState(c) === 'bad')) items.push('<span><i class="ring crit"></i>Störung</span>');
   if (SM.AP_CODES.some((c) => aptEventState(c) === 'good')) items.push('<span><i class="ring good"></i>Großereignis</span>');
@@ -488,7 +488,7 @@ function buildSchedules() {
         const w = SM.winOf(r.type_id), rot = 2 * bh + 2 * turn;
         if (rot > w) {
           // Langer Umlauf auf mehreren Flugzeugen: jedes startet an jedem k-ten Tag
-          const k = Math.ceil(rot / w), slot = (share[rid] = share[rid] ?? (idx % k)), dOff = (W.day + slot) % k;
+          const k = SM.kOf(r.type_id, rot) || 1, slot = (share[rid] = share[rid] ?? (idx % k)), dOff = (W.day + slot) % k;
           const t0 = 8 + (idx % 3) - 24 * dOff;
           legs.push({ a: r.base, b: r.dest, t0, t1: t0 + bh, r, dir: 'out' });
           legs.push({ a: r.dest, b: r.base, t0: t0 + bh + turn, t1: t0 + 2 * bh + turn, r, dir: 'in' });
@@ -585,14 +585,15 @@ function monthResult(al) {
 // ---------------------------------------------------------------------------
 function rstats(r, days, al = W.player) {
   const h = r.hist.slice(-days);
-  const s = { n: h.length, flights: 0, seats: 0, pax: 0, rev: 0, cost: 0, cancelled: 0, late: 0, demand: 0, spill: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, tr: 0, cargo: 0 };
+  const s = { n: h.length, flights: 0, seats: 0, pax: 0, rev: 0, cost: 0, cancelled: 0, late: 0, demand: 0, spill: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, tr: 0, trd: 0, prem: 0, cargo: 0 };
   for (const x of h) {
     s.flights += x.flights; s.seats += x.seats; s.pax += x.pax; s.rev += x.rev; s.cost += x.cost; s.cancelled += x.cancelled; s.late += x.late || 0;
     s.demand += (x.demand_out || 0) + (x.demand_in || 0); s.spill += (x.spill_out || 0) + (x.spill_in || 0);
-    s.pax_out += x.pax_out; s.pax_in += x.pax_in; s.seats_out += x.seats_out; s.seats_in += x.seats_in; s.tr += (x.tr_out || 0) + (x.tr_in || 0); s.cargo += x.cargo || 0;
+    s.pax_out += x.pax_out; s.pax_in += x.pax_in; s.seats_out += x.seats_out; s.seats_in += x.seats_in; s.tr += (x.tr_out || 0) + (x.tr_in || 0); s.trd += x.trd || 0; s.prem += x.prem || 0; s.cargo += x.cargo || 0;
   }
   const rot = al.rotH(r) * r.freq;
-  s.acCost = SM.aircraftDayFixedGeneric(r.type_id) * rot / P.OPERATING_WINDOW_H * s.n;
+  void rot;   // Flugzeugzeit wie in der Engine: Anteil am Betriebsfenster des Musters (Langstrecke 22 h), lange Umläufe binden ganze Flugzeuge
+  s.acCost = SM.aircraftDayFixedGeneric(r.type_id) * SM.acShareOf(r.type_id, al.rotH(r), r.freq) * s.n;
   s.db1 = s.rev - s.cost; s.db2 = s.db1 - s.acCost;
   s.lf = s.seats ? s.pax / s.seats : 0;
   s.avgFare = s.pax ? (s.rev / s.pax) - P.SERVICE[r.service].ancillary * cpi() : 0;
@@ -995,7 +996,7 @@ function routeItem(r) {
   const waiting = W.day < r.opened_day ? `startet ${dateShort(r.opened_day)}` : r.partial ? `Teilbetrieb: fliegt an ${pct(r.partial)} der Tage` : (r.flyingToday || 0) < r.freq ? `${r.flyingToday || 0} von ${r.freq} Umläufen haben ein Flugzeug` : null;
   const lfo = SM.routeLf(r, 7, 'out'), lfi = SM.routeLf(r, 7, 'in');
   let html = `<div class="ritem${open ? ' open' : ''}"><button class="rhead" data-act="toggle" data-id="${r.id}" aria-expanded="${open}">
-    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${r.freq}x täglich · ${tlx(r.type_id)} · ${svcLabel(r.service)}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}</div></div>
+    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${r.freq}x täglich · ${tlx(r.type_id)} · ${svcLabel(r.service)}${r.ap ? ` · <span class="chip" title="Preisautomatik: ${esc(apSummary(SM.apCfgOf(r), r.ap))}">Auto ${pct(r.ap)}</span>${r.pm && r.pm !== 1 ? ` <span class="chip" title="Premiumaufschlag">Premium ${pct(r.pm)}</span>` : ''}` : ''}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}</div></div>
     <div class="rdb ${s30.db2 < 0 ? 'neg' : 'pos'}">${s30.n ? eur(s30.db2 / s30.n, { plus: true }) : '–'}<small>DB2 pro Tag</small></div>
     <div class="lfrow"><span>hin</span><div class="bar"><i class="me" style="width:${(lfo * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfo) : '–'}</span></div>
     <div class="lfrow"><span>zurück</span><div class="bar"><i class="me" style="width:${(lfi * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfi) : '–'}</span></div>
@@ -1005,7 +1006,7 @@ function routeItem(r) {
 }
 function insights(r, s7, s30) {
   const out = [], pl = W.player;
-  { const h = pl.rotH(r), w = SM.winOf(r.type_id); if (h > w) { const k = Math.ceil(h / w), have = pl.fleet.filter((a) => a.type_id === r.type_id && a.base === r.base && a.delivery_day <= W.day).length;
+  { const h = pl.rotH(r), w = SM.winOf(r.type_id); if (h > w) { const k = SM.kOf(r.type_id, h), have = pl.fleet.filter((a) => a.type_id === r.type_id && a.base === r.base && a.delivery_day <= W.day).length;
     if (r.partial) out.push(['warn', `Langstrecke: Ein Umlauf dauert ${n1(h)} Stunden, ein Flugzeug ist ${k} Tage unterwegs. Für täglichen Betrieb braucht es ${k} Flugzeuge (${tl(r.type_id)} in ${r.base}); mit ${have} fliegt die Strecke an ${pct(r.partial)} der Tage.`]);
     else out.push(['info', `Langstrecke: Ein Umlauf dauert ${n1(h)} Stunden und bindet ${k} Flugzeuge pro täglichem Flug.`]); } }
   const ramp = r.ramp(W.day, pl.rampT());
@@ -1014,7 +1015,8 @@ function insights(r, s7, s30) {
   if (s30.n >= 14 && s30.lf < 0.6) out.push(['warn', `Nur ${pct(s30.lf)} Auslastung. Preis senken, kleineres Flugzeug oder weniger Frequenz prüfen.`]);
   if (s30.n >= 14 && s30.db1 > 0 && s30.db2 < 0) out.push(['warn', 'Deckt die direkten Flugkosten, aber nicht die Flugzeugzeit. Lohnt nur, wenn das Flugzeug sonst leer stünde.']);
   if (s30.n >= 14 && s30.db1 < 0) out.push(['crit', 'Deckt nicht einmal die direkten Flugkosten. Jeder Flug verbrennt Geld.']);
-  if (s30.tr > 0) out.push(['info', `Ø ${n0(s30.tr / Math.max(s30.n, 1))} Umsteiger pro Tag über Ihre Basis ${r.base}. Ihr Erlösanteil richtet sich nach der Flugstrecke.`]);
+  if (s30.tr > 0 || s30.trd > 0) { const n = Math.max(s30.n, 1), got = s30.tr / n, want = Math.max(got, s30.trd / n);
+    out.push([want > got * 1.25 && want - got > 20 ? 'warn' : 'info', `Ø ${n0(got)} Umsteiger pro Tag über ${r.base}${want > got * 1.1 ? ` – gewollt hätten ${n0(want)}. Für die anderen war kein Platz: mehr Frequenz oder ein größeres Flugzeug bringt sie mit` : ''}. Ihr Erlösanteil richtet sich nach der Flugstrecke.`]); }
   const comp = W.competitorOffers(W.playerId, r.base, r.dest);
   const cheap = comp.filter((c) => c.fare < r.fare_out * 0.9);
   if (cheap.length) { const c = cheap.sort((a, b) => a.fare - b.fare)[0]; out.push(['warn', `${W.airlines[c.airline].name} fliegt dieselbe Strecke ${pct(1 - c.fare / r.fare_out)} günstiger (${eur(c.fare)}).`]); }
@@ -1042,8 +1044,8 @@ function routeBody(r, s7, s30) {
     <div class="stack">
       <h3>Preise und Angebot</h3>
       <div class="grid2">
-        <label class="f"><span>Tarif ${r.base} → ${r.dest} (€)</span><input type="number" id="ef-o-${r.id}" min="10" max="900" step="5" value="${Math.round(r.fare_out)}"></label>
-        <label class="f"><span>Tarif ${r.dest} → ${r.base} (€)</span><input type="number" id="ef-i-${r.id}" min="10" max="900" step="5" value="${Math.round(r.fare_in)}"></label>
+        <label class="f"><span>Tarif ${r.base} → ${r.dest} (€)</span><input type="number" id="ef-o-${r.id}" min="10" max="5000" step="5" value="${Math.round(r.fare_out)}"></label>
+        <label class="f"><span>Tarif ${r.dest} → ${r.base} (€)</span><input type="number" id="ef-i-${r.id}" min="10" max="5000" step="5" value="${Math.round(r.fare_in)}"></label>
       </div>
       <div class="row">
         <label class="f" style="flex:1"><span>Frequenz pro Tag</span><select id="ef-f-${r.id}">${[1, 2, 3, 4, 5, 6].map((f) => `<option ${f === r.freq ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
@@ -1051,7 +1053,16 @@ function routeBody(r, s7, s30) {
         <label class="f" style="flex:1"><span>Flugzeugtyp</span><select id="ef-ty-${r.id}">${[...new Set([r.type_id, ...W.player.fleet.filter((x) => x.base === r.base).map((x) => x.type_id)])].filter((t) => SM.rangeOk(r.base, r.dest, t)).map((t) => `<option value="${t}" ${t === r.type_id ? 'selected' : ''}>${t} · ${P.AIRCRAFT_TYPES[t].seats[r.service]} Sitze</option>`).join('')}</select></label>
         <label class="f" style="flex:1"><span>Puffer</span><select id="ef-b-${r.id}">${Object.keys(P.BUFFER_POLICY).map((b) => `<option value="${b}" ${b === r.buffer ? 'selected' : ''}>${bufLabel(b)}</option>`).join('')}</select></label>
       </div>
-      <p class="small muted">Preise steuern Sie selbst – es gibt keine Automatik. Die Konkurrenz beobachtet Ihre Tarife und reagiert jede Woche.</p>
+      ${(() => {
+        const cfg = SM.apCfgOf(r), hasPrem = (() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return !!(c.f || c.b); })(), ref = SM.refPrice(r.base, r.dest, W.macro.cpi);
+        const C = P.CABIN[SM.haulOf(r.type_id)], pm = r.pm || 1;
+        const premRow = hasPrem && !(r.ap && cfg.plf) ? `<div class="ap-row"><span class="small muted" title="Aufschlag für Business/First gegenüber dem Standard (Business ${n1(C.bizMult)}-fach Economy). Höher: mehr Erlös je Gast, weniger Premiumgäste.">Premiumaufschlag</span><div class="seg wrap">${[0.7, 0.85, 1, 1.2, 1.4].map((v) => `<button data-act="pmset" data-id="${r.id}" data-v="${v}" aria-pressed="${Math.abs(pm - v) < 0.004}">${pct(v)}</button>`).join('')}</div><span class="small muted">Business ≈ ${eur(r.fare_out * C.bizMult * pm)}</span></div>` : hasPrem ? `<p class="small muted">Premiumaufschlag derzeit ${pct(pm)} – Business ≈ ${eur(r.fare_out * C.bizMult * pm)} (von der Automatik geführt).</p>` : '';
+        return `<label class="chk"><input type="checkbox" id="ap-${r.id}" data-ap="${r.id}" ${r.ap ? 'checked' : ''}> Preisautomatik: jede Woche kleine Schritte Richtung Ziel-Auslastung</label>
+        ${r.ap ? `<div class="ap-box">${apRows(cfg, r.ap, r.id, hasPrem)}
+          <div class="row small" style="gap:8px;flex-wrap:wrap"><span class="muted">Preisband hier: ${eur(Math.max(cfg.min * ref, 0)) === eur(0) ? 'Kostengrenze' : eur(cfg.min * ref)} bis ${eur(cfg.max * ref)} (Referenz ${eur(ref)})</span><button class="btn small" data-act="apstd" data-id="${r.id}">Standard aus dem Strategie-Hub übernehmen</button></div></div>` : ''}
+        ${premRow}
+        <p class="small muted">${r.ap ? 'Die Automatik startet zwei Wochen nach Eröffnung, verschiebt die Preise in kleinen Schritten und geht nie unter die Kostengrenze. Liegt ein Preis außerhalb des Bands, wandert er schrittweise zurück.' : 'Ohne Automatik führen Sie die Preise selbst.'} Die Konkurrenz beobachtet Ihre Tarife und reagiert jede Woche.</p>`;
+      })()}
       ${pend}
       <div class="row"><button class="btn primary" data-act="applyroute" data-id="${r.id}">Änderungen übernehmen</button>
         ${c ? `<span class="small">Strecke wirklich einstellen?</span><button class="btn danger small" data-act="closeroute" data-id="${r.id}">Ja, einstellen</button><button class="btn small" data-act="cancelconfirm">Abbrechen</button>`
@@ -1142,7 +1153,7 @@ function updateForecast() {
   const t = P.AIRCRAFT_TYPES[p.type];
   const study = pl.studies[SM.pairKey(base, p.dest)];
   const slotsB = slotsMine(base), slotsD = slotsMine(p.dest), slotOk = W.slotsOkFor(pl, base, p.dest, p.freq);
-  const wnd = SM.winOf(p.type), kLong = rotH > wnd ? Math.ceil(rotH / wnd) : 0;
+  const wnd = SM.winOf(p.type), kLong = SM.kOf(p.type, rotH);
   const freeWhole = free.filter((x) => x.free >= wnd - 1e-9).length;
   const acNeed = kLong ? (freeWhole >= kLong * p.freq ? null : `Langstrecke: Ein Umlauf dauert ${n1(rotH)} h – länger als das Betriebsfenster von ${wnd} h. Für ${p.freq}x täglich braucht es ${kLong * p.freq} freie ${tl(p.type)} in ${base}, frei sind ${freeWhole}. ${freeWhole ? `Mit ${freeWhole} fliegt die Strecke nur an ${pct(Math.min(1, freeWhole / kLong / p.freq))} der Tage.` : ''}`)
     : fit ? null : `Für ${p.freq}x täglich fehlt Flugzeugzeit an ${base}: ein Umlauf braucht ${n1(rotH)} h, frei sind ${free.length ? free.map((x) => n1(x.free) + ' h').join(', ') : 'keine passenden Flugzeuge'}.`;
@@ -1156,6 +1167,7 @@ function updateForecast() {
     <p class="small ink2">Nach <b>allen</b> Kosten – also auch Crew-Gehältern, Leasing, Versicherung, Technik, Slots und Terminal – bleiben <b class="${sgn(r.db2)}">${eur(r.db2, { plus: true })}</b> pro Tag. So viel landet im Ergebnis.</p>
     ${fcExplain(r, { band: W.forecastBand(pl), cur, m, study, potSum, rail })}
     <p class="small ink2">Jahresmittel bei ausgereifter Strecke, Marke ${n0(pl.brand * 100)}. Im ${MONTHS_L[m]}: Streckenbeitrag <b class="${sgn(cur.db2List)}">${eur(cur.db2List, { plus: true })}</b> pro Tag bei ${pct(cur.lf)} Auslastung. ${study && study.done ? `<b>Marktstudie liegt vor</b> (${esc(study.by)}): Nachfrage ${pct(study.est - 1, 0).replace(/^(?!-)/, '+')} gegenüber Modell, Unsicherheit ±${pct(study.err)}.` : `Ohne Marktstudie liegt die echte Nachfrage bis zu ±${pct(band)} daneben.`}</p>
+    ${SM.haulOf(p.type) === 'long' || kLong ? `<p class="small ${kLong > 1 ? 'warnc' : 'pos'}">${kLong > 1 ? `Umlauf ${n1(rotH)} h (hin, Bodenzeit, zurück, Bodenzeit) – mehr als ${SM.P.LONG_WINDOW_H} h. Ein Flugzeug ist ${kLong} Tage unterwegs; für einen täglichen Flug braucht es ${kLong} Flugzeuge, mit einem fliegt die Strecke an jedem ${kLong}. Tag.` : kLong === 1 ? `Ein Flugzeug reicht für den täglichen Flug: Umlauf ${n1(rotH)} h – länger als der normale ${wnd}-Stunden-Tag, deshalb fliegt das Flugzeug nur diesen einen Umlauf (mit Nachtflug, bis ${SM.P.LONG_WINDOW_H} h).` : `Ein Flugzeug reicht für den täglichen Flug: Umlauf ${n1(rotH)} h, passt in das ${wnd}-Stunden-Fenster der Langstrecke (über Nacht).`}</p>` : ''}
     ${kitHtml(p, { acNeed, kLong, freeWhole, free, rotH, wnd, t })}
     ${!slotOk ? `<div class="callout crit">Keine Slots: ${[base, p.dest].filter((x) => slotsMine(x) < p.freq).map((x) => `${x} hat für Sie nur ${slotTxt(x)} freie`).join(', ')}. Neue Slots kommen zum Sommer- und Winterflugplan (April, Oktober).</div>` : ''}
     <table class="t"><tbody>
@@ -1215,7 +1227,7 @@ function kitHtml(p, x) {
     if (x.kLong) n = Math.max(1, x.kLong * p.freq - x.freeWhole);
     else { let need = p.freq; for (const f of x.free.map((y) => y.free).sort((a, b) => b - a)) need -= Math.floor((f + 1e-9) / x.rotH); n = Math.max(1, Math.ceil(Math.max(0, need) / Math.max(1, Math.floor(x.wnd / x.rotH)))); }
   }
-  const stock = W.lessorStock && W.lessorStock[p.type] !== undefined ? W.lessorStock[p.type] : SM.stockCap(p.type);
+  const stock = W.lessorStock && W.lessorStock[p.type] !== undefined ? W.lessorStock[p.type] : SM.capOf(W, p.type);
   const auctionOnly = t.launch && W.day < t.launch + 365;
   const leaseOk = n > 0 && !auctionOnly && stock >= n;
   const used = n === 1 ? W.acMarket.filter((o) => o.type === p.type).sort((a, b) => a.delivery - b.delivery).slice(0, 2) : [];
@@ -1412,7 +1424,7 @@ VIEWS.fleetBuy = function viewFleetBuy() {
   </tbody></table></div><p class="small muted">Leasingraten sind in US-Dollar vereinbart: Fällt der Euro, wird das Leasing teurer. Der Zustand gebrauchter Flugzeuge ist verborgen: Verbrauchte Maschinen verhalten sich wie deutlich ältere. ${pl.oldAcExpert() ? 'Luis Perez begutachtet jedes Angebot ab 8 Jahren.' : 'Ein Gutachter wie Luis Perez (Unternehmen → Personal) sieht ihn genau, Ihre Technik ab Senior grob.'}</p></div>`;
   html += `<h2 class="sec">Neu vom Leasinggeber oder ab Werk</h2><div class="types">${Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => !t.launch || W.day >= t.launch - 30).map(([id, t]) => {
     const known = pl.familyKnown(id), fam = P.TYPE_GROUPS[t.group];
-    const stock = W.lessorStock && W.lessorStock[id] !== undefined ? W.lessorStock[id] : SM.stockCap(id), duty = SM.acTariff(W, pl, id), auctionOnly = t.launch && W.day < t.launch + 365;
+    const stock = W.lessorStock && W.lessorStock[id] !== undefined ? W.lessorStock[id] : SM.capOf(W, id), duty = SM.acTariff(W, pl, id), auctionOnly = t.launch && W.day < t.launch + 365;
     const usedOnly = t.stock === 0;
     const avail = usedOnly ? `<span class="chip warn">Nur gebraucht – selten auf dem Gebrauchtmarkt${t.maxPerAirline ? `, höchstens ${t.maxPerAirline} je Airline` : ''}</span>${t.worldMax ? ` <span class="chip">weltweit ${W.typeCount(id)} von ${t.worldMax} im Einsatz</span>` : ''}` : auctionOnly ? `<span class="chip me">Neues Muster – im ersten Jahr nur per Auktion</span>` : `<span class="chip ${stock <= 0 ? 'crit' : stock <= 2 ? 'warn' : ''}">${stock <= 0 ? 'beim Leasinggeber ausverkauft' : `${stock} beim Leasinggeber`}</span> <span class="chip">Lieferung ${SM.leaseDelivery(W, id, 'lease')} T.</span>${duty ? ` <span class="chip crit">Zoll +${pct(duty)}</span>` : ''}`;
     const intro = known ? `Familie ${fam} schon in der Flotte, Piloten können wechseln` : `neue Familie ${fam}: ${eur(P.TYPE_INTRO_COST)} Einführung${pl.typesIntroduced.length ? ` + ${eur(P.TYPE_COMPLEXITY_DAY)} pro Tag Komplexität, eigene Musterberechtigung für Piloten` : ''}`;
@@ -1474,21 +1486,44 @@ VIEWS.staff = function viewStaff() {
   // Fachkräfte
   html += `<div class="stack"><h2 class="sec">Fachkräfte und Berater <small>${pl.experts.length} angestellt</small></h2>`;
   html += pl.experts.length ? pl.experts.map((e) => `<div class="card pad stack"><div class="spread"><b>${esc(e.name)}</b><span class="chip me">${P.EXPERT_ROLES[e.role].label} · ${LEVEL[e.level]}</span></div>
-      <div class="small ink2">${esc(P.EXPERT_ROLES[e.role].effect[e.level - 1])}</div>
-      <div class="spread small muted"><span>${e.years} Jahre Erfahrung, ${esc(e.prev)}, Schwerpunkt ${esc(e.region)}</span><span>${eur(e.salary * cpi())}/Monat <button class="btn small" data-act="fireexpert" data-id="${e.id}">Freistellen</button></span></div></div>`).join('')
-    : '<p class="small muted">Noch niemand. Fachkräfte wirken sofort und dauerhaft, jede Rolle kann einmal besetzt werden (Marktanalyse zweimal).</p>';
+      <div class="small ink2">Zusage: ${esc(P.EXPERT_ROLES[e.role].effect[e.level - 1])}</div>
+      ${expertPerfHtml(e)}
+      ${expertContractHtml(e)}
+      <div class="spread small muted"><span>${e.years} Jahre Erfahrung, ${esc(e.prev)}, Schwerpunkt ${esc(e.region)}${refsTxt(e)}</span><span>${eur(e.salary * cpi())}/Monat <button class="btn small" data-act="fireexpert" data-id="${e.id}">Freistellen</button></span></div></div>`).join('')
+    : '<p class="small muted">Noch niemand. Fachkräfte wirken nach rund 30 Tagen Einarbeitung voll – wie gut genau, zeigt die monatliche Bewertung. Jede Rolle kann einmal besetzt werden (Marktanalyse zweimal).</p>';
   { const taken = SM.P.STAR_CONSULTANTS.map((S) => [S, W.starHolder(S.id)]).filter(([, h]) => h && h.id !== pl.id);
     if (taken.length) html += `<p class="small muted">${taken.map(([S, h]) => `${esc(S.name)} arbeitet gerade für ${esc(h.name)}.`).join(' ')} Wer ihn freistellt oder verliert, gibt ihn wieder frei.</p>`; }
   html += `<h3>Bewerbungen</h3>${W.candidates.slice().sort((a, b) => (P.EXPERT_ROLES[b.role].unique ? 1 : 0) - (P.EXPERT_ROLES[a.role].unique ? 1 : 0) || a.role.localeCompare(b.role) || b.level - a.level).map((c) => {
     const taken = pl.experts.filter((e) => e.role === c.role).length >= P.EXPERT_ROLES[c.role].max;
     return `<div class="cand"><div class="spread"><b>${esc(c.name)}</b><span class="chip">${P.EXPERT_ROLES[c.role].label} · ${LEVEL[c.level]}</span></div>
       <div class="small ink2">${esc(P.EXPERT_ROLES[c.role].effect[c.level - 1])}</div>
+      ${c.refs && c.refs.length ? `<div class="small">Referenz: ${c.refs.map((x) => `<b class="${x.perf >= 1 ? 'pos' : x.perf < 0.85 ? 'neg' : ''}">${pct(x.perf)}</b> der Zusage bei ${esc(x.airline)}${x.months ? ` (${x.months} Mon.)` : ''}`).join(' · ')} <span class="muted">– bei einem neuen Arbeitgeber kann es anders laufen</span></div>` : ''}
       <div class="spread small"><span class="muted">${c.years} Jahre, ${esc(c.trait)}, ${esc(c.prev)} · kennt ${esc(c.region)} · ${P.EXPERT_ROLES[c.role].unique ? `einmalig in der Welt – verfügbar, bis jemand zugreift · Antrittshonorar ${eur(P.EXPERT_ROLES[c.role].signOn)}` : 'bis ' + dateShort(c.expires)}</span>
         <span><b class="mono">${eur(c.salary)}</b>/Mon. <button class="btn small${taken ? '' : ' primary'}" data-act="hireexpert" data-id="${c.id}" ${taken ? 'disabled title="Rolle besetzt"' : ''}>Einstellen</button></span></div></div>`;
-  }).join('')}<p class="small muted">Neue Bewerbungen kommen zum Monatswechsel. Wer eine Region kennt, liefert dort Marktstudien schneller und genauer.</p></div>`;
+  }).join('')}<p class="small muted">Neue Bewerbungen kommen zum Monatswechsel. Wer eine Region kennt, liefert dort Marktstudien schneller und genauer. Der Lebenslauf ist ein Versprechen: Wie gut jemand bei Ihnen wirklich arbeitet, zeigt sich erst nach der Einarbeitung – mal unter, mal über der Zusage. Wer freigestellt wird, sucht neu und bringt die Bewertung als Referenz mit.</p></div>`;
   return html;
 };
 
+/** Ist-Leistung gegenüber der Zusage (Anteil in %), mit Balken. */
+function expertPerfHtml(e) {
+  if (e.startDay && e.startDay > W.day) return `<div class="small warnc">Beginnt am ${dateShort(e.startDay)} (Wettbewerbsverbot beim bisherigen Arbeitgeber).</div>`;
+  const uniq = P.EXPERT_ROLES[e.role].unique, now = SM.expertPerf(e, W.day);
+  if (e.ps === null || e.ps === undefined) return `<div class="small muted">Leistung: noch keine Bewertung – Einarbeitung, derzeit etwa ${pct(Math.min(1, now))} Wirkung. Die erste Bewertung kommt zum Monatswechsel.</div>`;
+  const v = e.ps, cls = v >= 1.02 ? 'good' : v < 0.85 ? 'crit' : 'me', last = e.pm !== undefined && e.perf ? e.pm / e.perf : 1;
+  const tag = v >= 1.15 ? 'übertrifft die Zusage deutlich' : v >= 1.02 ? 'übertrifft die Zusage' : v >= 0.93 ? 'hält, was versprochen wurde' : v >= 0.8 ? 'bleibt etwas hinter der Zusage' : 'bleibt klar hinter der Zusage';
+  return `<div class="lfrow perf" style="grid-template-columns:92px 1fr 52px" title="Gleitender Schnitt der Monatsleistung, gemessen an der zugesagten Wirkung (100 %)"><span class="small">Ist / Zusage</span><div class="bar"><i class="${cls}" style="width:${Math.min(100, v / 1.4 * 100).toFixed(0)}%"></i><span class="tgt" style="left:${(100 / 1.4).toFixed(1)}%"></span></div><b class="num ${v >= 1 ? 'pos' : v < 0.85 ? 'neg' : ''}">${pct(v)}</b></div>
+    <div class="small muted">${tag}${uniq ? '' : last < 0.6 ? ' · letzter Monat ein Fehlgriff' : last > 1.2 ? ' · letzter Monat ein Glücksgriff' : ''} · ${e.psN || 0} Monat${(e.psN || 0) === 1 ? '' : 'e'} bewertet</div>`;
+}
+const refsTxt = (e) => (e.refs && e.refs.length ? ` · vorher ${e.refs.map((x) => `${pct(x.perf)} bei ${esc(x.airline)}`).join(', ')}` : '');
+function expertContractHtml(e) {
+  if (P.EXPERT_ROLES[e.role].unique) return '';
+  const C = P.EXPERT_CONTRACT, sh = W.poachShield(e, W.day), lvl = sh < 0.35 ? ['hoch', 'pos'] : sh < 0.75 ? ['mittel', ''] : ['gering', 'neg'];
+  const bound = e.bindUntil > W.day;
+  return `<div class="row small" style="gap:6px;flex-wrap:wrap"><span class="muted">Schutz vor Abwerbung: <b class="${lvl[1]}">${lvl[0]}</b></span>
+    ${bound ? `<span class="chip good">gebunden bis ${dateShort(e.bindUntil)}</span>` : `<button class="btn small" data-act="exc" data-k="bind" data-id="${e.id}" title="Einmalig ${C.bindCost} Monatsgehälter. Zwölf Monate Bindung mit Kündigungsschutz: Abwerbung gelingt nur noch selten.">Halteprämie ${eur(e.salary * C.bindCost)}</button>`}
+    <label class="chk" title="Wettbewerbsverbot: +${Math.round(C.ncaSalary * 100)} % Gehalt als Karenzausgleich. Wer abwirbt, zahlt ${C.ncaComp} Monatsgehälter Ablöse an Sie, und die Person darf erst nach ${C.ncaWait} Tagen anfangen."><input type="checkbox" data-exnca="${e.id}" ${e.nca ? 'checked' : ''}> Wettbewerbsverbot</label>
+    <button class="btn small" data-act="exc" data-k="raise" data-v="0.1" data-id="${e.id}" title="Gehalt über Markt macht Abwerbung schwerer (bis 30 % über Markt).">Gehalt +10 %</button></div>`;
+}
 // ---------- Stationen ----------
 VIEWS.stations = function viewStations() {
   const pl = W.player, list = stationsOf(pl), proc = 1 - SM.lv3([0, 0.03, 0.06, 0.09], pl.skill('procurement'));
@@ -1696,6 +1731,21 @@ const CAB_PRESETS = {
 };
 const HAUL_LBL = { short: 'Kurz- und Mittelstrecke', long: 'Langstrecke' };
 const pctTxt = (x) => `${Math.round(x * 100)} %`;
+// Preisautomatik: Einstellmöglichkeiten (Werte wie im Motor: Faktor auf den Referenzpreis, Schritt je Woche, Ziel-Auslastung Premium)
+const AP_OPTS = {
+  lf: { label: 'Ziel-Auslastung', tip: 'Auf diese Auslastung steuert die Automatik. Höher = mehr Passagiere, tiefere Preise; niedriger = höhere Preise, mehr Abweisungen.', vals: [0.75, 0.8, 0.85, 0.9, 0.95], txt: (v) => pct(v) },
+  min: { label: 'Untergrenze', tip: 'Tiefster Preis, bezogen auf den Referenzpreis der Strecke. „Kosten“: nur die Kostengrenze zählt.', vals: [0, 0.7, 0.85, 1], txt: (v) => (v ? pct(v) : 'Kosten') },
+  max: { label: 'Obergrenze', tip: 'Höchster Preis, bezogen auf den Referenzpreis. Schützt vor Wucherpreisen, die Marke und Bewertungen kosten.', vals: [1.3, 1.5, 2, 3], txt: (v) => pct(v) },
+  spd: { label: 'Tempo', tip: 'Größter Schritt pro Woche. Vorsichtig hält die Konkurrenz ruhig, zügig reagiert schneller auf Saison und Wettbewerb.', vals: [0.015, 0.03, 0.06], txt: (v) => (v < 0.02 ? 'vorsichtig ±1,5 %' : v < 0.04 ? 'normal ±3 %' : 'zügig ±6 %') },
+  plf: { label: 'Premiumpreise', tip: 'Nur mit Business/First: Die Automatik verschiebt den Klassenaufschlag, bis die Premiumsitze so voll sind wie hier eingestellt. „fest“: Aufschlag bleibt, wie Sie ihn je Strecke setzen.', vals: [0, 0.6, 0.75, 0.9], txt: (v) => (v ? 'Ziel ' + pct(v) : 'fest') },
+};
+function apRows(cfg, lf, id, prem = true) {
+  return Object.entries(AP_OPTS).filter(([k]) => prem || k !== 'plf').map(([k, o]) => {
+    const cur = k === 'lf' ? lf : cfg[k];
+    return `<div class="ap-row"><span class="small muted" title="${esc(o.tip)}">${o.label}</span><div class="seg wrap">${o.vals.map((v) => `<button data-act="apset" data-k="${k}" data-v="${v}"${id ? ` data-id="${id}"` : ''} aria-pressed="${Math.abs((cur || 0) - v) < 0.004}">${o.txt(v)}</button>`).join('')}</div></div>`;
+  }).join('');
+}
+const apSummary = (cfg, lf) => `Ziel ${pct(lf)} · ${cfg.min ? pct(cfg.min) : 'Kosten'}–${pct(cfg.max)} vom Referenzpreis · ±${NF1.format(cfg.spd * 100)} %/Woche${cfg.plf ? ` · Premium Ziel ${pct(cfg.plf)}` : ''}`;
 function cabCur(pl) { return SM.cabClone(pl.cabin) || { short: { f: 0, b: 0 }, long: { f: 0, b: 0 } }; }
 function cabExampleType(pl, haul) {
   const cnt = {}; for (const a of pl.fleet) if (SM.haulOf(a.type_id) === haul) cnt[a.type_id] = (cnt[a.type_id] || 0) + 1;
@@ -1761,6 +1811,14 @@ VIEWS.strategy = function viewStrategy() {
     <div class="spread"><div class="seg wrap">${[0, 0.01, 0.02, 0.03, 0.05, 0.08].map((v) => `<button data-act="mktp" data-v="${v}" aria-pressed="${Math.abs(p - v) < 0.0005}">${v ? pctTxt(v) : 'aus'}</button>`).join('')}</div><span class="small muted">vom Umsatz</span></div>
     <div class="mkt-row">${mktCurve(pl, p)}<div class="stack" style="gap:4px"><span class="small muted">Kosten derzeit</span><b>${p ? `≈ ${eur(mon)} / Monat` : '–'}</b><span class="small muted">Marke langfristig</span><b>${n0(tgt * 100)} / 100</b></div></div>
     <p class="small muted">Das Budget wächst mit dem Umsatz. Die Wirkung sättigt: Die ersten 2–3 % bringen am meisten, ab 5 % fast nichts mehr dazu. Wettbewerber liegen bei 60–70, schlechte Pünktlichkeit kostet Punkte.</p></div></div>`;
+  // Preisautomatik
+  const nAp = pl.activeRoutes().filter((r) => r.ap).length, nAll = pl.activeRoutes().length, apT = pl.apDefault || pl.apLf || 0.85, apC = SM.apCfgOf(null, pl.apCfg);
+  const nOwn = pl.activeRoutes().filter((r) => r.ap && r.apo && JSON.stringify(SM.apCfgOf(r)) !== JSON.stringify(apC)).length;
+  html += `<div class="stack"><h2 class="sec sm">Preisautomatik <small>${nAp} von ${nAll} Strecken${pl.apDefault ? ' · auch für neue Strecken' : ''}</small></h2><div class="card pad stack scard">
+    <p class="small muted" style="margin:0">Standard für alle Strecken mit Automatik${nOwn ? ` (${nOwn} Strecke${nOwn > 1 ? 'n haben' : ' hat'} eigene Einstellungen – eine Änderung hier überschreibt nur den geänderten Wert)` : ''}:</p>
+    <div class="ap-box">${apRows(apC, apT, '', true)}</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="apall" data-on="1" data-v="${apT}">Für alle ${nAll} Strecken einschalten</button>${nAp ? '<button class="btn small" data-act="apall" data-on="0">überall aus</button>' : ''}</div>
+    <p class="small muted">Einmal pro Woche verschiebt die Automatik jeden Tarif um höchstens das eingestellte Tempo – nach oben, wenn die Flüge voller sind als das Ziel oder viele Reisende abgewiesen werden, nach unten, wenn sie leerer sind. Nahe am Ziel (±2,5 Punkte) bleibt der Preis stehen. Das Preisband begrenzt sie zwischen Untergrenze und Obergrenze, unter die Kostengrenze geht sie nie. Mit Business/First kann sie auch den Premiumaufschlag führen. Einzelne Strecken stellen Sie unter Strecken → Bearbeiten ab.</p></div></div>`;
   // Kundenbindung
   const lv = (pl.loyalty && pl.loyalty.lv) || 0, lf = pl.loyaltyFactor(W.day);
   html += `<div class="stack"><h2 class="sec sm">Vielfliegerprogramm ${lv ? `<small>${P.LOYALTY[lv].label} · Wirkung ${pct(lf)}</small>` : ''}</h2><div class="loy">${P.LOYALTY.map((x, i) => `<button class="loy-c${i === lv ? ' on' : ''}" data-act="loyalty" data-v="${i}" aria-pressed="${i === lv}"><b>${x.label}</b><span>${x.desc}</span>
@@ -1769,13 +1827,13 @@ VIEWS.strategy = function viewStrategy() {
   // Drehkreuze
   const hubRows = pl.bases.map((B) => {
     const rs = pl.activeRoutes().filter((r) => r.base === B), hl = (pl.hubs && pl.hubs[B]) || 0, nx = P.HUB[hl + 1];
-    let tr = 0, n = 0; for (const r of rs) { const h = r.hist.slice(-30); tr += h.reduce((a, x) => a + (x.tr_out || 0) + (x.tr_in || 0), 0); n = Math.max(n, h.length); }
-    const trd = n ? tr / n : 0;
-    return `<tr><td><b class="mono">${B}</b> <span class="small muted">${esc(apName(B))}</span></td><td class="r">${rs.length}</td><td class="r">${n0(trd)}</td><td><span class="chip ${hl ? 'good' : ''}">${P.HUB[hl].label}</span></td>
+    let tr = 0, dem = 0, n = 0; for (const r of rs) { const h = r.hist.slice(-30); tr += h.reduce((a, x) => a + (x.tr_out || 0) + (x.tr_in || 0), 0); dem += h.reduce((a, x) => a + (x.trd || 0), 0); n = Math.max(n, h.length); }
+    const trd = n ? tr / n / 2 : 0, want = n ? Math.max(tr, dem) / n / 2 : 0;
+    return `<tr><td><b class="mono">${B}</b> <span class="small muted">${esc(apName(B))}</span></td><td class="r">${rs.length}</td><td class="r">${n0(trd)}${want > trd * 1.15 ? ` <span class="small muted" title="So viele wollten umsteigen">/ ${n0(want)}</span>` : ''}</td><td><span class="chip ${hl ? 'good' : ''}">${P.HUB[hl].label}</span></td>
       <td>${nx ? `<button class="btn small ${rs.length >= nx.minRoutes ? 'primary' : ''}" data-act="hubup" data-apt="${B}" data-v="${hl + 1}" ${rs.length >= nx.minRoutes ? '' : 'disabled'} title="${esc(nx.desc)}">${nx.label}: ${eur(((nx.setup - (hl ? P.HUB[hl].setup : 0)) * SM.apx(B).cost) * cpi())}</button>${rs.length < nx.minRoutes ? ` <span class="small muted">ab ${nx.minRoutes} Strecken</span>` : ''}` : '<span class="small muted">höchste Stufe</span>'}
       ${hl ? ` <button class="btn small" data-act="hubup" data-apt="${B}" data-v="${hl - 1}">zurückstufen</button>` : ''}</td></tr>`;
   }).join('');
-  html += `<div class="stack"><h2 class="sec sm">Drehkreuze <small>Umsteiger über Ihre Basen</small></h2><div class="tw"><table class="t"><thead><tr><th>Basis</th><th class="r">Strecken</th><th class="r">Umsteiger/Tag</th><th>Stufe</th><th>Ausbau</th></tr></thead><tbody>${hubRows}</tbody></table></div>
+  html += `<div class="stack"><h2 class="sec sm">Drehkreuze <small>Umsteiger über Ihre Basen</small></h2><div class="tw"><table class="t"><thead><tr><th>Basis</th><th class="r">Strecken</th><th class="r" title="Reisende pro Tag, die über die Basis umsteigen (je Reise einmal gezählt) / so viele wollten">Umsteiger/Tag</th><th>Stufe</th><th>Ausbau</th></tr></thead><tbody>${hubRows}</tbody></table></div>
     <div class="hub-lv">${P.HUB.slice(1).map((x, i) => `<div><b>${i + 1}. ${x.label}</b><span>${x.desc}</span><em>ab ${x.minRoutes} Strecken · ${eur(x.monthly * cpi())}/Monat</em></div>`).join('')}</div>
     <p class="small muted">Jede Stufe macht Umsteigen bequemer (kürzere Umsteigezeit, abgestimmte Wellen, mehr sinnvolle Verbindungen) und bringt Geschäftsreisenden am Drehkreuz einen Heimvorteil. So wird auch ein kleinerer Flughafen zum Drehkreuz – Sie sind nicht auf London oder Frankfurt angewiesen. Umsteiger füllen freie Plätze: Am meisten bringt der Ausbau, wenn Ihre Flüge nicht schon voll sind.</p></div>`;
   // Slots und Marktkontrolle
@@ -1801,7 +1859,7 @@ VIEWS.strategy = function viewStrategy() {
 function strategySummary(pl) {
   const c = cabCur(pl), lv = (pl.loyalty && pl.loyalty.lv) || 0, hubs = Object.entries(pl.hubs || {}).filter(([, v]) => v);
   return `<div class="ssum"><span><em>Kabine Kurzstrecke</em><b>${c.short.b ? pctTxt(c.short.b) + ' Business' : 'nur Economy'}</b></span><span><em>Kabine Langstrecke</em><b>${c.long.f || c.long.b ? `${c.long.f ? pctTxt(c.long.f) + ' F · ' : ''}${pctTxt(c.long.b)} B` : 'nur Economy'}</b></span>
-    <span><em>Marketing</em><b>${pl.mktPct ? pctTxt(pl.mktPct) + ' vom Umsatz' : pl.marketing ? eur(pl.marketing) + '/Monat' : 'aus'}</b></span><span><em>Vielflieger</em><b>${lv ? P.LOYALTY[lv].label : 'keins'}</b></span>
+    <span><em>Marketing</em><b>${pl.mktPct ? pctTxt(pl.mktPct) + ' vom Umsatz' : pl.marketing ? eur(pl.marketing) + '/Monat' : 'aus'}</b></span><span><em>Vielflieger</em><b>${lv ? P.LOYALTY[lv].label : 'keins'}</b></span><span><em>Preisautomatik</em><b>${pl.activeRoutes().filter((r) => r.ap).length} Strecken</b></span>
     <span><em>Drehkreuze</em><b>${hubs.length ? hubs.map(([a, v]) => `${a} ${v}`).join(', ') : 'keins'}</b></span></div>`;
 }
 function onStrategyClick(act, b) {
@@ -2143,14 +2201,20 @@ VIEWS.credit = function viewCredit() {
 function eventRow(e) {
   const when = e.start > W.day ? `ab ${dateShort(e.start)}` : e.end > W.day ? `bis ${dateShort(e.end)}` : 'erholt sich';
   const cls = e.severity === 'crit' ? 'crit' : e.severity === 'good' ? 'good' : 'warn';
-  return `<div><time>${when}</time><span class="${cls}">${esc(e.text)}</span></div>`;
+  return `<div><time>${when}</time><span class="${cls}">${esc(e.text)}</span>${evCancelBtn(e.id)}</div>`;
+}
+/** Spielleitung: Knopf „Annullieren“ an Ereignissen und Ereignismeldungen. */
+function evCancelBtn(eid) {
+  if (!eid || !ui.mp || !ui.mp.manage) return '';
+  if (!SM.adminEvents(W).some((x) => x.id === eid && !x.cancelled)) return '';
+  return ` <button class="btn small ghost ev-x" data-act="evcancel" data-id="${esc(eid)}" title="Ereignis für alle annullieren (nur Spielleitung)">Annullieren</button>`;
 }
 VIEWS.world = function viewWorld() {
   const M = W.macro;
   const act = W.activeEvents(), up = W.upcomingEvents();
   let html = `<h2 class="sec">Weltlage <small>${dateLong(W.day)}</small></h2>`;
   html += `<div class="tiles">
-    <div class="tile"><span>Kerosin</span><b>${NF3.format(M.fuelUsd)} $/kg</b><em>Referenz ${NF3.format(M.fuelRefUsd)} $</em></div>
+    <div class="tile"><span>Kerosin</span><b>${NF3.format(M.fuelUsd)} $/kg</b><em>Referenz ${NF3.format(M.fuelRefUsd)} $${(() => { const x = SM.setFuelX(W); return Math.abs(x) > 0.03 ? ` · Marktpreise ${x > 0 ? '+' : '−'}${n0(Math.abs(x) * 12)}–${n0(Math.abs(x) * 30)} % (Kerosinzuschlag)` : ''; })()}</em></div>
     <div class="tile"><span>Euro</span><b>${NF3.format(M.eurusd)} $</b><em>Leasing und Kerosin in Dollar</em></div>
     <div class="tile"><span>Leitzins</span><b>${pct(M.rate, 2)}</b><em>Basis für Kredite</em></div>
     <div class="tile"><span>Preisniveau</span><b>${NF1.format(M.cpi * 100)}</b><em>Start 100, Inflation ~2,2 %</em></div>
@@ -2207,14 +2271,14 @@ const clampPct = (x) => Math.max(0, Math.min(100, x * 100)).toFixed(0);
 // ---------- Meldungen ----------
 function mergedNews() {
   const pl = W.player;
-  const a = W.news.map((n) => ({ day: n.day, msg: n.msg, kind: n.kind, who: n.airline }));
+  const a = W.news.map((n) => ({ day: n.day, msg: n.msg, kind: n.kind, who: n.airline, eid: n.eid }));
   const b = pl.events.map((e) => ({ day: e.day, msg: e.msg, kind: e.kind, who: W.playerId }));
   return a.concat(b).sort((x, y) => y.day - x.day);
 }
 function newsRow(n) {
   const al = W.airlines[n.who];
   const cls = n.kind === 'crit' ? 'crit' : n.kind === 'warn' ? 'warn' : n.kind === 'good' ? 'good' : '';
-  return `<div><time>${dateShort(n.day)}</time><span class="${cls}">${al ? `<span class="sw" style="background:${colorOf(al)}"></span> ` : ''}${esc(n.msg)}</span></div>`;
+  return `<div><time>${dateShort(n.day)}</time><span class="${cls}">${al ? `<span class="sw" style="background:${colorOf(al)}"></span> ` : ''}${esc(n.msg)}</span>${evCancelBtn(n.eid)}</div>`;
 }
 VIEWS.news = function viewNews() {
   const list = mergedNews().slice(0, 150);
@@ -2541,7 +2605,7 @@ function poachHtml() {
       <p class="small muted">Piloten haben ein Typ-Rating je Musterfamilie und fliegen nur dort. Flugbegleiterinnen und Technik sind für alle Muster einsetzbar.</p>
       <p class="small ink2">Erfolgschance je Person etwa <b>${pct(p)}</b>${T.staff ? ` · Stimmung drüben ${pct(theirMor)}` : ''}. Kosten: Prämie je gewonnener Person plus ${eur(S.recruit[role] * 0.4 * cpi())} Headhunter je Versuch. Wer wechselt, beginnt nach 7 Tagen.${T.isPlayer ? ' Mitspielende werden informiert.' : ' Die KI merkt sich das und wirbt zurück.'}</p>
       <div class="row"><button class="btn primary" data-act="poach" ${wait ? 'disabled' : ''}>${wait ? `wieder in ${wait} Tagen` : 'Abwerben'}</button></div></div>
-    ${humansExp.length ? `<div class="card pad stack"><h3>Fachkräfte von Mitspielenden</h3>${humansExp.map((h) => h.experts.map((e) => `<div class="spread small"><span>${logoSvg(h, 16)} <b>${esc(e.name)}</b> · ${P.EXPERT_ROLES[e.role].label} ${LEVEL[e.level]} bei ${esc(h.name)} · ${eur(e.salary)}/Mon.</span>
+    ${humansExp.length ? `<div class="card pad stack"><h3>Fachkräfte von Mitspielenden</h3>${humansExp.map((h) => h.experts.map((e) => `<div class="spread small"><span>${logoSvg(h, 16)} <b>${esc(e.name)}</b> · ${P.EXPERT_ROLES[e.role].label} ${LEVEL[e.level]} bei ${esc(h.name)} · ${eur(e.salary)}/Mon.${e.ps != null ? ` · leistet dort <b class="${e.ps >= 1 ? 'pos' : e.ps < 0.85 ? 'neg' : ''}">${pct(e.ps)}</b>` : ''}${e.nca ? ' · <span class="warnc" title="Ablöse an den Arbeitgeber und 30 Tage Wartezeit">Wettbewerbsverbot</span>' : ''}${e.bindUntil > W.day ? ' · <span class="warnc">gebunden</span>' : ''}</span>
       <span class="row" style="gap:6px"><select id="pe-${e.id}" style="width:auto">${[1.1, 1.25, 1.4, 1.6].map((f) => `<option value="${f}">+${Math.round((f - 1) * 100)} % Gehalt</option>`).join('')}</select><button class="btn small" data-act="poachexp" data-t="${h.id}" data-id="${e.id}">Abwerben</button></span></div>`).join('')).join('')}</div>` : ''}</div>`;
 }
 function onHardClick(act, b) {
@@ -2593,7 +2657,7 @@ function worldExtraHtml() {
   html += `<div class="stack"><h2 class="sec">Konjunktur nach Regionen <small>Zyklen laufen versetzt – Streuung schützt</small></h2><div class="econ">${regs.map(([rg, v]) => `<div><span>${rg}</span><div class="bar"><i class="${v < 0.95 ? 'crit' : v > 1.04 ? 'good' : ''}" style="width:${clampPct((v - 0.7) / 0.6)}%"></i><span class="tgt" style="left:50%"></span></div><b class="num">${n0(v * 100)}</b></div>`).join('')}</div></div>`;
   html += `<div class="stack"><h2 class="sec">Handelskonflikte und Zölle</h2>${tariffs.length ? `<table class="t"><tbody>${tariffs.map(([k, v]) => { const [a, b] = k.split('|'); return `<tr><td>${esc(SM.blocName(a))} ↔ ${esc(SM.blocName(b))}</td><td class="r">${pct(v)}</td></tr>`; }).join('')}</tbody></table><p class="small muted">Zölle senken Geschäftsreisen (stark), Fracht und Urlaubsreisen zwischen den Blöcken und verteuern Flugzeuge aus dem jeweils anderen Block (Airbus/ATR: EU, Boeing: USA, Embraer: Brasilien, Dash 8: Kanada).</p>` : '<p class="small muted">Freier Handel. Das kann sich schnell ändern.</p>'}</div>`;
   if (carbon.length || fees.length) html += `<div class="stack"><h2 class="sec">Abgaben und Entgelte</h2><table class="t"><tbody>${carbon.map(([b, v]) => `<tr><td>CO₂-Abgabe ${esc(SM.blocName(b))}</td><td class="r">Kerosin +${pct(v)}</td></tr>`).join('')}${fees.map(([a, v]) => `<tr><td>Entgelte ${a} · ${esc(apName(a))}</td><td class="r">+${pct(v - 1)}</td></tr>`).join('')}</tbody></table></div>`;
-  html += `<div class="stack"><h2 class="sec">Leasingmarkt <small>Bestand für alle Airlines</small></h2><div class="tw"><table class="t"><thead><tr><th>Typ</th><th class="r">verfügbar</th><th class="r">Lieferung</th><th class="r">ab Werk</th></tr></thead><tbody>${stock.map((k) => { const n = W.lessorStock && W.lessorStock[k] !== undefined ? W.lessorStock[k] : SM.stockCap(k); return `<tr><td>${tl(k)}</td><td class="r ${n <= 0 ? 'neg' : ''}">${n <= 0 ? 'ausverkauft' : n}</td><td class="r">${SM.leaseDelivery(W, k, 'lease')} T.</td><td class="r">${SM.leaseDelivery(W, k, 'factory')} T.</td></tr>`; }).join('')}</tbody></table></div><p class="small muted">Leasinggeber füllen ihren Bestand monatlich nur teilweise auf. Wer viel bestellt, kauft anderen den Markt leer und verlängert die Lieferzeiten.</p></div>`;
+  html += `<div class="stack"><h2 class="sec">Leasingmarkt <small>Bestand für alle Airlines</small></h2><div class="tw"><table class="t"><thead><tr><th>Typ</th><th class="r">verfügbar</th><th class="r">Lieferung</th><th class="r">ab Werk</th></tr></thead><tbody>${stock.map((k) => { const n = W.lessorStock && W.lessorStock[k] !== undefined ? W.lessorStock[k] : SM.capOf(W, k); return `<tr><td>${tl(k)}</td><td class="r ${n <= 0 ? 'neg' : ''}">${n <= 0 ? 'ausverkauft' : n}</td><td class="r">${SM.leaseDelivery(W, k, 'lease')} T.</td><td class="r">${SM.leaseDelivery(W, k, 'factory')} T.</td></tr>`; }).join('')}</tbody></table></div><p class="small muted">Leasinggeber füllen ihren Bestand monatlich nur teilweise auf. Wer viel bestellt, kauft anderen den Markt leer und verlängert die Lieferzeiten.</p></div>`;
   return html;
 }
 // Länder ohne Nachfrage auf der Karte ausgrauen
@@ -3038,7 +3102,7 @@ function assistantHints() {
   const gap = SM.staffPlanOf(pl).filter((r) => r.have + r.pipe < r.need - 0.5);
   if (gap.length && routes.length) add('gap', 'warn', 'ops', `Personal reicht nicht: es fehlen ${gap.map((r) => `${n0(Math.ceil(r.need - r.have - r.pipe))} ${esc(r.label)}`).join(', ')}.`, 'staff');
   if (pl.staff.morale < 0.55 && SM.sumObj(pl.staff.pil) > 0) add('morale', 'warn', 'ops', `Die Stimmung liegt bei <b>${pct(pl.staff.morale)}</b>. Unter 55 % steigt das Streikrisiko – Gehalt prüfen.`, 'staff');
-  for (const r of routes) if (r.partial && r.opened_day <= W.day) { const k = Math.ceil(pl.rotH(r) / SM.winOf(r.type_id)); add('part' + r.id, 'warn', 'net', `<b>${r.base}–${r.dest}</b> fliegt nur an ${pct(r.partial)} der Tage: Ein Umlauf dauert ${n1(pl.rotH(r))} h. Für täglichen Betrieb braucht es ${k} Flugzeuge.`, null, { route: r.id }); break; }
+  for (const r of routes) if (r.partial && r.opened_day <= W.day) { const k = SM.kOf(r.type_id, pl.rotH(r)) || 1; add('part' + r.id, 'warn', 'net', `<b>${r.base}–${r.dest}</b> fliegt nur an ${pct(r.partial)} der Tage: Ein Umlauf dauert ${n1(pl.rotH(r))} h. Für täglichen Betrieb braucht es ${k} Flugzeuge.`, null, { route: r.id }); break; }
   if (pl.lineCut) add('linecut', 'crit', 'fin', 'Die Bank hat Ihre <b>Kreditlinie gekürzt</b>. Der Überhang wird vom Konto eingezogen.', 'credit');
   if (pl.staff && pl.staff.pay < wageNow() - 0.01) add('wage', 'warn', 'ops', `Ihr Gehalt liegt <b>${pct(1 - pl.staff.pay / wageNow())} unter dem Marktlohn</b> – die Konkurrenz wirbt ab, die Stimmung sinkt.`, 'staff');
   { const att = pl.events.filter((e) => e.kind === 'crit' && /greift Ihre Strecke/.test(e.msg) && e.day >= W.day - 21).pop(); if (att) add('att' + att.day, 'crit', 'net', esc(att.msg) + ' Preise und Frequenz prüfen.', 'routes'); }
@@ -3324,6 +3388,19 @@ function onPaneClick(e) {
   if (act.startsWith('cfo') && onCfoClick(act, b)) return;
   if (act.startsWith('h') && onHistClick(act, b)) return;
   if (onStrategyClick(act, b)) return;
+  if (act === 'aplf') { doAction({ type: 'autoPrice', id: b.dataset.id, on: true, lf: Number(b.dataset.v) }); refreshAll(); return; }
+  if (act === 'evcancel') {
+    if (!ui.mp || !ui.mp.manage) return;
+    if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Wirklich annullieren?'; b.classList.add('danger'); return; }
+    b.disabled = true;
+    api(`/games/${ui.mp.id}/admin`, { body: { cmd: 'cancelEvent', eventId: b.dataset.id } }).then((r) => { toast(r.msg || 'Ereignis annulliert.'); return mpPoll(true); }).then(() => refreshAll()).catch((err) => { toast(err.message); refreshAll(); });
+    return;
+  }
+  if (act === 'admopen') { if (ui.mp && ui.mp.manage) showAdmin(ui.mp.id, () => { $('#modal').hidden = true; refreshAll(); }); return; }
+  if (act === 'apset') { const k = b.dataset.k, v = Number(b.dataset.v), id = b.dataset.id || undefined, a = { type: 'autoPrice', id, on: true, keep: !id }; if (k === 'lf') a.lf = v; else a.cfg = { [k]: v }; doAction(a); refreshAll(); return; }
+  if (act === 'apstd') { const pl = W.player; doAction({ type: 'autoPrice', id: b.dataset.id, on: true, lf: pl.apDefault || pl.apLf || 0.85, cfg: SM.apCfgOf(null, pl.apCfg) }); toast('Standard übernommen.'); refreshAll(); return; }
+  if (act === 'pmset') { doAction({ type: 'premPrice', id: b.dataset.id, v: Number(b.dataset.v) }); refreshAll(); return; }
+  if (act === 'apall') { const on = b.dataset.on === '1', r = doAction({ type: 'autoPrice', on, lf: Number(b.dataset.v || 0.85), reset: on }); if (r.ok) toast(on ? `Preisautomatik für ${r.n} Strecken an (Ziel ${pct(Number(b.dataset.v || 0.85))}).` : 'Preisautomatik überall aus.'); refreshAll(); return; }
   if (act === 'fltclear') { if (ui.flts) delete ui.flts[b.dataset.k || 'routes']; renderPane(true); return; }
   if (act.startsWith('mkt') && onMarketClick(act, b)) return;
   if (act.startsWith('deal') && onDealClick(act, b)) return;
@@ -3374,8 +3451,9 @@ function onPaneClick(e) {
     case 'fillstaff': { const res = doAction({ type: 'fillStaff' }); if (res.ok) toast(res.msg); refreshAll(); break; }
     case 'train': { if (doAction({ type: 'train', from: $('#tr-from').value, to: $('#tr-to').value, count: Math.floor(Number($('#tr-n').value)) }).ok) toast('Umschulung gestartet.'); refreshAll(); break; }
     case 'pay': doAction({ type: 'pay', v: Number(b.dataset.v) }); refreshAll(); break;
-    case 'hireexpert': { if (doAction({ type: 'hireExpert', cid: b.dataset.id }).ok) toast('Eingestellt. Die Wirkung gilt ab sofort.'); refreshAll(); break; }
-    case 'fireexpert': if (doAction({ type: 'fireExpert', id: b.dataset.id }).ok) toast('Freigestellt.'); refreshAll(); break;
+    case 'hireexpert': { if (doAction({ type: 'hireExpert', cid: b.dataset.id }).ok) toast('Eingestellt. Nach rund 30 Tagen Einarbeitung wirkt die Person voll – wie gut, zeigt die Bewertung ab dem Monatswechsel.'); refreshAll(); break; }
+    case 'fireexpert': if (doAction({ type: 'fireExpert', id: b.dataset.id }).ok) toast('Freigestellt. Die Person sucht jetzt neu – mit Ihrer Bewertung als Referenz.'); refreshAll(); break;
+    case 'exc': { const r = doAction({ type: 'expertContract', id: b.dataset.id, kind: b.dataset.k, v: Number(b.dataset.v || 0) }); if (r.ok) toast(b.dataset.k === 'bind' ? 'Halteprämie gezahlt: zwölf Monate gebunden.' : 'Gehalt erhöht.'); refreshAll(); break; }
     case 'term': { const res = doAction({ type: 'terminal', apt: b.dataset.apt, v: b.dataset.v }); refreshAll(); if (res.ok && res.msg) toast(res.msg); break; }
     case 'hand': doAction({ type: 'handling', apt: b.dataset.apt, v: b.dataset.v }); refreshAll(); break;
     case 'hangar': doAction({ type: 'hangar', apt: b.dataset.apt }); refreshAll(); break;
@@ -3869,6 +3947,8 @@ function onCfoChange(t) {
 function onPaneChange(e) {
   const t = e.target, pl = W.player;
   if (onCabRange(e, true) || onFltChange(t)) return;
+  if (t.dataset && t.dataset.exnca) { doAction({ type: 'expertContract', id: t.dataset.exnca, kind: 'nca', v: t.checked }); refreshAll(); return; }
+  if (t.dataset && t.dataset.ap) { const pl = W.player; doAction({ type: 'autoPrice', id: t.dataset.ap, on: t.checked, lf: pl.apDefault || pl.apLf || 0.85, cfg: t.checked ? SM.apCfgOf(null, pl.apCfg) : undefined }); refreshAll(); return; }
   if (t.id === 'hist-view') { ui.hist = ui.hist || { mode: 'd30' }; ui.hist.view = t.value || null; ui.hist.sel = null; if (ui.hist.mode === 'm') ui.hist.mode = 'd30'; renderPane(true); return; }
   if (onMarketChange(t) || onDealChange(t) || onAssignChange(t) || onLogoChange(t) || onHardChange(t) || onStudyChange(t) || onCfoChange(t)) return;
   if (t.dataset.actChange === 'move') { if (doAction({ type: 'move', acId: t.dataset.id, base: t.value }).ok) toast(`Umstationiert nach ${t.value} (12.000 € Überführung).`); refreshAll(); return; }
@@ -4142,8 +4222,8 @@ const GUIDE_ALL = [
     chips: () => [gChip('building', 'Firma → Personal'), gChip('clock', 'Anfangs max. 5 Tage'), gChip('coin', 'Agentur: 1,6× teurer')] },
   { k: 'time', t: 'Zeit starten', lead: 'Auf Play drücken. Jeder Tag bringt Passagiere, Kosten und Meldungen.', tab: 'dashboard', go: 'Zum Dashboard',
     chips: () => [gChip('space', 'Leertaste = Pause'), gChip('chart', 'Dashboard zeigt alles'), gChip('bell', 'Assistenz meldet sich')] },
-  { k: 'prices', t: 'Preise führen', lead: 'Es gibt keine Preisautomatik. Sie stellen die Preise je Strecke selbst ein.', tab: 'routes', go: 'Zum Netz',
-    chips: () => [gChip('route', 'Strecken → Netz'), gChip('target', 'Ziel: 70–90 %')] },
+  { k: 'prices', t: 'Preise führen', lead: 'Voll? Preis rauf. Leer? Preis runter. Selbst je Strecke – oder die Preisautomatik macht kleine Schritte für Sie.', tab: 'routes', go: 'Zum Netz',
+    chips: () => [gChip('route', 'Strecken → Netz'), gChip('target', 'Ziel: 70–90 %'), gChip('bolt', 'Automatik: ±3 %/Woche')] },
   { k: 'grow', t: 'Klug wachsen', lead: 'Erst prüfen, dann zahlen. So wird aus zwei Flugzeugen ein Netz.', tab: 'studies', go: 'Zu den Studien',
     chips: () => [gChip('search', 'Markt → Marktstudien'), gChip('calc', 'Finanzen → CFO'), gChip('target', 'Karte → Strategie')] },
   { k: 'money', t: 'Geld im Blick', lead: 'Kontostand ist nicht Gewinn: Kautionen und Käufe kosten sofort Geld. Halten Sie Reserve.', tab: 'finance', go: 'Zu den Finanzen',
@@ -4242,6 +4322,7 @@ async function showLobby(tab = null) {
   m.addEventListener('click', (e) => {
     const b = e.target.closest('[data-open]'); if (b) enterGame(b.dataset.open);
     const j = e.target.closest('[data-join]'); if (j) showJoin(j.dataset.join);
+    const mg = e.target.closest('[data-manage]'); if (mg) { showAdmin(mg.dataset.manage, () => showLobby()); return; }
     const d = e.target.closest('[data-del]');
     if (d) {
       if (!d.dataset.armed) { d.dataset.armed = '1'; d.textContent = 'Wirklich löschen?'; return; }
@@ -4269,15 +4350,50 @@ async function loadMainCard() {
     box.innerHTML = `<div class="mw-head"><div><span class="chip good">Dauerspiel</span><h2>Hauptwelt</h2>
         <p class="ink2">Eine gemeinsame Welt für alle Angemeldeten. Sie läuft rund um die Uhr weiter – ${sp.ms ? `${esc(sp.short)} Spielzeit, also rund ${n0(perDay)} Spieltage pro echtem Tag` : 'gerade angehalten'}. Bauen Sie Ihre Airline über Wochen auf und schauen Sie täglich vorbei.</p></div>
         <div class="mw-stats"><div><b>${dateShortY(g.day)}</b><span>Spieltag ${n0(g.day + 1)}</span></div><div><b>${g.players}/${g.max}</b><span>Airlines</span></div><div><b>${g.online}</b><span>zuletzt aktiv</span></div></div></div>
-      <div class="row">${g.member ? `<span class="small">Ihre Airline: <b>${esc(g.airlineName || '')}</b></span><button class="btn primary" data-open="main" style="margin-left:auto">Weiterspielen</button>`
+      <div class="row">${g.admin ? '<button class="btn small" data-manage="main">Verwalten</button>' : ''}${g.member ? `<span class="small">Ihre Airline: <b>${esc(g.airlineName || '')}</b></span><button class="btn primary" data-open="main" style="margin-left:auto">Weiterspielen</button>`
         : g.players >= g.max ? '<span class="chip">Die Hauptwelt ist gerade voll.</span>' : `<span class="small muted">Sie starten mit vollem Startkapital, egal wie lange die Welt schon läuft.</span><button class="btn primary" data-join="${MAIN_CODE}" style="margin-left:auto">Airline gründen</button>`}</div>`;
   } catch (e) { if (e.status === 401) return showAuth(); box.innerHTML = `<p class="small neg">Hauptwelt nicht erreichbar: ${esc(e.message)}</p>`; }
 }
 const dateShortY = (day) => { const p = dateParts(day); return `${p.d}. ${MONTHS[p.m]} ${p.y}`; };
+// ---------- Verwaltung eines Spiels (Admins überall, Spielleitung im eigenen Spiel) ----------
+const EV_TYPE = { storm: 'Unwetter', volcano: 'Vulkanasche', airspace: 'Luftraum', atc_strike: 'Lotsenstreik', airport_strike: 'Flughafenstreik', big_event: 'Großereignis', recession: 'Rezession', boom: 'Aufschwung', trade_war: 'Handelskrieg', trade_deal: 'Handelsabkommen', carbon: 'CO₂-Abgabe', fee_hike: 'Entgelte', tax_change: 'Ticketsteuer', rate_change: 'Leitzins', health: 'Gesundheitskrise', pilot_shortage: 'Pilotenmangel', fx_shock: 'Wechselkurs', fuel_spike: 'Kerosin', fuel_drop: 'Kerosin', own_strike: 'Streik (Airline)', strike: 'Streik (Airline)', sickness: 'Krankheitswelle', it_outage: 'IT-Ausfall' };
+async function showAdmin(id, onBack) {
+  const m = modal('<h1>Verwaltung</h1><p class="small muted">Lade …</p>');
+  let d;
+  try { d = await api(`/games/${id}/admin`); } catch (e) { toast(e.message); onBack(); return; }
+  const day = d.day, alName = (aid) => { const p = d.players.find((x) => x.airlineId === aid); return p ? p.airlineName : aid; };
+  const pRow = (p) => `<div class="adm-p"><div style="min-width:0"><b>${esc(p.airlineName)}</b> <span class="small muted mono">${esc(p.code || '')}</span>${p.me ? ' <span class="chip me">Sie</span>' : ''}${p.host ? ' <span class="chip">Leitung</span>' : ''}${p.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}
+      <div class="small muted"><i class="pc-dot ${p.online ? 'on' : ''}"></i>${esc(p.name)} · Basis ${esc(p.base || '–')} · ${p.equity === null ? '–' : 'EK ' + eur(p.equity)} · ${p.fleet} Flugzeuge · ${p.routes} Strecken · seit ${new Date(p.joined).toLocaleDateString('de-DE')}</div></div>
+    ${p.me ? '' : `<div class="row adm-act"><span class="row" style="gap:4px"><input type="number" class="adm-amt" data-for="${esc(p.airlineId)}" step="1" min="-100" max="100" placeholder="± Mio. €" aria-label="Kapitalkorrektur in Mio. Euro"><button class="btn small" data-adm="grant" data-al="${esc(p.airlineId)}">Kapital buchen</button></span>
+      <button class="btn small danger" data-adm="kick" data-al="${esc(p.airlineId)}">Entfernen</button><button class="btn small danger" data-adm="kick" data-ban="1" data-al="${esc(p.airlineId)}">Entfernen + sperren</button></div>`}</div>`;
+  const when = (e) => (e.cancelled ? 'annulliert' : e.start > day ? `ab ${dateShort(e.start)}` : e.end > day ? `bis ${dateShort(e.end)}` : 'wirkt nach');
+  const eRow = (e) => `<div class="adm-e${e.cancelled ? ' off' : ''}"><span class="chip ${e.severity === 'crit' ? 'crit' : e.severity === 'good' ? 'good' : 'warn'}">${esc(EV_TYPE[e.type] || e.type)}</span><div style="min-width:0"><span class="small">${esc(e.text)}</span><div class="small muted">${when(e)}${e.airline ? ' · betrifft ' + esc(alName(e.airline)) : ''}</div></div>
+    ${e.cancelled ? '' : `<button class="btn small" data-adm="cancel" data-ev="${esc(e.id)}">Annullieren</button>`}</div>`;
+  m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Verwaltung <small class="muted">${esc(d.name)}</small></h1><button class="btn small" data-adm="close">Schließen</button></div>
+    <p class="small muted">Spieltag ${n0(day + 1)} · ${d.players.length} Airlines. Alles, was Sie hier tun, sehen alle Mitspielenden als Meldung.</p>
+    <section class="stack"><h3>Airlines</h3><div class="adm-list">${d.players.map(pRow).join('') || '<p class="small muted">Niemand spielt mit.</p>'}</div>
+      <p class="small muted">„Entfernen“ beendet die Airline sofort: Strecken enden, Leasingflugzeuge gehen zurück, Slots, Gates und offene Angebote verfallen. Die Person kann danach neu beitreten – außer mit „sperren“. Kapital buchen: positiver Betrag schießt zu, negativer zieht ab (z. B. zum Ausgleich eines Fehlers).</p></section>
+    ${d.banned.length ? `<section class="stack"><h3>Gesperrt</h3><div class="adm-list">${d.banned.map((b) => `<div class="adm-p"><div><b>${esc(b.name)}</b> <span class="small muted">zuletzt ${esc(b.airlineName || '')} · seit ${new Date(b.at).toLocaleDateString('de-DE')}</span></div><button class="btn small" data-adm="unban" data-u="${esc(b.u)}">Sperre aufheben</button></div>`).join('')}</div></section>` : ''}
+    <section class="stack"><h3>Ereignisse</h3><div class="adm-list">${d.events.map(eRow).join('') || '<p class="small muted">Gerade keine Ereignisse.</p>'}</div>
+      <p class="small muted">Annullieren: Angekündigte Ereignisse fallen aus, laufende enden sofort. Steuern, Entgelte, CO₂-Abgabe, Zins, Wechselkurs und Kerosinsprung werden zurückgenommen; die Konjunktur erholt sich nach einer Rezession entsprechend schneller. Bereits ausgefallene Flüge bleiben ausgefallen.</p></section></div>`;
+  m.onclick = async (e) => {
+    const b = e.target.closest('[data-adm]'); if (!b) return;
+    const cmd = b.dataset.adm;
+    if (cmd === 'close') { m.onclick = null; onBack(); return; }
+    if ((cmd === 'kick' || cmd === 'cancel') && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = cmd === 'kick' ? (b.dataset.ban ? 'Wirklich entfernen und sperren?' : 'Wirklich entfernen?') : 'Wirklich annullieren?'; b.classList.add('danger'); return; }
+    const body = cmd === 'kick' ? { cmd: 'kick', airlineId: b.dataset.al, ban: !!b.dataset.ban } : cmd === 'unban' ? { cmd: 'unban', u: b.dataset.u } : cmd === 'cancel' ? { cmd: 'cancelEvent', eventId: b.dataset.ev }
+      : { cmd: 'grant', airlineId: b.dataset.al, amount: Number((m.querySelector(`.adm-amt[data-for="${b.dataset.al}"]`) || {}).value || 0) * 1e6 };
+    if (cmd === 'grant' && !body.amount) { toast('Bitte einen Betrag in Mio. € eingeben, z. B. 5 oder -5.'); return; }
+    b.disabled = true;
+    try { const r = await api(`/games/${id}/admin`, { body }); toast(r.msg || 'Erledigt.'); if (ui.mp && ui.mp.id === id) await mpPoll(true); }
+    catch (err) { toast(err.message); }
+    showAdmin(id, onBack);
+  };
+}
 function adminCard(g) {
   return `<div class="gcard"><div style="min-width:0"><b>${esc(g.name)}</b> ${g.locked ? '<span class="chip">🔒 Passwort</span>' : ''}
     <div class="small muted">Code ${esc(g.code)} · Leitung ${esc(g.hostName || '–')} · ${g.players}/${g.max} Airlines · Tag ${g.day + 1} · angelegt ${new Date(g.created).toLocaleDateString('de-DE')}${g.names ? ' · ' + g.names.map(esc).join(', ') : ''}</div></div>
-    <span class="row" style="gap:6px;flex-wrap:nowrap">${g.players >= g.max ? '<span class="chip">voll</span>' : '<span class="chip good">offen</span>'}<button class="btn small danger" data-del="${g.id}">Löschen</button>${g.member ? `<button class="btn small primary" data-open="${g.id}">Öffnen</button>` : g.players < g.max ? `<button class="btn small" data-join="${esc(g.code)}">Beitreten</button>` : ''}</span></div>`;
+    <span class="row" style="gap:6px;flex-wrap:nowrap">${g.players >= g.max ? '<span class="chip">voll</span>' : '<span class="chip good">offen</span>'}<button class="btn small" data-manage="${g.id}">Verwalten</button><button class="btn small danger" data-del="${g.id}">Löschen</button>${g.member ? `<button class="btn small primary" data-open="${g.id}">Öffnen</button>` : g.players < g.max ? `<button class="btn small" data-join="${esc(g.code)}">Beitreten</button>` : ''}</span></div>`;
 }
 function gameCard(g) {
   const mine = g.member;
@@ -4351,7 +4467,7 @@ async function enterGame(id) {
   try {
     const info = await api(`/games/${id}/info`);
     mpState.info = info; mpState.players = info.players; mpState.ver = ''; mpState.lastInfo = Date.now();
-    ui.mp = { id, airlineId: info.me.airlineId, host: info.me.host, code: info.code, name: info.name, invite: info.invite, main: !!info.main };
+    ui.mp = { id, airlineId: info.me.airlineId, host: info.me.host, admin: !!info.me.admin, manage: !!info.me.manage, code: info.code, name: info.name, invite: info.invite, main: !!info.main };
     // Stand vom letzten Besuch lesen, bevor der erste Abruf ihn überschreibt
     const seenKey = `skymarket-seen-${id}-${ui.mp.airlineId}`;
     let seen = null; try { seen = JSON.parse(localStorage.getItem(seenKey) || 'null'); } catch (e) { /* egal */ }
@@ -4397,7 +4513,7 @@ async function mpPoll(first) {
     const ping = Date.now() - mpState.lastPing > 15000;
     const r = await api(`/games/${id}/state?v=${encodeURIComponent(mpState.ver)}${ping ? '&ping=1' : ''}`, { raw: true });
     if (r.status === 401) { stopOnline(); showAuth(); return; }
-    if (r.status === 403 || r.status === 404) { stopOnline(); toast('Kein Zugriff auf dieses Spiel.'); showLobby(); return; }
+    if (r.status === 403 || r.status === 404) { stopOnline(); toast('Kein Zugriff mehr auf dieses Spiel – es wurde gelöscht oder die Spielleitung hat Ihre Airline entfernt.'); showLobby(); return; }
     if (!r.ok && r.status !== 204) throw new Error(`Server antwortet mit ${r.status}`);
     if (ping) mpState.lastPing = Date.now();
     const c = r.headers.get('x-clock');
@@ -4493,7 +4609,7 @@ VIEWS.players = function viewPlayers() {
       <div class="pc-top"><span class="pc-rank">${rank.get(al.id)}</span><span class="lgi">${logoSvg(al, 34)}</span>
         <div class="pc-name"><b>${esc(al.name)}</b> <span class="small muted mono">${esc(al.code || '')}</span>
           <span class="small"><i class="pc-dot ${p.online ? 'on' : ''}"></i>${esc(p.name || '–')} · <span class="muted">${esc(seenTxt(p))}</span></span></div>
-        <span class="pc-chips">${me ? '<span class="chip me">Sie</span>' : ''}${p.host ? '<span class="chip">Leitung</span>' : ''}${dead ? '<span class="chip crit">insolvent</span>' : al.status === 'restructuring' ? '<span class="chip warn">Restrukturierung</span>' : ''}</span></div>
+        <span class="pc-chips">${me ? '<span class="chip me">Sie</span>' : ''}${p.host ? '<span class="chip">Leitung</span>' : ''}${al.removed ? '<span class="chip crit">entfernt</span>' : dead ? '<span class="chip crit">insolvent</span>' : al.status === 'restructuring' ? '<span class="chip warn">Restrukturierung</span>' : ''}</span></div>
       <div class="pc-kpis">
         <div><span>Eigenkapital</span><b>${eur(k.eq)}</b><em>${k.growth === null ? '–' : `${k.growth >= 0 ? '+' : ''}${pct(k.growth)} seit Start`}</em></div>
         <div><span>Ergebnis 30 Tage</span><b>${k.days ? sg(k.net) : '–'}</b><em>${k.margin === null ? 'noch kein Umsatz' : `Marge ${pct(k.margin)}`}</em></div>
@@ -4504,7 +4620,7 @@ VIEWS.players = function viewPlayers() {
       ${!dead && k.routes ? `<button class="pc-rbtn" data-act="plroutes" data-al="${al.id}" aria-expanded="${!!(ui.plOpen && ui.plOpen[al.id])}">${ui.plOpen && ui.plOpen[al.id] ? '▾' : '▸'} Strecken, Flugzeuge und Preise</button>${ui.plOpen && ui.plOpen[al.id] ? playerRoutesHtml(al) : ''}` : ''}
     </div>`;
   };
-  let html = `<h2 class="sec">Mitspielende <small>${all.length} Airline${all.length === 1 ? '' : 's'} · ${online} online${ui.mp.main ? ' · Hauptwelt' : ''}</small></h2>
+  let html = `<div class="spread"><h2 class="sec">Mitspielende <small>${all.length} Airline${all.length === 1 ? '' : 's'} · ${online} online${ui.mp.main ? ' · Hauptwelt' : ''}</small></h2>${ui.mp.manage ? '<button class="btn small" data-act="admopen">Verwaltung: Airlines, Sperren, Ereignisse</button>' : ''}</div>
     <div class="row" style="gap:8px"><span class="small muted">Sortieren:</span><div class="seg">${Object.entries(PL_SORT).map(([k2, [l]]) => `<button data-act="plsort" data-v="${k2}" aria-pressed="${k2 === key}">${l}</button>`).join('')}</div>
       ${all.length > 8 ? `<input type="search" id="mp-q" placeholder="Airline oder Name suchen" value="${esc(ui.plQ || '')}" style="flex:1;min-width:160px">` : ''}</div>
     <div class="pgrid">${shown.map(card).join('') || '<p class="small muted">Niemand gefunden.</p>'}</div>`;

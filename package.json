@@ -1,6 +1,6 @@
 {
   "name": "skymarket-online",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "description": "SKYMARKET – Airline-Wirtschaftssimulation, Hauptwelt für alle und private Runden bis 4 Personen (Netlify Functions + Netlify Blobs)",
   "type": "module",

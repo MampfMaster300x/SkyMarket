@@ -228,5 +228,28 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const an = w2.airlines.find((a) => a.owner === 'anna');
   assert.equal(an.cabin.short.b, 0.12); assert.equal(an.mktPct, 0.03); assert.equal(an.loyalty.lv, 1);
   console.log('Strategie ok: Kabine, Marketing 3 %, Meilenprogramm, Slotkauf', r4.ok ? 'gekauft' : 'abgelehnt (' + r4.msg + ')', '· Drehkreuz:', r5.msg); }
+// Verwaltung: Admin entfernt und sperrt, hebt Sperre auf, annulliert Ereignis, bucht Kapital; Spielleitung im privaten Spiel
+{ assert.equal((await call('ben', 'GET', '/games/main/admin')).status, 403, 'Verwaltung nur für Admins');
+  assert.equal((await call('anna', 'POST', '/games/main/admin', { cmd: 'unban', u: 'x' })).status, 403, 'Verwaltung POST nur für Admins');
+  const ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung laden');
+  const benP = ad.players.find((p) => p.u === 'ben'); assert.ok(benP, 'Ben in der Liste');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'kick', airlineId: benP.airlineId, ban: true }), 'Ben entfernen und sperren');
+  assert.equal((await call('ben', 'GET', '/games/main/state')).status, 403, 'Ben hat keinen Zugriff mehr');
+  assert.equal((await call('ben', 'POST', '/games/main/join', { airline: { name: 'Neu Ben', code: 'NB', base: 'MUC' } })).status, 403, 'gesperrt');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'unban', u: 'ben' }), 'Sperre aufheben');
+  ok(await call('ben', 'POST', '/games/main/join', { airline: { name: 'Neu Ben', code: 'NB', base: 'MUC' } }), 'Ben tritt neu bei');
+  const ad2 = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung neu');
+  const ev = ad2.events.find((e) => !e.cancelled);
+  if (ev) { ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'cancelEvent', eventId: ev.id }), 'Ereignis annullieren');
+    assert.equal((await call('tim', 'POST', '/games/main/admin', { cmd: 'cancelEvent', eventId: ev.id })).status, 400, 'doppelt annullieren abgewiesen'); }
+  const annP = ad2.players.find((p) => p.u === 'anna');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'grant', airlineId: annP.airlineId, amount: 5e6 }), 'Kapital buchen');
+  const ad3 = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung danach');
+  assert.ok(ad3.players.find((p) => p.u === 'anna').equity > annP.equity + 4e6, 'Kapital gebucht');
+  const gi = ok(await call('anna', 'GET', `/games/${g.id}/admin`), 'Spielleitung privat');
+  const cl = gi.players.find((p) => p.u === 'cleo');
+  ok(await call('anna', 'POST', `/games/${g.id}/admin`, { cmd: 'kick', airlineId: cl.airlineId }), 'Spielleitung entfernt Cleo');
+  assert.equal((await call('ben', 'POST', `/games/${g.id}/admin`, { cmd: 'kick', airlineId: gi.players.find((p) => p.u === 'anna').airlineId })).status, 403, 'Mitspieler darf nicht verwalten');
+  console.log('Verwaltung ok: entfernen + sperren, entsperren, Neubeitritt,', ev ? 'Ereignis „' + ev.type + '“ annulliert,' : 'kein Ereignis offen,', 'Kapital +5 Mio., Spielleitung privat'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 console.log('Alle Prüfungen bestanden.');

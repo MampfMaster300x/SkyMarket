@@ -214,6 +214,181 @@ YYT|St. John's|47.62|-52.75|CA|0.21|0.8|0.9|1.5
 YXY|Whitehorse|60.71|-135.07|CA|0.04|0.5|1.4|0.4
 YZF|Yellowknife|62.46|-114.44|CA|0.02|0.6|0.8|0.5
 YFB|Iqaluit|63.76|-68.56|CA|0.008|0.6|0.4|0.15
+HAJ|Hannover|52.46|9.69|DE|2.0|1.0|0.6|5.6
+STR|Stuttgart|48.69|9.22|DE|2.7|1.3|0.7|9.0
+CGN|Köln/Bonn|50.87|7.14|DE|3.0|1.1|0.8|9.8
+NUE|Nürnberg|49.50|11.08|DE|1.3|1.0|0.8|3.9
+LEJ|Leipzig/Halle|51.42|12.24|DE|1.1|0.8|0.6|2.2
+BRE|Bremen|53.05|8.79|DE|1.0|0.9|0.6|2.1
+BRU|Brüssel|50.90|4.48|BE|3.5|1.4|1.1|22
+CRL|Brüssel-Charleroi|50.46|4.45|BE|1.5|0.6|0.9|10
+OSL|Oslo|60.19|11.10|NO|2.0|1.3|1.0|28
+BGO|Bergen|60.29|5.22|NO|0.6|1.0|1.2|6
+ARN|Stockholm|59.65|17.92|SE|2.4|1.3|1.0|23
+GOT|Göteborg|57.66|12.28|SE|1.0|1.0|0.8|5
+HEL|Helsinki|60.32|24.96|FI|1.6|1.2|1.0|16
+BLL|Billund|55.74|9.15|DK|0.8|0.7|1.2|3.8
+WAW|Warschau|52.17|20.97|PL|3.2|1.1|0.9|21
+KRK|Krakau|50.08|19.78|PL|1.5|0.8|1.4|11
+GDN|Danzig|54.38|18.47|PL|1.1|0.7|1.0|6
+PRG|Prag|50.10|14.26|CZ|2.2|1.1|1.6|14
+BUD|Budapest|47.44|19.26|HU|3.0|1.0|1.4|17
+OTP|Bukarest|44.57|26.08|RO|2.3|0.9|0.7|16
+SOF|Sofia|42.70|23.41|BG|1.5|0.8|0.8|8
+VAR|Warna|43.23|27.83|BG|0.5|0.4|1.6|2.5
+BEG|Belgrad|44.82|20.31|RS|1.7|0.8|0.8|8
+ZAG|Zagreb|45.74|16.07|HR|1.1|0.8|0.8|4
+SPU|Split|43.54|16.30|HR|0.4|0.4|2.2|4
+DBV|Dubrovnik|42.56|18.27|HR|0.2|0.4|2.4|3
+KEF|Reykjavík|63.99|-22.62|IS|0.25|0.7|2.0|8
+RIX|Riga|56.92|23.97|LV|1.0|0.8|1.0|7
+VNO|Vilnius|54.63|25.29|LT|0.8|0.7|0.8|5
+TLL|Tallinn|59.41|24.83|EE|0.6|0.9|1.1|3.2
+MLA|Malta|35.86|14.48|MT|0.5|0.6|2.2|8
+LCA|Larnaka|34.88|33.63|CY|0.9|0.7|2.0|9
+SKG|Thessaloniki|40.52|22.97|GR|1.1|0.7|1.4|7
+HER|Heraklion|35.34|25.18|GR|0.3|0.3|2.6|9
+RHO|Rhodos|36.41|28.09|GR|0.1|0.2|2.6|6
+CFU|Korfu|39.60|19.91|GR|0.1|0.2|2.4|3.5
+MXP|Mailand-Malpensa|45.63|8.72|IT|7.0|1.4|1.3|29
+LIN|Mailand-Linate|45.45|9.28|IT|4.0|1.4|0.8|10
+BGY|Bergamo|45.67|9.70|IT|3.0|0.7|1.0|17
+VCE|Venedig|45.51|12.35|IT|2.0|0.9|2.0|11
+NAP|Neapel|40.88|14.29|IT|3.0|0.7|1.6|12.5
+CTA|Catania|37.47|15.07|IT|1.5|0.5|1.8|12
+PMO|Palermo|38.18|13.10|IT|1.2|0.5|1.7|8
+BLQ|Bologna|44.53|11.29|IT|1.5|1.0|1.0|10
+AGP|Málaga|36.67|-4.50|ES|1.5|0.6|2.4|24
+ALC|Alicante|38.28|-0.56|ES|1.5|0.5|2.2|18
+VLC|Valencia|39.49|-0.48|ES|2.0|0.8|1.4|10
+SVQ|Sevilla|37.42|-5.90|ES|1.5|0.7|1.6|9
+BIO|Bilbao|43.30|-2.91|ES|1.2|1.0|1.0|6.3
+TFS|Teneriffa-Süd|28.04|-16.57|ES|0.5|0.3|2.6|12
+LPA|Gran Canaria|27.93|-15.39|ES|0.9|0.5|2.4|15
+ACE|Lanzarote|28.95|-13.61|ES|0.15|0.2|2.6|8.5
+FUE|Fuerteventura|28.45|-13.86|ES|0.12|0.2|2.6|7
+IBZ|Ibiza|38.87|1.37|ES|0.15|0.3|2.8|9
+OPO|Porto|41.24|-8.68|PT|1.8|0.8|1.4|15
+FAO|Faro|37.01|-7.97|PT|0.5|0.3|2.4|10
+FNC|Madeira|32.70|-16.77|PT|0.3|0.3|2.2|4.5
+NCE|Nizza|43.66|7.22|FR|1.0|0.9|2.2|14.8
+MRS|Marseille|43.44|5.21|FR|1.8|0.9|1.4|10
+LYS|Lyon|45.73|5.08|FR|2.3|1.1|1.0|10
+TLS|Toulouse|43.63|1.36|FR|1.4|1.1|0.9|7.5
+BOD|Bordeaux|44.83|-0.72|FR|1.2|0.9|1.1|6.8
+NTE|Nantes|47.15|-1.61|FR|1.0|0.8|0.9|7
+GVA|Genf|46.24|6.11|CH|1.0|1.6|1.3|17.8
+BSL|Basel|47.60|7.53|CH|1.0|1.2|0.8|8.9
+STN|London-Stansted|51.88|0.24|GB|4.0|0.6|1.0|29
+LTN|London-Luton|51.87|-0.37|GB|3.0|0.6|0.9|16
+EDI|Edinburgh|55.95|-3.37|GB|1.4|1.1|1.6|14
+GLA|Glasgow|55.87|-4.43|GB|1.8|0.9|1.0|7
+BHX|Birmingham|52.45|-1.75|GB|3.0|1.0|0.8|12
+BRS|Bristol|51.38|-2.72|GB|1.3|0.8|0.8|9
+EIN|Eindhoven|51.45|5.37|NL|1.0|0.8|0.6|7
+SZG|Salzburg|47.79|13.00|AT|0.5|0.6|1.8|2
+ADB|Izmir|38.29|27.16|TR|3.0|0.8|1.3|12.5
+ESB|Ankara|40.13|32.99|TR|5.0|1.0|0.6|13
+DLM|Dalaman|36.71|28.79|TR|0.2|0.2|2.6|5.5
+BJV|Bodrum|37.25|27.66|TR|0.2|0.2|2.6|4.5
+TLV|Tel Aviv|32.01|34.89|IL|4.5|1.3|1.2|22
+AMM|Amman|31.72|35.99|JO|4.0|0.8|1.0|9
+BEY|Beirut|33.82|35.49|LB|2.4|0.8|1.0|7
+KWI|Kuwait|29.24|47.97|KW|4.3|1.1|0.4|15
+BAH|Bahrain|26.27|50.63|BH|1.5|1.1|0.7|9
+MCT|Maskat|23.59|58.28|OM|1.7|0.9|1.2|13
+DMM|Dammam|26.47|49.80|SA|3.0|1.0|0.3|11
+MED|Medina|24.55|39.71|SA|1.5|0.4|1.5|9
+SHJ|Schardscha|25.33|55.52|AE|1.8|0.6|1.0|17
+IKA|Teheran|35.42|51.15|IR|15|0.8|0.6|9
+CMB|Colombo|7.18|79.88|LK|5.0|0.8|1.4|10
+MLE|Malé|4.19|73.53|MV|0.5|0.4|3.0|5
+KTM|Kathmandu|27.70|85.36|NP|3.0|0.5|1.5|7
+DAC|Dhaka|23.84|90.40|BD|21|0.8|0.5|12
+KHI|Karatschi|24.91|67.16|PK|17|0.9|0.4|9
+LHE|Lahore|31.52|74.40|PK|13|0.7|0.5|6
+ISB|Islamabad|33.55|72.83|PK|2.5|0.9|0.5|5
+CCU|Kolkata|22.65|88.45|IN|15|0.9|0.8|22
+MAA|Chennai|12.99|80.17|IN|11|1.0|0.8|22
+COK|Kochi|10.15|76.40|IN|3.0|0.6|1.4|11
+GOI|Goa|15.38|73.83|IN|1.5|0.3|2.4|8
+AMD|Ahmedabad|23.07|72.63|IN|8.0|0.9|0.6|12
+PNQ|Pune|18.58|73.92|IN|7.0|1.0|0.6|9
+HKT|Phuket|8.11|98.31|TH|0.5|0.3|2.8|18
+CNX|Chiang Mai|18.77|98.96|TH|1.2|0.4|2.0|8
+PEN|Penang|5.30|100.28|MY|1.8|0.8|1.6|8
+BKI|Kota Kinabalu|5.94|116.05|MY|1.0|0.5|1.6|9
+CEB|Cebu|10.31|123.98|PH|3.0|0.7|1.8|11
+DAD|Da Nang|16.04|108.20|VN|1.2|0.5|2.2|14
+PQC|Phu Quoc|10.17|103.99|VN|0.2|0.2|2.6|5
+PNH|Phnom Penh|11.55|104.84|KH|2.3|0.6|1.2|5.5
+RGN|Rangun|16.91|96.13|MM|7.0|0.5|0.6|5
+MFM|Macau|22.15|113.59|MO|0.7|0.8|2.4|7
+FUK|Fukuoka|33.59|130.45|JP|5.0|1.0|1.2|24
+CTS|Sapporo|42.78|141.69|JP|2.5|0.8|1.8|23
+OKA|Okinawa|26.20|127.65|JP|1.4|0.4|2.4|21
+NGO|Nagoya|34.86|136.81|JP|9.0|1.2|0.8|10
+ITM|Osaka-Itami|34.79|135.44|JP|10|1.3|0.8|15
+GMP|Seoul-Gimpo|37.56|126.79|KR|10|1.2|0.8|24
+PUS|Busan|35.18|128.94|KR|3.4|0.9|1.3|15
+DLC|Dalian|38.97|121.54|CN|6.0|0.9|0.9|18
+SHE|Shenyang|41.64|123.48|CN|8.0|0.8|0.6|19
+HRB|Harbin|45.62|126.25|CN|10|0.7|1.0|20
+TSN|Tianjin|39.12|117.35|CN|13|1.0|0.6|19
+CGO|Zhengzhou|34.52|113.84|CN|12|0.8|0.6|28
+NNG|Nanning|22.61|108.17|CN|8.0|0.7|0.9|16
+HAK|Haikou|19.93|110.46|CN|2.5|0.5|2.0|24
+SYX|Sanya|18.30|109.41|CN|1.0|0.3|2.8|22
+FOC|Fuzhou|25.93|119.66|CN|7.0|0.8|0.8|15
+URC|Ürümqi|43.91|87.47|CN|4.0|0.7|1.0|25
+ULN|Ulaanbaatar|47.65|106.82|MN|1.6|0.6|0.9|2.4
+ALA|Almaty|43.35|77.04|KZ|2.2|0.9|0.8|9
+NQZ|Astana|51.02|71.47|KZ|1.4|1.0|0.5|6
+TAS|Taschkent|41.26|69.28|UZ|3.0|0.7|0.8|6
+GYD|Baku|40.47|50.05|AZ|2.5|0.9|0.9|5
+TBS|Tiflis|41.67|44.95|GE|1.2|0.6|1.3|4
+EVN|Jerewan|40.15|44.40|AM|1.1|0.6|1.0|5
+HNL|Honolulu|21.32|-157.92|US|1.0|0.6|2.8|21
+OGG|Maui|20.90|-156.43|US|0.17|0.3|3.0|7
+ANC|Anchorage|61.17|-149.99|US|0.4|0.8|1.4|5.5
+AUS|Austin|30.19|-97.67|US|2.4|1.3|1.0|22
+BNA|Nashville|36.12|-86.68|US|2.0|1.1|1.4|24
+MSY|New Orleans|29.99|-90.26|US|1.3|0.8|2.0|14
+SAT|San Antonio|29.53|-98.47|US|2.6|0.8|1.1|10
+STL|St. Louis|38.75|-90.37|US|2.8|1.0|0.7|15
+MCI|Kansas City|39.30|-94.71|US|2.2|0.9|0.6|11
+PDX|Portland|45.59|-122.60|US|2.5|1.1|1.0|18
+SJC|San José|37.36|-121.93|US|2.0|1.6|0.6|11
+OAK|Oakland|37.72|-122.22|US|2.5|0.9|0.7|11
+SMF|Sacramento|38.70|-121.59|US|2.4|0.9|0.6|13
+SNA|Orange County|33.68|-117.87|US|3.2|1.1|1.1|11
+RDU|Raleigh-Durham|35.88|-78.79|US|2.0|1.1|0.6|14
+MDW|Chicago-Midway|41.79|-87.75|US|4.0|0.8|0.7|22
+DAL|Dallas-Love|32.85|-96.85|US|4.0|1.0|0.6|16
+HOU|Houston-Hobby|29.65|-95.28|US|3.0|0.8|0.6|13
+CLE|Cleveland|41.41|-81.85|US|2.0|0.9|0.5|10
+PIT|Pittsburgh|40.49|-80.23|US|2.3|1.0|0.6|10
+IND|Indianapolis|39.72|-86.29|US|2.0|0.9|0.5|9.5
+CMH|Columbus|39.99|-82.89|US|2.1|0.9|0.5|9.5
+SJU|San Juan|18.44|-66.00|PR|2.5|0.7|2.0|13
+PUJ|Punta Cana|18.57|-68.36|DO|0.2|0.2|3.0|9
+SDQ|Santo Domingo|18.43|-69.67|DO|3.5|0.6|1.2|5
+MBJ|Montego Bay|18.50|-77.91|JM|0.3|0.2|2.8|5
+NAS|Nassau|25.04|-77.47|BS|0.3|0.5|2.6|4.5
+HAV|Havanna|22.99|-82.41|CU|2.1|0.4|1.8|3
+SJO|San José (Costa Rica)|9.99|-84.20|CR|2.2|0.7|1.8|6
+LIR|Liberia (Costa Rica)|10.59|-85.54|CR|0.2|0.2|2.6|2
+GUA|Guatemala-Stadt|14.58|-90.53|GT|3.0|0.7|0.9|3
+SAL|San Salvador|13.44|-89.06|SV|2.0|0.6|0.8|4
+AUA|Aruba|12.50|-70.02|AW|0.1|0.3|3.0|2.6
+BGI|Barbados|13.07|-59.49|BB|0.3|0.4|2.6|2.4
+GDL|Guadalajara|20.52|-103.31|MX|5.3|0.9|1.0|17
+MTY|Monterrey|25.78|-100.11|MX|5.3|1.2|0.6|12
+TIJ|Tijuana|32.54|-116.97|MX|2.2|0.6|0.6|12
+SJD|Los Cabos|23.15|-109.72|MX|0.4|0.3|2.8|7
+PVR|Puerto Vallarta|20.68|-105.25|MX|0.5|0.3|2.6|6
+CCS|Caracas|10.60|-66.99|VE|5.0|0.6|0.6|3
+TNG|Tanger|35.73|-5.92|MA|1.2|0.5|1.4|2.5
 """
 EXTRA = {'VIE', 'BER', 'DUS', 'HAM'} | {'JNB','CPT','ADD','NBO','LOS','ACC','CMN','RAK','ALG','TUN','DSS','DAR','HRG','MRU'}   # nicht in den Top 100, aus der Europa-Version übernommen
 # v0.12: Erweiterung Australien/Ozeanien, Russland, Afrika, Südamerika, Kanada (Passagiere Mio./Jahr gerundet, Stand 2019/2024)
@@ -294,6 +469,55 @@ COUNTRIES = {
  'CM': ('Kamerun', 'Kamerun', 'Afrika', 0.08, 5, 22, 10, 20, 1.20, 0.65, 0.7),
  'SC': ('den Seychellen', 'Seychellen', 'Afrika', 0.70, 6, 25, 10, 15, 1.15, 0.9, 0.9),
  'MG': ('Madagaskar', 'Madagaskar', 'Afrika', 0.05, 5, 20, 8, 15, 1.20, 0.6, 0.65),
+ 'BE': ('Belgien', 'Belgien', 'Europa', 1.10, 8, 25, 10, 10, 1.02, 1.2, 1.1),
+ 'NO': ('Norwegen', 'Norwegen', 'Europa', 1.50, 8, 25, 8, 8, 1.03, 1.5, 1.3),
+ 'SE': ('Schweden', 'Schweden', 'Europa', 1.20, 7, 22, 7, 25, 1.03, 1.3, 1.2),
+ 'FI': ('Finnland', 'Finnland', 'Europa', 1.10, 7, 22, 0, 0, 1.03, 1.2, 1.1),
+ 'PL': ('Polen', 'Polen', 'Europa', 0.60, 5, 15, 0, 0, 1.02, 0.8, 0.8),
+ 'CZ': ('Tschechien', 'Tschechien', 'Europa', 0.70, 6, 18, 0, 0, 1.02, 0.85, 0.85),
+ 'HU': ('Ungarn', 'Ungarn', 'Europa', 0.55, 5, 18, 5, 5, 1.03, 0.8, 0.8),
+ 'RO': ('Rumänien', 'Rumänien', 'Europa', 0.45, 5, 15, 0, 0, 1.03, 0.7, 0.75),
+ 'BG': ('Bulgarien', 'Bulgarien', 'Europa', 0.35, 5, 15, 0, 0, 1.03, 0.65, 0.7),
+ 'RS': ('Serbien', 'Serbien', 'Europa', 0.30, 5, 15, 0, 0, 1.03, 0.65, 0.7),
+ 'HR': ('Kroatien', 'Kroatien', 'Europa', 0.55, 6, 18, 0, 0, 1.04, 0.8, 0.8),
+ 'IS': ('Island', 'Island', 'Europa', 1.30, 8, 25, 0, 0, 1.10, 1.4, 1.3),
+ 'LV': ('Lettland', 'Lettland', 'Europa', 0.55, 5, 15, 0, 0, 1.03, 0.75, 0.75),
+ 'LT': ('Litauen', 'Litauen', 'Europa', 0.60, 5, 15, 0, 0, 1.03, 0.75, 0.75),
+ 'EE': ('Estland', 'Estland', 'Europa', 0.65, 5, 15, 0, 0, 1.03, 0.8, 0.8),
+ 'MT': ('Malta', 'Malta', 'Europa', 0.80, 6, 18, 0, 0, 1.05, 0.9, 0.9),
+ 'CY': ('Zypern', 'Zypern', 'Europa', 0.80, 6, 20, 0, 0, 1.05, 0.9, 0.9),
+ 'IL': ('Israel', 'Israel', 'Nahost', 1.00, 6, 20, 10, 15, 1.05, 1.2, 1.1),
+ 'JO': ('Jordanien', 'Jordanien', 'Nahost', 0.25, 5, 20, 10, 25, 1.05, 0.7, 0.75),
+ 'LB': ('dem Libanon', 'Libanon', 'Nahost', 0.20, 5, 20, 10, 25, 1.10, 0.7, 0.75),
+ 'KW': ('Kuwait', 'Kuwait', 'Nahost', 0.90, 5, 15, 5, 5, 0.85, 1.0, 0.9),
+ 'BH': ('Bahrain', 'Bahrain', 'Nahost', 0.80, 5, 18, 5, 5, 0.85, 1.0, 0.9),
+ 'OM': ('dem Oman', 'Oman', 'Nahost', 0.60, 5, 18, 5, 10, 0.85, 0.9, 0.85),
+ 'IR': ('dem Iran', 'Iran', 'Nahost', 0.15, 3, 8, 5, 10, 0.70, 0.5, 0.55),
+ 'LK': ('Sri Lanka', 'Sri Lanka', 'Asien', 0.12, 4, 15, 8, 20, 1.15, 0.6, 0.6),
+ 'MV': ('den Malediven', 'Malediven', 'Asien', 0.40, 6, 25, 15, 30, 1.20, 0.9, 0.9),
+ 'NP': ('Nepal', 'Nepal', 'Asien', 0.05, 4, 12, 5, 10, 1.20, 0.55, 0.55),
+ 'BD': ('Bangladesch', 'Bangladesch', 'Asien', 0.08, 4, 10, 5, 15, 1.15, 0.55, 0.55),
+ 'PK': ('Pakistan', 'Pakistan', 'Asien', 0.06, 4, 10, 5, 15, 1.15, 0.55, 0.55),
+ 'KH': ('Kambodscha', 'Kambodscha', 'Asien', 0.08, 4, 15, 5, 15, 1.15, 0.55, 0.6),
+ 'MM': ('Myanmar', 'Myanmar', 'Asien', 0.05, 4, 12, 5, 10, 1.20, 0.55, 0.55),
+ 'MO': ('Macau', 'Macau', 'Asien', 1.40, 6, 18, 10, 10, 1.05, 1.2, 1.1),
+ 'MN': ('der Mongolei', 'Mongolei', 'Asien', 0.15, 5, 15, 5, 10, 1.20, 0.6, 0.65),
+ 'KZ': ('Kasachstan', 'Kasachstan', 'Asien', 0.35, 4, 12, 5, 10, 0.95, 0.65, 0.7),
+ 'UZ': ('Usbekistan', 'Usbekistan', 'Asien', 0.08, 4, 12, 5, 10, 1.00, 0.55, 0.6),
+ 'AZ': ('Aserbaidschan', 'Aserbaidschan', 'Asien', 0.20, 4, 15, 5, 10, 0.90, 0.65, 0.7),
+ 'GE': ('Georgien', 'Georgien', 'Asien', 0.20, 4, 15, 5, 10, 1.05, 0.6, 0.65),
+ 'AM': ('Armenien', 'Armenien', 'Asien', 0.20, 4, 15, 5, 10, 1.05, 0.6, 0.65),
+ 'PR': ('Puerto Rico', 'Puerto Rico', 'Lateinamerika', 0.70, 4, 14, 18, 40, 1.00, 1.0, 1.0),
+ 'DO': ('der Dominikanischen Republik', 'Dominik. Rep.', 'Lateinamerika', 0.30, 5, 20, 15, 30, 1.10, 0.75, 0.8),
+ 'JM': ('Jamaika', 'Jamaika', 'Lateinamerika', 0.20, 5, 25, 15, 30, 1.15, 0.8, 0.8),
+ 'BS': ('den Bahamas', 'Bahamas', 'Lateinamerika', 0.90, 6, 30, 20, 30, 1.15, 1.1, 1.0),
+ 'CU': ('Kuba', 'Kuba', 'Lateinamerika', 0.10, 5, 20, 15, 25, 1.20, 0.7, 0.75),
+ 'CR': ('Costa Rica', 'Costa Rica', 'Lateinamerika', 0.40, 5, 25, 15, 30, 1.10, 0.8, 0.8),
+ 'GT': ('Guatemala', 'Guatemala', 'Lateinamerika', 0.18, 4, 20, 10, 25, 1.10, 0.7, 0.75),
+ 'SV': ('El Salvador', 'El Salvador', 'Lateinamerika', 0.15, 4, 20, 10, 25, 1.10, 0.7, 0.75),
+ 'AW': ('Aruba', 'Aruba', 'Lateinamerika', 0.90, 6, 30, 15, 30, 1.15, 1.1, 1.0),
+ 'BB': ('Barbados', 'Barbados', 'Lateinamerika', 0.60, 6, 30, 15, 30, 1.15, 1.0, 1.0),
+ 'VE': ('Venezuela', 'Venezuela', 'Lateinamerika', 0.10, 4, 15, 10, 25, 0.80, 0.6, 0.65),
 }
 # Slotkoordinierte Flughäfen: (zusätzliche Slots, Entgelt je Bewegung)
 SLOTS = {
@@ -302,13 +526,17 @@ SLOTS = {
  'SIN': (8, 150), 'ICN': (8, 100), 'TPE': (8, 80), 'BKK': (8, 100), 'DXB': (8, 150), 'DOH': (10, 100), 'IST': (8, 100),
  'ORY': (6, 120), 'MAD': (8, 120), 'DUB': (8, 80), 'ZRH': (6, 150), 'SYD': (6, 150), 'MEX': (4, 100), 'GRU': (8, 80),
  'BOM': (4, 100), 'DEL': (8, 80), 'CGK': (8, 60), 'MNL': (6, 80), 'KUL': (10, 60),
+ 'BRU': (8, 100), 'LIN': (4, 120), 'GVA': (6, 120), 'TLV': (8, 80), 'GMP': (6, 120), 'ITM': (4, 150), 'FUK': (6, 80), 'MXP': (8, 80), 'STN': (6, 80),
 }
 # Ferienziele mit Saisonprofil
 SEASON = {'PMI': 'island', 'BCN': 'sun', 'FCO': 'sun', 'LIS': 'sun', 'AYT': 'island', 'CJU': 'sun', 'ATH': 'sun',
           'CUN': 'winter_sun', 'MCO': 'winter_sun', 'MIA': 'winter_sun', 'FLL': 'winter_sun', 'TPA': 'winter_sun', 'LAS': 'city',
           'BKK': 'winter_sun', 'DMK': 'winter_sun', 'DXB': 'winter_sun', 'AUH': 'winter_sun', 'SYD': 'sun', 'MEL': 'sun', 'SAN': 'sun', 'CAI': 'winter_sun',
           'HRG': 'winter_sun', 'RAK': 'winter_sun', 'MRU': 'winter_sun', 'CPT': 'winter_sun', 'TUN': 'sun',
-          'OOL': 'sun', 'HBA': 'sun', 'GIG': 'sun', 'FLN': 'sun', 'AER': 'sun', 'SSH': 'winter_sun', 'LXR': 'winter_sun', 'AGA': 'winter_sun', 'CTG': 'winter_sun'}
+          'OOL': 'sun', 'HBA': 'sun', 'GIG': 'sun', 'FLN': 'sun', 'AER': 'sun', 'SSH': 'winter_sun', 'LXR': 'winter_sun', 'AGA': 'winter_sun', 'CTG': 'winter_sun',
+          'HER': 'island', 'RHO': 'island', 'CFU': 'island', 'IBZ': 'island', 'TFS': 'winter_sun', 'LPA': 'winter_sun', 'ACE': 'winter_sun', 'FUE': 'winter_sun', 'FAO': 'sun', 'FNC': 'winter_sun', 'MLA': 'sun',
+          'LCA': 'sun', 'SPU': 'island', 'DBV': 'sun', 'DLM': 'island', 'BJV': 'island', 'VAR': 'island', 'AGP': 'sun', 'ALC': 'sun', 'NCE': 'sun', 'HKT': 'winter_sun', 'MLE': 'winter_sun', 'PUJ': 'winter_sun',
+          'MBJ': 'winter_sun', 'NAS': 'winter_sun', 'AUA': 'winter_sun', 'BGI': 'winter_sun', 'SJD': 'winter_sun', 'PVR': 'winter_sun', 'SYX': 'winter_sun', 'OKA': 'sun', 'GOI': 'winter_sun', 'PQC': 'winter_sun', 'KEF': 'sun', 'HNL': 'sun', 'OGG': 'sun'}
 # Europa-Flughäfen aus v0.1–v0.3 behalten ihre kalibrierten Werte
 OLD = {
  'HAM': dict(pop=3.2, income=1.10, biz=1.00, tour=0.90, land=7, paxfee=17, tax=15, taxi=0.00, cost=1.00, fuel=1.00, hand=1.00, slots=None, slotFee=0),

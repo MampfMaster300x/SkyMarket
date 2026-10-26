@@ -178,6 +178,9 @@ export async function tickMain(store) {
   return { ok: true, days };
 }
 const canControl = (meta, user) => meta.host === user.key || (meta.main && isAdmin(user));
+/** Verwaltung eines Spiels: Admins überall, in privaten Spielen auch die Spielleitung. */
+const canManage = (meta, user) => isAdmin(user) || (!meta.main && meta.host === user.key);
+const activeHumans = (w) => w.humans.filter((h) => !h.removed).length;
 
 // ---------------------------------------------------------------------------
 // Validierung
@@ -315,12 +318,13 @@ export async function handle(req, { store }) {
         if (memberOf(meta, user)) return json({ ok: true, already: true });
         const body = await readJson(req);
         if (meta.players.length >= meta.max) return fail(409, 'Das Spiel ist voll.');
+        if ((meta.banned || []).some((b) => b.u === user.key)) return fail(403, 'Die Spielleitung hat Sie aus diesem Spiel ausgeschlossen.');
         const viaInvite = body.invite && body.invite === meta.invite;
         if (meta.pw && !viaInvite && !isAdmin(user) && !checkPw(body.password || '', meta.pw.salt, meta.pw.hash)) return fail(403, 'Das Passwort stimmt nicht.');
         const al = validAirline(body.airline, meta); if (al.error) return fail(400, al.error);
         let airlineId = null;
         await mutateState(store, id, (w) => {
-          if (w.humans.length >= (meta.max || MAX_PLAYERS)) throw Object.assign(new Error('Das Spiel ist voll.'), { status: 409 });
+          if (activeHumans(w) >= (meta.max || MAX_PLAYERS)) throw Object.assign(new Error('Das Spiel ist voll.'), { status: 409 });
           const hmn = SM.addHuman(w, { name: al.name, code: al.code, base: al.base, owner: user.key });
           airlineId = hmn.id;
         });
@@ -335,6 +339,53 @@ export async function handle(req, { store }) {
         console.log(`Admin ${user.key} hat das Spiel ${meta.id} (${meta.name}) gelöscht.`);
         return json({ ok: true });
       }
+      // ---- Verwaltung: Airlines entfernen, Sperren, Ereignisse annullieren, Kapital korrigieren ----
+      if (op === 'admin' && method === 'GET') {
+        if (!canManage(meta, user)) return fail(403, 'Nur für Admins und die Spielleitung.');
+        const r = await mutateState(store, id, null);
+        const w = r.w || unpackWorld(r.buf);
+        const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
+        const now = Date.now();
+        return json({ id, name: meta.name, main: !!meta.main, day: w.day,
+          players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
+            return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
+              status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null }; }),
+          banned: meta.banned || [], events: SM.adminEvents(w) });
+      }
+      if (op === 'admin' && method === 'POST') {
+        if (!canManage(meta, user)) return fail(403, 'Nur für Admins und die Spielleitung.');
+        const body = await readJson(req), cmd = String(body.cmd || ''), by = isAdmin(user) ? 'Spielleitung' : 'Spielleitung';
+        if (cmd === 'kick') {
+          const p = meta.players.find((x) => x.airlineId === body.airlineId);
+          if (!p) return fail(404, 'Diese Airline spielt hier nicht (mehr).');
+          if (p.u === user.key) return fail(400, 'Sich selbst können Sie nicht entfernen.');
+          if (!meta.main && meta.host === p.u) return fail(400, 'Die Spielleitung kann nicht entfernt werden.');
+          let res = null;
+          await mutateState(store, id, (w) => { res = SM.kickHuman(w, p.airlineId, by); });
+          const next = await updateJson(store, K.meta(id), (m) => {
+            if (!m) return undefined;
+            m.players = m.players.filter((x) => x.u !== p.u);
+            if (body.ban) m.banned = [...(m.banned || []).filter((b) => b.u !== p.u), { u: p.u, name: p.name, airlineName: p.airlineName, at: Date.now(), by: user.name }].slice(-200);
+            return m;
+          });
+          await updateJson(store, K.user(p.u), (u) => { if (!u) return undefined; u.games = (u.games || []).filter((g) => g !== id); return u; });
+          try { await updateJson(store, K.presence(id), (pr) => { if (!pr || pr[p.u] === undefined) return undefined; delete pr[p.u]; return pr; }, {}, 2); } catch (e) { /* egal */ }
+          await indexUpsert(store, next);
+          console.log(`${user.key} hat ${p.airlineName} (${p.u}) aus ${meta.id} entfernt${body.ban ? ' und gesperrt' : ''}.`);
+          return json({ ok: true, msg: `${p.airlineName} wurde entfernt${body.ban ? ', ' + p.name + ' ist gesperrt' : ''}.`, kicked: res && res.ok });
+        }
+        if (cmd === 'unban') {
+          await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.banned = (m.banned || []).filter((b) => b.u !== body.u); return m; });
+          return json({ ok: true, msg: 'Sperre aufgehoben.' });
+        }
+        if (cmd === 'cancelEvent' || cmd === 'grant') {
+          const r = await mutateState(store, id, (w) => (cmd === 'grant' ? SM.adminGrant(w, String(body.airlineId || ''), Number(body.amount), by) : w.cancelEvent(String(body.eventId || ''), by)));
+          const res = r.result || { ok: false };
+          if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
+          return json({ ok: true, msg: cmd === 'grant' ? 'Kapital gebucht.' : 'Ereignis annulliert.', ver: r.etag });
+        }
+        return fail(400, 'Unbekannter Befehl.');
+      }
       const me = memberOf(meta, user) || (op === 'control' && meta.main && isAdmin(user) ? { u: user.key, airlineId: null } : null);
       if (!me) return fail(403, 'Sie sind in diesem Spiel nicht angemeldet.');
 
@@ -342,7 +393,7 @@ export async function handle(req, { store }) {
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
         const now = Date.now();
         return json({ id, name: meta.name, code: meta.code, invite: meta.invite, max: meta.max, locked: !!meta.pw,
-          main: !!meta.main, me: { airlineId: me.airlineId, host: canControl(meta, user), admin: isAdmin(user) },
+          main: !!meta.main, me: { airlineId: me.airlineId, host: canControl(meta, user), admin: isAdmin(user), manage: canManage(meta, user) },
           players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null })) });
       }
       if (op === 'state' && method === 'GET') {
