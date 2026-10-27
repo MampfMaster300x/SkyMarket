@@ -251,6 +251,35 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   ok(await call('anna', 'POST', `/games/${g.id}/admin`, { cmd: 'kick', airlineId: cl.airlineId }), 'Spielleitung entfernt Cleo');
   assert.equal((await call('ben', 'POST', `/games/${g.id}/admin`, { cmd: 'kick', airlineId: gi.players.find((p) => p.u === 'anna').airlineId })).status, 403, 'Mitspieler darf nicht verwalten');
   console.log('Verwaltung ok: entfernen + sperren, entsperren, Neubeitritt,', ev ? 'Ereignis „' + ev.type + '“ annulliert,' : 'kein Ereignis offen,', 'Kapital +5 Mio., Spielleitung privat'); }
+// Neustart der Hauptwelt nur durch den Admin
+{ const before = ok(await call('tim', 'GET', '/games/main/admin'), 'vor Neustart');
+  assert.equal((await call('ben', 'POST', '/games/main/admin', { cmd: 'resetWorld', keep: true })).status, 403, 'Neustart nur Admin');
+  const rs = ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'resetWorld', keep: true }), 'Neustart Hauptwelt');
+  const after = ok(await call('tim', 'GET', '/games/main/admin'), 'nach Neustart');
+  assert.equal(after.players.length, before.players.length, 'alle Airlines behalten'); assert.ok(after.day <= 1, 'Tag 1');
+  const stR = await call('anna', 'GET', '/games/main/state?v=r'), wr = JSON.parse(gunzipSync(Buffer.from(stR.data)).toString());
+  assert.ok(wr.airlines.some((a) => a.owner === 'anna'), 'Anna hat wieder eine Airline');
+  console.log('Neustart ok:', rs.msg); }
+// Kapitalmarkt: Anteile, anteiliger Gewinn, Kapitalerhöhung, Anleihe, Übernahme mit Mehrheit
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const wk = SMx.newWorld({ seed: 11 }), a1 = SMx.addHuman(wk, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }), b1 = SMx.addHuman(wk, { id: 'P2', name: 'Beta', code: 'BB', base: 'MUC' }); wk.playerId = 'P1';
+  a1.ledger.cash += 300e6 * 100; a1.ledger.equityContrib += 300e6 * 100;
+  for (let i = 0; i < 100; i++) wk.step();
+  const tg = wk.list.filter((x) => x.archetype && x.status === 'active').sort((x, y) => SMx.mktCap(wk, x) - SMx.mktCap(wk, y))[0];
+  for (const q of [0.2, 0.2, 0.15]) assert.equal(SMx.applyAction(wk, 'P1', { type: 'buyStake', target: tg.id, q }).ok, true, 'Anteile kaufen');
+  assert.ok(SMx.stakeOf(a1, tg) >= 0.55, 'Mehrheit'); assert.ok(wk.coops.some((c) => c.stake), 'Konzernallianz');
+  for (let i = 0; i < 65; i++) wk.step();
+  assert.ok(a1.stakes[tg.id].inc !== 0, 'anteiliger Gewinn gebucht');
+  const offer = SMx.maValue(wk, tg, a1); assert.ok(offer.mult === 1.3 && offer.rest < 0.46, 'Angebot nur für den Rest mit Mehrheitsaufschlag');
+  assert.equal(SMx.applyAction(wk, 'P1', { type: 'takeover', target: tg.id }).ok, true, 'Rest übernommen');
+  const iq = SMx.applyAction(wk, 'P2', { type: 'issueShares', q: 0.1 }); assert.equal(iq.ok, true, 'Kapitalerhöhung: ' + iq.msg);
+  assert.equal(SMx.applyAction(wk, 'P1', { type: 'buyStake', target: 'P2', q: 0.05 }).ok, true, 'Aktien eines Mitspielers kaufen');
+  assert.equal(SMx.applyAction(wk, 'P2', { type: 'issueShares', q: 0.2 }).ok, false, 'Sperrfrist für Kapitalerhöhung');
+  assert.equal(SMx.applyAction(wk, 'P2', { type: 'issueBond', amount: 3e6, years: 3 }).ok, true, 'Anleihe');
+  for (let i = 0; i < 35; i++) wk.step();
+  for (const al of [a1, b1]) assert.ok(Math.abs(SMx.balanceSheet(al).check) < 1, 'Bilanz stimmt ' + al.id);
+  const rt2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(wk)))); assert.ok(rt2.airlines.P1.stakes && rt2.airlines.P2.cap && rt2.airlines.P2.bonds, 'Speichern/Laden Kapitalmarkt');
+  console.log('Kapitalmarkt ok: 55 % an', tg.name, ', anteiliger Gewinn, Rest übernommen, Kapitalerhöhung', Math.round(iq.net / 1e3), 'Tsd. €, Anleihe, Bilanz stimmt'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 // Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
 { const SMx = (await import('../shared/engine.cjs')).default;
@@ -262,17 +291,21 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const r6 = A6({ type: 'openRoute', base: 'HAJ', dest: 'NUE', typeId: 'DH8D', freq: 1, wk: 4, fo: 100, fi: 100 }); assert.equal(r6.ok, true, '4x pro Woche: ' + r6.msg);
   assert.equal(p6.routes.find((r) => r.id === r6.id).wk, 4, 'Wochenfrequenz gespeichert');
   const b6 = SMx.balanceSheet(p6); assert.ok(Math.abs(b6.check) < 1, 'Bilanz stimmt mit Slots als Vermögen'); assert.ok(b6.slots > 0, 'Slots aktiviert');
-  assert.equal(A6({ type: 'openBase', apt: 'BRE' }).ok, false, 'zweite Basis erst ab Phase 2');
+  { const c0 = p6.ledger.cash; assert.equal(A6({ type: 'openBase', apt: 'BRE' }).ok, true, 'zweite Basis geht – nur teurer');
+    assert.ok(c0 - p6.ledger.cash > 1.9 * SMx.baseSetupCost(w6, 'BRE') * 100, 'Aufschlag auf die zweite Basis in Phase 1'); }
   const ai6 = w6.list.find((a) => a.archetype && a.status !== 'insolvent');
-  assert.equal(A6({ type: 'takeover', target: ai6.id }).ok, false, 'Übernahme erst ab Phase 3');
+  assert.ok(SMx.maValue(w6, ai6, p6).price > SMx.maValue(w6, ai6).price * 1.4, 'Übernahme vor Phase 3 mit Aufschlag');
+  { const rA = SMx.riskTerms(p6, 'DH8D'); A6({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAJ' }); const rB = SMx.riskTerms(p6, 'DH8D'); assert.ok(rB.lease > rA.lease, 'schnelles Wachstum kostet Aufschlag'); }
+  { const wL = SMx.newGame({ seed: 4, base: 'LHR' }), pL = wL.player; const ok3 = [0, 1, 2].map(() => SMx.applyAction(wL, pL.id, { type: 'acquire', typeId: 'B789', mode: 'lease', base: 'LHR' }).ok).filter(Boolean).length;
+    assert.ok(ok3 < 3, 'zum Start keine drei 787 in London'); }
   const px = Buffer.alloc(2048); px[10] = 0x21; const pr = A6({ type: 'setPixLogo', pal: ['#112233', '#ffcc00'], px: px.toString('base64') }); assert.equal(pr.ok, true, 'Pixel-Logo');
   A6({ type: 'orderStudy', kind: 'routes', tier: 'small', focus: null }); for (let i = 0; i < 8; i++) w6.step();
   assert.ok(Object.keys(p6.mk || {}).length >= 10, 'Studie hinterlässt Marktwissen');
-  const w7 = SMx.newGame({ seed: 9, base: 'HAM' }), p7 = w7.player; p7.ledger.cash += 400e6 * 100; p7.ledger.equityContrib += 400e6 * 100;
-  const ai7 = w7.list.find((a) => a.archetype && a.status !== 'insolvent'), n7 = ai7.fleet.length;
-  const t7 = SMx.applyAction(w7, p7.id, { type: 'takeover', target: ai7.id }); assert.equal(t7.ok, true, 'Übernahme im freien Spiel: ' + t7.msg);
+  const w7 = SMx.newGame({ seed: 9, base: "HAM" }), p7 = w7.player; p7.ledger.cash += 400e6 * 100; p7.ledger.equityContrib += 400e6 * 100;
+  const ai7 = w7.list.filter((a) => a.archetype && a.status !== 'insolvent').sort((x, y) => SMx.maValue(w7, x, p7).price - SMx.maValue(w7, y, p7).price)[0], n7 = ai7.fleet.length;
+  const t7 = SMx.applyAction(w7, p7.id, { type: 'takeover', target: ai7.id }); assert.equal(t7.ok, true, 'Übernahme mit Aufschlag: ' + t7.msg);
   assert.equal(p7.fleet.length, n7, 'Flotte übernommen'); assert.ok(Math.abs(SMx.balanceSheet(p7).check) < 1, 'Bilanz nach Übernahme');
   for (let i = 0; i < 5; i++) w7.step();
   const rt = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w6)))); assert.equal(rt.mode, 'career'); assert.ok(rt.player.prog && rt.player.pixLogo && rt.player.mk, 'Speichern/Laden 0.16');
-  console.log('0.16 ok: Karriere, Risikoaufschlag, Marktwissen + Studie, 4x/Woche, Slots als Vermögen, Basislimit, Übernahme (' + t7.fleet + ' Flugzeuge), Pixel-Logo'); }
+  console.log('0.16 ok: Phasen immer aktiv, Risikoaufschlag, Wachstumsaufschlag, keine drei 787 zum Start, Marktwissen + Studie, 4x/Woche, Slots als Vermögen, Basis mit Aufschlag, Übernahme (' + t7.fleet + ' Flugzeuge), Pixel-Logo'); }
 console.log('Alle Prüfungen bestanden.');

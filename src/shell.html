@@ -379,6 +379,15 @@ table.t td b { white-space: nowrap; }
 .phases .ph.cur span { color: var(--ink); font-weight: 600; }
 .pchecks { display: grid; gap: 6px; align-content: start; }
 .career .card { align-content: start; }
+.grid2 > .card.stack { align-content: start; }
+.stk-kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; font-size: 12.5px; }
+.stk-kv span { display: grid; gap: 2px; } .stk-kv em { font-style: normal; font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.stk-list { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.stk-row { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.stk-val { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.stk-val span { display: grid; text-align: right; } .stk-val em { font-style: normal; font-size: 11px; }
+.stk-act { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 640px) { .stk-row { grid-template-columns: minmax(0, 1fr) auto; } .stk-act { grid-column: 1 / -1; justify-content: flex-start; } .stk-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .pchecks .pc { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 8px; align-items: center; font-size: 12px; }
 .pchecks .pc b { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pchecks .pc.ok span { color: var(--good); }

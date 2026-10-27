@@ -385,6 +385,27 @@ export async function handle(req, { store }) {
           if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
           return json({ ok: true, msg: cmd === 'grant' ? 'Kapital gebucht.' : 'Ereignis annulliert.', ver: r.etag });
         }
+        if (cmd === 'resetWorld') {
+          if (meta.main && !isAdmin(user)) return fail(403, 'Die Hauptwelt kann nur der Admin neu starten.');
+          const keep = body.keep !== false, now = Date.now();
+          const cur = await store.getWithMetadata(K.state(id), { type: 'arrayBuffer' });
+          const md0 = (cur && cur.metadata) || {};
+          const w = SM.newWorld({ difficulty: meta.difficulty || 'normal', rivals: SM.RIVALS[body.rivals] ? body.rivals : 'normal', seed: randomBytes(4).readUInt32LE(0) });
+          const players = [];
+          if (keep) for (const p of meta.players) {
+            try { const h = SM.addHuman(w, { name: p.airlineName, code: p.code, base: p.base, owner: p.u }); players.push({ ...p, airlineId: h.id, joined: now }); }
+            catch (e) { /* Basis ungültig: Person muss neu beitreten */ }
+          }
+          w.playerId = meta.main ? null : ((players.find((p) => p.u === meta.host) || players[0] || {}).airlineId || null);
+          w.pushNews(0, `Neustart der Welt durch die Spielleitung${keep ? ' – alle Airlines beginnen von vorn' : ''}`, 'warn', null);
+          await store.set(K.state(id), packSized(w), { metadata: { speed: md0.speed || 'm30', lastTick: now, carry: 0, day: 0, ver: (md0.ver || 0) + 1 } });
+          const dropped = meta.players.filter((p) => !players.some((x) => x.u === p.u));
+          const next = await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.players = players; m.resetAt = now; return m; });
+          for (const p of dropped) await updateJson(store, K.user(p.u), (u) => { if (!u) return undefined; u.games = (u.games || []).filter((g) => g !== id); return u; });
+          await indexUpsert(store, next);
+          console.log(`${user.key} hat ${meta.id} neu gestartet (${keep ? 'mit' : 'ohne'} Airlines).`);
+          return json({ ok: true, msg: keep ? `Welt neu gestartet – ${players.length} Airlines beginnen von vorn.` : 'Welt neu gestartet – alle müssen neu beitreten.' });
+        }
         return fail(400, 'Unbekannter Befehl.');
       }
       const me = memberOf(meta, user) || (op === 'control' && meta.main && isAdmin(user) ? { u: user.key, airlineId: null } : null);

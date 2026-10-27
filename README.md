@@ -109,6 +109,7 @@ Der Benutzer **Tim** (Groß-/Kleinschreibung egal) ist Admin. In der Lobby sieht
 - **Airline entfernen** – sofort: Strecken enden, Leasingflugzeuge gehen an die Leasinggeber zurück, Slots, Gates, Handelsangebote, Kooperationen und Gebote verfallen. Die Person kann neu beitreten – außer mit **„Entfernen + sperren“**. Gesperrte stehen in einer Liste mit „Sperre aufheben“.
 - **Ereignisse annullieren** – in der Liste aller laufenden und angekündigten Ereignisse oder direkt an der Meldung („Annullieren“, nur für Admins sichtbar, mit Rückfrage). Angekündigte fallen aus, laufende enden sofort; Ticketsteuer, Entgelte, CO₂-Abgabe, Leitzins, Wechselkurs und Kerosinsprung werden zurückgenommen, Zölle neu berechnet, die Konjunktur nach einer Rezession entsprechend angehoben. Alle sehen eine Meldung „Spielleitung annulliert: …“.
 - **Kapital buchen** – ± bis 100 Mio. € je Airline, z. B. um einen Fehler auszugleichen (als Eigenkapitalbewegung).
+- **Welt neu starten** – Tag 1, neue Weltlage und Konkurrenz. Mit „Alle Mitspielenden behalten“ beginnen alle Airlines mit Name, Kürzel und Basis von vorn, sonst müssen alle neu beitreten. Die Hauptwelt kann nur der Admin neu starten.
 - In privaten Spielen kann auch die **Spielleitung** (wer das Spiel angelegt hat) Airlines entfernen, sperren, Ereignisse annullieren und Kapital buchen.
 
 - **Wichtig:** Das Konto „Tim“ gleich nach dem Deploy registrieren. Wer den Namen zuerst anlegt, hat die Rechte.
@@ -179,7 +180,7 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
-## Neu in 0.16: Spielphasen, Marktwissen, teure Großflughäfen, Wettbewerb, Übernahmen, Pixel-Logo
+## Neu in 0.16: Spielphasen, Marktwissen, teure Großflughäfen, Wettbewerb, Kapitalmarkt und Übernahmen, mehr Abwerben, Pixel-Logo
 
 **Strategischer Start – überall möglich, aber nicht überall bezahlbar**
 - Gründen geht an jedem Flughafen. Große Flughäfen kosten aber ein Vermögen: **Betriebslizenz** beim Gründen und beim ersten Flug zu jedem neuen Flughafen (Bremen 23 Tsd. €, Hannover 67 Tsd. €, Hamburg 197 Tsd. €, Frankfurt 953 Tsd. €, London-Heathrow 1,3 Mio. €), **Basiskosten nach Größe** (Bremen rund 13 Tsd. € im Monat, Frankfurt 98 Tsd. €), Einrichtung einer weiteren Basis 204 Tsd. € (Bremen) bis 1,2 Mio. € (Heathrow).
@@ -187,12 +188,15 @@ Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, ink
 - **Regionalstrecken tragen höhere Preise**: Auf dünnen Strecken ab kleinen Flughäfen (ohne Billigflieger-Druck) liegt der Marktpreis bis zu 60 % höher (Bremen–Berlin 100 € statt 68 €).
 - **Dash 8 als günstiger Einstieg**: Leasing 120 Tsd. € im Monat (vorher 175 Tsd.), Turboprop-Piloten etwas günstiger, Verwaltung wächst mit der Flotte (1 Flugzeug rund 60 Tsd. € im Monat statt 180 Tsd.), Verwaltung je Flugzeug nach Größe (Dash 8 rund 600 €/Tag, A380 1.440 €/Tag). Ergebnis im Test: Eine Dash 8 mit drei guten Strecken ab einem Regionalflughafen trägt sich; mit sauberen Preisen wächst das Eigenkapital um 200–300 Tsd. € im Monat.
 
-**Fünf Spielphasen (Karriere)**
-- Gründung → Regionalairline (5 Flugzeuge, 3 Monate, 1 Gewinnmonat) → Netzwerk-Airline (12 Flugzeuge, 9 Monate, 3 Gewinnmonate, 8 Strecken, Eigenkapital auf Startniveau) → Interkontinental (25 Flugzeuge, 18 Monate, 6 Gewinnmonate, 1,25 × Startkapital, 1 Mio. Fluggäste) → Global Player (50 Flugzeuge, 30 Monate, 12 Gewinnmonate, 2 × Startkapital, 5 Mio. Fluggäste).
-- **Jede Phase schaltet frei**: mehr Basen (1 → 2 → 4 → 6 → beliebig), Drehkreuz-Stufen (Umsteigeknoten ab Phase 2, Mega-Hub ab Phase 4), mehr neue Flugzeuge je 30 Tage (2 → 3 → 5 → 8 → frei), Übernahmen ab Phase 3.
-- **Große Flugzeuge am Anfang sehr teuer**: Leasinggeber und Banken verlangen von jungen Airlines Risikoaufschläge. In der Gründungsphase: Dash 8 normal, Regionaljets +25 % Rate und 3 Monatsraten Kaution, A320 & Co. +50 % und 4 Raten, Langstrecke +85 % und 6 Raten, A380/747/Concorde +130 % und 8 Raten (Eigenanteil beim Kauf 20–70 %). Mit jeder Phase werden die Konditionen besser.
-- Neuer Reiter **Unternehmen → Ziele & Phasen** mit Fortschrittsbalken, Freischaltungen und Konditionstabelle; Phase auch im Dashboard.
-- Beim Gründen wählbar: **Karriere** (empfohlen) oder **Freies Spiel** (alles sofort zu normalen Konditionen). Die Hauptwelt läuft als Karriere; bestehende Airlines spielen ohne Phasen weiter, neue und neu gestartete Airlines beginnen in Phase 1.
+**Fünf Spielphasen – keine Einstellung, keine Verbote, sondern Preise und Risiko**
+- Jede Airline durchläuft die Phasen: Gründung → Regionalairline (5 Flugzeuge, 3 Monate, 1 Gewinnmonat) → Netzwerk-Airline (12 Flugzeuge, 9 Monate, 3 Gewinnmonate, 8 Strecken, Eigenkapital auf Startniveau) → Interkontinental (25 Flugzeuge, 18 Monate, 6 Gewinnmonate, 1,25 × Startkapital, 1 Mio. Fluggäste) → Global Player (50 Flugzeuge, 30 Monate, 12 Gewinnmonate, 2 × Startkapital, 5 Mio. Fluggäste).
+- **Alles ist von Anfang an erlaubt – nur am Anfang teuer und riskant**:
+  - Leasinggeber und Banken verlangen von jungen Airlines Risikoaufschläge. In der Gründungsphase: Dash 8 normal, Regionaljets +25 % Rate und 3 Monatsraten Kaution, A320 & Co. +50 % und 4 Raten, Langstrecke +85 % und 6 Raten, A380/747/Concorde +130 % und 8 Raten (Eigenanteil beim Kauf 20–70 %).
+  - Wer schneller wächst, als die Phase hergibt, zahlt drauf: jedes weitere Flugzeug in 30 Tagen (über 2/3/5/8 je Phase) +12 % Rate und eine Monatsrate mehr Kaution; jede Basis über der Phase doppelte Einrichtung und +50 % laufende Basiskosten; Drehkreuz-Ausbau über der Phase doppelt so teuer; Übernahmen vor Phase 3 +50 % Kaufpreis.
+  - **Langstrecke ist für Neulinge riskant**: Im ersten Jahr buchen Reisende eine unbekannte Airline auf Langstrecken nur zögerlich (London–New York zum Marktpreis: rund 24 % Auslastung statt 58 %).
+  - Beispiel: Wer in London startet, bekommt mit 16 Mio. € Startkapital genau eine 787 (Kaution und erste Raten fast 12 Mio. €); für London–New York fehlen dann noch Slots für 7,4 Mio. € und die Lizenz in New York.
+- Mit jeder Phase werden die Konditionen normal. Fortschritt, Konditionen und Aufschläge zeigt **Unternehmen → Ziele & Phasen**, die Phase steht auch im Dashboard.
+- Bestehende Airlines (ältere Spielstände, Hauptwelt) bekommen beim Laden automatisch die Phase, die ihrer heutigen Größe entspricht.
 
 **Marktwissen – Prognosen sind nicht mehr geschenkt**
 - Jede Verbindung hat einen **festen, unbekannten Schätzfehler**. Ohne Marktdaten liegt die Prognose bis etwa Faktor 2,5 daneben (± 79 %), wer beide Flughäfen selbst anfliegt, schätzt grob (± 48 %). Neu rechnen hilft nicht – nur besseres Wissen.
@@ -223,8 +227,25 @@ Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, ink
 **Hedging repariert**
 - Absicherung als echter Swap auf eine feste Menge: täglich abgerechnet, steigt Kerosin, bekommen Sie Geld, fällt es, zahlen Sie. Vorzeitiges Beenden kostet den Marktwert der Restlaufzeit (vorher war die Absicherung eine Gratis-Option).
 
+**Kapitalmarkt und Übernahmen Schritt für Schritt (neuer Reiter Markt → Börse)**
+- **Jede Airline hat einen Börsenwert**: Eigenkapital + 5 × Jahresergebnis (mindestens 60 % des Eigenkapitals), dazu die Marktstimmung, die jeden Monat schwankt. Kursverlauf über 24 Monate.
+- **Anteile an anderen Airlines kaufen und verkaufen** (KI-Airlines und Mitspielende, soweit deren Aktien frei sind). Je mehr Sie schon halten, desto teurer wird jedes weitere Prozent; große Verkäufe drücken den Preis.
+- **Anteiliger Gewinn (Equity-Methode)**: Ihr Anteil am Monatsergebnis der Beteiligung landet jeden Monat in Ihrem Ergebnis (neue Zeile „Beteiligungen“, steuerfrei) und im Buchwert; Dividenden kommen als Geld.
+- **Stufen**: ab 25 % Sperrminorität (die KI-Airline greift Ihre Strecken nicht mehr an), ab 50 % Mehrheit (Konzernallianz mit gemeinsamem Einkauf und Codeshare), dann **Übernahmeangebot für den Rest** zum Börsenwert × 1,3. Ohne Mehrheit ist die Komplettübernahme feindlich und kostet × 1,5. Andere Aktionäre bekommen ihren Anteil am Angebot.
+- **Eigene Aktien verkaufen (Kapitalerhöhung)**: 5, 10 oder 20 % neue Aktien bringen frisches Geld, höchstens 49 % außerhalb Ihrer Hand (Sie behalten die Mehrheit), höchstens alle 90 Tage. Junge Airlines müssen mit Abschlag verkaufen (Phase 1: 35 %, später 10 %). Aktionäre außerhalb bekommen Dividenden (0, 25 oder 50 % vom Monatsgewinn, einstellbar). **Aktienrückkauf** aus dem Streubesitz.
+- **Anleihen**: 1–50 Mio. € für 3, 5 oder 7 Jahre, Zins nach Rating (A 1,5 % bis B 6,5 % über dem Leitzins), Rückzahlung am Ende in einer Summe, höchstens so viel wie das Eigenkapital; vorzeitig mit 2 % Aufgeld.
+- Gehört eine Airline nicht mehr zum Markt (Insolvenz, Neustart, entfernt), werden Beteiligungen daran abgeschrieben.
+
+**Mehr Abwerben**
+- **Personal**: bis zu 60 Personen je Versuch (vorher 20), Wechselprämie bis 80.000 €. Wartezeit gilt nur noch je Berufsgruppe und Airline (21 Tage) – Piloten, Kabine und Technik lassen sich gleichzeitig umwerben. KI-Airlines haben jetzt Personal passend zu ihrer Flottengröße.
+- **Fachkräfte auch bei KI-Airlines**: Jede KI-Airline hat zwei bis drei Spezialistinnen und Spezialisten passend zum Geschäftsmodell (z. B. Revenue Management bei Premium-Airlines, Einkauf bei Billigfliegern).
+- **Firmenkunden abwerben**: Vertriebsoffensive an einem Flughafen gegen eine bestimmte Airline (drei Budgetstufen). Erfolg hängt von Budget, Marke, Flügen ab dem Flughafen und einem Drehkreuz dort ab. Bei Erfolg buchen Geschäftsreisende dort ein halbes Jahr lieber bei Ihnen – bei Mitspielenden entsprechend seltener.
+
 **Übernahmen (M&A)**
-- KI-Airlines komplett kaufen (Markt → Wettbewerb → Übernahmen): Flotte samt Leasing und Krediten, Strecken samt Slots, Basen, Personal, Kasse und Bankschulden. Preis = (Eigenkapital + 4 × Jahresgewinn) × 1,3. Die Prämie über dem Buchwert wird sofort abgeschrieben. In der Karriere ab Phase 3.
+- Komplettübernahme (Markt → Wettbewerb → Übernahmen oder direkt an der Börse): Flotte samt Leasing und Krediten, Strecken samt Slots, Basen, Personal, Kasse und Bankschulden. Die Prämie über dem Buchwert wird sofort abgeschrieben. Vor Phase 3 kostet eine Übernahme 50 % mehr.
+
+**Admin: Welt neu starten**
+- In der Verwaltung kann der Admin die Hauptwelt neu starten (in privaten Spielen die Spielleitung ihr Spiel): neue Weltlage, neue Konkurrenz, Tag 1. Wahlweise behalten alle Mitspielenden Name, Kürzel und Basis und beginnen mit frischem Startkapital – oder alle müssen neu beitreten.
 
 **Pixel-Logo**
 - Unter Profil & Logo: eigenes Logo auf 64 × 64 Pixeln zeichnen (Stift, Füllen, Radierer, Pipette, 15 Farben). Es ersetzt überall das gestaltete Logo; exakt dasselbe Bild gibt es pro Welt nur einmal.
