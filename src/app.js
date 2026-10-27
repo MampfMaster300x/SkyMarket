@@ -4682,6 +4682,8 @@ async function showAdmin(id, onBack) {
     <section class="stack"><h3>Airlines</h3><div class="adm-list">${d.players.map(pRow).join('') || '<p class="small muted">Niemand spielt mit.</p>'}</div>
       <p class="small muted">„Entfernen“ beendet die Airline sofort: Strecken enden, Leasingflugzeuge gehen zurück, Slots, Gates und offene Angebote verfallen. Die Person kann danach neu beitreten – außer mit „sperren“. Kapital buchen: positiver Betrag schießt zu, negativer zieht ab (z. B. zum Ausgleich eines Fehlers).</p></section>
     ${d.banned.length ? `<section class="stack"><h3>Gesperrt</h3><div class="adm-list">${d.banned.map((b) => `<div class="adm-p"><div><b>${esc(b.name)}</b> <span class="small muted">zuletzt ${esc(b.airlineName || '')} · seit ${new Date(b.at).toLocaleDateString('de-DE')}</span></div><button class="btn small" data-adm="unban" data-u="${esc(b.u)}">Sperre aufheben</button></div>`).join('')}</div></section>` : ''}
+    ${d.canSpeed ? `<section class="stack"><h3>Tempo</h3><div class="seg wrap">${Object.entries(SM.SPEEDS).filter(([, v]) => !v.local).map(([k, v]) => `<button data-adm="speed" data-v="${k}" aria-pressed="${k === d.speed}">${esc(v.label)}</button>`).join('')}</div>
+      <p class="small muted">Gilt sofort für alle in ${d.main ? 'der Hauptwelt' : 'diesem Spiel'}; die Uhr rechnet die angefangene Zeit um. Alle sehen eine Meldung.</p></section>` : ''}
     <section class="stack"><h3>Welt neu starten</h3><div class="callout warn stack"><span class="small">Startet ${d.main ? 'die Hauptwelt' : 'dieses Spiel'} bei Tag 1 mit neuer Weltlage und neuer Konkurrenz. Alle Airlines, Flotten, Strecken und Kassen verfallen.</span>
       <label class="chk small"><input type="checkbox" id="adm-keep" checked> Alle Mitspielenden behalten – sie beginnen mit Name, Kürzel und Basis wie bisher und frischem Startkapital</label>
       <div class="row"><button class="btn small danger" data-adm="reset">Welt neu starten</button></div></div></section>
@@ -4691,6 +4693,7 @@ async function showAdmin(id, onBack) {
     const b = e.target.closest('[data-adm]'); if (!b) return;
     const cmd = b.dataset.adm;
     if (cmd === 'close') { m.onclick = null; onBack(); return; }
+    if (cmd === 'speed') { try { await api(`/games/${id}/control`, { body: { speed: b.dataset.v, tz: new Date().getTimezoneOffset() } }); toast(`Tempo: ${SM.SPEEDS[b.dataset.v].label}`); if (ui.mp && ui.mp.id === id) await mpPoll(true); } catch (err) { toast(err.message); } showAdmin(id, onBack); return; }
     if (cmd === 'reset' && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Wirklich alles neu starten? Noch einmal klicken.'; return; }
     if (cmd === 'reset') { b.disabled = true; try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'resetWorld', keep: !!(m.querySelector('#adm-keep') || {}).checked } }); toast(r.msg || 'Neu gestartet.'); if (ui.mp && ui.mp.id === id) { ui.mpLastDay = null; await mpPoll(true); } } catch (err) { toast(err.message); } showAdmin(id, onBack); return; }
     if ((cmd === 'kick' || cmd === 'cancel') && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = cmd === 'kick' ? (b.dataset.ban ? 'Wirklich entfernen und sperren?' : 'Wirklich entfernen?') : 'Wirklich annullieren?'; b.classList.add('danger'); return; }

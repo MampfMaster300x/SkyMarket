@@ -177,7 +177,7 @@ export async function tickMain(store) {
   }
   return { ok: true, days };
 }
-const canControl = (meta, user) => meta.host === user.key || (meta.main && isAdmin(user));
+const canControl = (meta, user) => meta.host === user.key || isAdmin(user);
 /** Verwaltung eines Spiels: Admins überall, in privaten Spielen auch die Spielleitung. */
 const canManage = (meta, user) => isAdmin(user) || (!meta.main && meta.host === user.key);
 const activeHumans = (w) => w.humans.filter((h) => !h.removed).length;
@@ -347,7 +347,7 @@ export async function handle(req, { store }) {
         const w = r.w || unpackWorld(r.buf);
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
         const now = Date.now();
-        return json({ id, name: meta.name, main: !!meta.main, day: w.day,
+        return json({ id, name: meta.name, main: !!meta.main, day: w.day, speed: SM.speedKey(r.md.speed), canSpeed: canControl(meta, user),
           players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
             return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
               status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null }; }),
@@ -408,7 +408,7 @@ export async function handle(req, { store }) {
         }
         return fail(400, 'Unbekannter Befehl.');
       }
-      const me = memberOf(meta, user) || (op === 'control' && meta.main && isAdmin(user) ? { u: user.key, airlineId: null } : null);
+      const me = memberOf(meta, user) || (op === 'control' && isAdmin(user) ? { u: user.key, airlineId: null } : null);
       if (!me) return fail(403, 'Sie sind in diesem Spiel nicht angemeldet.');
 
       if (op === 'info' && method === 'GET') {

@@ -251,6 +251,13 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   ok(await call('anna', 'POST', `/games/${g.id}/admin`, { cmd: 'kick', airlineId: cl.airlineId }), 'Spielleitung entfernt Cleo');
   assert.equal((await call('ben', 'POST', `/games/${g.id}/admin`, { cmd: 'kick', airlineId: gi.players.find((p) => p.u === 'anna').airlineId })).status, 403, 'Mitspieler darf nicht verwalten');
   console.log('Verwaltung ok: entfernen + sperren, entsperren, Neubeitritt,', ev ? 'Ereignis „' + ev.type + '“ annulliert,' : 'kein Ereignis offen,', 'Kapital +5 Mio., Spielleitung privat'); }
+// Tempo der Hauptwelt durch den Admin (auch ohne eigene Airline), nicht durch andere
+{ const ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung Tempo'); assert.ok(ad.canSpeed && ad.speed, 'Tempo sichtbar');
+  ok(await call('tim', 'POST', '/games/main/control', { speed: 'm10' }), 'Tim stellt Tempo');
+  assert.equal(ok(await call('tim', 'GET', '/games/main/admin'), 'nach Tempo').speed, 'm10', 'Tempo übernommen');
+  assert.equal((await call('ben', 'POST', '/games/main/control', { speed: 'h1' })).status, 403, 'Tempo nur Admin');
+  ok(await call('tim', 'POST', '/games/main/control', { speed: 'm30' }), 'Tempo zurück');
+  console.log('Tempo ok: Tim stellt die Hauptwelt um, andere nicht'); }
 // Neustart der Hauptwelt nur durch den Admin
 { const before = ok(await call('tim', 'GET', '/games/main/admin'), 'vor Neustart');
   assert.equal((await call('ben', 'POST', '/games/main/admin', { cmd: 'resetWorld', keep: true })).status, 403, 'Neustart nur Admin');
