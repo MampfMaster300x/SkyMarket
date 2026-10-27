@@ -644,7 +644,7 @@ const SECTIONS = [
   { key: 'karte', label: 'Karte', sub: 'Live-Lage und Überblick', icon: 'globe', tabs: [['dashboard', 'Dashboard'], ['strategy', 'Strategie'], ['history', 'Verlauf'], ['cockpit', 'Übersicht'], ['departures', 'Abflüge'], ['news', 'Meldungen']] },
   { key: 'flotte', label: 'Flotte', sub: 'Jedes Flugzeug zählt', icon: 'plane', tabs: [['fleetOwn', 'Ihre Flotte'], ['fleetPlan', 'Einsatzplan'], ['fleetBuy', 'Beschaffung'], ['fleetAcmi', 'Charter']] },
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung']] },
-  { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['cfo', 'CFO-Beratung']] },
+  { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['rescue', 'Sanierung'], ['cfo', 'CFO-Beratung']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['exchange', 'Börse'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
   { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Ziele & Phasen'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
 ];
@@ -910,7 +910,7 @@ VIEWS.cockpit = function viewCockpit() {
   }
   const warns = pl.events.filter((e) => (e.kind === 'warn' || e.kind === 'crit') && e.day >= W.day - 10).slice(-3).reverse();
   for (const e of warns) html += `<div class="callout ${e.kind}"><b>${dateShort(e.day)}</b>${esc(e.msg)}</div>`;
-  if (pl.status === 'restructuring') html += `<div class="callout crit"><b>Restrukturierung läuft</b>Ohne positiven Kontostand innerhalb von ${P.INSOLVENCY_AFTER_DAYS - pl.distressDays} Tagen folgt die Insolvenz. Verlustbringer schließen, Flugzeuge abgeben oder einen Kredit aufnehmen.</div>`;
+  if (pl.status === 'restructuring') html += `<div class="callout crit"><b>Restrukturierung läuft</b>Ohne positiven Kontostand innerhalb von ${P.RESTRUCT.humanDays - pl.distressDays} Tagen folgt die Insolvenz. <button class="btn small" data-act="tab" data-tab="rescue">Sanierung öffnen</button></div>`;
   const stg = pl.stage(), next = P.STAGES.find((s) => s.min > pl.fleet.length);
   html += `<div class="tiles">
     <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>Dispo bis ${eur(-pl.creditLimit(W.macro.bank ?? 1))} · frei ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
@@ -1293,7 +1293,7 @@ function kitHtml(p, x) {
   const opts = [];
   const rk = SM.riskTerms(pl, p.type);
   if (leaseOk) opts.push(['lease', `${n > 1 ? n + ' × ' : ''}${tl(p.type)} leasen`, `${eur(t.lease_month * rk.lease * cpi())}/Monat${(rk.gap || rk.conc) ? ` (inkl. ${pct(rk.lease - 1)} Risikoaufschlag${rk.conc ? ', weil Sie gerade schnell wachsen' : ' für junge Airlines'})` : ''}, Kaution ${eur(acquireCost(p.type, 'lease') * n)}, Lieferung in ${SM.leaseDelivery(W, p.type, 'lease')} Tagen`]);
-  for (const o of used) opts.push(['used:' + o.id, `Gebraucht: ${o.age} Jahre, ${o.kind === 'lease' ? eur(o.lease_month * pl.oldAcFactor(o.age)) + '/Monat' : 'Kauf ' + eur(o.price * pl.oldAcFactor(o.age))}`, `sofort ${eur(acquireCost(o.type, o.kind === 'lease' ? 'lease' : 'buy', o))}, Lieferung in ${o.delivery} Tagen${pl.oldAcExpert() ? ' · Zustand ' + condWord(o.cond || 1) : ''}`]);
+  for (const o of used) opts.push(['used:' + o.id, `Gebraucht${o.from ? ' (Insolvenzmasse ' + o.from + ')' : ''}: ${o.age} Jahre, ${o.kind === 'lease' ? eur(o.lease_month * pl.oldAcFactor(o.age)) + '/Monat' : 'Kauf ' + eur(o.price * pl.oldAcFactor(o.age))}`, `sofort ${eur(acquireCost(o.type, o.kind === 'lease' ? 'lease' : 'buy', o))}, Lieferung in ${o.delivery} Tagen${pl.oldAcExpert() ? ' · Zustand ' + condWord(o.cond || 1) : ''}`]);
   opts.push(['none', 'Ohne Flugzeug anlegen', 'Die Strecke startet, sobald ein passendes Flugzeug frei ist']);
   if (!opts.some((o) => o[0] === p.acq)) p.acq = n ? opts[0][0] : 'none';
   if (!n) p.acq = 'none';
@@ -1479,7 +1479,7 @@ VIEWS.fleetBuy = function viewFleetBuy() {
   if (pl.bases.length > 1) html += `<label class="f"><span>Stationieren in</span><select id="acq-base">${pl.bases.map((b) => `<option ${b === base ? 'selected' : ''}>${b}</option>`).join('')}</select></label>`;
   const btn = (id, mode, label, offer = null, primary = false) => { const need = acquireCost(id, mode, offer); const ok = cash >= need; return `<button class="btn small${primary ? ' primary' : ''}" data-act="acquire" data-type="${id}" data-mode="${mode}"${offer ? ` data-offer="${offer.id}"` : ''} ${ok ? '' : 'disabled'} title="${ok ? `sofort ${eur(need)}${need > pl.ledger.cash / 100 ? ' – geht in den Dispo' : ''}` : 'Auch mit Dispo fehlen ' + eur(need - cash)}">${label}</button>`; };
   html += `<div class="stack"><h2 class="sec">Gebrauchtmarkt <small>wechselt monatlich</small></h2><div class="tw"><table class="t"><thead><tr><th>Typ</th><th class="r">Alter · Zustand</th><th class="r">Konditionen</th><th></th></tr></thead><tbody>
-    ${W.acMarket.slice().sort((a, b) => a.type.localeCompare(b.type) || a.age - b.age).map((o) => `<tr><td><b>${tlx(o.type)}</b><div class="small muted">Angebot bis ${dateShort(o.expires)} · Lieferung ${o.delivery} T.</div></td><td style="text-align:right"><span class="mono">${o.age} J.</span><div>${condInfo(o)}</div></td>
+    ${W.acMarket.slice().sort((a, b) => a.type.localeCompare(b.type) || a.age - b.age).map((o) => `<tr><td><b>${tlx(o.type)}</b>${o.from ? ` <span class="chip warn" title="Aus einer Insolvenz – deutlich unter Marktpreis">aus der Insolvenz von ${esc(o.from)}</span>` : ''}<div class="small muted">Angebot bis ${dateShort(o.expires)} · Lieferung ${o.delivery} T.</div></td><td style="text-align:right"><span class="mono">${o.age} J.</span><div>${condInfo(o)}</div></td>
       <td style="text-align:right">${(() => { const f = pl.oldAcFactor(o.age), v = o.kind === 'lease' ? o.lease_month : o.price; return `<b class="mono">${eur(v * f)}${o.kind === 'lease' ? '/Mon.' : ''}</b><div class="small muted">${o.kind === 'lease' ? 'Leasing 36 M.' : 'Kauf'}${f < 1 ? ` · <span class="pos" title="statt ${eur(v)}">Luis −10 %</span>` : ''}</div>`; })()}</td>
       <td class="r">${btn(o.type, o.kind === 'lease' ? 'lease' : 'buy', o.kind === 'lease' ? 'Leasen' : 'Kaufen', o)}</td></tr>`).join('')}
   </tbody></table></div><p class="small muted">Leasingraten sind in US-Dollar vereinbart: Fällt der Euro, wird das Leasing teurer. Der Zustand gebrauchter Flugzeuge ist verborgen: Verbrauchte Maschinen verhalten sich wie deutlich ältere. ${pl.oldAcExpert() ? 'Luis Perez begutachtet jedes Angebot ab 8 Jahren.' : 'Ein Gutachter wie Luis Perez (Unternehmen → Personal) sieht ihn genau, Ihre Technik ab Senior grob.'}</p></div>`;
@@ -2361,6 +2361,51 @@ VIEWS.rivals = function viewRivals() {
   return html;
 };
 const clampPct = (x) => Math.max(0, Math.min(100, x * 100)).toFixed(0);
+// ---------- Sanierung: alle Hebel in der Krise ----------
+VIEWS.rescue = function viewRescue() {
+  const pl = W.player, R = P.RESTRUCT, o = SM.rescueOptions(W, pl), bs = SM.balanceSheet(pl), crisis = pl.status === 'restructuring', tight = crisis || o.cash < 0 || (pl.runway ?? Infinity) < 60;
+  let html = `<h2 class="sec">Sanierung <small>${crisis ? 'Restrukturierung läuft' : tight ? 'Liquidität knapp' : 'für den Notfall'}</small></h2>`;
+  html += crisis ? `<div class="callout crit"><b>Noch ${o.daysLeft} Tage bis zur Insolvenz</b>Der Kontostand steht ${eur(o.cash)} – ${o.cash < 0 ? `es fehlen ${eur(-o.cash)}, damit die Uhr stoppt.` : 'positiv halten, dann endet die Restrukturierung.'} Kreditlinie ${eur(o.credit)} von ${eur(o.limit)} genutzt.</div>`
+    : `<p class="small ink2">Hier liegen alle Hebel, um Geld zu beschaffen – vorbeugend oder in der Krise. Rutscht das Konto über die Kreditlinie hinaus ins Minus, beginnt nach ${P.RESTRUCTURING_AFTER_DAYS} Tagen die Restrukturierung; nach ${R.humanDays} Tagen im Minus folgt die Insolvenz. Dann wird alles abgewickelt: Flugzeuge gehen billig an den Gebrauchtmarkt, Slots und Gates werden frei, das Personal sucht neue Jobs.</p>`;
+  html += `<div class="tiles"><div class="tile"><span>Kontostand</span><b class="${sgn(o.cash)}">${eur(o.cash)}</b><em>Reichweite ${pl.runway === undefined || !isFinite(pl.runway) ? 'stabil' : n0(pl.runway) + ' Tage'}</em></div>
+    <div class="tile"><span>Eigenkapital</span><b class="${sgn(bs.equity)}">${eur(bs.equity)}</b><em>Rating ${pl.rating}</em></div>
+    <div class="tile"><span>Gestundete Leasingraten</span><b>${pl.defer && pl.defer.owed ? eur(pl.defer.owed) : '–'}</b><em>${pl.defer ? (pl.defer.until > W.day ? `gestundet bis ${dateShort(pl.defer.until)}` : 'wird nachgezahlt') : 'keine Stundung'}</em></div></div>`;
+  // Flugzeuge
+  const ac = o.aircraft;
+  html += `<div class="card pad stack"><h3>Flugzeuge zu Geld machen</h3>${ac.length ? ac.map((a) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b>${esc(acName(a.id))}</b> · ${tl(a.type)} · ${a.owned ? 'Eigentum' : a.flex ? 'Flex-Leasing' : `Leasing ${eur(a.lease)}/Monat`}${a.used ? '' : ' · <span class="warnc">ungenutzt</span>'}</span><span class="row rsbtns" style="gap:6px">${a.owned
+      ? `<button class="btn small" data-act="rsell" data-id="${a.id}">Verkaufen: ${eur(a.sale, { plus: true })}</button><button class="btn small" data-act="rslb" data-id="${a.id}" title="Verkaufen und zurückmieten – das Flugzeug fliegt weiter">Sale & Lease-back: ${eur(a.slb, { plus: true })} · Miete ${eur(a.slbRate)}/Monat</button>`
+      : `<button class="btn small" data-act="rsell" data-id="${a.id}">Zurückgeben: ${eur(a.ret, { plus: true })}</button>`}</span></div>`).join('') : '<p class="small muted">Keine Flugzeuge.</p>'}
+    <p class="small muted">Verkauf: Erlös abzüglich Kredit. Sale & Lease-back: Ein Leasinggeber kauft das Flugzeug zum Marktwert und vermietet es Ihnen zurück – Geld sofort, das Flugzeug fliegt weiter. Rückgabe von Leasingflugzeugen: Kaution zurück minus Strafe${crisis ? ` (in der Restrukturierung nur ${pct(R.returnPenX)} der üblichen Strafe)` : ''}. Strecken ohne Flugzeug fliegen erst wieder, wenn eins frei ist.</p></div>`;
+  // Rechte und Beteiligungen
+  html += `<div class="card pad stack"><h3>Rechte und Beteiligungen verkaufen</h3>
+    ${o.slots.map((x) => `<div class="spread small"><span>${x.n} Slot${x.n > 1 ? 's' : ''} in ${x.apt} (Reserve)</span><button class="btn small" data-act="rslot" data-apt="${x.apt}">${x.buyer ? `an ${esc(x.buyer)}` : 'an den Flughafen'}: +${eur(x.value)}</button></div>`).join('')}
+    ${o.stakes.map((x) => `<div class="spread small"><span>${pct(x.f, 1)} an ${esc(x.name)}</span><button class="btn small" data-act="rstake" data-id="${x.id}">verkaufen: +${eur(x.value)}</button></div>`).join('')}
+    ${o.gates.map((x) => `<div class="spread small"><span>Exklusivvertrag ${x.apt}</span><button class="btn small" data-act="rgate" data-apt="${x.apt}">kündigen: +${eur(x.value)}</button></div>`).join('')}
+    ${!o.slots.length && !o.stakes.length && !o.gates.length ? '<p class="small muted">Keine freien Slots in Reserve, keine Beteiligungen, keine Exklusivverträge. Slots auf laufenden Strecken werden frei, wenn Sie die Strecke einstellen – dann lassen sie sich hier verkaufen.</p>' : ''}
+    <p class="small muted">Slots verkaufen Sie an eine KI-Airline vor Ort (${pct(R.slotAI)} des Marktpreises) oder zurück an den Flughafen (${pct(R.slotPool)}).</p></div>`;
+  // Kapital
+  const iq = SM.issueQuote(W, pl, 0.2), c = SM.capState(pl);
+  html += `<div class="card pad stack"><h3>Kapital und Gläubiger</h3>
+    <div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b>Leasingraten stunden</b> – ${R.defer.days} Tage keine Raten, danach über ${R.defer.repayDays} Tage nachzahlen (+${pct(R.defer.fee)})</span><button class="btn small" data-act="rdefer" ${pl.defer && W.day - pl.defer.day < R.defer.gap ? 'disabled' : ''}>Stundung beantragen</button></div>
+    <div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b>Notkapitalerhöhung</b> – neue Aktien mit ${pct(R.issueDisc)} Abschlag, ohne Sperrfrist${crisis ? '' : ' (nur in der Restrukturierung)'}</span><button class="btn small" data-act="capissue" data-q="${Math.min(0.2, Math.max(0.01, (P.CAPITAL.extMax - c.ext) / Math.max(0.01, 1 - c.ext)))}" ${crisis ? '' : 'disabled'}>bis +${eur(iq.net)}</button></div>
+    <div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b>Schulden gegen Aktien</b> – die Bank wandelt Ihre genutzte Kreditlinie (${eur(o.credit)}) in Aktien, der Rahmen ist danach wieder frei</span><button class="btn small" data-act="rswap" ${crisis && o.credit > 1e5 ? '' : 'disabled'}>wandeln</button></div>
+    <div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b>Sanierungskredit</b> – ein Fonds leiht ${pct(R.rescue.share)} Ihrer Flugzeuge, Slots und Beteiligungen zu ${pct(R.rescue.rate)} Zins, ${R.rescue.years} Jahre</span><button class="btn small" data-act="rloan" ${crisis && !pl.rescueLoan ? '' : 'disabled'}>beantragen</button></div>
+    <p class="small muted">Außerdem: Verlustbringer unter <a href="#" data-act="tab" data-tab="routes">Strecken</a> einstellen, Personal und Gehälter unter <a href="#" data-act="tab" data-tab="staff">Personal</a> anpassen, eine Basis schließen, Marketing kürzen.</p></div>`;
+  return html;
+};
+function onRescueClick(act, b) {
+  if (!['rsell', 'rslb', 'rslot', 'rstake', 'rgate', 'rdefer', 'rswap', 'rloan'].includes(act)) return false;
+  let r = null;
+  if (act === 'rsell') { r = doAction({ type: 'dispose', acId: b.dataset.id }); if (r.ok) toast('Flugzeug abgegeben.'); }
+  else if (act === 'rslb') { r = doAction({ type: 'saleLeaseback', acId: b.dataset.id }); if (r.ok) toast(`Verkauft und zurückgemietet: ${eur(r.value)} Erlös, ${eur(r.lease)}/Monat Miete.`); }
+  else if (act === 'rslot') { r = doAction({ type: 'sellSlots', apt: b.dataset.apt, n: 'all' }); if (r.ok) toast(`Slots verkauft: +${eur(r.back)}.`); }
+  else if (act === 'rstake') { r = doAction({ type: 'sellStake', target: b.dataset.id, q: 1 }); if (r.ok) toast(`Beteiligung verkauft: +${eur(r.proceeds)}.`); }
+  else if (act === 'rgate') { r = doAction({ type: 'gateLock', apt: b.dataset.apt, on: false }); if (r.ok) toast(`Exklusivvertrag gekündigt${r.back ? `: +${eur(r.back)}` : ''}.`); }
+  else if (act === 'rdefer') { r = doAction({ type: 'leaseDefer' }); if (r.ok) toast('Leasingraten gestundet.'); }
+  else if (act === 'rswap') { r = doAction({ type: 'debtSwap' }); if (r.ok) toast(`${eur(r.amount)} Schulden in ${pct(r.q, 1)} Aktien gewandelt.`); }
+  else if (act === 'rloan') { r = doAction({ type: 'rescueLoan' }); if (r.ok) toast(`Sanierungskredit: +${eur(r.amount)}.`); }
+  refreshAll(); return true;
+}
 // ---------- Börse: Aktien, Beteiligungen, Kapitalerhöhung, Rückkauf, Dividende, Anleihen ----------
 const mio = (x) => `${NF1.format((x || 0) / 1e6)} Mio. €`;
 function miniSpark(vals) {
@@ -3382,7 +3427,7 @@ function assistantHints() {
   const bs = SM.balanceSheet(pl);
   for (const d of incomingDeals().slice(0, 2)) add('deal' + d.id, 'info', 'strat', `<b>${esc(W.airlines[d.from].name)}</b> bietet einen Handel an (bis ${dateShort(d.expires)}): ${esc(SM.dealText(W, d))}.`, 'trade');
   for (const d of openDecisions()) add('dec' + d.id, 'crit', 'ops', `<b>Entscheidung bis ${dateShort(d.deadline)}:</b> ${esc(d.text)}`, 'cockpit');
-  if (pl.status === 'restructuring') add('restr', 'crit', 'fin', `<b>Restrukturierung:</b> Noch ${P.INSOLVENCY_AFTER_DAYS - pl.distressDays} Tage, bis der Kontostand wieder positiv sein muss.`, 'credit');
+  if (pl.status === 'restructuring') add('restr', 'crit', 'fin', `<b>Restrukturierung:</b> Noch ${P.RESTRUCT.humanDays - pl.distressDays} Tage, bis der Kontostand wieder positiv sein muss. Unter Finanzen → Sanierung liegen alle Hebel.`, 'credit');
   else if (netCash(pl) < 0 && bs.cash >= 0) add('dispo', 'warn', 'fin', `<b>Konto im Dispo</b> (${eur(netCash(pl))}). Das ist erlaubt, kostet aber ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins – und kürzt die Bank die Linie, wird der Überhang sofort eingezogen.`, 'credit');
   if (bs.cash < 0 && pl.status !== 'restructuring') add('neg', 'crit', 'fin', `<b>Dispo überzogen</b> (${eur(netCash(pl))}). Nach ${P.INSOLVENCY_AFTER_DAYS} Tagen droht die Insolvenz. Kredit aufnehmen oder Verlustbringer schließen.`, 'credit');
   else if (isFinite(pl.runway) && pl.runway < 60 && routes.length) add('runway', 'warn', 'fin', `Das Geld reicht beim jetzigen Abfluss noch etwa <b>${n0(pl.runway)} Tage</b>.`, 'credit');
@@ -3700,6 +3745,7 @@ function onPaneClick(e) {
   if ((act.startsWith('lg') || act.startsWith('pix')) && onLogoClick(act, b)) return;
   if (onHardClick(act, b)) return;
   if (onCapClick(act, b)) return;
+  if (onRescueClick(act, b)) return;
   switch (act) {
     case 'tab': setTab(b.dataset.tab); break;
     case 'invite': showInvite(); break;
@@ -4345,7 +4391,8 @@ function gameOver() {
   const pl = W.player, endDay = (pl.events.find((e) => e.msg === 'Insolvenz') || { day: W.day }).day, worst = pl.routes.map((r) => ({ r, s: rstats(r, 60) })).sort((a, b) => a.s.db2 - b.s.db2).slice(0, 3);
   const m = $('#modal');
   m.innerHTML = `<div class="dialog" role="dialog" aria-modal="true"><h1>Insolvenz</h1>
-    <p>${esc(pl.name)} hat nach ${endDay} Tagen am ${dateLong(endDay)} den Flugbetrieb eingestellt. Die Kreditlinie war ausgeschöpft und der Kontostand blieb ${P.INSOLVENCY_AFTER_DAYS} Tage negativ.</p>
+    <p>${esc(pl.name)} hat nach ${endDay} Tagen am ${dateLong(endDay)} den Flugbetrieb eingestellt. Die Kreditlinie war ausgeschöpft und der Kontostand blieb ${P.RESTRUCT.humanDays} Tage negativ.</p>
+    ${pl.liq ? `<div class="callout info"><b>Abwicklung</b>${[pl.liq.own ? `${pl.liq.own} eigene Flugzeuge gehen mit Abschlag an den Gebrauchtmarkt` : '', pl.liq.lease ? `${pl.liq.lease} Leasingflugzeuge vermieten die Leasinggeber günstig weiter` : '', pl.liq.slots ? `${pl.liq.slots} Slots werden frei` : '', pl.liq.staff ? `${pl.liq.staff} Beschäftigte suchen neue Jobs` : '', pl.liq.experts ? `${pl.liq.experts} Fachkräfte stehen wieder auf dem Markt` : ''].filter(Boolean).join(' · ') || 'Es gab nichts mehr zu verwerten.'}. Andere Airlines – auch Ihre nächste – können sich daran bedienen.</div>` : ''}
     ${worst.length ? `<div class="stack"><h3>Die größten Verlustbringer zuletzt</h3><table class="t"><tbody>${worst.map(({ r, s }) => `<tr><td>${r.base}–${r.dest} ${freqTxt(r)} ${tl(r.type_id)}</td><td class="r">${pct(s.lf)} Auslastung</td><td class="r neg">${eur(s.n ? s.db2 / s.n : 0)} pro Tag</td></tr>`).join('')}</tbody></table></div>` : ''}
     <p class="small muted">Typische Ursachen: zu große Flugzeuge für den Markt, Strecken mit starker Bahnkonkurrenz, ungenutzte Flugzeuge, dauerhaft Agenturpersonal, Preiskampf gegen Low-Cost-Airlines, ungesicherter Ölpreisschock.</p>
     <div class="callout good"><b>Kein Grund aufzuhören.</b> Gründen Sie ${ui.mp ? 'in derselben Welt' : 'in dieser Welt'} eine neue Airline mit frischem Startkapital – Markt und Konkurrenz laufen einfach weiter.</div>

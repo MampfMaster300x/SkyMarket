@@ -181,7 +181,7 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
-## Neu in 0.16: Spielphasen, Marktwissen, teure Großflughäfen, Wettbewerb, Kapitalmarkt und Übernahmen, mehr Abwerben, Pixel-Logo
+## Neu in 0.16: Spielphasen, Marktwissen, teure Großflughäfen, Wettbewerb, Kapitalmarkt und Übernahmen, Sanierung und Insolvenz, mehr Abwerben, Pixel-Logo
 
 **Strategischer Start – überall möglich, aber nicht überall bezahlbar**
 - Gründen geht an jedem Flughafen. Große Flughäfen kosten aber ein Vermögen: **Betriebslizenz** beim Gründen und beim ersten Flug zu jedem neuen Flughafen (Bremen 23 Tsd. €, Hannover 67 Tsd. €, Hamburg 197 Tsd. €, Frankfurt 953 Tsd. €, London-Heathrow 1,3 Mio. €), **Basiskosten nach Größe** (Bremen rund 13 Tsd. € im Monat, Frankfurt 98 Tsd. €), Einrichtung einer weiteren Basis 204 Tsd. € (Bremen) bis 1,2 Mio. € (Heathrow).
@@ -247,6 +247,13 @@ Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, ink
 
 **Admin: Welt neu starten**
 - In der Verwaltung kann der Admin die Hauptwelt neu starten (in privaten Spielen die Spielleitung ihr Spiel): neue Weltlage, neue Konkurrenz, Tag 1. Wahlweise behalten alle Mitspielenden Name, Kürzel und Basis und beginnen mit frischem Startkapital – oder alle müssen neu beitreten.
+
+**Sanierung und Insolvenz (neuer Reiter Finanzen → Sanierung)**
+- **Mehr Zeit für Spielende**: Nach 7 Tagen über der Kreditlinie beginnt die Restrukturierung, die Insolvenz kommt erst nach 45 Tagen im Minus (KI-Airlines: 30). Ihre Strecken werden nicht mehr automatisch geschlossen – Sie entscheiden selbst, was geht. Die Ansicht zeigt den Countdown und wie viel Geld fehlt.
+- **Flugzeuge zu Geld machen**: verkaufen (Erlös abzüglich Kredit), **Sale & Lease-back** (ein Leasinggeber kauft zum Marktwert minus 5 % und vermietet zurück – Geld sofort, das Flugzeug fliegt weiter, Miete etwas über der Marktmiete) oder Leasingflugzeuge zurückgeben (in der Restrukturierung nur halbe Strafe).
+- **Rechte und Beteiligungen verkaufen**: Slots in Reserve an eine KI-Airline vor Ort (80 % des Marktpreises) oder an den Flughafen (50 %), Anteile an anderen Airlines, Exklusivverträge für Gates (40 % des Preises zurück).
+- **Kapital und Gläubiger**: Leasingraten 90 Tage stunden (danach über 180 Tage nachzahlen, +5 %, einmal im Jahr), **Notkapitalerhöhung** mit 55 % Abschlag ohne Sperrfrist, **Schulden gegen Aktien** (die Bank wandelt die genutzte Kreditlinie in Aktien, der Rahmen ist danach wieder frei), **Sanierungskredit** über 25 % der Sicherheiten (Flugzeuge, Slots, Beteiligungen) zu 14 % auf 3 Jahre.
+- **Insolvenz wird abgewickelt – die Reste kommen an den Markt**: Eigene Flugzeuge stehen zu 60 % des Marktwerts im Gebrauchtmarkt („aus der Insolvenz von …“), Leasingflugzeuge gehen mit 15 % Rabatt auf die Rate an neue Mieter. Slots und Gates werden frei, das Personal sucht neue Arbeit (der Arbeitsmarkt entspannt sich), Fachkräfte stehen als Kandidaten bereit, Beteiligungen, Anleihen, Kooperationen und Verträge enden. Das gilt für Mitspielende und KI-Airlines gleichermaßen; das Insolvenzfenster zeigt, was abgewickelt wurde.
 
 **Pixel-Logo**
 - Unter Profil & Logo: eigenes Logo auf 64 × 64 Pixeln zeichnen (Stift, Füllen, Radierer, Pipette, 15 Farben). Es ersetzt überall das gestaltete Logo; exakt dasselbe Bild gibt es pro Welt nur einmal.
@@ -424,7 +431,7 @@ Diese Version ist das Ergebnis einer Prüfung aller Teile: Wirtschaftskern (Zufa
 
 - Ist die Airline insolvent, bietet das Insolvenz-Fenster **„Neue Airline gründen“**: neuer Name, neues Kürzel, neue Heimatbasis, volles Startkapital – in **derselben Welt**, Markt und Konkurrenz laufen weiter. Das gilt in der Hauptwelt, in privaten Runden und im Offline-Spiel.
 - Freiwillig geht es auch: **Unternehmen → Profil & Logo → „Airline aufgeben und neu gründen“** (mit Bestätigung).
-- Die alte Airline wird abgewickelt: Leasingflugzeuge gehen an die Leasinggeber zurück, Strecken, Personal, Slots, offene Angebote, Kooperationen und Auktionsgebote verfallen. Die Assistenz bleibt.
+- Die alte Airline wird abgewickelt: Flugzeuge gehen günstig an den Gebrauchtmarkt, Slots und Gates werden frei, Personal und Fachkräfte wechseln an den Arbeitsmarkt, offene Angebote, Kooperationen und Auktionsgebote verfallen. Die Assistenz bleibt.
 - Frühere Airlines stehen mit Zeitraum, Passagieren und Eigenkapital am Ende im Profil.
 
 ## So funktioniert ein gemeinsames Spiel

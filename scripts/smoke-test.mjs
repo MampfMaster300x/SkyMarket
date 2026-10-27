@@ -287,6 +287,24 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   for (const al of [a1, b1]) assert.ok(Math.abs(SMx.balanceSheet(al).check) < 1, 'Bilanz stimmt ' + al.id);
   const rt2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(wk)))); assert.ok(rt2.airlines.P1.stakes && rt2.airlines.P2.cap && rt2.airlines.P2.bonds, 'Speichern/Laden Kapitalmarkt');
   console.log('Kapitalmarkt ok: 55 % an', tg.name, ', anteiliger Gewinn, Rest übernommen, Kapitalerhöhung', Math.round(iq.net / 1e3), 'Tsd. €, Anleihe, Bilanz stimmt'); }
+// Sanierung und Insolvenz: Werkzeuge in der Krise, Abwicklung an den Markt
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const wr = SMx.newGame({ seed: 5, base: 'HAM' }), pr = wr.player, A = (a) => SMx.applyAction(wr, pr.id, a);
+  A({ type: 'acquire', typeId: 'DH8D', mode: 'buy', base: 'HAM' }); A({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAM' });
+  A({ type: 'openRoute', base: 'HAM', dest: 'CGN', typeId: 'DH8D', freq: 1, fo: 120, fi: 120 }); A({ type: 'fillStaff' });
+  for (let i = 0; i < 30; i++) wr.step();
+  pr.ledger.cash -= 30e6 * 100; pr.ledger.equityContrib -= 30e6 * 100;
+  for (let i = 0; i < 10; i++) wr.step();
+  assert.equal(pr.status, 'restructuring', 'Restrukturierung');
+  const rl = A({ type: 'rescueLoan' }); assert.equal(rl.ok, true, 'Sanierungskredit: ' + rl.msg);
+  const own = pr.fleet.find((a) => a.owned); assert.equal(A({ type: 'saleLeaseback', acId: own.id }).ok, true, 'Sale & Lease-back');
+  assert.equal(A({ type: 'leaseDefer' }).ok, true, 'Stundung');
+  assert.ok(Math.abs(SMx.balanceSheet(pr).check) < 1, 'Bilanz in der Sanierung');
+  const n0m = wr.acMarket.length; pr.ledger.cash -= 100e6 * 100;
+  for (let i = 0; i < 60 && pr.status !== 'insolvent'; i++) wr.step();
+  assert.equal(pr.status, 'insolvent', 'Insolvenz'); assert.ok(pr.liq && pr.fleet.length === 0 && wr.acMarket.length > n0m, 'Masse geht an den Markt');
+  assert.ok(wr.acMarket.some((o) => o.from === pr.name), 'Insolvenzangebote markiert');
+  console.log('Sanierung ok: Sale & Lease-back, Stundung, Sanierungskredit · Insolvenz:', JSON.stringify(pr.liq)); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 // Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
 { const SMx = (await import('../shared/engine.cjs')).default;
