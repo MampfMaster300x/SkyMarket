@@ -167,7 +167,7 @@ assert.equal((await call('anna', 'POST', '/games/main/control', { speed: 'x4' })
 assert.equal((await call('ben', 'POST', '/games/main/action', { action: { type: 'setRivals', key: 'hard' } })).status, 403, 'Konkurrenz nur Admin');
 // offline weiterlaufen: 30 Stunden zurückdatieren, stündlicher Lauf holt nach
 const ms = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' });
-assert.equal(ms.metadata.speed, 'm30', 'Hauptwelt: 30 Min. pro Tag');
+assert.equal(ms.metadata.speed, 'm20', 'Hauptwelt: 20 Min. pro Tag');
 await store.set('games/main/state', ms.data, { metadata: { ...ms.metadata, lastTick: Date.now() - 15 * 3600000 - 1000 }, onlyIfMatch: ms.etag });
 const tk = await tickMain(store);
 assert.ok(tk.days >= 30, 'Tick holt 30 Tage nach: ' + JSON.stringify(tk));
@@ -267,6 +267,32 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const stR = await call('anna', 'GET', '/games/main/state?v=r'), wr = JSON.parse(gunzipSync(Buffer.from(stR.data)).toString());
   assert.ok(wr.airlines.some((a) => a.owner === 'anna'), 'Anna hat wieder eine Airline');
   console.log('Neustart ok:', rs.msg); }
+// Geplanter Start: Anmelden, Logo, Basis ändern – Uhr steht bis zum Termin, dann 1 Tag = 20 Min.
+{ const t0 = Date.now(), startAt = t0 + 2 * 3600e3;
+  const rs = ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'resetWorld', keep: true, startAt, speed: 'm20' }), 'Neustart mit Termin');
+  assert.ok(/Start:/.test(rs.msg), 'Meldung nennt Start');
+  const mn = ok(await call('anna', 'GET', '/main'), 'Lobby'); assert.equal(mn.startAt, startAt, 'Termin in der Lobby'); assert.equal(mn.speed, 'm20', 'Tempo 20 Min.');
+  assert.ok(mn.roster.length >= 2 && mn.roster.every((r) => r.name && r.base), 'Liste der Airlines mit Basis');
+  const act = async (u, a) => ok(await call(u, 'POST', '/games/main/action', { action: a }), 'Aktion ' + a.type);
+  const blocked = await act('anna', { type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAM' }); assert.equal(blocked.ok, false, 'vor dem Start kein Flugzeug'); assert.ok(blocked.waiting, 'Hinweis auf Start');
+  assert.equal((await act('anna', { type: 'setLogo', shape: 'circle', sym: 'bolt', c1: '#123456', c2: '#ffffff' })).ok, true, 'Logo vor dem Start');
+  ok(await call('anna', 'POST', '/games/main/rebase', { airline: { name: 'Nordlicht', code: 'NL', base: 'BRE' } }), 'Basis vor dem Start ändern');
+  const mn2 = ok(await call('ben', 'GET', '/main'), 'Lobby 2'); const nl = mn2.roster.find((r) => r.name === 'Nordlicht');
+  assert.ok(nl && nl.base === 'BRE' && nl.logo && nl.logo.sym === 'bolt', 'andere sehen Name, Basis und Logo');
+  ok(await call('tim', 'POST', '/games/main/control', { speed: 'm10' }), 'Tempo vor dem Start'); ok(await call('tim', 'POST', '/games/main/control', { speed: 'm20' }), 'Tempo zurück');
+  const real = Date.now;
+  Date.now = () => real() + 3600e3;   // eine Stunde später: noch vor dem Start
+  let ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Admin vor Start'); assert.equal(ad.day, 0, 'Uhr steht'); assert.equal(ad.startAt, startAt, 'Termin im Admin');
+  Date.now = () => real() + 3 * 3600e3;   // eine Stunde nach dem Start = 3 Spieltage
+  ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Admin nach Start'); assert.equal(ad.day, 3, 'eine Stunde nach dem Start: 3 Tage (' + ad.day + ')'); assert.equal(ad.startAt, null, 'Termin vorbei');
+  assert.equal((await act('anna', { type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'BRE' })).ok, true, 'nach dem Start Flugzeug');
+  assert.equal((await call('anna', 'POST', '/games/main/rebase', { airline: { name: 'Nordlicht', code: 'NL', base: 'HAM' } })).status, 400, 'mit Flugzeug keine Basisänderung');
+  Date.now = real;
+  // Termin verschieben und sofort starten
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'resetWorld', keep: true, startAt: Date.now() + 864e5 }), 'Neustart morgen');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'setStart', startAt: null }), 'Jetzt starten');
+  assert.equal(ok(await call('tim', 'GET', '/games/main/admin'), 'gestartet').startAt, null, 'läuft sofort');
+  console.log('Starttermin ok: Anmeldung, Logo, Basiswechsel vor dem Start, Uhr steht, danach 3 Tage pro Stunde, Jetzt starten'); }
 // Kapitalmarkt: Anteile, anteiliger Gewinn, Kapitalerhöhung, Anleihe, Übernahme mit Mehrheit
 { const SMx = (await import('../shared/engine.cjs')).default;
   const wk = SMx.newWorld({ seed: 11 }), a1 = SMx.addHuman(wk, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }), b1 = SMx.addHuman(wk, { id: 'P2', name: 'Beta', code: 'BB', base: 'MUC' }); wk.playerId = 'P1';

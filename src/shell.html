@@ -336,7 +336,7 @@ p { margin: 0; }
 .chk { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; } .chk input { margin-top: 3px; flex: none; }
 label.f { display: grid; gap: 4px; font-size: 12px; color: var(--ink-2); min-width: 0; }
 label.f > span { font-size: 11px; color: var(--ink-3); }
-input[type="number"], input[type="text"], select { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; }
+input[type="number"], input[type="text"], input[type="search"], input[type="datetime-local"], select { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; }
 input[type="number"] { font-family: var(--f-mono); }
 input[type="checkbox"] { accent-color: var(--accent); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -684,6 +684,30 @@ select.picked { display: none !important; }
 .gcard { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: var(--r); padding: 9px 11px; background: var(--panel-2); }
 input[type="password"] { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; }
 .rt.hu { stroke-width: 1.4; opacity: .7; }
+.bp { gap: 8px; }
+.bp-lbl { text-transform: uppercase; letter-spacing: .07em; font-size: 10.5px; color: var(--ink-3); }
+.bp-sel { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 8px; }
+.bp-sel.flash { animation: bpflash .5s ease; } @keyframes bpflash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: none; } }
+.bp-selhead { display: flex; gap: 10px; align-items: center; } .bp-selhead > .mono { font-size: 22px; letter-spacing: .04em; }
+.bp-kpis { display: flex; flex-wrap: wrap; gap: 6px; } .bp-kpis > div { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 9px; display: grid; min-width: 96px; }
+.bp-kpis span { font-size: 10.5px; color: var(--ink-3); } .bp-kpis b { font: 600 13px var(--f-mono); }
+.bp-tools { display: grid; gap: 6px; } .bp-tools input[type=search] { width: 100%; }
+.bp-seg button { font-size: 12px; padding: 5px 9px; }
+.bp-opts { flex-wrap: wrap; gap: 6px 14px; }
+.bp-list { display: grid; gap: 4px; max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); padding: 4px; background: var(--panel); }
+.bp-row { display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; align-items: center; text-align: left; border: 1px solid transparent; background: var(--panel-2); border-radius: 8px; padding: 6px 8px; color: var(--ink); cursor: pointer; }
+.bp-row:hover { border-color: var(--line-2, var(--line)); }
+.bp-row[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.bp-row > .mono { font-size: 14px; letter-spacing: .03em; } .bp-n { display: grid; gap: 1px; min-width: 0; font-size: 13px; }
+.bp-m { font-size: 11.5px; color: var(--ink-2); } .bp-m b { color: var(--ink); }
+.bp-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; } .bp-tags .chip { font-size: 10.5px; }
+.bp-count { padding: 4px 6px; margin: 0; }
+@media (max-width: 640px) { .bp-row { grid-template-columns: 40px 1fr; } .bp-tags { grid-column: 2; justify-content: flex-start; } .bp-list { max-height: 300px; } }
+.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.ro { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; background: var(--panel-2); }
+.ro.me { border-color: var(--accent); } .ro-logo { flex: 0 0 auto; display: inline-flex; }
+.mw-count b { color: var(--accent); }
+.prestart { border-color: var(--accent); }
 .basegroups { display: grid; gap: 6px; max-height: 300px; overflow: auto; }
 .basegroups summary { cursor: pointer; font-weight: 600; font-size: 12.5px; padding: 4px 0; }
 .basegroups details > .basepick { margin: 4px 0 8px; }

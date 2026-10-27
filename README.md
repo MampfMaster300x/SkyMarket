@@ -110,7 +110,9 @@ Der Benutzer **Tim** (Groß-/Kleinschreibung egal) ist Admin. In der Lobby sieht
 - **Ereignisse annullieren** – in der Liste aller laufenden und angekündigten Ereignisse oder direkt an der Meldung („Annullieren“, nur für Admins sichtbar, mit Rückfrage). Angekündigte fallen aus, laufende enden sofort; Ticketsteuer, Entgelte, CO₂-Abgabe, Leitzins, Wechselkurs und Kerosinsprung werden zurückgenommen, Zölle neu berechnet, die Konjunktur nach einer Rezession entsprechend angehoben. Alle sehen eine Meldung „Spielleitung annulliert: …“.
 - **Kapital buchen** – ± bis 100 Mio. € je Airline, z. B. um einen Fehler auszugleichen (als Eigenkapitalbewegung).
 - **Tempo einstellen** – in der Verwaltung, auch ohne eigene Airline in der Welt: von „1 Tag = 1 Stunde“ bis zu den schnellen Stufen. Gilt sofort für alle, alle sehen eine Meldung. (Hauptwelt: nur Admins; private Spiele: Spielleitung und Admins.)
-- **Welt neu starten** – Tag 1, neue Weltlage und Konkurrenz. Mit „Alle Mitspielenden behalten“ beginnen alle Airlines mit Name, Kürzel und Basis von vorn, sonst müssen alle neu beitreten. Die Hauptwelt kann nur der Admin neu starten.
+- **Welt neu starten** – Tag 1, neue Weltlage und Konkurrenz. Mit „Alle Mitspielenden behalten“ beginnen alle Airlines mit Name, Kürzel, Basis und Logo von vorn, sonst müssen alle neu beitreten. Die Hauptwelt kann nur der Admin neu starten.
+  - **Mit Starttermin** (Feld „Start“, bei der Hauptwelt ist der nächste Freitag, 12:00 Uhr vorgeschlagen) und **Tempo nach dem Start** (Hauptwelt: 1 Tag = 20 Min.): Bis zum Termin steht die Uhr. Alle können sich anmelden, Logo, Name und Heimatbasis festlegen und Strecken vorplanen; Flugzeuge, Strecken und Personal gibt es erst ab dem Start – für alle gleichzeitig.
+  - Solange der Start geplant ist, zeigt die Verwaltung **„Termin ändern“** und **„Jetzt starten“**.
 - In privaten Spielen kann auch die **Spielleitung** (wer das Spiel angelegt hat) Airlines entfernen, sperren, Ereignisse annullieren und Kapital buchen.
 
 - **Wichtig:** Das Konto „Tim“ gleich nach dem Deploy registrieren. Wer den Namen zuerst anlegt, hat die Rechte.
@@ -180,6 +182,29 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 ```
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
+
+## Neu in 0.17: Starttermin für die Hauptwelt, Basis-Finder, Kosten auf jedem Knopf, Nachfrage je Region überarbeitet
+
+**Hauptwelt mit Starttermin**
+- Der Admin startet die Hauptwelt neu und legt einen **Termin** fest (Vorschlag: nächster Freitag, 12:00 Uhr). Bis dahin steht die Uhr; danach läuft die Welt mit **1 Tag = 20 Minuten** (neue Tempo-Stufe „Ausgedehnt“, auch Vorgabe für eine neue Hauptwelt).
+- **Vorab anmelden**: Airline gründen, Logo gestalten oder zeichnen, **Name, Kürzel und Heimatbasis bis zum Start ändern** („Name und Basis ändern“), Strecken als Plan vorbereiten. Flugzeuge, Strecken, Personal und alle anderen Käufe gibt es erst ab dem Start – für alle gleichzeitig.
+- **Lobby**: Countdown bis zum Start, **Liste aller angemeldeten Airlines mit Logo und „Start in HAM“**, und ein **Einladungslink** zum Kopieren (`…/?join=HAUPTW`): Wer ihn öffnet, legt ein Konto an und kommt direkt zur Anmeldung.
+- Im Spiel zeigt die Übersicht bis zum Start eine Karte mit Countdown, dem, was schon geht, und allen Angemeldeten; oben steht „Start in 2 Tagen 21 Std.“.
+
+**Heimatbasis finden statt Dropdown**
+- Bei jeder Gründung (offline, neues Spiel, Beitritt, Neustart, Basiswechsel) gibt es einen **Basis-Finder**: Suche, Filter nach **Größe** (klein bis 8 Mio. · mittel · groß · Drehkreuz), **Region**, „ohne KI-Basis“, „mit Anlaufrabatt“, sortierbar nach Größe, Lizenz, Basiskosten, Slotpreis, Entgelten oder wenig Konkurrenz.
+- Jede Zeile zeigt Passagiere, Lizenz, Basiskosten im Monat, Slotpreis, Entgelte je Gast und Anlaufrabatt; Kennzeichen für KI-Basen und **wie viele Mitspielende dort schon starten**. Die Auswahl zeigt alles noch einmal ausführlich.
+- Name und Basis lassen sich auch später ändern, solange die Airline noch kein Flugzeug und keine Strecke hat (Profil & Logo).
+
+**Kosten direkt am Knopf**
+- **Strecke eröffnen**: Knopf mit Gesamtsumme („Strecke eröffnen · Flugzeug leasen · zusammen 848 Tsd. €“) und darüber die Aufschlüsselung: Lizenz + Slots + Kaution (kommt bei Rückgabe zurück) + Einführung neues Muster + Anwerbung Personal, dazu die laufende Leasingrate.
+- **Flugzeuge** („Leasen, 36 Monate · sofort 490 Tsd. €“, Flex, ab Werk, Gebrauchtmarkt), **Basis eröffnen**, **Slots** (auch „1 kaufen“), **Gate-Exklusivvertrag**, **Personal einstellen** (Anwerbungskosten, passt sich der Anzahl an), **Studien**, **Abwerben** (Höchstbetrag), **Übernahme** („Ja, für 120 Mio. € übernehmen“).
+
+**Nachfrage je Region geprüft – kein Golf-Monopol mehr**
+- Ursache: Der Aufschlag für Strecken zwischen zwei großen Märkten wuchs ohne Grenze (Dubai–Seoul hatte 14.000 mögliche Reisende pro Tag und Richtung, rund 25-mal so viel wie real), und der Abschlag für Interkontinentalreisen galt auch für Nachbarn wie Dubai–Mumbai. Damit landete die Nachfrage der Golf-Drehkreuze auf wenigen Strecken.
+- Jetzt: Aufschlag gedeckelt (höchstens × 5), zwischen Regionen zählt die **Entfernung** (bis 2.500 km wie eine Grenze in Europa, ab 6.000 km voller Abschlag), **Familienbesuche Golf ↔ Südasien, Philippinen, Ägypten**, wenig Austausch Golf ↔ Ostasien, politisch kleine Märkte (z. B. Israel ↔ Golf/Ägypten) gedämpft.
+- Ergebnis: Stärkste Strecke je Mio. Passagiere am Flughafen – Nahost 160 (vorher 177, Ausreißer bis 14.000/Tag), Europa 143, Asien 156, Nordamerika 70. Ein Testbot mit perfekter Marktkenntnis wuchs in Dubai vorher in einem Jahr von 13 auf 63 Mio. € Eigenkapital, jetzt auf 18 Mio. € – vergleichbar mit Bangkok, Johannesburg oder São Paulo.
+- Sale & Lease-back: Die Miete richtet sich jetzt nach der Marktmiete des Typs (+25 % Krisenaufschlag) statt pauschal 0,95 % des Werts.
 
 ## Neu in 0.16: Spielphasen, Marktwissen, teure Großflughäfen, Wettbewerb, Kapitalmarkt und Übernahmen, Sanierung und Insolvenz, mehr Abwerben, Pixel-Logo
 

@@ -5,9 +5,12 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import SM from '../shared/engine.cjs';
 
 const MAX_PLAYERS = 4;
-// Hauptwelt: eine dauerhafte Welt für alle Angemeldeten, 1 Spieltag = 30 Minuten, Tempo nur durch Admins
+// Hauptwelt: eine dauerhafte Welt für alle Angemeldeten, 1 Spieltag = 20 Minuten, Tempo nur durch Admins
 const MAIN_ID = 'main', MAIN_CODE = 'HAUPTW', MAIN_NAME = 'Hauptwelt';
 const MAIN_MAX = Math.max(4, Math.min(200, Number(process.env.MAIN_MAX_PLAYERS) || 60));
+const MAIN_SPEED = 'm20';
+// Vor dem geplanten Start: nur Vorbereitung (Logo, Assistenz, Pläne, Einstellungen ohne Kosten)
+const PRESTART_OK = new Set(['setLogo', 'setPixLogo', 'assistant', 'savePlan', 'deletePlan', 'planAuto', 'setCabin', 'insurance', 'marketingPct', 'pay']);
 const MAX_DAYS_PER_TICK = 30;          // Aufholen höchstens 30 Tage je Anfrage (Rest folgt mit der nächsten)
 const IDLE_CAP_MS = 60000;              // Schnelle Stufen: ohne Anfragen läuft höchstens eine Minute nach
 const SLOW_CAP_DAYS = 400;              // Langsame Stufen laufen auch offline weiter (bis 400 Tage Rückstand)
@@ -146,7 +149,15 @@ async function mutateState(store, id, fn = null) {
 }
 async function loadMeta(store, id) { return store.get(K.meta(id), { type: 'json' }); }
 function memberOf(meta, user) { return meta && meta.players.find((p) => p.u === user.key); }
-function clockHeader(md) { const key = SM.speedKey(md.speed), sp = SM.SPEEDS[key]; return JSON.stringify({ speed: key, ms: sp.ms, lastTick: md.lastTick || Date.now(), carry: md.carry || 0, now: Date.now(), day: md.day || 0 }); }
+function clockHeader(md) { const key = SM.speedKey(md.speed), sp = SM.SPEEDS[key], now = Date.now(); return JSON.stringify({ speed: key, ms: sp.ms, lastTick: md.lastTick || now, carry: md.carry || 0, now, day: md.day || 0, startAt: md.startAt && md.startAt > now ? md.startAt : null }); }
+const waiting = (md, now = Date.now()) => !!(md && md.startAt && md.startAt > now);
+const fmtStart = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+/** Airlines eines Spiels für Lobby und Beitritt: Name, Kürzel, Basis, Spieler und Logo. */
+function rosterOf(meta, w) {
+  return meta.players.map((p) => { const al = w ? w.airlines[p.airlineId] : null;
+    return { name: p.airlineName, code: p.code, base: al && al.bases[0] ? al.bases[0] : p.base, user: p.name, joined: p.joined, status: al ? al.status : null,
+      logo: al && al.logo ? al.logo : null, pixLogo: al && al.pixLogo ? al.pixLogo : null }; });
+}
 
 /** Legt die Hauptwelt an, falls es sie noch nicht gibt, und liefert ihr Meta. */
 async function ensureMain(store) {
@@ -155,7 +166,7 @@ async function ensureMain(store) {
   const now = Date.now();
   const w = SM.newWorld({ difficulty: 'normal', rivals: 'normal', seed: randomBytes(4).readUInt32LE(0), mode: 'career' });
   w.playerId = null;
-  await store.set(K.state(MAIN_ID), packSized(w), { metadata: { speed: 'm30', lastTick: now, carry: 0, day: w.day, ver: 1 }, onlyIfNew: true });
+  await store.set(K.state(MAIN_ID), packSized(w), { metadata: { speed: MAIN_SPEED, lastTick: now, carry: 0, day: w.day, ver: 1 }, onlyIfNew: true });
   await store.set(K.code(MAIN_CODE), MAIN_ID, { onlyIfNew: true });
   meta = { id: MAIN_ID, name: MAIN_NAME, code: MAIN_CODE, main: true, invite: rnd(16, 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'), host: null, hostName: 'Admin', created: now, difficulty: 'normal', max: MAIN_MAX, pw: null, players: [] };
   const res = await store.setJSON(K.meta(MAIN_ID), meta, { onlyIfNew: true });
@@ -236,8 +247,9 @@ export async function handle(req, { store }) {
       const r = await mutateState(store, MAIN_ID, null);
       const pres = (await store.get(K.presence(MAIN_ID), { type: 'json' })) || {};
       const now = Date.now(), me = memberOf(meta, user);
+      let roster = null; try { roster = rosterOf(meta, r.w || unpackWorld(r.buf)); } catch (e) { roster = rosterOf(meta, null); }
       return json({ ...summary(meta), main: true, day: r.md.day || 0, speed: SM.speedKey(r.md.speed), member: !!me, airlineName: me ? me.airlineName : null, admin: isAdmin(user),
-        online: Object.values(pres).filter((t) => now - t < 15 * 60000).length, codes: meta.players.map((p) => p.code) });
+        online: Object.values(pres).filter((t) => now - t < 15 * 60000).length, codes: meta.players.map((p) => p.code), startAt: waiting(r.md, now) ? r.md.startAt : null, now, roster });
     }
 
     // ---- Spielelisten ----
@@ -278,7 +290,8 @@ export async function handle(req, { store }) {
       if (!meta) return fail(404, `Kein Spiel mit dem Code ${code || '–'} gefunden.`);
       const t = url.searchParams.get('t');
       const st = await store.getMetadata(K.state(meta.id));
-      return json({ ...summary(meta), day: st && st.metadata ? st.metadata.day || 0 : 0, member: !!memberOf(meta, user), tokenOk: !!t && t === meta.invite, adminOk: isAdmin(user), codes: meta.players.map((p) => p.code) });
+      return json({ ...summary(meta), day: st && st.metadata ? st.metadata.day || 0 : 0, member: !!memberOf(meta, user), tokenOk: !!t && t === meta.invite, adminOk: isAdmin(user), codes: meta.players.map((p) => p.code),
+        startAt: st && waiting(st.metadata) ? st.metadata.startAt : null, bases: meta.players.map((p) => ({ base: p.base, name: p.airlineName })) });
     }
 
     // ---- Neues Spiel ----
@@ -347,7 +360,7 @@ export async function handle(req, { store }) {
         const w = r.w || unpackWorld(r.buf);
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
         const now = Date.now();
-        return json({ id, name: meta.name, main: !!meta.main, day: w.day, speed: SM.speedKey(r.md.speed), canSpeed: canControl(meta, user),
+        return json({ id, name: meta.name, main: !!meta.main, day: w.day, speed: SM.speedKey(r.md.speed), canSpeed: canControl(meta, user), startAt: waiting(r.md, now) ? r.md.startAt : null,
           players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
             return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
               status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null }; }),
@@ -388,23 +401,41 @@ export async function handle(req, { store }) {
         if (cmd === 'resetWorld') {
           if (meta.main && !isAdmin(user)) return fail(403, 'Die Hauptwelt kann nur der Admin neu starten.');
           const keep = body.keep !== false, now = Date.now();
+          const startAt = Number(body.startAt) || 0;
+          if (startAt && (startAt < now + 60000 || startAt > now + 90 * 864e5)) return fail(400, 'Der Start muss mindestens eine Minute und höchstens 90 Tage in der Zukunft liegen.');
           const cur = await store.getWithMetadata(K.state(id), { type: 'arrayBuffer' });
           const md0 = (cur && cur.metadata) || {};
+          const speed = SM.SPEEDS[body.speed] && !SM.SPEEDS[body.speed].local && body.speed !== 'p' ? body.speed : (md0.speed || (meta.main ? MAIN_SPEED : 'm30'));
+          // Logos und Assistenz der bisherigen Airlines mitnehmen
+          let oldW = null; if (keep && cur) { try { oldW = unpackWorld(cur.data); } catch (e) { oldW = null; } }
           const w = SM.newWorld({ difficulty: meta.difficulty || 'normal', rivals: SM.RIVALS[body.rivals] ? body.rivals : 'normal', seed: randomBytes(4).readUInt32LE(0) });
           const players = [];
           if (keep) for (const p of meta.players) {
-            try { const h = SM.addHuman(w, { name: p.airlineName, code: p.code, base: p.base, owner: p.u }); players.push({ ...p, airlineId: h.id, joined: now }); }
+            try { const h = SM.addHuman(w, { name: p.airlineName, code: p.code, base: p.base, owner: p.u, quiet: true }); players.push({ ...p, airlineId: h.id, joined: now });
+              const o = oldW && oldW.airlines[p.airlineId]; if (o) { if (o.logo) h.logo = o.logo; if (o.pixLogo) h.pixLogo = o.pixLogo; if (o.assistant) h.assistant = o.assistant; } }
             catch (e) { /* Basis ungültig: Person muss neu beitreten */ }
           }
           w.playerId = meta.main ? null : ((players.find((p) => p.u === meta.host) || players[0] || {}).airlineId || null);
-          w.pushNews(0, `Neustart der Welt durch die Spielleitung${keep ? ' – alle Airlines beginnen von vorn' : ''}`, 'warn', null);
-          await store.set(K.state(id), packSized(w), { metadata: { speed: md0.speed || 'm30', lastTick: now, carry: 0, day: 0, ver: (md0.ver || 0) + 1 } });
+          w.pushNews(0, `Neustart der Welt durch die Spielleitung${keep ? ' – alle Airlines beginnen von vorn' : ''}${startAt ? `. Start: ${fmtStart(startAt)}` : ''}`, 'warn', null);
+          await store.set(K.state(id), packSized(w), { metadata: { speed, lastTick: startAt || now, carry: 0, day: 0, ver: (md0.ver || 0) + 1, ...(startAt ? { startAt } : {}) } });
           const dropped = meta.players.filter((p) => !players.some((x) => x.u === p.u));
-          const next = await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.players = players; m.resetAt = now; return m; });
+          const next = await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.players = players; m.resetAt = now; m.startAt = startAt || null; return m; });
           for (const p of dropped) await updateJson(store, K.user(p.u), (u) => { if (!u) return undefined; u.games = (u.games || []).filter((g) => g !== id); return u; });
           await indexUpsert(store, next);
           console.log(`${user.key} hat ${meta.id} neu gestartet (${keep ? 'mit' : 'ohne'} Airlines).`);
-          return json({ ok: true, msg: keep ? `Welt neu gestartet – ${players.length} Airlines beginnen von vorn.` : 'Welt neu gestartet – alle müssen neu beitreten.' });
+          return json({ ok: true, msg: (keep ? `Welt neu gestartet – ${players.length} Airlines beginnen von vorn.` : 'Welt neu gestartet – alle müssen neu beitreten.') + (startAt ? ` Start: ${fmtStart(startAt)}.` : '') });
+        }
+        if (cmd === 'setStart') {
+          const now = Date.now(), startAt = body.startAt === null || body.startAt === 'now' ? 0 : Number(body.startAt) || 0;
+          if (startAt && (startAt < now + 60000 || startAt > now + 90 * 864e5)) return fail(400, 'Der Start muss mindestens eine Minute und höchstens 90 Tage in der Zukunft liegen.');
+          const r = await mutateState(store, id, (w, md) => {
+            if (startAt && !waiting(md, now) && w.day > 0) throw Object.assign(new Error('Die Welt läuft schon. Für einen neuen Starttermin bitte „Welt neu starten“ mit Termin wählen.'), { status: 409 });
+            if (startAt) { md.startAt = startAt; md.lastTick = startAt; md.carry = 0; w.pushNews(w.day, `Neuer Starttermin: ${fmtStart(startAt)}`, 'info', null); }
+            else if (waiting(md, now)) { delete md.startAt; md.lastTick = now; md.carry = 0; w.pushNews(w.day, 'Die Spielleitung hat das Spiel gestartet – die Uhr läuft', 'good', null); }
+            return { ok: true };
+          });
+          await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.startAt = startAt || null; return m; });
+          return json({ ok: true, msg: startAt ? `Start am ${fmtStart(startAt)}.` : 'Die Uhr läuft.', ver: r.etag });
         }
         return fail(400, 'Unbekannter Befehl.');
       }
@@ -413,10 +444,10 @@ export async function handle(req, { store }) {
 
       if (op === 'info' && method === 'GET') {
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
-        const now = Date.now();
-        return json({ id, name: meta.name, code: meta.code, invite: meta.invite, max: meta.max, locked: !!meta.pw,
+        const now = Date.now(), st = await store.getMetadata(K.state(id));
+        return json({ id, name: meta.name, code: meta.code, invite: meta.invite, max: meta.max, locked: !!meta.pw, startAt: st && waiting(st.metadata, now) ? st.metadata.startAt : null,
           main: !!meta.main, me: { airlineId: me.airlineId, host: canControl(meta, user), admin: isAdmin(user), manage: canManage(meta, user) },
-          players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null })) });
+          players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null })) });
       }
       if (op === 'state' && method === 'GET') {
         if (url.searchParams.get('ping')) {
@@ -458,6 +489,10 @@ export async function handle(req, { store }) {
         const { action } = await readJson(req);
         if (!action || typeof action !== 'object' || typeof action.type !== 'string') return fail(400, 'Ungültige Aktion.');
         if (action.type === 'setRivals' && !canControl(meta, user) && !isAdmin(user)) return fail(403, 'Die Stärke der Konkurrenz stellt nur die Spielleitung ein.');
+        if (!PRESTART_OK.has(action.type)) {
+          const st = await store.getMetadata(K.state(id));
+          if (st && waiting(st.metadata)) return json({ ok: false, waiting: true, msg: `Das Spiel startet erst am ${fmtStart(st.metadata.startAt)}. Bis dahin können Sie Logo, Name und Heimatbasis festlegen, Pläne vorbereiten und Mitspielende einladen.` });
+        }
         const r = await mutateState(store, id, (w) => SM.applyAction(w, me.airlineId, action));
         const res = r.result || { ok: false };
         return json({ ok: !!res.ok, msg: res.msg || null, ver: r.etag, day: r.md.day, id: res.id ?? null, status: res.status ?? null, reply: res.reply ?? null, counterId: res.counterId ?? null });
@@ -477,12 +512,23 @@ export async function handle(req, { store }) {
         await indexUpsert(store, next);
         return json({ ok: true, airlineId: me.airlineId });
       }
+      // ---- Vor dem ersten Flugzeug (z. B. vor dem Start): Name, Kürzel und Heimatbasis ändern ----
+      if (op === 'rebase' && method === 'POST') {
+        const body = await readJson(req);
+        const al = validAirline(body.airline, { ...meta, players: meta.players.filter((p) => p.u !== user.key) }); if (al.error) return fail(400, al.error);
+        const r = await mutateState(store, id, (w) => SM.rebaseHuman(w, me.airlineId, { name: al.name, code: al.code, base: al.base }));
+        if (!r.result || !r.result.ok) return fail(400, (r.result && r.result.msg) || 'Nicht möglich.');
+        const next = await updateJson(store, K.meta(id), (m) => { const p = m.players.find((x) => x.u === user.key); if (!p) return undefined; Object.assign(p, { airlineName: al.name, code: al.code, base: al.base }); return m; });
+        await indexUpsert(store, next);
+        return json({ ok: true, ver: r.etag });
+      }
       if (op === 'control' && method === 'POST') {
         if (!canControl(meta, user)) return fail(403, meta.main ? 'In der Hauptwelt stellen nur Admins das Tempo ein.' : 'Nur die Spielleitung ändert das Tempo.');
         const { speed, tz } = await readJson(req);
         if (!SM.SPEEDS[speed] || SM.SPEEDS[speed].local) return fail(400, 'Ungültiges Tempo.');
         const r = await mutateState(store, id, (w, md, now) => {
           const was = SM.speedKey(md.speed);
+          if (waiting(md, now)) { md.speed = speed === 'p' ? md.speed : speed; md.carry = 0; return; }   // vor dem Start: Uhr bleibt auf dem Termin
           md.speed = speed; md.lastTick = now;
           if (speed === 'rt') md.carry = dayMsLocal(tz, now);
           else if (was !== speed) { const pw = speedInfo(was).ms, pn = speedInfo(speed).ms; md.carry = pw && pn ? Math.min(pn * 0.999, (md.carry || 0) / pw * pn) : 0; }

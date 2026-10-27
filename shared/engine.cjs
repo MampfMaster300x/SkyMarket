@@ -27,7 +27,7 @@ const SM = (() => {
     LEISURE_SEASON_PROFILE: SEASON_DATA,
     INTERCONT: 0.6, MIN_ROUTE_KM: 250, LONGHAUL_TAX_KM: 3000,
     // Nachfragemodell (kalibriert an rund 110 realen Märkten und am Aufkommen aller Flughäfen, siehe tripRaw)
-    DEMAND: { leisE: -0.8, bizE: -0.6, vfrE: -0.8, intercont: 0.15, border: 0.4, eu: 0.5, big: 0.8, bigLong: 1, bigFrom: 10, overDom: 1.2, overIntl: 2.9, kMax: 6, covN: 8,
+    DEMAND: { leisE: -0.8, bizE: -0.6, vfrE: -0.8, intercont: 0.15, border: 0.4, eu: 0.5, big: 0.8, bigLong: 1, bigFrom: 10, bigMax: 5, nearKm: 2500, farKm: 6000, overDom: 1.2, overIntl: 2.9, kMax: 6, covN: 8,
       // Anteil der Inlandsreisen, die zu Flughäfen im Spiel führen (Rest: Ziele, die es im Spiel nicht gibt)
       cover: { DE: 0.95, GB: 0.85, FR: 0.8, ES: 0.85, IT: 0.8, PT: 0.95, GR: 0.5, NO: 0.25, SE: 0.4, JP: 0.6, AU: 0.85, NZ: 0.75, US: 0.75, CA: 0.8, MX: 0.75, CN: 0.65, IN: 0.7, BR: 0.75, RU: 0.6, TR: 0.7, KR: 0.8, AR: 0.6, CO: 0.6, ZA: 0.85, SA: 0.5, ID: 0.4, PH: 0.5, MY: 0.6, TH: 0.6, VN: 0.85, EG: 0.8, MA: 0.7 } },
     // Anteil internationaler Reisender (Land, einzelne Flughäfen abweichend); große Flächenländer fliegen vor allem im Inland
@@ -60,6 +60,12 @@ const SM = (() => {
       groups: { eu: ['DE', 'FR', 'NL', 'BE', 'CH', 'AT', 'IT', 'ES', 'PT', 'DK', 'SE', 'NO', 'PL', 'CZ', 'HU', 'RO', 'BG', 'RS', 'HR', 'GR', 'LV', 'LT', 'EE', 'TR'], na: ['US', 'CA', 'MX'],
         sea: ['MY', 'TH', 'KH', 'MM', 'VN'], cn: ['CN', 'HK', 'MO'], gulf: ['AE', 'OM', 'SA', 'QA', 'KW', 'BH', 'JO'], sa: ['IN', 'NP', 'BD', 'PK'],
         am: ['AR', 'BR', 'PY', 'UY', 'CL', 'PE', 'BO', 'EC', 'CO', 'VE'], ca: ['GT', 'SV', 'CR', 'PA'], ea: ['KE', 'TZ', 'UG', 'RW'], sf: ['ZA', 'NA', 'ZW', 'ZM', 'MZ'], cau: ['GE', 'AM', 'AZ'] } },
+    // Golfstaaten: ein Großteil der Bevölkerung kommt aus Südasien, den Philippinen und Ägypten – viele Familienbesuche
+    VFR_TIES_GULF: { 'DXB-BOM': 1.6, 'DXB-DEL': 1.4, 'DXB-COK': 2.2, 'DXB-HYD': 1.6, 'DXB-BLR': 1.3, 'DXB-MAA': 1.6, 'DXB-KHI': 2.2, 'DXB-LHE': 2.0, 'DXB-ISB': 2.0, 'DXB-DAC': 2.0, 'DXB-CMB': 1.6, 'DXB-KTM': 1.8, 'DXB-MNL': 1.8, 'DXB-CAI': 1.5, 'DXB-AMD': 1.3, 'DXB-GOI': 1.2, 'DXB-CCU': 1.2, 'DXB-CEB': 1.2, 'DXB-PNQ': 1.0, 'AUH-BOM': 1.6, 'AUH-DEL': 1.4, 'AUH-COK': 2.2, 'AUH-HYD': 1.6, 'AUH-BLR': 1.3, 'AUH-MAA': 1.6, 'AUH-KHI': 2.2, 'AUH-LHE': 2.0, 'AUH-ISB': 2.0, 'AUH-DAC': 2.0, 'AUH-CMB': 1.6, 'AUH-KTM': 1.8, 'AUH-MNL': 1.8, 'AUH-CAI': 1.5, 'AUH-AMD': 1.3, 'AUH-GOI': 1.2, 'AUH-CCU': 1.2, 'AUH-CEB': 1.2, 'AUH-PNQ': 1.0, 'SHJ-BOM': 1.6, 'SHJ-DEL': 1.4, 'SHJ-COK': 2.2, 'SHJ-HYD': 1.6, 'SHJ-BLR': 1.3, 'SHJ-MAA': 1.6, 'SHJ-KHI': 2.2, 'SHJ-LHE': 2.0, 'SHJ-ISB': 2.0, 'SHJ-DAC': 2.0, 'SHJ-CMB': 1.6, 'SHJ-KTM': 1.8, 'SHJ-MNL': 1.8, 'SHJ-CAI': 1.5, 'SHJ-AMD': 1.3, 'SHJ-GOI': 1.2, 'SHJ-CCU': 1.2, 'SHJ-CEB': 1.2, 'SHJ-PNQ': 1.0, 'DOH-BOM': 1.6, 'DOH-DEL': 1.4, 'DOH-COK': 2.2, 'DOH-HYD': 1.6, 'DOH-BLR': 1.3, 'DOH-MAA': 1.6, 'DOH-KHI': 2.2, 'DOH-LHE': 2.0, 'DOH-ISB': 2.0, 'DOH-DAC': 2.0, 'DOH-CMB': 1.6, 'DOH-KTM': 1.8, 'DOH-MNL': 1.8, 'DOH-CAI': 1.5, 'DOH-AMD': 1.3, 'DOH-GOI': 1.2, 'DOH-CCU': 1.2, 'DOH-CEB': 1.2, 'DOH-PNQ': 1.0, 'KWI-BOM': 1.6, 'KWI-DEL': 1.4, 'KWI-COK': 2.2, 'KWI-HYD': 1.6, 'KWI-BLR': 1.3, 'KWI-MAA': 1.6, 'KWI-KHI': 2.2, 'KWI-LHE': 2.0, 'KWI-ISB': 2.0, 'KWI-DAC': 2.0, 'KWI-CMB': 1.6, 'KWI-KTM': 1.8, 'KWI-MNL': 1.8, 'KWI-CAI': 1.5, 'KWI-AMD': 1.3, 'KWI-GOI': 1.2, 'KWI-CCU': 1.2, 'KWI-CEB': 1.2, 'KWI-PNQ': 1.0, 'BAH-BOM': 1.6, 'BAH-DEL': 1.4, 'BAH-COK': 2.2, 'BAH-HYD': 1.6, 'BAH-BLR': 1.3, 'BAH-MAA': 1.6, 'BAH-KHI': 2.2, 'BAH-LHE': 2.0, 'BAH-ISB': 2.0, 'BAH-DAC': 2.0, 'BAH-CMB': 1.6, 'BAH-KTM': 1.8, 'BAH-MNL': 1.8, 'BAH-CAI': 1.5, 'BAH-AMD': 1.3, 'BAH-GOI': 1.2, 'BAH-CCU': 1.2, 'BAH-CEB': 1.2, 'BAH-PNQ': 1.0, 'MCT-BOM': 1.6, 'MCT-DEL': 1.4, 'MCT-COK': 2.2, 'MCT-HYD': 1.6, 'MCT-BLR': 1.3, 'MCT-MAA': 1.6, 'MCT-KHI': 2.2, 'MCT-LHE': 2.0, 'MCT-ISB': 2.0, 'MCT-DAC': 2.0, 'MCT-CMB': 1.6, 'MCT-KTM': 1.8, 'MCT-MNL': 1.8, 'MCT-CAI': 1.5, 'MCT-AMD': 1.3, 'MCT-GOI': 1.2, 'MCT-CCU': 1.2, 'MCT-CEB': 1.2, 'MCT-PNQ': 1.0, 'RUH-BOM': 1.6, 'RUH-DEL': 1.4, 'RUH-COK': 2.2, 'RUH-HYD': 1.6, 'RUH-BLR': 1.3, 'RUH-MAA': 1.6, 'RUH-KHI': 2.2, 'RUH-LHE': 2.0, 'RUH-ISB': 2.0, 'RUH-DAC': 2.0, 'RUH-CMB': 1.6, 'RUH-KTM': 1.8, 'RUH-MNL': 1.8, 'RUH-CAI': 1.5, 'RUH-AMD': 1.3, 'RUH-GOI': 1.2, 'RUH-CCU': 1.2, 'RUH-CEB': 1.2, 'RUH-PNQ': 1.0, 'JED-BOM': 1.6, 'JED-DEL': 1.4, 'JED-COK': 2.2, 'JED-HYD': 1.6, 'JED-BLR': 1.3, 'JED-MAA': 1.6, 'JED-KHI': 2.2, 'JED-LHE': 2.0, 'JED-ISB': 2.0, 'JED-DAC': 2.0, 'JED-CMB': 1.6, 'JED-KTM': 1.8, 'JED-MNL': 1.8, 'JED-CAI': 1.5, 'JED-AMD': 1.3, 'JED-GOI': 1.2, 'JED-CCU': 1.2, 'JED-CEB': 1.2, 'JED-PNQ': 1.0, 'DMM-BOM': 1.6, 'DMM-DEL': 1.4, 'DMM-COK': 2.2, 'DMM-HYD': 1.6, 'DMM-BLR': 1.3, 'DMM-MAA': 1.6, 'DMM-KHI': 2.2, 'DMM-LHE': 2.0, 'DMM-ISB': 2.0, 'DMM-DAC': 2.0, 'DMM-CMB': 1.6, 'DMM-KTM': 1.8, 'DMM-MNL': 1.8, 'DMM-CAI': 1.5, 'DMM-AMD': 1.3, 'DMM-GOI': 1.2, 'DMM-CCU': 1.2, 'DMM-CEB': 1.2, 'DMM-PNQ': 1.0, 'MED-BOM': 1.6, 'MED-DEL': 1.4, 'MED-COK': 2.2, 'MED-HYD': 1.6, 'MED-BLR': 1.3, 'MED-MAA': 1.6, 'MED-KHI': 2.2, 'MED-LHE': 2.0, 'MED-ISB': 2.0, 'MED-DAC': 2.0, 'MED-CMB': 1.6, 'MED-KTM': 1.8, 'MED-MNL': 1.8, 'MED-CAI': 1.5, 'MED-AMD': 1.3, 'MED-GOI': 1.2, 'MED-CCU': 1.2, 'MED-CEB': 1.2, 'MED-PNQ': 1.0 },
+    // Ländergruppen mit wenig Austausch: Die Golfstaaten sind riesige Drehkreuze, aber Ostasien ist für sie kein großer Herkunftsmarkt
+    AFFINITY: [{ a: ['AE', 'QA', 'SA', 'KW', 'BH', 'OM'], b: ['KR', 'JP', 'CN', 'TW', 'HK', 'MO'], f: 0.3 }, { a: ['AE', 'QA', 'SA', 'KW', 'BH', 'OM'], b: ['US', 'CA', 'MX', 'BR', 'AR', 'CL', 'CO', 'PE'], f: 0.6 }, { a: ['IL'], b: ['SA', 'KW', 'QA', 'OM', 'IR', 'LB'], f: 0.05 }],
+    // Politisch oder praktisch kleine Märkte trotz großer Flughäfen (Anteil der Schwerkraft-Nachfrage)
+    PAIR_DAMP: { 'CAI-TLV': 0.08, 'AMM-TLV': 0.15, 'BEY-TLV': 0, 'IKA-TLV': 0, 'TLV-DXB': 0.35, 'TLV-AUH': 0.35, 'TLV-DOH': 0.05, 'TLV-RUH': 0.05, 'TLV-JED': 0.05, 'TLV-DMM': 0.05, 'TLV-MED': 0.05, 'TLV-KWI': 0.02, 'TLV-BAH': 0.2, 'TLV-MCT': 0.1, 'TLV-SHJ': 0.1, 'IKA-RUH': 0.2, 'IKA-JED': 0.4, 'IKA-DMM': 0.2, 'DOH-RUH': 0.6, 'DOH-JED': 0.6, 'DOH-DMM': 0.6, 'BEY-RUH': 0.6 },
     VFR_TIES: { 'SYD-AKL': 1.6, 'MEL-AKL': 1.5, 'BNE-AKL': 1.5, 'SYD-CHC': 1.3, 'SYD-WLG': 1.3, 'PER-DPS': 1.4, 'SYD-NAN': 1.3, 'YYZ-YUL': 1.2, 'SVO-LED': 1.3, 'LHR-SYD': 1.3, 'LHR-AKL': 1.3, 'LIS-GRU': 1.4, 'LIS-GIG': 1.4, 'MAD-EZE': 1.4, 'CDG-YUL': 1.5, 'CDG-ABJ': 1.5, 'CDG-DLA': 1.4, 'LIS-LAD': 1.6, 'BER-FCO': 1.3, 'DUS-FCO': 1.3, 'FRA-FCO': 1.3, 'MUC-FCO': 1.4, 'LHR-LIS': 1.5, 'CDG-LIS': 1.8, 'DUS-LIS': 1.3, 'LHR-PMI': 1.2, 'BER-VIE': 1.2, 'MUC-VIE': 1.3 },
     ROUTE_DETOUR: 1.05,
     FUEL_USD_KG: 0.88, EURUSD: 1.10,
@@ -520,16 +526,27 @@ const SM = (() => {
   function tripRaw(o, d) {
     const A = ap(o), B = ap(d), D = P.DEMAND;
     const dk = gcDistanceKm(o, d), dist = Math.max(dk, P.GRAVITY_MIN_DIST_KM) / 1000;
-    const ties = P.VFR_TIES[o + '-' + d] ?? P.VFR_TIES[d + '-' + o] ?? 1.0;
+    const ties = P.VFR_TIES[o + '-' + d] ?? P.VFR_TIES[d + '-' + o] ?? P.VFR_TIES_GULF[o + '-' + d] ?? P.VFR_TIES_GULF[d + '-' + o] ?? 1.0;
     const lh = 1 + P.LH_BOOST * clamp((dk - P.LH_FROM_KM) / (P.LH_FULL_KM - P.LH_FROM_KM), 0, 1);
-    const border = A.country === B.country ? 1 : A.region !== B.region ? D.intercont : EU.has(A.country) && EU.has(B.country) ? D.eu : D.border;
-    const g = P.GRAVITY, f = border * lh;
+    const border = A.country === B.country ? 1 : A.region !== B.region ? crossRegion(dk) : EU.has(A.country) && EU.has(B.country) ? D.eu : D.border;
+    const g = P.GRAVITY, f = border * lh * affinity(A.country, B.country) * (P.PAIR_DAMP[o + '-' + d] ?? P.PAIR_DAMP[d + '-' + o] ?? 1);
     return {
       leisure: f * g.leisure.K * A.pop ** 0.8 * A.income ** 1.5 * B.tour * B.pop ** 0.2 * dist ** D.leisE,
       business: f * g.business.K * (A.pop * B.pop) ** 0.5 * A.biz * B.biz * A.income ** 0.5 * dist ** D.bizE,
       vfr: f * g.vfr.K * (A.pop * B.pop) ** 0.5 * ties * dist ** D.vfrE,
     };
   }
+  /**
+   * Zwischen Regionen zählt die Entfernung, nicht das Etikett: Dubai–Mumbai oder Madrid–Casablanca sind Nachbarmärkte
+   * (wie eine Grenze in Europa), erst auf echter Langstrecke gilt der volle Abschlag für Interkontinentalreisen.
+   */
+  const _aff = {};
+  function affinity(ca, cb) {
+    const k = ca < cb ? ca + cb : cb + ca; if (_aff[k] !== undefined) return _aff[k];
+    let f = 1; for (const g of P.AFFINITY) if ((g.a.includes(ca) && g.b.includes(cb)) || (g.a.includes(cb) && g.b.includes(ca))) f *= g.f;
+    return (_aff[k] = f);
+  }
+  function crossRegion(dk) { const D = P.DEMAND, t = clamp((dk - D.nearKm) / (D.farKm - D.nearKm), 0, 1); return D.border + (D.intercont - D.border) * t; }
   /** Reales Aufkommen ohne Umsteiger (Mio. Passagiere im Jahr). */
   const odVolume = (c) => Math.max(0.05, (ap(c).pax || 0.5) * (1 - (P.HUB_TRANSFER[c] || 0)));
   /** Anteil internationaler Reisender am Flughafen (Rest: Inland). */
@@ -538,7 +555,8 @@ const SM = (() => {
   /** Aufschlag für Strecken zwischen zwei großen Märkten, auf Langstrecke stärker (London–New York statt Hamburg–Cusco). */
   function bigPairV(va, vb, dk) {
     const D = P.DEMAND, a = Math.max(0, Math.log(va / D.bigFrom)), b = Math.max(0, Math.log(vb / D.bigFrom));
-    return a && b ? Math.exp(D.big * a * b * (1 + D.bigLong * Math.min(1, dk / 6000))) : 1;
+    // gedeckelt: Zwei große Märkte ziehen sich an, aber nicht ins Uferlose (sonst Dubai–Seoul 25-mal so groß wie real)
+    return a && b ? Math.min(D.bigMax, Math.exp(D.big * Math.sqrt(a * b) * (1 + D.bigLong * Math.min(1, dk / 6000)))) : 1;
   }
   // Inland: Nur ein Teil der Inlandsreisen führt zu Flughäfen, die es im Spiel gibt (wenige Flughäfen im Land = kleiner Teil)
   const _nCty = {}; for (const c of AP_CODES) _nCty[ap(c).country] = (_nCty[ap(c).country] || 0) + 1;
@@ -562,7 +580,7 @@ const SM = (() => {
       LO[i] = A.pop ** 0.8 * A.income ** 1.5; LD[i] = A.tour * A.pop ** 0.2; BO[i] = A.pop ** 0.5 * A.biz * A.income ** 0.5; BD[i] = A.pop ** 0.5 * A.biz; SP[i] = A.pop ** 0.5;
       VD[i] = layerVol(C[i], true); VI[i] = layerVol(C[i], false); cty.push(A.country); reg.push(A.region); eu.push(EU.has(A.country));
     }
-    const special = new Set([...Object.keys(P.VFR_TIES), ...Object.keys(P.RAIL_TIME_H)]);
+    const special = new Set([...Object.keys(P.VFR_TIES), ...Object.keys(P.VFR_TIES_GULF), ...Object.keys(P.RAIL_TIME_H), ...Object.keys(P.PAIR_DAMP)]);
     const pi = [], pj = [], pv = [], pd = [];
     for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
       const dp = lat[j] - lat[i], dl = lon[j] - lon[i], h = Math.sin(dp / 2) ** 2 + cl[i] * cl[j] * Math.sin(dl / 2) ** 2, dk = 2 * R * Math.asin(Math.sqrt(h));
@@ -575,11 +593,11 @@ const SM = (() => {
       } else {
         const ld = Math.log(Math.max(dk, P.GRAVITY_MIN_DIST_KM) / 1000);
         const lh = 1 + P.LH_BOOST * clamp((dk - P.LH_FROM_KM) / (P.LH_FULL_KM - P.LH_FROM_KM), 0, 1);
-        const border = dom ? 1 : reg[i] !== reg[j] ? D.intercont : eu[i] && eu[j] ? D.eu : D.border;
+        const border = dom ? 1 : reg[i] !== reg[j] ? crossRegion(dk) : eu[i] && eu[j] ? D.eu : D.border;
         const leis = g.leisure.K * (LO[i] * LD[j] + LO[j] * LD[i]) * Math.exp(D.leisE * ld);
         const biz = g.business.K * (BO[i] * BD[j] + BO[j] * BD[i]) * Math.exp(D.bizE * ld);
         const vfr = g.vfr.K * 2 * SP[i] * SP[j] * Math.exp(D.vfrE * ld);
-        v = 0.5 * border * lh * (leis + biz + vfr) * (dom ? 1 : bigPairV(VI[i], VI[j], dk)) * (dk < 900 ? accessibility(C[i], C[j]) : 1);
+        v = 0.5 * border * lh * (dom ? 1 : affinity(cty[i], cty[j])) * (leis + biz + vfr) * (dom ? 1 : bigPairV(VI[i], VI[j], dk)) * (dk < 900 ? accessibility(C[i], C[j]) : 1);
       }
       if (v > 0) { pi.push(i); pj.push(j); pv.push(v); pd.push(dom ? 1 : 0); }
     }
@@ -1468,6 +1486,11 @@ const SM = (() => {
     const used = w.labor && w.labor.m === month ? w.labor[role] || 0 : 0;
     const S = P.STAFF;
     return { pool: Math.floor((S.marketPool[role] + S.marketPerAirline[role] * Math.max(1, w.humans.length)) / tight), used };
+  }
+  /** Einmalige Kosten fürs Einstellen (Anwerbung, ohne Gehalt) – dieselbe Formel wie beim Einstellen selbst. */
+  function hireQuote(w, role, count) {
+    const S = P.STAFF, tight = role === 'pilot' ? w.macro.laborTight : 1 + (w.macro.laborTight - 1) * 0.4, { pool, used } = laborPool(w, role);
+    return S.recruit[role] * Math.max(0, count) * w.macro.cpi * tight * (w.macro.wage || 1) * (1 + 0.6 * used / Math.max(1, pool));
   }
   /** Wie viele Flugzeuge eines Typs Leasinggeber auf Lager haben (gemeinsam für alle Airlines). */
   /** Leasingbestand je Muster wächst mit der Zahl der Spielenden (Hauptwelt: mehr Nachfrage, mehr Leasinggeber). */
@@ -3912,6 +3935,7 @@ const SM = (() => {
     p: { label: 'Pause', short: 'Pause', ms: 0, slow: false },
     h1: { label: 'Langzeit (1 Tag = 1 Std.)', short: '1 Std./Tag', ms: 3600000, slow: true },
     m30: { label: 'Dauerspiel (1 Tag = 30 Min.)', short: '30 Min./Tag', ms: 1800000, slow: true },
+    m20: { label: 'Ausgedehnt (1 Tag = 20 Min.)', short: '20 Min./Tag', ms: 1200000, slow: true },
     m10: { label: 'Gemächlich (1 Tag = 10 Min.)', short: '10 Min./Tag', ms: 600000, slow: true },
     m1: { label: 'Zügig (1 Tag = 1 Min.)', short: '1 Min./Tag', ms: 60000, slow: true, noTheme: true },
     x1: { label: 'Schnell (1 Tag = 12 Sek.)', short: '1×', ms: 12000, slow: false },
@@ -3922,7 +3946,7 @@ const SM = (() => {
   // 'rt' (Echtzeit) gibt es nicht mehr – alte Spiele laufen mit 1 Tag = 1 Std. weiter
   const speedKey = (v) => (SPEEDS[v] ? v : v === 'rt' ? 'h1' : ({ 0: 'p', 1: 'x1', 2: 'x2', 4: 'x4', 10: 'x10' }[Number(v)] || 'p'));
   /** Menschliche Airline hinzufügen (Einzelspieler: PLY; Mehrspieler: P1–P4). */
-  function addHuman(w, { id = null, name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = null, owner = null } = {}) {
+  function addHuman(w, { id = null, name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = null, owner = null, quiet = false } = {}) {
     if (!P.AIRPORTS[base]) throw new Error('Unbekannter Flughafen');
     { const bad = startBaseMsg(w, base); if (bad) throw new Error(bad); }
     const diff = DIFFICULTY[difficulty || w.difficulty] || DIFFICULTY.normal;
@@ -3935,7 +3959,7 @@ const SM = (() => {
     w.newEntrantSlots(base);
     { const lic = licenceFee(w, base); if (lic > 0) { al.ledger.post('one_off', -lic); al.log(w.day, `Betriebslizenz und Gründung am Heimatflughafen ${ap(base).name}: ${Math.round(lic / 1000)} Tsd. EUR`, 'info'); } }
     al.log(w.day, `${name} gegründet in ${ap(base).name}, Startkapital ${(diff.equity / 1e6).toFixed(0)} Mio. EUR`, 'info');
-    if (humans > 0 || w.day > 0) w.pushNews(w.day, `Neue Airline am Markt: ${name} mit Basis ${ap(base).name}`, 'info', id);
+    if (!quiet && (humans > 0 || w.day > 0)) w.pushNews(w.day, `Neue Airline am Markt: ${name} mit Basis ${ap(base).name}`, 'info', id);
     al._day = w.day;
     return al;
   }
@@ -4011,6 +4035,31 @@ const SM = (() => {
     w.order = w.order.filter((k) => k !== id); w.order.splice(pos < 0 ? w.order.length : pos, 0, id);
     al.color = old.color; al.past = past; al.assistant = old.assistant || null; al.logo = old.logo && al.name === old.name ? old.logo : null;
     al.log(day, `Neustart: ${old.name} wurde ${wasInsolvent ? 'nach der Insolvenz ' : ''}abgewickelt, ${al.name} beginnt mit frischem Kapital`, 'info');
+    return { ok: true, airline: al };
+  }
+  /**
+   * Vor dem ersten Flugzeug: Name, Kürzel und Heimatbasis einer menschlichen Airline ändern (z. B. vor dem Start der Hauptwelt).
+   * Die Airline wird mit derselben Kennung frisch gegründet; Logo, Pixel-Logo, Assistenz, Farbe und gespeicherte Pläne bleiben.
+   */
+  function rebaseHuman(w, id, { name, code, base } = {}) {
+    const old = w.airlines[id];
+    if (!old || old.archetype) return { ok: false, msg: 'Unbekannte Airline.' };
+    if (old.status === 'insolvent' || old.removed) return { ok: false, msg: 'Diese Airline ist nicht mehr aktiv.' };
+    if (old.fleet.length || old.activeRoutes().length || Object.keys(old.stakes || {}).length) return { ok: false, msg: 'Name und Heimatbasis lassen sich nur ändern, solange Ihre Airline noch kein Flugzeug, keine Strecke und keine Beteiligung hat.' };
+    if (!P.AIRPORTS[base]) return { ok: false, msg: 'Bitte eine Heimatbasis wählen.' };
+    { const bad = startBaseMsg(w, base); if (bad) return { ok: false, msg: bad }; }
+    const keep = { color: old.color, assistant: old.assistant || null, logo: old.logo || null, pixLogo: old.pixLogo || null, past: old.past || null, plans: old.plans || null, joinedDay: old.joinedDay || 0 };
+    const pos = w.order.indexOf(id), wasBase = old.bases[0];
+    delete w.airlines[id];
+    w.order = w.order.filter((k) => k !== id);
+    const al = addHuman(w, { id, name: name || old.name, code: code || old.code, base, difficulty: old.difficulty, owner: old.owner, quiet: true });
+    w.order = w.order.filter((k) => k !== id); w.order.splice(pos < 0 ? w.order.length : pos, 0, id);
+    al.color = keep.color; al.assistant = keep.assistant; al.joinedDay = keep.joinedDay;
+    if (keep.logo) al.logo = keep.logo;
+    if (keep.pixLogo) al.pixLogo = keep.pixLogo;
+    if (keep.past) al.past = keep.past;
+    if (keep.plans) al.plans = keep.plans.filter((x) => x.base === base || !x.base);
+    if (wasBase !== base) al.log(w.day, `Heimatbasis geändert: ${ap(wasBase).name} → ${ap(base).name}`, 'info');
     return { ok: true, airline: al };
   }
   function newGame({ name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = 'normal', rivals = null, seed = (Date.now() >>> 0), mode = 'free' } = {}) {
@@ -5245,7 +5294,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;
