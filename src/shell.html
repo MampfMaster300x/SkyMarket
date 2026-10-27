@@ -366,6 +366,23 @@ table.t td b { white-space: nowrap; }
 .bar i { display: block; height: 100%; background: var(--ink-3); border-radius: 3px; }
 .bar i.me { background: var(--accent); } .bar i.crit { background: var(--crit); } .bar i.good { background: var(--good); }
 .bar .tgt { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: .5; }
+/* Marktwissen und Karriere-Phasen */
+.kbar { display: inline-flex; gap: 2px; vertical-align: middle; margin-right: 4px; }
+.kbar i { width: 6px; height: 10px; border-radius: 2px; background: var(--panel-2); border: 1px solid var(--line-2); }
+.kbar i.on { background: var(--accent); border-color: var(--accent); }
+.callout.know { display: block; }
+.phases { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.phases .ph { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--ink-3); text-align: center; }
+.phases .ph i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line-2); font-weight: 700; color: var(--ink-2); }
+.phases .ph.done i { background: var(--good); border-color: var(--good); color: #fff; }
+.phases .ph.cur i { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.phases .ph.cur span { color: var(--ink); font-weight: 600; }
+.pchecks { display: grid; gap: 6px; align-content: start; }
+.career .card { align-content: start; }
+.pchecks .pc { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 8px; align-items: center; font-size: 12px; }
+.pchecks .pc b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pchecks .pc.ok span { color: var(--good); }
+@media (max-width: 520px) { .pchecks .pc { grid-template-columns: 1fr auto; } .pchecks .pc .bar { grid-column: 1 / -1; order: 3; } .phases .ph span { font-size: 9.5px; } }
 .cand { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 4px; }
 .econ { display: grid; gap: 7px; }
 .econ > div { display: grid; grid-template-columns: 120px 1fr 36px; gap: 10px; align-items: center; font-size: 12.5px; }
@@ -743,6 +760,14 @@ h2.sec small { margin-left: auto; text-align: right; }
 
 /* Logo */
 .logo-svg { display: inline-block; vertical-align: middle; flex: none; }
+img.logo-svg.pix { image-rendering: pixelated; image-rendering: crisp-edges; border-radius: 4px; }
+.pix-wrap { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.pix-wrap > .stack { flex: 1 1 220px; }
+#pixc { width: min(320px, 100%); flex: 0 1 320px; aspect-ratio: 1; image-rendering: pixelated; image-rendering: crisp-edges; border: 1px solid var(--line-2); border-radius: 6px; touch-action: none; cursor: crosshair; background: var(--panel-2); }
+.pix-pal { display: grid; grid-template-columns: repeat(8, minmax(0, 28px)); gap: 5px; }
+.pix-pal button { width: 28px; height: 28px; border-radius: 6px; border: 2px solid var(--line-2); padding: 0; }
+.pix-pal button[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 600px) { .pix-pal { grid-template-columns: repeat(8, minmax(0, 1fr)); } .pix-pal button { width: 100%; } }
 .lgi { display: inline-flex; vertical-align: -4px; }
 /* Mitspielende */
 /* Marktstudien */

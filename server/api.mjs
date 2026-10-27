@@ -153,7 +153,7 @@ async function ensureMain(store) {
   let meta = await loadMeta(store, MAIN_ID);
   if (meta) return meta;
   const now = Date.now();
-  const w = SM.newWorld({ difficulty: 'normal', rivals: 'normal', seed: randomBytes(4).readUInt32LE(0) });
+  const w = SM.newWorld({ difficulty: 'normal', rivals: 'normal', seed: randomBytes(4).readUInt32LE(0), mode: 'career' });
   w.playerId = null;
   await store.set(K.state(MAIN_ID), packSized(w), { metadata: { speed: 'm30', lastTick: now, carry: 0, day: w.day, ver: 1 }, onlyIfNew: true });
   await store.set(K.code(MAIN_CODE), MAIN_ID, { onlyIfNew: true });
@@ -295,12 +295,13 @@ export async function handle(req, { store }) {
       for (let i = 0; i < 8 && !code; i++) { const c = rnd(6); const r = await store.set(K.code(c), id, { onlyIfNew: true }); if (r.modified !== false) code = c; }
       if (!code) return fail(500, 'Kein freier Code gefunden, bitte noch einmal versuchen.');
       const rivals = SM.RIVALS[body.rivals] ? body.rivals : null;
-      const w = SM.newWorld({ difficulty, rivals, seed: randomBytes(4).readUInt32LE(0) });
+      const mode = body.mode === 'free' ? 'free' : 'career';
+      const w = SM.newWorld({ difficulty, rivals, seed: randomBytes(4).readUInt32LE(0), mode });
       const h = SM.addHuman(w, { name: al.name, code: al.code, base: al.base, owner: user.key });
       w.playerId = h.id;
       const now = Date.now();
       await store.set(K.state(id), packSized(w), { metadata: { speed, lastTick: now, carry: speed === 'rt' ? dayMsLocal(body.tz, now) : 0, day: w.day, ver: 1 }, onlyIfNew: true });
-      const meta = { id, name, code, invite: rnd(16, 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'), host: user.key, hostName: user.name, created: now, difficulty, max: MAX_PLAYERS,
+      const meta = { id, name, code, invite: rnd(16, 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'), host: user.key, hostName: user.name, created: now, difficulty, mode, max: MAX_PLAYERS,
         pw: pw ? hashPw(pw) : null, players: [{ u: user.key, name: user.name, airlineId: h.id, airlineName: al.name, code: al.code, base: al.base, joined: now }] };
       await store.setJSON(K.meta(id), meta);
       await updateJson(store, K.user(user.key), (u) => { if (!u) return undefined; u.games = [...new Set([...(u.games || []), id])]; return u; });

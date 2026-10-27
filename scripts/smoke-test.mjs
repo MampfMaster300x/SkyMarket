@@ -252,4 +252,27 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.equal((await call('ben', 'POST', `/games/${g.id}/admin`, { cmd: 'kick', airlineId: gi.players.find((p) => p.u === 'anna').airlineId })).status, 403, 'Mitspieler darf nicht verwalten');
   console.log('Verwaltung ok: entfernen + sperren, entsperren, Neubeitritt,', ev ? 'Ereignis „' + ev.type + '“ annulliert,' : 'kein Ereignis offen,', 'Kapital +5 Mio., Spielleitung privat'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
+// Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const w6 = SMx.newGame({ seed: 9, base: 'HAJ', mode: 'career' }), p6 = w6.player, A6 = (a) => SMx.applyAction(w6, p6.id, a);
+  assert.equal(SMx.careerLv(p6), 0, 'Karriere startet in Phase 1');
+  assert.ok(SMx.riskTerms(p6, 'B789').lease > 1.5 && SMx.riskTerms(p6, 'DH8D').lease === 1, 'Risikoaufschlag für große Muster');
+  const k0 = w6.knowOf(p6, 'HAJ', 'MUC'); assert.ok(k0.lv <= 1 && k0.sigma > 0.2, 'ohne Studie nur grobes Marktwissen');
+  assert.equal(A6({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAJ' }).ok, true, 'Dash 8 leasen');
+  const r6 = A6({ type: 'openRoute', base: 'HAJ', dest: 'NUE', typeId: 'DH8D', freq: 1, wk: 4, fo: 100, fi: 100 }); assert.equal(r6.ok, true, '4x pro Woche: ' + r6.msg);
+  assert.equal(p6.routes.find((r) => r.id === r6.id).wk, 4, 'Wochenfrequenz gespeichert');
+  const b6 = SMx.balanceSheet(p6); assert.ok(Math.abs(b6.check) < 1, 'Bilanz stimmt mit Slots als Vermögen'); assert.ok(b6.slots > 0, 'Slots aktiviert');
+  assert.equal(A6({ type: 'openBase', apt: 'BRE' }).ok, false, 'zweite Basis erst ab Phase 2');
+  const ai6 = w6.list.find((a) => a.archetype && a.status !== 'insolvent');
+  assert.equal(A6({ type: 'takeover', target: ai6.id }).ok, false, 'Übernahme erst ab Phase 3');
+  const px = Buffer.alloc(2048); px[10] = 0x21; const pr = A6({ type: 'setPixLogo', pal: ['#112233', '#ffcc00'], px: px.toString('base64') }); assert.equal(pr.ok, true, 'Pixel-Logo');
+  A6({ type: 'orderStudy', kind: 'routes', tier: 'small', focus: null }); for (let i = 0; i < 8; i++) w6.step();
+  assert.ok(Object.keys(p6.mk || {}).length >= 10, 'Studie hinterlässt Marktwissen');
+  const w7 = SMx.newGame({ seed: 9, base: 'HAM' }), p7 = w7.player; p7.ledger.cash += 400e6 * 100; p7.ledger.equityContrib += 400e6 * 100;
+  const ai7 = w7.list.find((a) => a.archetype && a.status !== 'insolvent'), n7 = ai7.fleet.length;
+  const t7 = SMx.applyAction(w7, p7.id, { type: 'takeover', target: ai7.id }); assert.equal(t7.ok, true, 'Übernahme im freien Spiel: ' + t7.msg);
+  assert.equal(p7.fleet.length, n7, 'Flotte übernommen'); assert.ok(Math.abs(SMx.balanceSheet(p7).check) < 1, 'Bilanz nach Übernahme');
+  for (let i = 0; i < 5; i++) w7.step();
+  const rt = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w6)))); assert.equal(rt.mode, 'career'); assert.ok(rt.player.prog && rt.player.pixLogo && rt.player.mk, 'Speichern/Laden 0.16');
+  console.log('0.16 ok: Karriere, Risikoaufschlag, Marktwissen + Studie, 4x/Woche, Slots als Vermögen, Basislimit, Übernahme (' + t7.fleet + ' Flugzeuge), Pixel-Logo'); }
 console.log('Alle Prüfungen bestanden.');

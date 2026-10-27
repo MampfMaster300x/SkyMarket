@@ -179,6 +179,56 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.16: Spielphasen, Marktwissen, teure Großflughäfen, Wettbewerb, Übernahmen, Pixel-Logo
+
+**Strategischer Start – überall möglich, aber nicht überall bezahlbar**
+- Gründen geht an jedem Flughafen. Große Flughäfen kosten aber ein Vermögen: **Betriebslizenz** beim Gründen und beim ersten Flug zu jedem neuen Flughafen (Bremen 23 Tsd. €, Hannover 67 Tsd. €, Hamburg 197 Tsd. €, Frankfurt 953 Tsd. €, London-Heathrow 1,3 Mio. €), **Basiskosten nach Größe** (Bremen rund 13 Tsd. € im Monat, Frankfurt 98 Tsd. €), Einrichtung einer weiteren Basis 204 Tsd. € (Bremen) bis 1,2 Mio. € (Heathrow).
+- **Regionalflughäfen locken mit Anlaufrabatt**: Neue Strecken zahlen im ersten Jahr weniger Passagier- und Landeentgelte (Bremen −40 %, Hannover −22 %, ab 10 Mio. Passagieren keiner).
+- **Regionalstrecken tragen höhere Preise**: Auf dünnen Strecken ab kleinen Flughäfen (ohne Billigflieger-Druck) liegt der Marktpreis bis zu 60 % höher (Bremen–Berlin 100 € statt 68 €).
+- **Dash 8 als günstiger Einstieg**: Leasing 120 Tsd. € im Monat (vorher 175 Tsd.), Turboprop-Piloten etwas günstiger, Verwaltung wächst mit der Flotte (1 Flugzeug rund 60 Tsd. € im Monat statt 180 Tsd.), Verwaltung je Flugzeug nach Größe (Dash 8 rund 600 €/Tag, A380 1.440 €/Tag). Ergebnis im Test: Eine Dash 8 mit drei guten Strecken ab einem Regionalflughafen trägt sich; mit sauberen Preisen wächst das Eigenkapital um 200–300 Tsd. € im Monat.
+
+**Fünf Spielphasen (Karriere)**
+- Gründung → Regionalairline (5 Flugzeuge, 3 Monate, 1 Gewinnmonat) → Netzwerk-Airline (12 Flugzeuge, 9 Monate, 3 Gewinnmonate, 8 Strecken, Eigenkapital auf Startniveau) → Interkontinental (25 Flugzeuge, 18 Monate, 6 Gewinnmonate, 1,25 × Startkapital, 1 Mio. Fluggäste) → Global Player (50 Flugzeuge, 30 Monate, 12 Gewinnmonate, 2 × Startkapital, 5 Mio. Fluggäste).
+- **Jede Phase schaltet frei**: mehr Basen (1 → 2 → 4 → 6 → beliebig), Drehkreuz-Stufen (Umsteigeknoten ab Phase 2, Mega-Hub ab Phase 4), mehr neue Flugzeuge je 30 Tage (2 → 3 → 5 → 8 → frei), Übernahmen ab Phase 3.
+- **Große Flugzeuge am Anfang sehr teuer**: Leasinggeber und Banken verlangen von jungen Airlines Risikoaufschläge. In der Gründungsphase: Dash 8 normal, Regionaljets +25 % Rate und 3 Monatsraten Kaution, A320 & Co. +50 % und 4 Raten, Langstrecke +85 % und 6 Raten, A380/747/Concorde +130 % und 8 Raten (Eigenanteil beim Kauf 20–70 %). Mit jeder Phase werden die Konditionen besser.
+- Neuer Reiter **Unternehmen → Ziele & Phasen** mit Fortschrittsbalken, Freischaltungen und Konditionstabelle; Phase auch im Dashboard.
+- Beim Gründen wählbar: **Karriere** (empfohlen) oder **Freies Spiel** (alles sofort zu normalen Konditionen). Die Hauptwelt läuft als Karriere; bestehende Airlines spielen ohne Phasen weiter, neue und neu gestartete Airlines beginnen in Phase 1.
+
+**Marktwissen – Prognosen sind nicht mehr geschenkt**
+- Jede Verbindung hat einen **festen, unbekannten Schätzfehler**. Ohne Marktdaten liegt die Prognose bis etwa Faktor 2,5 daneben (± 79 %), wer beide Flughäfen selbst anfliegt, schätzt grob (± 48 %). Neu rechnen hilft nicht – nur besseres Wissen.
+- **Marktstudien** liefern Wissen für alle untersuchten Verbindungen: klein = solide (± 23 %), erweitert = gut (± 12 %), umfassend = sehr genau (± 5 %). Das Wissen veraltet nach rund einem Jahr um eine Stufe.
+- **Fachkraft Marktanalyse**: macht alle Schätzungen 25–55 % genauer und bewertet jeden Monat selbst 6, 15 oder 30 neue Märkte ab Ihren Basen.
+- Eigene Strecken: Ist-Daten, sehr genau.
+- Streckenplanung zeigt Wissensstufe, Spanne und Quelle; Markt-Liste und Flughafenkarte zeigen **geschätzte** Potenziale (Spannen bei wenig Wissen) und sind danach sortiert.
+
+**Wettbewerb und Nachfrage**
+- **Etablierte Airlines**: Auf großen Märkten fliegen Airlines außerhalb des Spiels (Bestandsverkehr) und nehmen einen Teil der Reisenden. Die Streckenplanung zeigt ihre Sitze.
+- Saudi-Arabien: Inlandsnachfrage korrigiert (Dschidda–Riad 12.700 statt 21.600 Reisende am Tag, real rund 11.000–14.000).
+- KI-Airlines erhöhen eine Strecke höchstens auf 8 Flüge täglich.
+
+**Slots an jedem Flughafen**
+- **1 Slot je 200.000 Passagiere im Jahr** (mindestens 1). Je nach Größe hält Bestandsverkehr 30–90 % davon. Slots kosten nach Größe – kleine Flughäfen wenig, Großflughäfen sehr viel: Bremen 37 Tsd. €, Hannover 119 Tsd. €, Hamburg 387 Tsd. €, Düsseldorf 546 Tsd. €; ist ein Großflughafen voll, verdoppelt sich der Preis (München 2,7 Mio. €, Frankfurt 4,3 Mio. €, Heathrow 6,1 Mio. €).
+- **Gekaufte Slots sind Vermögen**: Sie stehen mit dem Kaufpreis in der Bilanz (statt das Ergebnis zu belasten); Rückgabe zum halben Marktpreis.
+- Neue Basis an einem vollen Flughafen: zwei Plätze aus dem Slotpool kommen dazu (zum Marktpreis).
+- **Gate-Exklusivvertrag an jedem Flughafen** Ihres Netzes (Preis nach Größe).
+- Drehkreuze bekommen zusätzliche Slots, je mehr Umsteiger sie bringen (1 je 200.000 im Jahr).
+- Streckenplanung zeigt Slots, Lizenz und wann sich das wieder verdient hat.
+
+**Flugplan und Netz**
+- **Seltener als täglich**: 1× bis 6× pro Woche – ideal für dünne Strecken und Inseln.
+- **Rolle je Strecke**: gemischt, Zubringer (Umsteiger haben Vorrang) oder Endziel (nur Ortsgäste). In Planung und Bearbeiten einstellbar.
+- **Drehkreuze verbinden**: Umsteigen über zwei eigene Drehkreuze (z. B. Hamburg → Madeira → New York), Reisende wählen die kürzere Verbindung, außer der Umweg ist deutlich billiger. Viele Langstrecken machen ein Drehkreuz attraktiver (Strategie zeigt Attraktivität und Umsteigezeit).
+- **Marke wirkt erst nach Anlauf**: Eine neue Airline braucht rund ein Jahr, bis Marke und Premiumprodukt voll zahlen (vorher zählte die Marke ab Tag 1).
+
+**Hedging repariert**
+- Absicherung als echter Swap auf eine feste Menge: täglich abgerechnet, steigt Kerosin, bekommen Sie Geld, fällt es, zahlen Sie. Vorzeitiges Beenden kostet den Marktwert der Restlaufzeit (vorher war die Absicherung eine Gratis-Option).
+
+**Übernahmen (M&A)**
+- KI-Airlines komplett kaufen (Markt → Wettbewerb → Übernahmen): Flotte samt Leasing und Krediten, Strecken samt Slots, Basen, Personal, Kasse und Bankschulden. Preis = (Eigenkapital + 4 × Jahresgewinn) × 1,3. Die Prämie über dem Buchwert wird sofort abgeschrieben. In der Karriere ab Phase 3.
+
+**Pixel-Logo**
+- Unter Profil & Logo: eigenes Logo auf 64 × 64 Pixeln zeichnen (Stift, Füllen, Radierer, Pipette, 15 Farben). Es ersetzt überall das gestaltete Logo; exakt dasselbe Bild gibt es pro Welt nur einmal.
+
 ## Neu in 0.15: Langstrecke, Umsteiger, 175 neue Flughäfen, realistische Nachfrage je Standort, Slots mit Warteliste, Personal zum Termin, Preisautomatik, Verwaltung, Fachkräfte
 
 **Langstrecke**
