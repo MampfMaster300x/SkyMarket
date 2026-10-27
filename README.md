@@ -183,6 +183,32 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.17.1: Aufbau lohnt sich – günstiger starten, schneller rentabel, Konkurrenz schont Angeschlagene
+
+**Strecken eröffnen kostet kein Vermögen mehr**
+- Neues Ziel: **Station** statt Betriebslizenz (Madrid rund 90 Tsd. € statt 1,04 Mio. €, Palma 45 Tsd. €, kleine Flughäfen wenige Tausend). Die volle Lizenz gilt nur noch für die Heimatbasis und weitere Basen.
+- **Slots** kosten wenig, solange ein Flughafen Platz hat (Hamburg rund 30 Tsd. €, Madrid rund 140 Tsd. €). Teuer wird es erst, wenn weniger als 30 % frei sind – bis zum Sechsfachen.
+- Beispiel aus dem Test: Hamburg mit Dash 8 und A320neo, vier Strecken (Palma, Madrid, London-Stansted, Barcelona) – Eröffnung zusammen rund 760 Tsd. € statt 10,4 Mio. €.
+
+**Schneller rentabel**
+- Neue Strecken füllen sich schneller (Start bei 50 % der Nachfrage statt 35 %, nach rund drei Wochen weitgehend voll).
+- **Anlaufrabatt** auf Entgelte im ersten Jahr jetzt an jedem Flughafen: mindestens 20 % (Drehkreuze über 60 Mio. Passagiere 10 %), kleine Flughäfen bis 50 %, dazu halber Rabatt auf die Abfertigung.
+- **Garantie für junge Flugzeuge**: In den ersten zwei Jahren kostet die Wartung neuer oder junger Leasingflugzeuge 25 % weniger.
+- Weniger Verwaltung für kleine Airlines, geringerer Aufschlag für Muster über der Phase (A320neo zum Start +15 % statt +50 % Leasingrate), mehr Zusatzerlöse je Gast (Gepäck, Sitzplatz: Basic 24 €, Standard 14 €), etwas geringere Kosten bei Ausfällen.
+- Ergebnis im Test (Hamburg, zwei Flugzeuge, ohne weiteres Wachstum): nach 18 Monaten +1,5 bis +3,5 Mio. € Eigenkapital statt Insolvenz nach vier Monaten. Winter und Rezessionen bleiben spürbar.
+
+**Ehrliche Übersicht**
+- Im Dashboard steht unter „Profitabilität je Strecke“ jetzt auch, was **außerhalb der Strecken** anfällt (Leerlauf der Flugzeuge, Verwaltung, Basis, Personalreserve, Zinsen) und was am Ende als Ergebnis pro Tag bleibt; wenig genutzte Flugzeuge werden genannt.
+- Strecken mit 2× pro Woche zeigen keinen falschen Hinweis „0 von 1 Umläufen“ mehr.
+
+**Konkurrenz mit Augenmaß (verdeckt)**
+- Die KI schätzt, wie gefährlich jede menschliche Airline ist: Wer gerade kämpft (Eigenkapital unter dem Einsatz, Verluste, Krise), wird kaum angegriffen, nicht unterboten und seltener abgeworben. Wer wächst und verdient, wird zum Ziel – Angriffe, Kapazität und Preiskampf richten sich vor allem gegen starke Herausforderer.
+
+**Fairer Markt**
+- Wer deutlich teurer ist als das günstigste vergleichbare Angebot, verliert steil Kunden. Vorher konnte ein einzelner Flug auf riesigen Märkten (z. B. Bangkok–Seoul, Singapur–Seoul) 50–75 % über dem üblichen Preis voll werden.
+- Etablierte Airlines nehmen die Nachfrage auf, die sie bevorzugt – kein „Überlauf“ mehr, der kleinen Anbietern jeden Preis bezahlt.
+- Golf-Drehkreuze: realistischer Umsteigeranteil (Dubai 66 %, Doha 76 %, Abu Dhabi 65 %), weniger lokale Nachfrage.
+
 ## Neu in 0.17: Starttermin für die Hauptwelt, Basis-Finder, Kosten auf jedem Knopf, Nachfrage je Region überarbeitet
 
 **Hauptwelt mit Starttermin**

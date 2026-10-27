@@ -832,7 +832,10 @@ VIEWS.dashboard = function viewDashboard() {
   const prof = rows.length ? `<div class="dbars">${rows.slice(0, 10).map((x) => { const w = Math.abs(x.d) / maxAbs * 50;
       return `<div class="dbar" title="${x.r.base}–${x.r.dest}: ${eur(x.d, { plus: true })} pro Tag, Auslastung ${pct(x.s.lf)}"><span class="dl">${x.r.base}–${x.r.dest}</span><span class="dtrack div"><i class="${x.d < 0 ? 'neg' : 'pos'}" style="${x.d < 0 ? `right:50%;width:${w}%` : `left:50%;width:${w}%`}"></i></span><span class="dv ${sgn(x.d)}">${eur(x.d, { plus: true })}</span></div>`; }).join('')}</div>
       ${rows.length > 10 ? `<p class="small muted">${rows.length - 10} weitere Strecken unter Strecken → Netz.</p>` : ''}
-      <p class="small muted">Streckenbeitrag (DB2) pro Tag, Mittel der letzten 30 Tage. ${rows.filter((x) => x.d < 0).length ? `<b>${rows.filter((x) => x.d < 0).length}</b> Strecke${rows.filter((x) => x.d < 0).length > 1 ? 'n' : ''} im Minus.` : 'Alle Strecken tragen sich.'}</p>`
+      <p class="small muted">Streckenbeitrag (DB2) pro Tag, Mittel der letzten 30 Tage. ${rows.filter((x) => x.d < 0).length ? `<b>${rows.filter((x) => x.d < 0).length}</b> Strecke${rows.filter((x) => x.d < 0).length > 1 ? 'n' : ''} im Minus.` : 'Alle Strecken tragen sich.'}</p>
+      ${!F.base && !F.type ? (() => { const h = (pl.dayHist || []).slice(-30); if (h.length < 7) return ''; const net = h.reduce((a, x) => a + (x.net || 0), 0) / h.length, db = rows.reduce((a, x) => a + x.d, 0), gap = net - db;
+        const idle = pl.fleet.filter((a) => a.delivery_day <= W.day).map((a) => ({ a, h: a.fhDay || 0 })).filter((x) => x.h < 6);
+        return Math.abs(gap) > 500 ? `<p class="small ${gap < 0 ? 'ink2' : 'muted'}">Außerhalb der Strecken: <b class="${sgn(gap)}">${eur(gap, { plus: true })}</b>/Tag (Leerlauf der Flugzeuge, Verwaltung, Basis, Personalreserve, Zinsen, Einmaliges) → Ergebnis <b class="${sgn(net)}">${eur(net, { plus: true })}</b>/Tag.${idle.length ? ` Wenig genutzt: ${idle.map((x) => `${esc(acName(x.a.id))} (${tl(x.a.type_id)})`).join(', ')} – ein Flugzeug kostet auch am Boden.` : ''}</p>` : ''; })() : ''}`
     : '<p class="small muted">Noch keine Strecke im Betrieb.</p>';
   html += panel('Profitabilität je Strecke', 'routes', prof, rows.length ? `gesamt ${eur(rows.reduce((a, x) => a + x.d, 0), { plus: true })}/Tag` : '');
   // Monatsergebnisse
@@ -1009,7 +1012,7 @@ VIEWS.plan = function viewPlan() {
 };
 function routeItem(r) {
   const s7 = rstats(r, 7), s30 = rstats(r, 30), open = ui.expanded === r.id;
-  const waiting = W.day < r.opened_day ? `startet ${dateShort(r.opened_day)}` : r.partial ? `Teilbetrieb: fliegt an ${pct(r.partial)} der Tage` : (r.flyingToday || 0) < r.freq ? `${r.flyingToday || 0} von ${r.freq} Umläufen haben ein Flugzeug` : null;
+  const waiting = W.day < r.opened_day ? `startet ${dateShort(r.opened_day)}` : r.partial ? `Teilbetrieb: fliegt an ${pct(r.partial)} der Tage` : r.wk && r.wk < 7 ? ((r.flyingToday || 0) < r.wk / 7 - 1e-6 ? `${Math.round((r.flyingToday || 0) * 7)} von ${r.wk} Flügen pro Woche haben ein Flugzeug` : null) : (r.flyingToday || 0) < r.freq ? `heute ${r.flyingToday || 0} von ${r.freq} Umläufen mit Flugzeug${(r.flyingToday || 0) === 0 ? ' (Wartung oder Ausfall?)' : ''}` : null;
   const lfo = SM.routeLf(r, 7, 'out'), lfi = SM.routeLf(r, 7, 'in');
   let html = `<div class="ritem${open ? ' open' : ''}"><button class="rhead" data-act="toggle" data-id="${r.id}" aria-expanded="${open}">
     <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${freqTxt(r)}${r.role === 'feeder' ? ' · Zubringer' : r.role === 'local' ? ' · Endziel' : ''} · ${tlx(r.type_id)} · ${svcLabel(r.service)}${r.ap ? ` · <span class="chip" title="Preisautomatik: ${esc(apSummary(SM.apCfgOf(r), r.ap))}">Auto ${pct(r.ap)}</span>${r.pm && r.pm !== 1 ? ` <span class="chip" title="Premiumaufschlag">Premium ${pct(r.pm)}</span>` : ''}` : ''}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}</div></div>
@@ -1210,7 +1213,7 @@ function updateForecast() {
     </div>
     ${knowHtml(kn)}
     <p class="small ink2">Nach <b>allen</b> Kosten – also auch Crew-Gehältern, Leasing, Versicherung, Technik, Slots und Terminal – bleiben <b class="${sgn(r.db2)}">${eur(r.db2, { plus: true })}</b> pro Tag. So viel landet im Ergebnis.</p>
-    ${(() => { const lic = pl.stations[p.dest] ? 0 : SM.licenceFee(W, p.dest); return lic ? `<p class="small ink2">Neuer Flughafen für Sie: Die Betriebslizenz für ${p.dest} kostet beim Eröffnen einmalig <b>${eur(lic)}</b>${SM.incentiveAt(p.dest) > 0.05 || SM.incentiveAt(base) > 0.05 ? '' : ''}.</p>` : ''; })()}
+    ${(() => { const lic = pl.stations[p.dest] ? 0 : SM.stationFee(W, p.dest); return lic ? `<p class="small ink2">Neuer Flughafen für Sie: Die Station in ${p.dest} kostet beim Eröffnen einmalig <b>${eur(lic)}</b>${SM.incentiveAt(p.dest) > 0.05 || SM.incentiveAt(base) > 0.05 ? '' : ''}.</p>` : ''; })()}
     ${(() => { const ib = Math.max(SM.incentiveAt(base), SM.incentiveAt(p.dest)); return ib > 0.05 ? `<p class="small pos">Anlaufrabatt: ${[base, p.dest].filter((x) => SM.incentiveAt(x) > 0.05).map((x) => `${x} erlässt ${pct(SM.incentiveAt(x))} der Entgelte`).join(', ')} – im ersten Jahr der Strecke, in der Prognose schon eingerechnet.</p>` : ''; })()}
     ${fcExplain(r, { band, cur, m, study, potSum, rail, kn })}
     <p class="small ink2">Jahresmittel bei ausgereifter Strecke, Marke ${n0(pl.brand * 100)}. Im ${MONTHS_L[m]}: Streckenbeitrag <b class="${sgn(cur.db2List)}">${eur(cur.db2List, { plus: true })}</b> pro Tag bei ${pct(cur.lf)} Auslastung. ${study && study.done ? `<b>Streckenstudie liegt vor</b> (${esc(study.by)}): Der Nachfragetrend ist eingerechnet.` : ''}</p>
@@ -1218,8 +1221,8 @@ function updateForecast() {
     ${kitHtml(p, { acNeed, kLong, freeWhole, free, rotH, wnd, t })}
     ${!slotOk ? `<div class="callout crit stack"><span>Keine Slots: ${[base, p.dest].filter((x) => slotsMine(x) < p.freq).map((x) => `${x} hat für Sie nur ${slotTxt(x)} freie`).join(', ')}. Neue Slots kommen zum Sommer- und Winterflugplan (April, Oktober) oder werden frei, wenn andere Strecken aufgeben.</span>
       <span class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="plansave">In Planung speichern + Warteliste</button><span class="small">Sobald die Slots da sind, eröffnet SKYMARKET die Strecke automatisch (abschaltbar unter Strecken → In Planung). Wartende bekommen frei werdende Slots reihum.</span></span></div>`
-      : (() => { const sc = W.slotCost(pl, base, p.dest, p.freq), lic = pl.stations[p.dest] ? 0 : SM.licenceFee(W, p.dest), tot = sc.cost + lic, pb = r.db2 > 0 ? tot / (r.db2 * 30.4) : null;
-        return sc.cost > 0 ? `<p class="small ink2">Slots: ${sc.parts.map((x) => `${x.n} in ${x.apt}`).join(', ')} kosten beim Eröffnen einmalig <b>${eur(sc.cost)}</b> (danach gehören sie Ihnen als Vermögenswert; schließen Sie die Strecke, bleiben sie in Ihrer Reserve).${tot > 0 ? ` Zusammen mit ${lic ? 'Lizenz' : 'allem'} ${eur(tot)} – ${pb === null ? 'bei dieser Schätzung verdient die Strecke das nicht zurück' : pb < 1 ? 'nach dieser Schätzung in unter einem Monat verdient' : `nach dieser Schätzung in rund ${n0(pb)} Monaten verdient`}.` : ''}</p>` : ''; })()}
+      : (() => { const sc = W.slotCost(pl, base, p.dest, p.freq), lic = pl.stations[p.dest] ? 0 : SM.stationFee(W, p.dest), tot = sc.cost + lic, pb = r.db2 > 0 ? tot / (r.db2 * 30.4) : null;
+        return sc.cost > 0 ? `<p class="small ink2">Slots: ${sc.parts.map((x) => `${x.n} in ${x.apt}`).join(', ')} kosten beim Eröffnen einmalig <b>${eur(sc.cost)}</b> (danach gehören sie Ihnen als Vermögenswert; schließen Sie die Strecke, bleiben sie in Ihrer Reserve).${tot > 0 ? ` Zusammen mit ${lic ? 'Station' : 'allem'} ${eur(tot)} – ${pb === null ? 'bei dieser Schätzung verdient die Strecke das nicht zurück' : pb < 1 ? 'nach dieser Schätzung in unter einem Monat verdient' : `nach dieser Schätzung in rund ${n0(pb)} Monaten verdient`}.` : ''}</p>` : ''; })()}
     <table class="t"><tbody>
       <tr><td title="Wer bei den heutigen Preisen tatsächlich fliegt – mit Ihnen, mit der Konkurrenz oder mit Umsteigen über fremde Drehkreuze. Der Rest des Potenzials bleibt zu Hause oder fährt anders.">Reisende ${base}→${p.dest} (Markt heute)</td><td class="r">${(() => { const mk = r.dirs.out.market || {}; const fly = Math.max(0, (mk.potential || potSum) - (mk.outside || 0)); return `${n0(fly)} pro Tag <span class="muted small">· ${n0(fly * 365 / 1000)} Tsd. im Jahr · Potenzial ${n0(potSum)}</span>`; })()}</td></tr>
       <tr><td>Mix Ihrer Passagiere</td><td class="r">Urlaub ${pct(r.dirs.out.seg.leisure / segTot)} · Geschäft ${pct(r.dirs.out.seg.business / segTot)} · Besuch ${pct(r.dirs.out.seg.vfr / segTot)}</td></tr>
@@ -1348,7 +1351,7 @@ const hireLbl = (role, n) => `Einstellen · Anwerbung ${eurB(SM.hireQuote(W, rol
 function planCost(p) {
   const pl = W.player, k = ui.plannerKit || {}, parts = [], monthly = [];
   const freq = p.wk && p.wk < 7 ? 1 : p.freq;
-  const lic = pl.stations[p.dest] ? 0 : SM.licenceFee(W, p.dest); if (lic) parts.push([`Lizenz ${p.dest}`, lic]);
+  const lic = pl.stations[p.dest] ? 0 : SM.stationFee(W, p.dest); if (lic) parts.push([`Station ${p.dest}`, lic]);
   const sc = W.slotCost(pl, p.base, p.dest, freq).cost; if (sc > 0) parts.push(['Slots', sc]);
   if (k.n && p.acq && p.acq !== 'none') {
     const intro = pl.familyKnown(p.type) ? 0 : P.TYPE_INTRO_COST;
