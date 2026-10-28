@@ -426,6 +426,10 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const ac = T.fleet[0], v = SMx.aiDealValue(wg, T, { from: pg.id, to: T.id, give: [{ k: 'cash', amount: 1 }], take: [{ k: 'ac', id: ac.id }] });
   assert.equal(v.margin, 0, 'Konzernhandel ohne Aufschlag');
   console.log('0.17.9 ok: Mehrheit an', T.name, '– Ausschüttung gesteuert, Sonderausschüttung', Math.round(sp.mine / 1e5) / 10, 'Mio. €, Konzernhandel zum fairen Wert', o.ok ? '' : ''); }
+{ const SMx = (await import('../shared/engine.cjs')).default; const wa = SMx.newGame({ seed: 2, base: 'HAM' }), c0 = wa.player.ledger.cash;
+  assert.equal(SMx.adminGrant(wa, wa.playerId, 999e6, 'Tim').ok, true, 'Spielleitung +999 Mio.'); assert.equal(wa.player.ledger.cash - c0, 999e6 * 100, '+999 Mio. gebucht');
+  SMx.adminGrant(wa, wa.playerId, -2000e6, 'Tim'); assert.equal(wa.player.ledger.cash - c0, 0, 'höchstens −999 Mio. je Buchung');
+  console.log('0.17.11 ok: Kapitalkorrektur bis ±999 Mio. €'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 // Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
 { const SMx = (await import('../shared/engine.cjs')).default;

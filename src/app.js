@@ -889,7 +889,7 @@ function renderSidebar() {
   const lf = seats7 ? pax7 / seats7 : null, lfPrev = seats14 ? pax14 / seats14 : null, otp = playerOtp();
   const cashPrev = h.length > 30 ? h[h.length - 31] : h[0];
   const sbHtml = `
-    <div class="card2 alcard"><button class="albadge" data-act="tab" data-tab="profile" title="Logo gestalten">${logoSvg(pl, 46)}</button><div style="min-width:0"><b>${esc(pl.name)}</b><span>${pl.stage().label} · Basis ${pl.bases.join(', ')}${ui.mp ? ' · ' + esc(ui.mp.name) : ''}</span></div></div>
+    <div class="card2 alcard"><button class="albadge" data-act="tab" data-tab="profile" title="Logo gestalten">${logoSvg(pl, 46)}</button><div style="min-width:0"><b>${esc(pl.name)}</b><span>${pl.stage().label} · Basis ${pl.bases.join(', ')}${ui.mp ? ' · ' + esc(ui.mp.name) : ''}</span>${preStart() && !pl.fleet.length ? '<button class="btn small ghost" data-act="rebase" style="margin-top:4px;padding:2px 8px">Basis ändern</button>' : ''}</div></div>
     <div class="card2 kpilist">
       <div><span>Kontostand${nc < 0 ? ' · im Dispo' : ''}</span><b class="${nc < 0 ? 'neg' : ''}">${eur(nc)}</b>${nc > 0 && cashPrev > 0 ? kpiDelta(trendPct(nc, cashPrev)) : '<em></em>'}</div>
       <div class="kpi-link" data-act="tab" data-tab="history" role="button" tabindex="0" title="Verlauf Tag für Tag"><span>Tagesergebnis <i class="tl-go">↗</i></span><b class="${sgn(pl.ledger.lastDay || 0)}">${eur(pl.ledger.lastDay || 0, { plus: true })}</b><em></em></div>
@@ -3050,7 +3050,11 @@ VIEWS.profile = function viewProfile() {
   const pl = W.player, cur = logoOf(pl);
   ui.logo = ui.logo || { shape: cur.dflt ? 'shield' : cur.shape, sym: cur.dflt ? 'paper' : cur.sym, c1: cur.c1, c2: cur.c2 };
   const L = ui.logo, demo = { ...pl, logo: L };
+  const canRb = !pl.fleet.length && !pl.activeRoutes().length && !Object.keys(pl.stakes || {}).length;
   return `<h2 class="sec">Profil & Logo <small>${esc(pl.name)} · ${esc(pl.code || '')}</small></h2>
+    <div class="card pad spread" style="gap:10px;flex-wrap:wrap"><div class="stack" style="gap:2px"><b>Name, Kürzel und Heimatbasis</b><span class="small">${esc(pl.name)} (${esc(pl.code || '')}) · Start in <b class="mono">${esc(pl.bases[0])}</b> ${esc(apName(pl.bases[0]))}</span>
+      <span class="small muted">${canRb ? (preStart() ? `Bis zum Start am ${esc(startTxt(preStart()))} jederzeit änderbar.` : 'Änderbar, solange Sie noch kein Flugzeug, keine Strecke und keine Beteiligung haben.') : 'Nicht mehr änderbar – Ihre Airline hat schon Flugzeuge, Strecken oder Beteiligungen.'}</span></div>
+      <button class="btn small${canRb ? ' primary' : ''}" data-act="rebase" ${canRb ? '' : 'disabled'}>Name und Basis ändern</button></div>
     <div class="logo-stage"><div class="logo-big">${logoSvg(demo, 112, L)}</div>
       <div class="stack" style="gap:6px"><b style="font-size:18px">${esc(pl.name)}</b><span class="small muted">So erscheint Ihr Logo in der Seitenleiste, bei Mitspielenden, im Handel und auf dem Leitwerk.</span>
       <div class="acv-box" style="max-width:280px">${acSvg('A20N', { color: L.c1, code: pl.code, ink: L.c2 })}</div></div></div>
@@ -4874,7 +4878,7 @@ const airlineFields = (prefix, name = '', code = '', base = 'HAJ', ctx = null) =
 // ---------- Heimatbasis finden: Filter nach Größe, Region, Kosten und Konkurrenz ----------
 const BP = {};
 const BP_SIZE = [['all', 'Alle Größen'], ['s', 'Klein · bis 8 Mio.'], ['m', 'Mittel · 8–20 Mio.'], ['l', 'Groß · 20–50 Mio.'], ['x', 'Drehkreuz · über 50 Mio.']];
-const BP_SORT = { pax: ['Größe', (c) => -(P.AIRPORTS[c].pax || 0)], lic: ['Lizenz', (c) => bpCost(c).lic], base: ['Basiskosten', (c) => bpCost(c).base], slot: ['Slotpreis', (c) => bpCost(c).slot],
+const BP_SORT = { pax: ['Größe', (c) => -(P.AIRPORTS[c].pax || 0)], lic: ['Eröffnungskosten', (c) => bpCost(c).lic + bpCost(c).slots3], base: ['Basiskosten', (c) => bpCost(c).base], slot: ['Slotpreis', (c) => bpCost(c).slot],
   fee: ['Entgelte je Gast', (c) => bpCost(c).fee], comp: ['wenig Konkurrenz', (c, st) => bpComp(c, st).n * 1000 - (P.AIRPORTS[c].pax || 0)], name: ['Name', null] };
 const bpSize = (c) => { const x = P.AIRPORTS[c].pax || 0; return x <= SM.CAREER.startMaxPax ? 's' : x <= 20 ? 'm' : x <= 50 ? 'l' : 'x'; };
 const BP_COST = new Map();
@@ -4897,9 +4901,10 @@ function bpComp(c, st = null) { const x = (st && st.ctx) || { ai: {}, hum: {} };
 function baseInfoHtml(c, st = null) {
   const a = P.AIRPORTS[c], k = bpCost(c), sz = bpSize(c), cp = bpComp(c, st);
   return `<div class="bp-selhead"><b class="mono">${c}</b><div style="min-width:0"><b>${esc(apName(c))}</b> <span class="small muted">${esc(SM.COUNTRY_LABEL[a.country] || a.country)} · ${esc(a.region)}</span>
-      <div class="small">${NF1.format(a.pax || 0)} Mio. Passagiere im Jahr · Einzugsgebiet ${NF1.format(a.pop || 0)} Mio. Menschen</div></div></div>
-    <div class="bp-kpis"><div><span>Lizenz beim Start</span><b>${eur(k.lic)}</b></div><div title="Drei Slots am Basisflughafen gehören zur Gründung – damit sind die ersten drei täglichen Abflüge sicher. Weitere Slots kosten je nach Knappheit mehr."><span>${P.BASE_SLOTS.n} Basis-Slots</span><b>${eur(k.slots3)}</b></div><div><span>Start gesamt</span><b>${eur(k.lic + k.slots3)}</b></div><div><span>Basis im Monat</span><b>${eur(k.base)}</b></div><div><span>Entgelte + Steuer je Gast</span><b>${eur(k.fee)}</b></div>${k.inc > 0.05 ? `<div><span>Anlaufrabatt</span><b class="pos">${pct(k.inc)}</b></div>` : ''}</div>
-    <div class="small">${sz === 's' ? '<span class="pos">Regionalflughafen: günstiger Einstieg, kleine Märkte, wenig Slotdruck.</span>' : sz === 'm' ? '<span class="ink2">Mittlerer Flughafen: solide Nachfrage, spürbare Kosten.</span>' : '<span class="warnc">Großer Flughafen: teuer, starke Konkurrenz, Slots knapp – am Anfang ein großes Risiko.</span>'}
+      <div class="small">${NF1.format(a.pax || 0)} Mio. Passagiere im Jahr · Einzugsgebiet ${NF1.format(a.pop || 0)} Mio. Menschen</div></div>
+      <div class="bp-total" title="Wird bei der Eröffnung sofort vom Startkapital abgezogen"><span>Bei Eröffnung fällig</span><b>${eur(k.lic + k.slots3)}</b><em>Lizenz ${eurB(k.lic)} + ${P.BASE_SLOTS.n} Slots ${eurB(k.slots3)}</em><em>danach ${eurB(k.base)} im Monat</em></div></div>
+    <div class="bp-kpis"><div><span>Lizenz beim Start</span><b>${eur(k.lic)}</b></div><div title="Drei Slots am Basisflughafen gehören zur Gründung – damit sind die ersten drei täglichen Abflüge sicher. Weitere Slots kosten je nach Knappheit mehr."><span>${P.BASE_SLOTS.n} Basis-Slots</span><b>${eur(k.slots3)}</b></div><div><span>Basis im Monat</span><b>${eur(k.base)}</b></div><div><span>Entgelte + Steuer je Gast</span><b>${eur(k.fee)}</b></div><div title="Neue Strecken: Nachlass auf Passagierentgelte im ersten Jahr – nur an kleinen und mittleren Flughäfen"><span>Anlaufrabatt</span>${k.inc > 0.005 ? `<b class="pos">${pct(k.inc)}</b>` : '<b class="muted">keiner</b>'}</div></div>
+    <div class="small">${sz === 's' ? '<span class="pos">Regionalflughafen: günstiger Einstieg, kleine Märkte, wenig Slotdruck.</span>' : sz === 'm' ? '<span class="ink2">Mittlerer Flughafen: solide Nachfrage, spürbare Kosten.</span>' : '<span class="warnc">Großer Flughafen: teuer, starke Konkurrenz, Slots knapp, kein Anlaufrabatt – am Anfang ein großes Risiko.</span>'}
       ${cp.ai.length ? ` · KI-Basis: <b>${cp.ai.map(esc).join(', ')}</b>` : ' · keine KI-Basis'}${cp.hum.length ? ` · Hier starten auch: <b>${cp.hum.map(esc).join(', ')}</b>` : ''}</div>`;
 }
 function basePicker(prefix, sel = 'HAJ', ctx = null) {
@@ -4933,7 +4938,7 @@ function bpListHtml(st) {
     const hl = (k, txt) => (st.sort === k ? `<b>${txt}</b>` : txt);
   return (l.length ? l.map((c) => { const a = P.AIRPORTS[c], k = bpCost(c), cp = bpComp(c, st), sz = bpSize(c);
     return `<button type="button" class="bp-row" data-bpa="${c}" aria-pressed="${c === st.sel}"><b class="mono">${c}</b><span class="bp-n"><span>${esc(apName(c))} <span class="muted">· ${esc(SM.COUNTRY_LABEL[a.country] || a.country)}</span></span>
-      <span class="bp-m">${hl('pax', NF1.format(a.pax || 0) + ' Mio. Pax')} · Lizenz ${hl('lic', eurC(k.lic))} · Basis ${hl('base', eurC(k.base))}/Mon. · Slot ${hl('slot', eurC(k.slot))} · Entgelte ${hl('fee', eurC(k.fee))}${k.inc > 0.05 ? ` · <span class="pos">Rabatt ${pct(k.inc)}</span>` : ''}</span></span>
+      <span class="bp-m">${hl('pax', NF1.format(a.pax || 0) + ' Mio. Pax')} · <b>Eröffnung ${hl('lic', eurC(k.lic + k.slots3))}</b> · Basis ${hl('base', eurC(k.base))}/Mon. · Slot ${hl('slot', eurC(k.slot))} · Entgelte ${hl('fee', eurC(k.fee))}${k.inc > 0.05 ? ` · <span class="pos">Rabatt ${pct(k.inc)}</span>` : ''}</span></span>
       <span class="bp-tags"><span class="chip ${sz === 's' ? 'good' : sz === 'm' ? '' : 'warn'}">${sz === 's' ? 'klein' : sz === 'm' ? 'mittel' : sz === 'l' ? 'groß' : 'Drehkreuz'}</span>${cp.ai.length ? `<span class="chip" title="${esc(cp.ai.join(', '))}">KI ${cp.ai.length}</span>` : ''}${cp.hum.length ? `<span class="chip me" title="${esc(cp.hum.join(', '))}">${cp.hum.length} Spieler</span>` : ''}</span></button>`; }).join('')
     : '<p class="small muted" style="padding:8px">Kein Flughafen passt zu diesen Filtern.</p>') + `<p class="small muted bp-count">${total > l.length ? `Die ersten ${l.length} von ${total} Treffern – Filter oder Suche eingrenzen.` : `${total} von ${SM.AP_CODES.length} Flughäfen`}</p>`;
 }
@@ -5244,7 +5249,7 @@ async function showAdmin(id, onBack) {
   const day = d.day, alName = (aid) => { const p = d.players.find((x) => x.airlineId === aid); return p ? p.airlineName : aid; };
   const pRow = (p) => `<div class="adm-p"><div style="min-width:0"><b>${esc(p.airlineName)}</b> <span class="small muted mono">${esc(p.code || '')}</span>${p.me ? ' <span class="chip me">Sie</span>' : ''}${p.host ? ' <span class="chip">Leitung</span>' : ''}${p.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}
       <div class="small muted"><i class="pc-dot ${p.online ? 'on' : ''}"></i>${esc(p.name)} · Basis ${esc(p.base || '–')} · ${p.equity === null ? '–' : 'EK ' + eur(p.equity)} · ${p.fleet} Flugzeuge · ${p.routes} Strecken · seit ${new Date(p.joined).toLocaleDateString('de-DE')}</div></div>
-    ${p.me ? '' : `<div class="row adm-act"><span class="row" style="gap:4px"><input type="number" class="adm-amt" data-for="${esc(p.airlineId)}" step="1" min="-100" max="100" placeholder="± Mio. €" aria-label="Kapitalkorrektur in Mio. Euro"><button class="btn small" data-adm="grant" data-al="${esc(p.airlineId)}">Kapital buchen</button></span>
+    ${p.me ? '' : `<div class="row adm-act"><span class="row" style="gap:4px"><input type="number" class="adm-amt" data-for="${esc(p.airlineId)}" step="1" min="-999" max="999" placeholder="± Mio. € (bis 999)" aria-label="Kapitalkorrektur in Mio. Euro"><button class="btn small" data-adm="grant" data-al="${esc(p.airlineId)}">Kapital buchen</button></span>
       <button class="btn small danger" data-adm="kick" data-al="${esc(p.airlineId)}">Entfernen</button><button class="btn small danger" data-adm="kick" data-ban="1" data-al="${esc(p.airlineId)}">Entfernen + sperren</button></div>`}</div>`;
   const when = (e) => (e.cancelled ? 'annulliert' : e.start > day ? `ab ${dateShort(e.start)}` : e.end > day ? `bis ${dateShort(e.end)}` : 'wirkt nach');
   const eRow = (e) => `<div class="adm-e${e.cancelled ? ' off' : ''}"><span class="chip ${e.severity === 'crit' ? 'crit' : e.severity === 'good' ? 'good' : 'warn'}">${esc(EV_TYPE[e.type] || e.type)}</span><div style="min-width:0"><span class="small">${esc(e.text)}</span><div class="small muted">${when(e)}${e.airline ? ' · betrifft ' + esc(alName(e.airline)) : ''}</div></div>
@@ -5285,6 +5290,7 @@ async function showAdmin(id, onBack) {
     const body = cmd === 'kick' ? { cmd: 'kick', airlineId: b.dataset.al, ban: !!b.dataset.ban } : cmd === 'unban' ? { cmd: 'unban', u: b.dataset.u } : cmd === 'cancel' ? { cmd: 'cancelEvent', eventId: b.dataset.ev }
       : { cmd: 'grant', airlineId: b.dataset.al, amount: Number((m.querySelector(`.adm-amt[data-for="${b.dataset.al}"]`) || {}).value || 0) * 1e6 };
     if (cmd === 'grant' && !body.amount) { toast('Bitte einen Betrag in Mio. € eingeben, z. B. 5 oder -5.'); return; }
+    if (cmd === 'grant' && Math.abs(body.amount) > 999e6) { toast('Höchstens ±999 Mio. € auf einmal.'); return; }
     b.disabled = true;
     try { const r = await api(`/games/${id}/admin`, { body }); toast(r.msg || 'Erledigt.'); if (ui.mp && ui.mp.id === id) await mpPoll(true); }
     catch (err) { toast(err.message); }

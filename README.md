@@ -183,6 +183,16 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.17.11: Startbasis leichter ändern, Kapitalkorrektur bis 999 Mio.
+
+- **Startbasis ändern:** Unter Unternehmen → Profil & Logo gibt es oben die Karte „Name, Kürzel und Heimatbasis“ mit „Name und Basis ändern“ – bis zum Start der Welt (und danach, solange noch kein Flugzeug, keine Strecke und keine Beteiligung da ist). Vor dem Start steht zusätzlich in der linken Spalte unter dem Airline-Namen „Basis ändern“. Der Dialog nutzt die Basisauswahl mit Filtern und Eröffnungskosten.
+- **Spielleitung:** Kapitalkorrektur je Buchung jetzt bis ±999 Mio. € (vorher ±100 Mio.).
+
+## Neu in 0.17.10: Eröffnungskosten auf einen Blick, kein Rabatt an großen Flughäfen
+
+- **Basisauswahl:** Rechts neben dem Flughafen steht groß „Bei Eröffnung fällig“ (Lizenz + 3 Basis-Slots) mit Aufschlüsselung und den laufenden Kosten pro Monat. In der Liste steht statt der Lizenz jetzt „Eröffnung“ (Gesamtbetrag), die Sortierung „Eröffnungskosten“ sortiert danach.
+- **Anlaufrabatt nur bis mittlere Flughäfen:** Große Flughäfen und Drehkreuze (über 20 Mio. Passagiere) geben keinen Anlaufrabatt mehr (vorher mindestens 8 %). Kleine und mittlere bleiben bei 15–50 %. Die Basisauswahl zeigt „Anlaufrabatt: keiner“.
+
 ## Neu in 0.17.9: Konzernvorteile bei Beteiligungen
 
 Beteiligungen an KI-Airlines bringen jetzt gestaffelte Vorteile – deutlich weniger als eine Übernahme, bei der alles übergeht:

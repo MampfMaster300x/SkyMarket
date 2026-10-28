@@ -79,7 +79,7 @@ const SM = (() => {
     // Kaufkraft: Auf Kurz- und Mittelstrecke richten sich Preise nach dem Einkommen (Türkei rund −15 %, Indien −30 %), auf Langstrecke sind sie weltweit ähnlicher
     INCOME_FARE: { dom: { SA: 0.85 }, ref: 0.9, exp: 0.25, min: 0.7, max: 1.08, fullKm: 2000, farKm: 7000, farShare: 0.3 },
     // Anlaufrabatt kleiner Flughäfen für neue Strecken von Spielenden: Passagier- und Landeentgelte im ersten Jahr reduziert
-    ROUTE_INCENTIVE: { maxPax: 10, share: 0.5, days: 365, floor: 0.15, floorBig: 0.08, bigPax: 60 },
+    ROUTE_INCENTIVE: { maxPax: 10, share: 0.5, days: 365, floor: 0.15, noneAbove: 20 },   // große Flughäfen und Drehkreuze (über 20 Mio. Pax) geben keinen Anlaufrabatt
     // Marktwissen: Wie genau kennen Sie die Nachfrage einer Verbindung? Stufe 0 unbekannt … 4 sehr genau (Unsicherheit als Faktor).
     // Eigene Strecke: Ist-Daten. Wissen veraltet je decay Tage um eine Stufe. analyst: Abschlag auf die Unsicherheit je Fachkraft-Stufe.
     MARKET_INFO: { sigma: [0.45, 0.3, 0.16, 0.09, 0.04], own: 0.05, decay: 365, analyst: [0, 0.25, 0.4, 0.55], scan: [0, 6, 15, 30], studyLv: { small: 2, extended: 3, full: 4 },
@@ -821,7 +821,7 @@ const SM = (() => {
   const sumCosts = (c) => COST_KEYS.reduce((a, k) => a + (c[k] || 0), 0) + (c.disruption_expected || 0);
   /** Anlaufrabatt eines kleinen Flughafens (Anteil der Entgelte, die im ersten Jahr einer neuen Strecke entfallen). */
   /** Anlaufrabatt auf Entgelte im ersten Jahr einer neuen Strecke: kleine Flughäfen bis 50 %, auch große Flughäfen werben mit 20 % (Drehkreuze über 60 Mio. Passagiere 10 %). */
-  function incentiveAt(apt) { const R = P.ROUTE_INCENTIVE; if (!R) return 0; const x = ap(apt).pax || 0; return Math.max(x > R.bigPax ? R.floorBig : R.floor, R.share * Math.max(0, 1 - x / R.maxPax)); }
+  function incentiveAt(apt) { const R = P.ROUTE_INCENTIVE; if (!R) return 0; const x = ap(apt).pax || 0; if (x > R.noneAbove) return 0; return Math.max(R.floor, R.share * Math.max(0, 1 - x / R.maxPax)); }
   /** Verwaltung je Flugzeug und Tag: wächst mit der Größe (Dash 8 rund 600 EUR, A320 900, A380 1.440). */
   function ovhAc(typeId) { const t = P.AIRCRAFT_TYPES[typeId]; return P.OVERHEAD_PER_AIRCRAFT_DAY * clamp(Math.sqrt((t.seats.standard || 180) / 180), 0.6, 1.6); }
   function aircraftDayFixedGeneric(typeId) {
@@ -4232,7 +4232,7 @@ const SM = (() => {
   }
   /** Spielleitung: Kapital zuschießen oder abziehen (Korrektur), als Eigenkapitalbewegung gebucht. */
   function adminGrant(w, id, amount, by = 'Spielleitung') {
-    const al = w.airlines[id], amt = Math.round(clamp(Number(amount) || 0, -100e6, 100e6) / 1e4) * 1e4;
+    const al = w.airlines[id], amt = Math.round(clamp(Number(amount) || 0, -999e6, 999e6) / 1e4) * 1e4;
     if (!al || !al.isPlayer || al.removed) return { ok: false, msg: 'Unbekannte Airline.' };
     if (!amt) return { ok: false, msg: 'Bitte einen Betrag angeben.' };
     al.ledger.cash += Math.round(amt * 100); al.ledger.equityContrib = (al.ledger.equityContrib || 0) + Math.round(amt * 100);
