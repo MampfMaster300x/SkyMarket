@@ -705,6 +705,36 @@ select.picked { display: none !important; }
 input[type="password"] { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; }
 .rt.hu { stroke-width: 1.4; opacity: .7; }
 .acmi-ev { border-color: var(--good, #1fa463); }
+.cand.named { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.named-note { color: var(--accent-ink); }
+.cal { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.cal-row { display: grid; grid-template-columns: 128px 1fr; border-top: 1px solid var(--line); min-height: 44px; }
+.cal-row:first-child { border-top: 0; }
+.cal-head { min-height: 26px; background: var(--panel-2); }
+.cal-l { display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; gap: 1px; border-right: 1px solid var(--line); min-width: 0; }
+.cal-l b { font-size: 12.5px; } .cal-l span { font-size: 10.5px; line-height: 1.25; }
+.cal-t { position: relative; min-width: 0; overflow: hidden; }
+.cal-head .cal-t > span { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 5px; font-size: 10.5px; color: var(--ink-3); border-left: 1px solid var(--line); overflow: hidden; white-space: nowrap; }
+.cal-t > i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); opacity: .5; }
+.cal-b, .cal-g, .cal-m { position: absolute; top: 8px; bottom: 8px; border-radius: 5px; font-size: 10.5px; line-height: 1; display: flex; align-items: center; padding: 0 5px; overflow: hidden; white-space: nowrap; }
+.cal-b { background: var(--c-flotte, #1fa463); color: #fff; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.cal-b.ev { background: var(--accent); color: var(--on-accent); }
+.cal-g { z-index: 1; border: 1px dashed color-mix(in srgb, var(--good) 60%, transparent); background: color-mix(in srgb, var(--good) 10%, transparent); color: var(--good); cursor: pointer; font: inherit; font-size: 10.5px; }
+.cal-g:hover, .cal-g.on { background: color-mix(in srgb, var(--good) 26%, transparent); border-style: solid; }
+.cal-m { z-index: 2; background: repeating-linear-gradient(45deg, var(--panel-2), var(--panel-2) 4px, var(--line) 4px, var(--line) 8px); }
+.cal-ev { position: absolute; bottom: 0; height: 4px; background: var(--accent); border-radius: 2px; }
+.cal-free { display: grid; gap: 6px; margin-top: 8px; }
+.cal-free .chip-t { padding: 4px 10px; font-size: 11.5px; }
+.chip-t.pick { text-decoration: none; color: var(--good); border-style: dashed; border-color: color-mix(in srgb, var(--good) 60%, transparent); }
+.chip-t.pick[aria-pressed="true"] { border-style: solid; color: var(--ink); }
+.cal-key { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+.cal-key i { display: inline-block; position: static; width: 18px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; padding: 0; }
+.cal-key i.cal-e { background: var(--accent); height: 4px; vertical-align: 2px; }
+.cal-mini { position: relative; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.cal-mini span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); }
+.acmi-c { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--line); }
+.acf select { width: auto; }
+@media (max-width: 640px) { .cal-row { grid-template-columns: 84px 1fr; } .cal-l span:nth-child(3) { display: none; } }
 .slotdate { display: grid; grid-template-columns: 1fr; gap: 8px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--panel-2); }
 .slotdate > div:first-child { display: flex; flex-direction: column; gap: 2px; }
 .slotdate > div > b { font-size: 17px; }
@@ -1455,6 +1485,8 @@ const SM = (() => {
         effect: ['Kreditlinie +25 %, Zins −0,5 Pkt.', 'Kreditlinie +50 %, Zins −1,0 Pkt.', 'Kreditlinie +100 %, Zins −1,5 Pkt.'] },
       marketing: { label: 'Marketing', salary: [7000, 11500, 18000], max: 1,
         effect: ['Neue Strecken in 24 statt 30 Tagen bekannt, Werbung +30 % wirksamer', '20 Tage, Werbung +60 % wirksamer', '16 Tage, Werbung doppelt so wirksam'] },
+      inflight: { label: 'Bordprodukt und Service', salary: [6500, 10500, 16500], max: 1,
+        effect: ['Kabinenstimmung +3 Pkt., Geschäftsreisende bewerten den Bordservice besser (+4 %), Catering 12 % teurer', 'Kabinenstimmung +6 Pkt., Premium-Wahrnehmung deutlich besser (+7 %), Catering 24 % teurer', 'Kabinenstimmung +9 Pkt., Premium-Wahrnehmung wie bei Spitzen-Airlines (+10 %), Catering 36 % teurer'] },
       // Einzigartiger Top-Berater: wirkt in allen Bereichen über Expertenniveau. Es gibt ihn nur einmal pro Welt.
       consultant: { label: 'Top-Beratung', salary: [260000, 260000, 260000, 260000], max: 1, unique: true, signOn: 450000,
         effect: ['', '', '', 'Wirkt in allen acht Bereichen über Expertenniveau: Pünktlichkeit +11 Pkt., Defekte −65 %, Kreditlinie ×2,5, Flex-Tarife +29 %, Kerosin −8 %, Werbung 2,4-fach, Streikrisiko −80 %, Prognosen deutlich genauer'] },
@@ -1474,6 +1506,16 @@ const SM = (() => {
         trait: 'der Beste seines Fachs – und das weiß er', prev: 'saniert und baut Airlines seit drei Jahrzehnten' },
       { id: 'LP', name: 'Luis Perez', role: 'fleetadvisor', level: 3, years: 24, region: 'Lateinamerika', he: true, aiCash: 20e6,
         trait: 'kennt jedes gebrauchte Flugzeug am Markt beim Vornamen', prev: 'Gutachter und Remarketing-Chef bei Leasinggebern' },
+    ],
+    // Bekannte Köpfe der Branche: tauchen zu bestimmten Zeiten als Bewerbung auf (Vorschläge), sonst wie normale Fachkräfte.
+    // talent = feste Leistung im Verhältnis zur Zusage; perk = persönliche Stärke; grow = wird nach days Tagen im Haus eine Stufe besser.
+    NAMED_EXPERTS: [
+      { id: 'NLF', name: 'Lukas Flitz', role: 'ops', level: 3, years: 19, region: 'Europa', he: true, talent: 1.12, perk: 'turn', from: 25, stay: 75, again: 210,
+        trait: 'holt aus jedem Umlauf ein paar Minuten heraus', prev: 'leitete die Verkehrszentrale eines großen Ferienfliegers', note: 'Persönliche Stärke: Bodenzeiten an allen Stationen 4 Minuten kürzer – mehr Umläufe pro Flugzeug.' },
+      { id: 'NMG', name: 'Marten Grillkalt', role: 'procurement', level: 1, years: 3, region: 'Europa', he: true, talent: 1.18, grow: { days: 365, to: 2 }, from: 50, stay: 75, again: 180,
+        trait: 'bleibt in jeder Verhandlung eiskalt', prev: 'Trainee im Kerosin- und Handling-Einkauf eines Netzwerkcarriers', note: 'Junior mit Potenzial: liefert schon jetzt über Junior-Niveau und wird nach einem Jahr im Haus Senior (Gehalt steigt dann mit).' },
+      { id: 'NPS', name: 'Philipp Peter Son', role: 'inflight', level: 3, years: 22, region: 'Europa', he: true, talent: 1.08, perk: 'gourmet', from: 80, stay: 75, again: 240,
+        trait: 'macht aus jedem Bordmenü ein kleines Ereignis', prev: 'verantwortete Catering und Kabinenkonzept einer Premium-Airline', note: 'Persönliche Stärke: Sterneküche an Bord – Business- und First-Gäste zahlen 5 % mehr, die Kabine ist stolz auf ihr Produkt (Stimmung zusätzlich +3 Pkt.).' },
     ],
     OLD_AC_AGE: 8,
     STUDY_COST: 25000, STUDY_DAYS: [21, 14, 10], STUDY_ERR: [0.10, 0.05, 0.02],
@@ -2239,7 +2281,9 @@ const SM = (() => {
     log(day, msg, kind = 'info') { this.events.push({ day, msg, kind }); if (this.events.length > 300) this.events.shift(); }
     station(apt) { if (!this.stations[apt]) this.stations[apt] = { handling: 'contract', terminal: 'std' }; return this.stations[apt]; }
     terminalAt(apt) { return this.isPlayer && this.stations[apt] ? this.stations[apt].terminal : 'std'; }
-    turnExtra(apt) { return P.TERMINALS[this.terminalAt(apt)].turn; }
+    /** Persönliche Stärke einer angestellten Fachkraft (nach Antritt). */
+    perk(k) { const d = this._day ?? 0; return this.experts.some((e) => e.perk === k && !(e.startDay > d)); }
+    turnExtra(apt) { return P.TERMINALS[this.terminalAt(apt)].turn - (this.perk('turn') ? 4 : 0); }
     rotH(r) { return rotationHours(r.base, r.dest, r.type_id, r.service, r.buffer, this.turnExtra(r.base), this.turnExtra(r.dest)); }
     extraU(o, d) {
       if (!this.isPlayer) return null;
@@ -2251,9 +2295,11 @@ const SM = (() => {
       if (lf > 0) { const LU = P.LOYALTY[lv].u; u.leisure += LU.leisure * lf; u.business += LU.business * lf; u.vfr += LU.vfr * lf; }
       // Firmenkunden: gewonnene Verträge (+) oder an die Konkurrenz verlorene (−) an einem Flughafen
       if (this.corp) { const day = this._day ?? 0; for (const x of [o, d]) { const c = this.corp[x]; if (c && c.until > day) u.business += c.u / 2; } }
+      // Bordprodukt: besseres Essen und Service heben die Wahrnehmung, vor allem bei Geschäftsreisenden
+      { const lv = this.skill('inflight'); if (lv > 0) { u.business += lv3([0, 0.04, 0.07, 0.10], lv); u.leisure += lv3([0, 0.01, 0.02, 0.03], lv); } }
       return u;
     }
-    bizPrem() { return lv3([0, 0.08, 0.15, 0.22], this.skill('revenue')); }
+    bizPrem() { return lv3([0, 0.08, 0.15, 0.22], this.skill('revenue')) + (this.perk('gourmet') ? 0.05 : 0); }
     /** Kabinenaufteilung der Airline (Spielende: Strategie; Premium-KI: Standard mit Business, auf Langstrecke auch First). */
     cabinCfg() { return this.cabin || (this.archetype === 'premium' ? P.CABIN.ai : null); }
     /** Wirkung des Vielfliegerprogramms (0…1): wächst über 6 Monate und mit der Größe des Netzes. */
@@ -2711,7 +2757,7 @@ const SM = (() => {
   const capOf = (w, typeId) => Math.round(stockCap(typeId) * (1 + 0.2 * Math.min(20, Math.max(0, ((w && w.humans) ? w.humans.length : 1) - 1))));
   function stockCap(typeId) { const t = P.AIRCRAFT_TYPES[typeId]; if (t.stock !== undefined) return t.stock; if (['A20N', 'B38M', 'A21N'].includes(typeId)) return 10; return t.ill.kind === 'wide' ? 3 : 5; }
   const REGION_PHASE = { Europa: 0, Nordamerika: 0.6, Lateinamerika: 1.4, Nahost: 2.0, Afrika: 2.6, Asien: 3.3, Ozeanien: 4.0 };
-  const EXPERT_MISS = { analyst: 'Marktprognose daneben', revenue: 'Tarifstrategie verfehlt', procurement: 'ungünstigen Liefervertrag abgeschlossen', ops: 'Fehlplanung in der Einsatzsteuerung', tech: 'Wartungsintervalle falsch eingeschätzt', hr: 'Gespräche mit der Belegschaft verpatzt', finance: 'Bankgespräch lief schlecht', marketing: 'Kampagne ging am Publikum vorbei' };
+  const EXPERT_MISS = { analyst: 'Marktprognose daneben', revenue: 'Tarifstrategie verfehlt', procurement: 'ungünstigen Liefervertrag abgeschlossen', ops: 'Fehlplanung in der Einsatzsteuerung', tech: 'Wartungsintervalle falsch eingeschätzt', hr: 'Gespräche mit der Belegschaft verpatzt', inflight: 'neues Menü fiel bei den Gästen durch', finance: 'Bankgespräch lief schlecht', marketing: 'Kampagne ging am Publikum vorbei' };
   const EXPERT_LUCK = { analyst: 'Trend früh erkannt', revenue: 'Tarife genau getroffen', procurement: 'Top-Konditionen ausgehandelt', ops: 'Umläufe glänzend gesteuert', tech: 'Ausfälle vorausschauend verhindert', hr: 'Team begeistert', finance: 'Bank überzeugt', marketing: 'Kampagne ging viral' };
   /**
    * Großereignisse nach Kalender (Spielbeginn 1. Januar 2027): werden Monate vorher angekündigt und treiben die Nachfrage
@@ -2740,6 +2786,21 @@ const SM = (() => {
     { key: 'wc34', label: 'Fußball-WM', y: 2034, m: 11, d: 20, dur: 30, lead: 365, airports: ['RUH', 'JED', 'DMM'], countries: ['SA'], demand: { leisure: 1.9, business: 1.1, vfr: 1.2 }, demand2: { leisure: 1.15 } },
   ];
   /** Tagesrate einer Charteranfrage für ein bestimmtes Muster (Familie: nach Sitzen angepasst). */
+  const MON_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  function dayDE(d) { const y = Math.floor(d / 365), r = d - y * 365; let m = 11; while (m > 0 && MONTH_STARTS[m] > r) m--; return `${r - MONTH_STARTS[m] + 1}. ${MON_DE[m]} ${2027 + y}`; }
+  /** Alle laufenden und künftigen Charteraufträge eines Flugzeugs, nach Beginn sortiert. */
+  function acmiList(a, day) { return [a.acmi, ...(a.acmiQ || [])].filter((b) => b && b.end > day).sort((x, y) => x.start - y.start); }
+  /** Freie Zeiträume eines Flugzeugs zwischen from und to (Tage), ohne Charter, Lieferung und laufende Werftzeit. */
+  function acmiGaps(a, from, to) {
+    const busy = acmiList(a, from).map((b) => [b.start, b.end]);
+    if (a.delivery_day > from) busy.push([from, a.delivery_day]);
+    if ((a.status === 'ccheck' || a.status === 'aog') && a.until > from) busy.push([from, a.until]);
+    busy.sort((x, y) => x[0] - y[0]);
+    const out = []; let t = from;
+    for (const [s0, e0] of busy) { if (s0 > t) out.push([t, Math.min(s0, to)]); t = Math.max(t, e0); if (t >= to) break; }
+    if (t < to) out.push([t, to]);
+    return out.filter(([x, y]) => y > x);
+  }
   function acmiRateFor(o, typeId) {
     if (!typeId || typeId === o.type) return o.rate;
     const a = P.AIRCRAFT_TYPES[typeId].seats.standard, b = P.AIRCRAFT_TYPES[o.type].seats.standard;
@@ -3194,6 +3255,7 @@ const SM = (() => {
         const st = al.stations[o];
         c.handling = st && st.handling === 'own' ? t.handling * P.OWN_HANDLING_SHARE * cpi : t.handling * apx(o).hand * cpi * proc;
         c.pax_fees = ap(o).paxfee * P.TERMINALS[al.terminalAt(o)].paxF * pax * cpi;
+        { const lv = al.skill('inflight'); if (lv > 0) c.pax_service *= 1 + lv3([0, 0.12, 0.24, 0.36], lv); }
         if (r.opened_day === undefined || this.day - r.opened_day < P.ROUTE_INCENTIVE.days) { c.pax_fees *= 1 - incentiveAt(o); c.landing *= 1 - incentiveAt(d); if (c.handling) c.handling *= 1 - 0.5 * incentiveAt(o); }
       }
       c.maintenance *= maintF;
@@ -3562,6 +3624,7 @@ const SM = (() => {
       for (const al of this.list) {
         if (al.status === 'insolvent') continue;
         for (const a of al.fleet) {
+          if (a.acmiQ && a.acmiQ.length && (!a.acmi || a.acmi.end <= this.day)) { a.acmi = a.acmiQ.shift(); if (!a.acmiQ.length) delete a.acmiQ; }
           if (a.delivery_day > this.day) continue;
           if ((a.status === 'ccheck' || a.status === 'aog') && a.until <= this.day) {
             al.log(this.day, a.status === 'ccheck' ? `${a.id}: C-Check abgeschlossen, wieder einsatzbereit` : `${a.id}: Reparatur abgeschlossen, wieder einsatzbereit`, 'fleet');
@@ -3569,7 +3632,8 @@ const SM = (() => {
           }
           // Checks staffeln: Ist schon ein gleiches Muster an derselben Basis in der Werft, wartet das nächste (bis 10 % Überziehung)
           const busyTwin = () => al.fleet.some((x) => x !== a && x.status === 'ccheck' && x.type_id === a.type_id && x.base === a.base);
-          if (a.status === 'ok' && a.fh - a.lastC >= P.CCHECK_FH && !(a.acmi && a.acmi.start <= this.day && a.acmi.end > this.day) && !(a.fh - a.lastC < P.CCHECK_FH * 1.1 && busyTwin())) {
+          const charterSoon = () => a.fh - a.lastC < P.CCHECK_FH * 1.15 && acmiList(a, this.day).some((b) => b.start < this.day + P.CCHECK_DAYS);
+          if (a.status === 'ok' && a.fh - a.lastC >= P.CCHECK_FH && !(a.acmi && a.acmi.start <= this.day && a.acmi.end > this.day) && !(a.fh - a.lastC < P.CCHECK_FH * 1.1 && busyTwin()) && !charterSoon()) {
             const days = Math.max(4, P.CCHECK_DAYS - (al.hangars.includes(a.base) ? P.HANGAR_CHECK_DAYS : 0) - Math.round(al.skill('tech')));
             a.status = 'ccheck'; a.until = this.day + days; a.lastC = a.fh;
             al.log(this.day, `${a.id} (${P.AIRCRAFT_TYPES[a.type_id].label}) ist für ${days} Tage im C-Check`, al.isPlayer ? 'warn' : 'info');
@@ -3616,6 +3680,7 @@ const SM = (() => {
           if (al.defer && al.defer.until > this.day) { L.post('lease', -lc, false); al.defer.owed += lc; }   // gestundet: Aufwand ja, Zahlung später
           else L.post('lease', -lc);
         }
+        if (a.acmiQ && a.acmiQ.length && (!a.acmi || a.acmi.end <= this.day)) { a.acmi = a.acmiQ.shift(); if (!a.acmiQ.length) delete a.acmiQ; }
         const onAcmi = a.acmi && a.acmi.start <= this.day && a.acmi.end > this.day;
         if (onAcmi) {
           if (a.status === 'aog') L.post('rev_acmi', -2 * a.acmi.rate);
@@ -3990,7 +4055,7 @@ const SM = (() => {
         for (const g of STAFF_GROUPS) if (cov.need.pil[g] > 0 && st.pil[g] > 0) overload = Math.max(overload, cov.need.pil[g] / st.pil[g] - 1);
         if (cov.need.cab > 0 && st.cab > 0) overload = Math.max(overload, cov.need.cab / st.cab - 1);
       }
-      const target = clamp(0.62 + 1.6 * (st.pay - (this.macro.wage || 1)) - 1.2 * Math.max(0, Math.min(overload, 0.3)) + lv3([0, 0.05, 0.1, 0.15], al.skill('hr')), 0.05, 0.97);
+      const target = clamp(0.62 + 1.6 * (st.pay - (this.macro.wage || 1)) - 1.2 * Math.max(0, Math.min(overload, 0.3)) + lv3([0, 0.05, 0.1, 0.15], al.skill('hr')) + lv3([0, 0.03, 0.06, 0.09], al.skill('inflight')) + (al.perk('gourmet') ? 0.03 : 0), 0.05, 0.97);
       st.morale = clamp(st.morale + 0.35 * (target - st.morale), 0, 1);
     }
     completeDaily(al) {
@@ -4019,6 +4084,7 @@ const SM = (() => {
           trait: r.pick(TRAITS), prev: r.pick(PREV), expires: day + r.int(25, 50) });
       }
       this.ensureStar();
+      this.ensureNamed();
       this.acMarket = this.acMarket.filter((o) => o.expires > day);
       while (this.acMarket.length < 12) {
         const pool = Object.keys(P.AIRCRAFT_TYPES).filter((k) => { const tt = P.AIRCRAFT_TYPES[k]; return !tt.launch && (!tt.worldMax || this.typeCount(k) + this.acMarket.filter((o) => o.type === k).length < tt.worldMax); });
@@ -4264,6 +4330,19 @@ const SM = (() => {
         this.candidates.push({ ...S, salary: Math.round(sal * (this.macro.cpi || 1) / 1000) * 1000, expires: 1e9, since: this.day });
       }
     }
+    /** Bekannte Köpfe: erscheinen ab einem Tag als Bewerbung, bleiben eine Weile, kommen später wieder – solange sie niemand angestellt hat. */
+    ensureNamed() {
+      this.namedNext = this.namedNext || {};
+      for (const N of P.NAMED_EXPERTS) {
+        if (this.list.some((a) => a.experts.some((e) => e.id === N.id)) || this.candidates.some((c) => c.id === N.id)) continue;
+        const due = this.namedNext[N.id] ?? N.from; if (this.day < due) continue;
+        const { from, stay, again, ...rest } = N;
+        const sal = P.EXPERT_ROLES[N.role].salary[N.level - 1] * 1.1;
+        this.candidates.push({ ...rest, named: true, salary: Math.round(sal * (this.macro.cpi || 1) / 100) * 100, expires: this.day + stay, since: this.day });
+        this.namedNext[N.id] = this.day + stay + again;
+        this.pushNews(this.day, `${N.name} ist auf dem Arbeitsmarkt: ${N.trait} (${P.EXPERT_ROLES[N.role].label})`, 'info', null);
+      }
+    }
     /** Freigestellte Fachkraft sucht neu – mit Referenz (Bewertung beim bisherigen Arbeitgeber). */
     expertToMarket(e, al) {
       if (this.candidates.some((c) => c.id === e.id)) return;
@@ -4278,6 +4357,10 @@ const SM = (() => {
       for (const e of al.experts) {
         if (e.perf === undefined) { e.talent = expertTalent(e); e.perf = clamp(e.talent, E.min, E.max); e.pm = e.perf; e.ps = null; e.psN = 0; }
         if (e.startDay && e.startDay > day) continue;
+        if (e.grow && e.level < e.grow.to && day - (e.hiredDay ?? day) >= e.grow.days) {
+          e.level++; e.salary = Math.max(e.salary, Math.round(P.EXPERT_ROLES[e.role].salary[e.level - 1] * (this.macro.cpi || 1) / 100) * 100);
+          if (al.isPlayer) al.log(day, `${e.name} hat sich entwickelt: jetzt ${['', 'Junior', 'Senior', 'Experte'][e.level]} in ${P.EXPERT_ROLES[e.role].label} – mehr Wirkung, Gehalt jetzt ${String(Math.round(e.salary / 100) / 10).replace('.', ',')} Tsd. EUR im Monat`, 'good');
+        }
         const uniq = P.EXPERT_ROLES[e.role].unique, x = r.random();
         let pm = clamp(e.perf + r.gauss(0, E.noiseSd), E.min, E.max), note = null;
         if (!uniq && x < E.mistakeP) { pm = e.perf * E.mistake; note = 'miss'; }
@@ -4324,7 +4407,7 @@ const SM = (() => {
       return (e.bindUntil > day ? C.bindP : 1) * (e.nca ? C.ncaP : 1) * payF * tenure;
     }
     hireExpert(al, cid) {
-      const c = this.candidates.find((x) => x.id === cid);
+      const c = this.candidates.find((x) => x.id === cid && x.expires > this.day);
       if (!c) return { ok: false, msg: 'Die Person ist nicht mehr verfügbar.' };
       if (al.experts.filter((e) => e.role === c.role).length >= P.EXPERT_ROLES[c.role].max) return { ok: false, msg: `${P.EXPERT_ROLES[c.role].label} ist schon besetzt. Erst die bisherige Person freistellen.` };
       const sign = P.EXPERT_ROLES[c.role].signOn || 0;
@@ -4539,10 +4622,14 @@ const SM = (() => {
       const o = this.acmiOffers.find((x) => x.id === offerId), a = al.fleet.find((x) => x.id === acId);
       if (!o || !a) return { ok: false, msg: 'Angebot oder Flugzeug nicht gefunden.' };
       if (a.type_id !== o.type && P.AIRCRAFT_TYPES[a.type_id].group !== P.AIRCRAFT_TYPES[o.type].group) return { ok: false, msg: `Der Kunde will eine ${P.AIRCRAFT_TYPES[o.type].label} oder ein Muster derselben Familie.` };
-      if (a.acmi && a.acmi.end > o.start) return { ok: false, msg: 'Das Flugzeug ist in dem Zeitraum schon verchartert.' };
+      const clash = acmiList(a, this.day).find((b) => o.start < b.end && o.end > b.start);
+      if (clash) return { ok: false, msg: `${a.id} ist vom ${dayDE(clash.start)} bis ${dayDE(clash.end)} schon an ${clash.client} verchartert – der Zeitraum überschneidet sich.`, clash: { start: clash.start, end: clash.end, client: clash.client } };
       if (a.delivery_day > o.start) return { ok: false, msg: 'Das Flugzeug ist bis dahin noch nicht geliefert.' };
-      const rate = acmiRateFor(o, a.type_id);
-      a.acmi = { start: o.start, end: o.end, rate, client: o.client };
+      if (o.start < this.day) return { ok: false, msg: 'Der Auftrag hat schon begonnen.' };
+      const rate = acmiRateFor(o, a.type_id), bk = { start: o.start, end: o.end, rate, client: o.client, ev: o.ev ? true : undefined };
+      // Mehrere Aufträge je Flugzeug: a.acmi ist immer der laufende oder nächste, weitere warten in a.acmiQ
+      const all = [...acmiList(a, this.day), bk].sort((x, y) => x.start - y.start);
+      a.acmi = all[0]; if (all.length > 1) a.acmiQ = all.slice(1); else delete a.acmiQ;
       this.acmiOffers = this.acmiOffers.filter((x) => x !== o);
       al.log(this.day, `${a.id} an ${o.client} verchartert, ${o.end - o.start} Tage zu ${Math.round(rate / 100) / 10} Tsd. EUR pro Tag`, 'fleet');
       return { ok: true };
@@ -5982,7 +6069,7 @@ const SM = (() => {
           if (!R.familyKnown(a.type_id)) R.ledger.post('one_off', -P.TYPE_INTRO_COST * (R.isPlayer ? 1 : 0.5));
           if (!R.typesIntroduced.includes(a.type_id)) R.typesIntroduced.push(a.type_id);
           R.acCounter++;
-          Object.assign(a, { id: `${R.id}-${String(R.acCounter).padStart(3, '0')}`, base: R.bases.includes(a.base) ? a.base : R.bases[0], assigned: [], used_hours: 0, idle_days: 0, acmi: null, prevOwner: G.name, mode: 'auto', pins: [] });
+          Object.assign(a, { id: `${R.id}-${String(R.acCounter).padStart(3, '0')}`, base: R.bases.includes(a.base) ? a.base : R.bases[0], assigned: [], used_hours: 0, idle_days: 0, acmi: null, acmiQ: undefined, prevOwner: G.name, mode: 'auto', pins: [] });
           R.fleet.push(a);
         } else if (it.k === 'staff') {
           const key = it.role === 'pilot' ? null : it.role === 'cabin' ? 'cab' : 'tech';
@@ -6273,11 +6360,11 @@ const SM = (() => {
   function assignAircraft(w, al, a) {
     const ac = al.fleet.find((x) => x.id === a.acId);
     if (!ac) return { ok: false, msg: 'Flugzeug nicht gefunden.' };
-    const mode = ['auto', 'manual', 'reserve'].includes(a.mode) ? a.mode : 'auto';
+    const mode = ['auto', 'manual', 'reserve', 'charter'].includes(a.mode) ? a.mode : 'auto';
     const label = ac.id.replace(al.id + '-', (al.code || 'SM') + '-');
     if (mode !== 'manual') {
       ac.mode = mode; ac.pins = [];
-      al.log(w.day, `${label}: ${mode === 'auto' ? 'automatische Einsatzplanung' : 'als Reserve vorgehalten'}`, 'fleet');
+      al.log(w.day, `${label}: ${mode === 'auto' ? 'automatische Einsatzplanung' : mode === 'charter' ? 'im Charter-Pool – fliegt keine eigenen Strecken mehr, nur Charteraufträge' : 'als Reserve vorgehalten'}`, 'fleet');
       w.operableFreq(al);
       return { ok: true };
     }
@@ -6600,7 +6687,7 @@ const SM = (() => {
     return {
       v: 4, param: P.VERSION, day: w.day, difficulty: w.difficulty, mode: w.mode || 'free', rivals: w.rivals || null, rng: w.rng.s, macro: w.macro, fuelHist: w.fuelHist.slice(-370),
       playerId: w.playerId, order: w.order, news: w.news.slice(-120), events: w.events.filter((e) => e.end + (e.recovery || 0) > w.day - 30), eventCounter: w.eventCounter,
-      seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, eventMult: w.eventMult,
+      seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
       entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
@@ -6628,7 +6715,7 @@ const SM = (() => {
     if (s.v !== 4) throw new Error('Spielstand aus einer älteren Version');
     const w = new World(1);
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
-      seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
+      seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
       lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
@@ -6693,7 +6780,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 
@@ -8222,6 +8309,7 @@ function acRoleChips(pl, a) {
   const out = [];
   const inService = a.delivery_day <= W.day && !((a.status === 'ccheck' || a.status === 'aog') && a.until > W.day) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day);
   if (inService && a.used_hours > 0) { const c = crewInfo(pl, a); if (c) out.push(`<span class="chip ${c.cls}" title="${esc(c.tip)}">${c.txt}</span>`); }
+  else if (inService && acMode(a) === 'charter') out.push(`<span class="chip warn" title="Fliegt nur Charteraufträge">Charter-Pool${SM.acmiList(a, W.day).length ? ' · ' + SM.acmiList(a, W.day).length + ' Auftr.' : ' · ohne Auftrag'}</span>`);
   else if (inService && acMode(a) === 'reserve') out.push(`<span class="chip me" title="Springt ein, wenn ein anderes Flugzeug ausfällt">Reserve in ${a.base}</span>`);
   else if (inService) out.push(`<span class="chip" title="Einsatzbereit, aber ohne Strecke – kostet trotzdem jeden Tag">bereit in ${a.base}</span>`);
   return out.join(' ');
@@ -8272,26 +8360,77 @@ VIEWS.fleetOwn = function viewFleetOwn() {
   if (pl.fleet.length) html += `<p class="small muted">Ältere Flugzeuge verbrauchen mehr Kerosin, kosten mehr Wartung und fallen öfter aus. Alle ${n0(P.CCHECK_FH)} Flugstunden steht ein C-Check an; ein eigener Hangar an der Basis verkürzt ihn.</p>`;
   return html;
 };
+/** Charter: Pool, Kalender mit freien Zeiträumen, filterbare Anfragen. */
+const grpOf = (t) => P.AIRCRAFT_TYPES[t].group;
+function acmiGain(pl, o, a) {
+  const rate = SM.acmiRateFor(o, a.type_id), T = P.AIRCRAFT_TYPES[a.type_id], maint = (T.maint_bh * 8 + T.maint_cycle * 3) * cpi();
+  const routes = acMode(a) === 'charter' ? [] : [...new Set(a.assigned || [])].map((id) => pl.routes.find((r) => r.id === id)).filter(Boolean);
+  const lost = routes.reduce((x, r) => x + Math.max(0, SM.routeDb(r, 30, pl) / Math.max(1, Math.min(30, r.hist.length))) * Math.min(1, (a.used_hours || 0) / Math.max(1, pl.rotH(r) * r.freq)), 0);
+  return { rate, net: rate - maint - lost, lost, total: (rate - maint - lost) * (o.end - o.start) };
+}
+/** Kann Flugzeug a den Auftrag o fliegen (Familie, Lieferung, keine Überschneidung)? */
+function acmiFits(a, o) { return grpOf(a.type_id) === grpOf(o.type) && a.delivery_day <= o.start && !SM.acmiList(a, W.day).some((b) => o.start < b.end && o.end > b.start) && !((a.status === 'ccheck' || a.status === 'aog') && a.until > o.start); }
+function acmiCalendar(pl, rows, F) {
+  const from = W.day, span = F.range, to = from + span, pc = (d) => ((Math.max(from, Math.min(to, d)) - from) / span * 100).toFixed(2);
+  // Monatsköpfe
+  const heads = []; for (let d = from; d < to;) { const p = dateParts(d), nxt = (() => { let e = d + 1; while (e < to && dateParts(e).m === p.m) e++; return e; })(); heads.push(`<span style="left:${pc(d)}%;width:${(pc(nxt) - pc(d)).toFixed(2)}%">${MONTHS[p.m].slice(0, 3)}${p.m === 0 || d === from ? ' ' + String(p.y).slice(2) : ''}</span>`); d = nxt; }
+  const weeks = []; for (let d = from + ((7 - ((from + 4) % 7)) % 7); d < to; d += 7) weeks.push(`<i style="left:${pc(d)}%"></i>`);
+  const evs = (W.events || []).filter((e) => e.mega && e.end > from && e.start < to).slice(0, 6).map((e) => `<span class="cal-ev" style="left:${pc(e.start)}%;width:${Math.min(100 - pc(e.start), Math.max(0.8, pc(e.end) - pc(e.start))).toFixed(2)}%" title="${esc(e.title || e.text || 'Großereignis')}"></span>`).join('');
+  const row = (a) => {
+    const bk = SM.acmiList(a, from).filter((b) => b.start < to), gaps = SM.acmiGaps(a, from, to), sel = F.gap && F.gap.ac === a.id;
+    const bars = bk.map((b) => `<span class="cal-b${b.ev ? ' ev' : ''}" style="left:${pc(b.start)}%;width:${Math.min(100 - pc(b.start), Math.max(0.6, pc(b.end) - pc(b.start))).toFixed(2)}%" title="${esc(b.client)} · ${dateShort(b.start)}–${dateShort(b.end)} · ${eur(b.rate)}/Tag">${b.end - b.start >= span / 12 ? esc(b.client) : ''}</span>`).join('');
+    const mt = (a.status === 'ccheck' || a.status === 'aog') && a.until > from ? `<span class="cal-m" style="left:0;width:${pc(a.until)}%" title="${a.status === 'ccheck' ? 'C-Check' : 'Reparatur'} bis ${dateShort(a.until)}"></span>` : '';
+    const dl = a.delivery_day > from ? `<span class="cal-m" style="left:0;width:${pc(a.delivery_day)}%" title="Lieferung ${dateShort(a.delivery_day)}"></span>` : '';
+    const gp = gaps.map(([g0, g1]) => `<button class="cal-g${sel && F.gap.from === g0 ? ' on' : ''}" data-act="acmigap" data-ac="${a.id}" data-from="${g0}" data-to="${g1}" style="left:${pc(g0)}%;width:${Math.min(100 - pc(g0), Math.max(0.6, pc(g1) - pc(g0))).toFixed(2)}%" title="frei ${dateShort(g0)}–${g1 >= to ? 'offen' : dateShort(g1)} (${g1 - g0}${g1 >= to ? '+' : ''} Tage) – antippen: passende Anfragen zeigen">${g1 - g0 >= span / 10 ? `frei ${g1 - g0}${g1 >= to ? '+' : ''} T.` : ''}</button>`).join('');
+    const pool = acMode(a) === 'charter', freeDays = gaps.reduce((x, [g0, g1]) => x + g1 - g0, 0), busy = span - freeDays;
+    return `<div class="cal-row"><div class="cal-l"><b class="mono">${acName(a.id)}</b><span class="small muted">${a.type_id} · ${a.base}${pool ? '' : ' · Linie'}</span><span class="small ${busy ? 'pos' : 'muted'}">${pct(busy / span)} gebucht</span></div><div class="cal-t">${weeks.join('')}${gp}${dl}${mt}${bars}</div></div>`;
+  };
+  return `<div class="cal"><div class="cal-row cal-head"><div class="cal-l"></div><div class="cal-t">${heads.join('')}${evs}</div></div>${rows.map(row).join('')}</div>
+    <div class="cal-free">${rows.map((a) => { const g = SM.acmiGaps(a, from, to).filter(([g0, g1]) => g1 - g0 >= 2); return g.length ? `<div class="row small" style="gap:6px;flex-wrap:wrap;align-items:center"><b class="mono">${acName(a.id)}</b> frei: ${g.map(([g0, g1]) => `<button class="chip-t pick" aria-pressed="${!!(F.gap && F.gap.ac === a.id && F.gap.from === g0)}" data-act="acmigap" data-ac="${a.id}" data-from="${g0}" data-to="${g1}">${dateShort(g0)}–${g1 >= to ? 'offen' : dateShort(g1)} · ${g1 - g0}${g1 >= to ? '+' : ''} T.</button>`).join('')}</div>` : `<div class="small"><b class="mono">${acName(a.id)}</b> <span class="muted">im Zeitraum ausgebucht</span></div>`; }).join('')}</div>
+    <div class="cal-key small muted"><span><i class="cal-b"></i>gebucht</span><span><i class="cal-b ev"></i>Großereignis</span><span><i class="cal-g"></i>frei – antippen filtert die Anfragen</span><span><i class="cal-m"></i>Werft/Lieferung</span><span><i class="cal-e"></i>Großereignis im Kalender</span></div>`;
+}
 VIEWS.fleetAcmi = function viewFleetAcmi() {
-  const pl = W.player, grp = (t) => P.AIRCRAFT_TYPES[t].group;
-  const offers = W.acmiOffers.slice().sort((a, b) => (!!b.ev - !!a.ev) || (pl.fleet.some((x) => grp(x.type_id) === grp(b.type)) - pl.fleet.some((x) => grp(x.type_id) === grp(a.type))) || a.start - b.start);
-  const mine = pl.fleet.filter((a) => a.acmi && a.acmi.end > W.day);
-  let html = `<h2 class="sec">Charter (ACMI) <small>${offers.length} Anfragen${offers.some((o) => o.ev) ? ` · ${offers.filter((o) => o.ev).length} zu Großereignissen` : ''}</small></h2>`;
-  html += `<p class="small ink2">ACMI heißt: Sie stellen Flugzeug, Crew, Wartung und Versicherung, der Kunde zahlt eine Tagesrate und trägt Treibstoff und Gebühren. Ein Muster derselben Familie passt auch (Rate nach Sitzen angepasst). Zu Großereignissen – WM, Olympia, Hadsch, Oktoberfest – zahlen Veranstalter deutlich mehr. In der Charterzeit fehlt das Flugzeug im eigenen Flugplan.</p>`;
-  if (mine.length) html += `<div class="callout info"><b>Ihre Charter</b>${mine.map((a) => `${acName(a.id)}: ${esc(a.acmi.client)} ${a.acmi.start > W.day ? 'ab ' + dateShort(a.acmi.start) : 'bis ' + dateShort(a.acmi.end)} · ${eur(a.acmi.rate)}/Tag`).join('<br>')}</div>`;
-  html += offers.length ? offers.map((o) => {
-    const cands = pl.fleet.filter((a) => grp(a.type_id) === grp(o.type) && a.delivery_day <= o.start && !(a.acmi && a.acmi.end > o.start));
+  const pl = W.player, F = ui.acf = ui.acf || { ac: '', fit: true, fam: '', ev: false, sort: 'start', gap: null, range: 120 };
+  const pool = pl.fleet.filter((a) => acMode(a) === 'charter'), withBk = pl.fleet.filter((a) => acMode(a) !== 'charter' && SM.acmiList(a, W.day).length);
+  const calRows = [...pool, ...withBk];
+  if (F.gap && !pl.fleet.some((a) => a.id === F.gap.ac)) F.gap = null;
+  let html = `<h2 class="sec">Charter (ACMI) <small>${W.acmiOffers.length} Anfragen${W.acmiOffers.some((o) => o.ev) ? ` · ${W.acmiOffers.filter((o) => o.ev).length} zu Großereignissen` : ''}</small></h2>
+    <p class="small ink2">ACMI: Sie stellen Flugzeug, Crew, Wartung und Versicherung, der Kunde zahlt eine Tagesrate und trägt Treibstoff und Gebühren. Ein Muster derselben Familie passt auch. Ein Flugzeug kann mehrere Aufträge hintereinander haben – der Kalender zeigt, wo noch Platz ist.</p>`;
+  // Charter-Pool
+  const others = pl.fleet.filter((a) => acMode(a) !== 'charter');
+  html += `<div class="card pad stack"><div class="spread"><h3>Charter-Flotte <small class="muted">${pool.length} Flugzeug${pool.length === 1 ? '' : 'e'} im Pool</small></h3></div>
+    ${pool.length ? `<div class="row" style="gap:6px;flex-wrap:wrap">${pool.map((a) => `<span class="chip me" style="padding:4px 4px 4px 10px">${acName(a.id)} · ${a.type_id} <button class="btn small ghost" data-act="acmipool" data-id="${a.id}" data-on="0" title="Zurück in die automatische Einsatzplanung">zurück in den Linienflug</button></span>`).join('')}</div>` : '<p class="small muted">Noch kein Flugzeug im Charter-Pool. Flugzeuge im Pool fliegen keine eigenen Strecken mehr und stehen nur für Charter bereit – sinnvoll für Maschinen, die im Netz wenig verdienen.</p>'}
+    ${others.length ? `<div class="row" style="gap:8px;flex-wrap:wrap"><select id="acmi-pooladd" style="width:auto;flex:1;min-width:200px">${others.map((a) => `<option value="${a.id}">${acName(a.id)} · ${a.type_id} · ${a.base} · ${a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Linienflug' : 'ohne Einsatz'}</option>`).join('')}</select><button class="btn small primary" data-act="acmipool" data-on="1">In den Charter-Pool</button></div>
+      <p class="small muted">Fliegt die Maschine Strecken, übernehmen andere Flugzeuge die Umläufe – fehlt Kapazität, fallen Flüge aus.</p>` : ''}</div>`;
+  // Kalender
+  if (calRows.length) html += `<div class="stack"><div class="spread"><h3 class="sec sm">Charterkalender <small>${dateShort(W.day)} bis ${dateShort(W.day + F.range)}</small></h3><div class="seg" role="group">${[60, 120, 240].map((d) => `<button data-act="acmirange" data-v="${d}" aria-pressed="${F.range === d}">${d === 240 ? '8 Mon.' : d / 30 + ' Mon.'}</button>`).join('')}</div></div>${acmiCalendar(pl, calRows, F)}</div>`;
+  // Anfragen filtern
+  const fams = [...new Set(W.acmiOffers.map((o) => grpOf(o.type)))];
+  const target = F.ac ? pl.fleet.filter((a) => a.id === F.ac) : calRows.length ? calRows : pl.fleet;
+  let list = W.acmiOffers.filter((o) => (!F.fam || grpOf(o.type) === F.fam) && (!F.ev || o.ev));
+  if (F.gap) { const a = pl.fleet.find((x) => x.id === F.gap.ac); list = list.filter((o) => o.start >= F.gap.from && o.end <= F.gap.to && a && acmiFits(a, o)); }
+  else if (F.fit) list = list.filter((o) => target.some((a) => acmiFits(a, o)));
+  const best = (o) => { const c = pl.fleet.filter((a) => acmiFits(a, o)); return c.length ? Math.max(...c.map((a) => acmiGain(pl, o, a).total)) : -1e12; };
+  const SORT = { start: (a, b) => a.start - b.start, rate: (a, b) => b.rate - a.rate, total: (a, b) => best(b) - best(a), dur: (a, b) => (b.end - b.start) - (a.end - a.start) };
+  list.sort((a, b) => (!!b.ev - !!a.ev) * (F.sort === 'start' ? 0 : 0) || SORT[F.sort](a, b));
+  html += `<div class="stack"><h3 class="sec sm">Anfragen <small>${list.length} von ${W.acmiOffers.length}</small></h3>
+    <div class="row acf" style="gap:8px;flex-wrap:wrap"><select id="acf-ac" aria-label="Flugzeug"><option value="">${calRows.length ? 'Charter-Flotte' : 'alle Flugzeuge'}</option>${pl.fleet.map((a) => `<option value="${a.id}" ${F.ac === a.id ? 'selected' : ''}>${acName(a.id)} · ${a.type_id}</option>`).join('')}</select>
+      <select id="acf-fam" aria-label="Familie"><option value="">alle Familien</option>${fams.map((g) => `<option value="${g}" ${F.fam === g ? 'selected' : ''}>${esc(P.TYPE_GROUPS[g])}</option>`).join('')}</select>
+      <select id="acf-sort" aria-label="Sortierung">${[['start', 'nach Beginn'], ['total', 'nach Gesamterlös'], ['rate', 'nach Tagesrate'], ['dur', 'nach Dauer']].map(([k, l]) => `<option value="${k}" ${F.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="chk small"><input type="checkbox" id="acf-fit" ${F.fit ? 'checked' : ''}> passt in freie Zeiträume</label><label class="chk small"><input type="checkbox" id="acf-ev" ${F.ev ? 'checked' : ''}> nur Großereignisse</label></div>
+    ${F.gap ? `<div class="callout info row" style="gap:8px;align-items:center"><span>Freier Zeitraum <b>${acName(F.gap.ac)}</b>: ${dateShort(F.gap.from)} bis ${F.gap.to >= W.day + F.range ? 'offen' : dateShort(F.gap.to)}</span><button class="btn small" data-act="acmigap" data-clear="1" style="margin-left:auto">Filter aufheben</button></div>` : ''}`;
+  html += list.length ? list.map((o) => {
+    const cands = pl.fleet.filter((a) => acmiFits(a, o)).sort((a, b) => (acMode(b) === 'charter') - (acMode(a) === 'charter') || acmiGain(pl, o, b).net - acmiGain(pl, o, a).net);
+    const show = F.gap ? cands.filter((a) => a.id === F.gap.ac) : F.ac ? cands.filter((a) => a.id === F.ac) : cands;
     const days = o.end - o.start, t = P.AIRCRAFT_TYPES[o.type];
-    const gain = (a) => { const rate = SM.acmiRateFor(o, a.type_id), maint = (P.AIRCRAFT_TYPES[a.type_id].maint_bh * 8 + P.AIRCRAFT_TYPES[a.type_id].maint_cycle * 3) * cpi();
-      const routes = [...new Set(a.assigned || [])].map((id) => pl.routes.find((r) => r.id === id)).filter(Boolean), lost = routes.reduce((x, r) => x + Math.max(0, SM.routeDb(r, 30, pl) / Math.max(1, Math.min(30, r.hist.length))) * Math.min(1, (a.used_hours || 0) / Math.max(1, pl.rotH(r) * r.freq)), 0);
-      return { rate, net: rate - maint - lost, lost }; };
     return `<div class="card pad stack${o.ev ? ' acmi-ev' : ''}"><div class="spread"><b>${esc(o.client)}</b><span class="row" style="gap:4px">${o.ev ? '<span class="chip good">Großereignis</span>' : ''}<span class="chip">${tlx(o.type)}</span></span></div>
       <div class="small ink2">${dateShort(o.start)} bis ${dateShort(o.end)} (${days} Tage) · <b>${eur(o.rate)} pro Tag</b> · gesamt ${eur(o.rate * days)}${o.apt ? ` · Einsatz rund um ${esc(apName(o.apt))}` : ''}</div>
-      ${cands.length ? `<div class="stack" style="gap:4px">${cands.slice(0, 4).map((a) => { const g = gain(a); return `<div class="spread small"><span>${acName(a.id)} · ${a.type_id}${a.type_id !== o.type ? ' (Familie)' : ''} · ${a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Einsatz' : '<span class="pos">frei</span>'}</span><span>${eur(g.rate)}/Tag · <b class="${sgn(g.net)}">${eur(g.net, { plus: true })}</b>/Tag ${g.lost > 0 ? 'nach entgangenem Streckenbeitrag' : 'gegenüber Stillstand'}</span></div>`; }).join('')}
-        <div class="row"><select id="acmi-${o.id}" style="width:auto">${cands.map((a) => `<option value="${a.id}">${acName(a.id)} · ${a.type_id}</option>`).join('')}</select><button class="btn small primary" data-act="acmi" data-id="${o.id}">Verchartern</button></div></div>`
-        : `<span class="small muted">Kein passendes Flugzeug der Familie ${esc(P.TYPE_GROUPS[t.group])} frei.</span>`}
+      ${calRows.length ? `<div class="cal-mini" title="Zeitraum im Kalender">${(() => { const l = Math.min(98, Math.max(0, o.start - W.day) / F.range * 100), w = Math.max(2, Math.min(100 - l, (Math.min(o.end, W.day + F.range) - Math.max(o.start, W.day)) / F.range * 100)); return `<span style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></span>`; })()}</div>` : ''}
+      ${show.length ? `<div class="stack" style="gap:6px">${show.slice(0, 4).map((a) => { const g = acmiGain(pl, o, a); return `<div class="acmi-c"><span class="small"><b>${acName(a.id)}</b> · ${a.type_id}${a.type_id !== o.type ? ' (Familie)' : ''} · ${acMode(a) === 'charter' ? '<span class="pos">Charter-Pool, frei</span>' : a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Linienflug' : '<span class="pos">frei</span>'}<br><span class="muted">${eur(g.rate)}/Tag · netto <b class="${sgn(g.net)}">${eur(g.net, { plus: true })}</b>/Tag${g.lost > 0 ? ' nach entgangenem Streckenbeitrag' : ''} · gesamt ${eur(g.total, { plus: true })}</span></span><button class="btn small primary" data-act="acmi" data-id="${o.id}" data-ac="${a.id}">Verchartern · ${eurB(g.rate * days)}</button></div>`; }).join('')}${show.length > 4 ? `<span class="small muted">und ${show.length - 4} weitere passende Flugzeuge</span>` : ''}</div>`
+        : `<span class="small muted">${cands.length ? 'Das gewählte Flugzeug ist in dem Zeitraum nicht frei.' : `Kein Flugzeug der Familie ${esc(P.TYPE_GROUPS[t.group])} in dem Zeitraum frei.`}</span>`}
       <span class="small muted">Angebot gilt bis ${dateShort(o.expires)}</span></div>`;
-  }).join('') : '<p class="small muted">Gerade keine Anfragen. Neue kommen zum Monatswechsel und vor Großereignissen.</p>';
+  }).join('') : `<p class="small muted">${W.acmiOffers.length ? 'Keine Anfrage passt zu den Filtern.' + (F.fit || F.gap ? ' Tipp: „passt in freie Zeiträume“ ausschalten zeigt alle.' : '') : 'Gerade keine Anfragen. Neue kommen zum Monatswechsel und vor Großereignissen.'}</p>`;
+  html += '</div>';
   return html;
 };
 VIEWS.fleetBuy = function viewFleetBuy() {
@@ -8386,16 +8525,18 @@ VIEWS.staff = function viewStaff() {
   html += `<div class="stack"><h2 class="sec">Fachkräfte und Berater <small>${pl.experts.length} angestellt</small></h2>`;
   html += pl.experts.length ? pl.experts.map((e) => `<div class="card pad stack"><div class="spread"><b>${esc(e.name)}</b><span class="chip me">${P.EXPERT_ROLES[e.role].label} · ${LEVEL[e.level]}</span></div>
       <div class="small ink2">Zusage: ${esc(P.EXPERT_ROLES[e.role].effect[e.level - 1])}</div>
+      ${e.note ? `<div class="small named-note">★ ${esc(e.grow && e.level >= e.grow.to ? 'Hat sich vom Junior zum Senior entwickelt.' : e.note)}${e.grow && e.level < e.grow.to ? ` Noch ${Math.max(0, e.grow.days - (W.day - (e.hiredDay ?? W.day)))} Tage.` : ''}</div>` : ''}
       ${expertPerfHtml(e)}
       ${expertContractHtml(e)}
       <div class="spread small muted"><span>${e.years} Jahre Erfahrung, ${esc(e.prev)}, Schwerpunkt ${esc(e.region)}${refsTxt(e)}</span><span>${eur(e.salary * cpi())}/Monat <button class="btn small" data-act="fireexpert" data-id="${e.id}">Freistellen</button></span></div></div>`).join('')
     : '<p class="small muted">Noch niemand. Fachkräfte wirken nach rund 30 Tagen Einarbeitung voll – wie gut genau, zeigt die monatliche Bewertung. Jede Rolle kann einmal besetzt werden (Marktanalyse zweimal).</p>';
   { const taken = SM.P.STAR_CONSULTANTS.map((S) => [S, W.starHolder(S.id)]).filter(([, h]) => h && h.id !== pl.id);
     if (taken.length) html += `<p class="small muted">${taken.map(([S, h]) => `${esc(S.name)} arbeitet gerade für ${esc(h.name)}.`).join(' ')} Wer ihn freistellt oder verliert, gibt ihn wieder frei.</p>`; }
-  html += `<h3>Bewerbungen</h3>${W.candidates.slice().sort((a, b) => (P.EXPERT_ROLES[b.role].unique ? 1 : 0) - (P.EXPERT_ROLES[a.role].unique ? 1 : 0) || a.role.localeCompare(b.role) || b.level - a.level).map((c) => {
+  html += `<h3>Bewerbungen</h3>${W.candidates.filter((c) => c.expires > W.day).sort((a, b) => (P.EXPERT_ROLES[b.role].unique ? 2 : b.named ? 1 : 0) - (P.EXPERT_ROLES[a.role].unique ? 2 : a.named ? 1 : 0) || a.role.localeCompare(b.role) || b.level - a.level).map((c) => {
     const taken = pl.experts.filter((e) => e.role === c.role).length >= P.EXPERT_ROLES[c.role].max;
-    return `<div class="cand"><div class="spread"><b>${esc(c.name)}</b><span class="chip">${P.EXPERT_ROLES[c.role].label} · ${LEVEL[c.level]}</span></div>
+    return `<div class="cand${c.named ? ' named' : ''}"><div class="spread"><b>${esc(c.name)}${c.named ? ' <span class="chip good">bekannt in der Branche</span>' : ''}</b><span class="chip">${P.EXPERT_ROLES[c.role].label} · ${LEVEL[c.level]}</span></div>
       <div class="small ink2">${esc(P.EXPERT_ROLES[c.role].effect[c.level - 1])}</div>
+      ${c.note ? `<div class="small named-note">★ ${esc(c.note)}</div>` : ''}
       ${c.refs && c.refs.length ? `<div class="small">Referenz: ${c.refs.map((x) => `<b class="${x.perf >= 1 ? 'pos' : x.perf < 0.85 ? 'neg' : ''}">${pct(x.perf)}</b> der Zusage bei ${esc(x.airline)}${x.months ? ` (${x.months} Mon.)` : ''}`).join(' · ')} <span class="muted">– bei einem neuen Arbeitgeber kann es anders laufen</span></div>` : ''}
       <div class="spread small"><span class="muted">${c.years} Jahre, ${esc(c.trait)}, ${esc(c.prev)} · kennt ${esc(c.region)} · ${P.EXPERT_ROLES[c.role].unique ? `einmalig in der Welt – verfügbar, bis jemand zugreift · Antrittshonorar ${eur(P.EXPERT_ROLES[c.role].signOn)}` : 'bis ' + dateShort(c.expires)}</span>
         <span><b class="mono">${eur(c.salary)}</b>/Mon. <button class="btn small${taken ? '' : ' primary'}" data-act="hireexpert" data-id="${c.id}" ${taken ? 'disabled title="Rolle besetzt"' : ''}>Einstellen</button></span></div></div>`;
@@ -9400,7 +9541,7 @@ VIEWS.news = function viewNews() {
 };
 
 // ---------- Einsatzplan: Flugzeuge festen Strecken zuweisen ----------
-const MODE_LABEL = { auto: 'Automatisch', manual: 'Feste Strecken', reserve: 'Reserve' };
+const MODE_LABEL = { auto: 'Automatisch', manual: 'Feste Strecken', reserve: 'Reserve', charter: 'Charter-Pool' };
 const ROUTE_HUES = [212, 152, 266, 32, 330, 186, 48, 0, 100, 290];
 const routeColor = (r) => `hsl(${ROUTE_HUES[Math.max(0, W.player.routes.indexOf(r)) % ROUTE_HUES.length]} 75% 58%)`;
 const acMode = (a) => a.mode || 'auto';
@@ -9479,7 +9620,7 @@ function assignEditor(a) {
       <div class="lfrow" style="grid-template-columns:90px 1fr 96px"><span>Betriebszeit</span><div class="bar"><i class="${over ? 'crit' : 'me'}" style="width:${long ? 100 : pctH.toFixed(0)}%"></i></div><span class="num ${over ? 'neg' : ''}">${long ? 'Langstrecke' : `${n1(hours)} / ${win} h`}</span></div>
       ${over ? `<div class="callout crit">Zu viel: ${n1(hours)} Stunden passen nicht ins Betriebsfenster von ${win} Stunden.</div>` : ''}
       <p class="small muted">Grenzen: gleiche Basis, gleicher Flugzeugtyp wie die Strecke, höchstens ${win} Stunden am Tag, nicht mehr Umläufe als die Frequenz. Ein Langstreckenumlauf belegt das Flugzeug ganz. Fällt ein fest zugewiesenes Flugzeug aus, übernehmen Automatik- oder Reserveflugzeuge desselben Typs.</p>`;
-  } else html += `<p class="small muted">${D.mode === 'auto' ? 'Der Planer setzt das Flugzeug dort ein, wo Umläufe offen sind.' : 'Das Flugzeug fliegt nur, wenn sonst ein Umlauf ausfiele (Technik, C-Check, Charter). Bis dahin kostet es Leasing und Versicherung.'}</p>`;
+  } else html += `<p class="small muted">${D.mode === 'charter' ? 'Das Flugzeug fliegt keine eigenen Strecken mehr und steht nur für Charteraufträge bereit – Kalender und passende Anfragen unter Flotte → Charter.' : D.mode === 'auto' ? 'Der Planer setzt das Flugzeug dort ein, wo Umläufe offen sind.' : 'Das Flugzeug fliegt nur, wenn sonst ein Umlauf ausfiele (Technik, C-Check, Charter). Bis dahin kostet es Leasing und Versicherung.'}</p>`;
   html += `<div class="row"><button class="btn primary" data-act="asgsave">Speichern</button><button class="btn" data-act="asgcancel">Abbrechen</button></div></div>`;
   return html;
 }
@@ -10364,7 +10505,7 @@ function assistantHints() {
   const miss = unplacedNow();
   if (miss.length) add('unpl', 'warn', 'ops', `Ohne Flugzeug: ${miss.map(([r, k]) => `${r.base}–${r.dest} (${k}×)`).join(', ')}. Diese Flüge fallen aus.`, 'fleetPlan');
   for (const a of pl.fleet) {
-    if (a.delivery_day <= W.day && !(a.used_hours > 0) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) && a.status !== 'ccheck' && a.status !== 'aog') { add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> (${tl(a.type_id)}) steht ungenutzt und kostet ${eur(acDayCost(a))} pro Tag.`, 'fleetOwn'); break; }
+    if (a.delivery_day <= W.day && !(a.used_hours > 0) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) && a.status !== 'ccheck' && a.status !== 'aog') { if (acMode(a) === 'charter') add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> ist im Charter-Pool, hat heute aber keinen Auftrag – kostet ${eur(acDayCost(a))} pro Tag. ${W.acmiOffers.filter((o) => acmiFits(a, o)).length} passende Anfragen.`, 'fleetAcmi'); else add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> (${tl(a.type_id)}) steht ungenutzt und kostet ${eur(acDayCost(a))} pro Tag.`, 'fleetOwn'); break; }
   }
   for (const a of pl.fleet) {
     const toC = P.CCHECK_FH - (a.fh - a.lastC);
@@ -10626,6 +10767,7 @@ function refreshAll() { W.operableFreq(W.player); buildSchedules(); renderHeader
 // Auf-/Zuklappen merken, damit es beim Neuzeichnen so bleibt
 document.addEventListener('toggle', (e) => { const d = e.target; if (!d || !d.dataset || !d.dataset.keep) return; ui.open = ui.open || {}; ui.open[d.dataset.keep] = d.open; const h = d.querySelector('.fold-hint'); if (h) h.textContent = d.open ? 'einklappen' : 'aufklappen'; }, true);
 document.addEventListener('input', (e) => { const t = e.target; if (t && (t.id === 'slot-apt' || t.id === 'slot-n')) { const st = ui.slotForm = ui.slotForm || { apt: '', n: 1 }; if (t.id === 'slot-apt') st.apt = slotAptOf(t.value) || ''; else st.n = Math.max(1, Math.min(8, Math.round(Number(t.value)) || 1)); const box = $('#slot-q'); if (box) box.innerHTML = slotQuoteHtml(st.apt, st.n); return; } });
+document.addEventListener('change', (e) => { const t = e.target; if (!t || !t.id || !t.id.startsWith('acf-') || !ui.acf) return; const k = t.id.slice(4); ui.acf[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'ac' || k === 'fit') ui.acf.gap = null; renderPane(true); });
 document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.id) return; const fid = t.id.startsWith('dl-cash-') ? t.id.replace('dl-cash-', 'dl-fmt-') : t.dataset && t.dataset.fmt; if (!fid) return; const f = document.getElementById(fid), v = Math.max(0, Math.round(Number(t.value) || 0)); if (f) f.textContent = v ? '= ' + eur(v) : ''; });
 function onPaneClick(e) {
   const mb = e.target.closest('[data-mktbase]');
@@ -10715,7 +10857,10 @@ function onPaneClick(e) {
     }
     case 'askdispose': ui.confirm = 'dispose:' + b.dataset.id; renderPane(true); break;
     case 'dispose': { if (doAction({ type: 'dispose', acId: b.dataset.id }).ok) { ui.confirm = null; toast('Flugzeug abgegeben.'); } refreshAll(); break; }
-    case 'acmi': { const sel = $(`#acmi-${b.dataset.id}`); if (doAction({ type: 'acmi', offerId: b.dataset.id, acId: sel && sel.value }).ok) toast('Charter vereinbart.'); refreshAll(); break; }
+    case 'acmi': { const sel = $(`#acmi-${b.dataset.id}`), acId = b.dataset.ac || (sel && sel.value); if (doAction({ type: 'acmi', offerId: b.dataset.id, acId }).ok) toast(`Charter vereinbart – ${acName(acId)} steht im Kalender.`); refreshAll(); break; }
+    case 'acmipool': { const on = b.dataset.on === '1', id = on ? ($('#acmi-pooladd') || {}).value : b.dataset.id; if (!id) break; const r = doAction({ type: 'assignAircraft', acId: id, mode: on ? 'charter' : 'auto', pins: [] }); if (r.ok) toast(on ? `${acName(id)} ist im Charter-Pool.` : `${acName(id)} fliegt wieder im Netz.`); refreshAll(); break; }
+    case 'acmirange': ui.acf.range = Number(b.dataset.v) || 120; renderPane(true); break;
+    case 'acmigap': ui.acf.gap = b.dataset.clear ? null : { ac: b.dataset.ac, from: Number(b.dataset.from), to: Number(b.dataset.to) }; renderPane(true); if (ui.acf.gap) { const h = [...document.querySelectorAll('#pane h3.sec')].find((x) => /Anfragen/.test(x.textContent)); if (h) h.scrollIntoView({ block: 'start', behavior: 'smooth' }); } break;
     case 'selapt': selectAirport(b.dataset.apt); break;
     case 'marketall': ui.marketAll = !ui.marketAll; renderPane(true); break;
     case 'chall': ui.chAll = !ui.chAll; renderPane(true); break;

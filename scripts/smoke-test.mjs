@@ -379,6 +379,36 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.equal(pf.heldAt('LHR', wf.day), 0, 'vor dem Termin keine Zuteilung'); wf.step(); wf.step();
   assert.ok(pf.heldAt('LHR', wf.day) >= 1, 'am Termin zugeteilt');
   console.log('0.17.5 ok: 3 Basis-Slots (FRA', Math.round(SMx.baseSlotCost(wf, 'FRA') / 1000), 'Tsd. €), Strecke ab voller Basis, Studie ab gewählter Basis, Warteliste am', t, 'bedient'); }
+// 0.17.6: Charter-Pool, mehrere Aufträge je Flugzeug, freie Zeiträume
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const wc = SMx.newGame({ seed: 4, base: 'HAM' }), pc = wc.player, A = (a) => SMx.applyAction(wc, pc.id, a);
+  A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); for (let i = 0; i < 20; i++) wc.step();
+  const ac = pc.fleet[0]; assert.equal(A({ type: 'assignAircraft', acId: ac.id, mode: 'charter' }).ok, true, 'Charter-Pool'); assert.equal(ac.mode, 'charter');
+  const mk = (start, end) => { const o = { id: 'T' + start, client: 'Test ' + start, type: 'A20N', start: wc.day + start, end: wc.day + end, rate: 20000, expires: wc.day + 30 }; wc.acmiOffers.push(o); return o; };
+  const o1 = mk(5, 20), o2 = mk(30, 50), o3 = mk(15, 35);
+  assert.equal(A({ type: 'acmi', offerId: o2.id, acId: ac.id }).ok, true, 'später Auftrag');
+  assert.equal(A({ type: 'acmi', offerId: o1.id, acId: ac.id }).ok, true, 'früherer Auftrag davor');
+  assert.equal(A({ type: 'acmi', offerId: o3.id, acId: ac.id }).ok, false, 'Überschneidung abgelehnt');
+  assert.deepEqual(SMx.acmiList(ac, wc.day).map((b) => b.start - wc.day), [5, 30], 'zwei Aufträge in Reihenfolge');
+  assert.deepEqual(SMx.acmiGaps(ac, wc.day, wc.day + 60).map(([x, y]) => [x - wc.day, y - wc.day]), [[0, 5], [20, 30], [50, 60]], 'freie Zeiträume');
+  const d0 = wc.day; let rev = 0; for (let i = 0; i < 55; i++) { wc.step(); }
+  const acc = pc.ledger.months ? null : null; rev = SMx.acmiList(ac, wc.day).length;
+  assert.equal(rev, 0, 'beide Aufträge geflogen'); assert.ok(ac.used_hours === 0 || ac.mode === 'charter', 'fliegt keine Strecke');
+  const ser = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(wc)))); assert.ok(ser.player.fleet[0].mode === 'charter', 'Pool bleibt nach Speichern');
+  console.log('0.17.6 ok: Charter-Pool, zwei Aufträge nacheinander ab Tag', d0, ', Überschneidung abgelehnt, freie Zeiträume stimmen'); }
+// 0.17.7: bekannte Fachkräfte (Lukas Flitz, Marten Grillkalt, Philipp Peter Son), Rolle Bordprodukt
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const wn = SMx.newGame({ seed: 4, base: 'HAM' }), pn = wn.player, A = (a) => SMx.applyAction(wn, pn.id, a);
+  pn.ledger.cashOnly(5e8, 't'); while (wn.day < 95) wn.step();
+  for (const id of ['NLF', 'NMG', 'NPS']) assert.ok(wn.candidates.some((c) => c.id === id), id + ' bewirbt sich');
+  const t0 = pn.turnExtra('HAM'), u0 = pn.extraU('HAM', 'CDG').business;
+  for (const id of ['NLF', 'NMG', 'NPS']) assert.equal(A({ type: 'hireExpert', cid: id }).ok, true, id + ' eingestellt');
+  for (let i = 0; i < 35; i++) wn.step();
+  assert.equal(pn.turnExtra('HAM'), t0 - 4, 'Flitz: Bodenzeit kürzer');
+  assert.ok(pn.extraU('HAM', 'CDG').business > u0 + 0.08 && pn.bizPrem() >= 0.05, 'Son: Premium-Wahrnehmung');
+  const mg = pn.experts.find((e) => e.id === 'NMG'); assert.equal(mg.level, 1, 'Grillkalt startet als Junior');
+  while (wn.day < 95 + 400) wn.step(); assert.equal(mg.level, 2, 'Grillkalt wird Senior');
+  console.log('0.17.7 ok: Flitz −4 Min. Bodenzeit, Son hebt die Premium-Wahrnehmung, Grillkalt nach einem Jahr Senior'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 // Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
 { const SMx = (await import('../shared/engine.cjs')).default;

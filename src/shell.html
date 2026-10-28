@@ -696,6 +696,36 @@ select.picked { display: none !important; }
 input[type="password"] { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; }
 .rt.hu { stroke-width: 1.4; opacity: .7; }
 .acmi-ev { border-color: var(--good, #1fa463); }
+.cand.named { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.named-note { color: var(--accent-ink); }
+.cal { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.cal-row { display: grid; grid-template-columns: 128px 1fr; border-top: 1px solid var(--line); min-height: 44px; }
+.cal-row:first-child { border-top: 0; }
+.cal-head { min-height: 26px; background: var(--panel-2); }
+.cal-l { display: flex; flex-direction: column; justify-content: center; padding: 4px 8px; gap: 1px; border-right: 1px solid var(--line); min-width: 0; }
+.cal-l b { font-size: 12.5px; } .cal-l span { font-size: 10.5px; line-height: 1.25; }
+.cal-t { position: relative; min-width: 0; overflow: hidden; }
+.cal-head .cal-t > span { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 5px; font-size: 10.5px; color: var(--ink-3); border-left: 1px solid var(--line); overflow: hidden; white-space: nowrap; }
+.cal-t > i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); opacity: .5; }
+.cal-b, .cal-g, .cal-m { position: absolute; top: 8px; bottom: 8px; border-radius: 5px; font-size: 10.5px; line-height: 1; display: flex; align-items: center; padding: 0 5px; overflow: hidden; white-space: nowrap; }
+.cal-b { background: var(--c-flotte, #1fa463); color: #fff; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.cal-b.ev { background: var(--accent); color: var(--on-accent); }
+.cal-g { z-index: 1; border: 1px dashed color-mix(in srgb, var(--good) 60%, transparent); background: color-mix(in srgb, var(--good) 10%, transparent); color: var(--good); cursor: pointer; font: inherit; font-size: 10.5px; }
+.cal-g:hover, .cal-g.on { background: color-mix(in srgb, var(--good) 26%, transparent); border-style: solid; }
+.cal-m { z-index: 2; background: repeating-linear-gradient(45deg, var(--panel-2), var(--panel-2) 4px, var(--line) 4px, var(--line) 8px); }
+.cal-ev { position: absolute; bottom: 0; height: 4px; background: var(--accent); border-radius: 2px; }
+.cal-free { display: grid; gap: 6px; margin-top: 8px; }
+.cal-free .chip-t { padding: 4px 10px; font-size: 11.5px; }
+.chip-t.pick { text-decoration: none; color: var(--good); border-style: dashed; border-color: color-mix(in srgb, var(--good) 60%, transparent); }
+.chip-t.pick[aria-pressed="true"] { border-style: solid; color: var(--ink); }
+.cal-key { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+.cal-key i { display: inline-block; position: static; width: 18px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; padding: 0; }
+.cal-key i.cal-e { background: var(--accent); height: 4px; vertical-align: 2px; }
+.cal-mini { position: relative; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.cal-mini span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); }
+.acmi-c { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--line); }
+.acf select { width: auto; }
+@media (max-width: 640px) { .cal-row { grid-template-columns: 84px 1fr; } .cal-l span:nth-child(3) { display: none; } }
 .slotdate { display: grid; grid-template-columns: 1fr; gap: 8px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--panel-2); }
 .slotdate > div:first-child { display: flex; flex-direction: column; gap: 2px; }
 .slotdate > div > b { font-size: 17px; }

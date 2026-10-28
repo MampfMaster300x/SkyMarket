@@ -183,6 +183,23 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.17.7: Bekannte Köpfe und Bordprodukt
+
+- **Neue Fachrolle „Bordprodukt und Service“** (Junior/Senior/Experte): Kabinenstimmung +3/+6/+9 Punkte, bessere Wahrnehmung vor allem bei Geschäftsreisenden (+4/+7/+10 %), dafür Catering 12/24/36 % teurer. Erscheint auch bei normalen Bewerbungen.
+- **Drei bekannte Köpfe der Branche** bewerben sich zu bestimmten Zeiten (Meldung im Nachrichtenticker), bleiben rund 75 Tage auf dem Markt und kommen später wieder, solange sie niemand angestellt hat. Sie sind keine Garantie: Leistung schwankt monatlich, Abwerbung durch KI-Airlines ist möglich (Halteprämie und Wettbewerbsverbot schützen).
+  - **Lukas Flitz** – Operations (OCC), Experte, 19 Jahre, ehemals Leiter der Verkehrszentrale eines Ferienfliegers. Liefert zuverlässig über Zusage (rund 112 %). Persönliche Stärke: Bodenzeiten an allen Stationen 4 Minuten kürzer. Ab etwa Februar im Spiel.
+  - **Marten Grillkalt** – Einkauf, Junior, 3 Jahre, „bleibt in jeder Verhandlung eiskalt“. Günstig, liefert deutlich über Junior-Niveau (rund 118 %) und wird nach einem Jahr im Haus Senior – Wirkung und Gehalt steigen dann. Ab etwa März.
+  - **Philipp Peter Son** – Bordprodukt und Service, Experte, 22 Jahre, ehemals Catering und Kabinenkonzept einer Premium-Airline. Persönliche Stärke „Sterneküche an Bord“: Business- und First-Gäste zahlen 5 % mehr, Stimmung zusätzlich +3 Punkte. Ab etwa April.
+- Bekannte Köpfe stehen in den Bewerbungen oben und sind hervorgehoben; ihre persönliche Stärke steht auf der Karte. Abgelaufene Bewerbungen werden nicht mehr angezeigt.
+
+## Neu in 0.17.6: Charter-Flotte mit Kalender
+
+- **Charter-Pool:** Unter Flotte → Charter (oder im Einsatzplan als Einsatzart „Charter-Pool“) schiebt man einzelne Flugzeuge ins Chartergeschäft. Sie fliegen dann keine eigenen Strecken mehr und stehen nur für Charteraufträge bereit; „zurück in den Linienflug“ holt sie wieder ins Netz.
+- **Mehrere Aufträge je Flugzeug:** Ein Flugzeug kann jetzt mehrere Charteraufträge hintereinander haben. Überschneidungen werden abgelehnt (mit Datum des kollidierenden Auftrags). Vorher konnte ein späterer Auftrag einen laufenden versehentlich überschreiben. C-Checks starten nicht kurz vor einem gebuchten Auftrag.
+- **Charterkalender:** Zeitleiste über 2, 4 oder 8 Monate für alle Pool-Flugzeuge und alle Flugzeuge mit Charter: gebuchte Aufträge (Großereignisse hervorgehoben), Werft und Lieferung, freie Zeiträume und Großereignisse als Marker. Je Flugzeug steht, wie viel des Zeitraums gebucht ist, darunter die freien Zeiträume als Knöpfe.
+- **Anfragen filtern:** nach Flugzeug, Familie, „passt in freie Zeiträume“, „nur Großereignisse“; sortieren nach Beginn, Gesamterlös, Tagesrate oder Dauer. Ein Klick auf einen freien Zeitraum zeigt nur Anfragen, die genau hineinpassen. Jede Anfrage zeigt ihre Lage im Kalender und je passendem Flugzeug Tagesrate, Netto pro Tag, Gesamterlös und einen eigenen Buchungsknopf.
+- Steht ein Pool-Flugzeug ohne Auftrag, weist die Assistenz mit der Zahl passender Anfragen darauf hin.
+
 ## Neu in 0.17.5: Basis-Slots, Reiter „Slots“, Studien je Basis
 
 - **Drei Slots pro Basis:** Wer eine Basis eröffnet (auch die Heimatbasis beim Start), kauft dort drei Slots mit – garantiert verfügbar, auch an vollen Flughäfen. Der Festpreis wächst mit der Größe: Bremen rund 19 Tsd. €, Hannover 50 Tsd. €, Hamburg 135 Tsd. €, Frankfurt 570 Tsd. €, London 756 Tsd. €. Die Basisauswahl zeigt „3 Basis-Slots“ und „Start gesamt“, der Knopf „Basis eröffnen“ den Gesamtpreis inkl. Slots. Laufende Welten: Fehlende Basis-Slots werden beim nächsten Laden zugeteilt (zum Basispreis, ohne Kosten, wenn das Geld nicht reicht).

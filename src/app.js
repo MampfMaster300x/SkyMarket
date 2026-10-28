@@ -1517,6 +1517,7 @@ function acRoleChips(pl, a) {
   const out = [];
   const inService = a.delivery_day <= W.day && !((a.status === 'ccheck' || a.status === 'aog') && a.until > W.day) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day);
   if (inService && a.used_hours > 0) { const c = crewInfo(pl, a); if (c) out.push(`<span class="chip ${c.cls}" title="${esc(c.tip)}">${c.txt}</span>`); }
+  else if (inService && acMode(a) === 'charter') out.push(`<span class="chip warn" title="Fliegt nur Charteraufträge">Charter-Pool${SM.acmiList(a, W.day).length ? ' · ' + SM.acmiList(a, W.day).length + ' Auftr.' : ' · ohne Auftrag'}</span>`);
   else if (inService && acMode(a) === 'reserve') out.push(`<span class="chip me" title="Springt ein, wenn ein anderes Flugzeug ausfällt">Reserve in ${a.base}</span>`);
   else if (inService) out.push(`<span class="chip" title="Einsatzbereit, aber ohne Strecke – kostet trotzdem jeden Tag">bereit in ${a.base}</span>`);
   return out.join(' ');
@@ -1567,26 +1568,77 @@ VIEWS.fleetOwn = function viewFleetOwn() {
   if (pl.fleet.length) html += `<p class="small muted">Ältere Flugzeuge verbrauchen mehr Kerosin, kosten mehr Wartung und fallen öfter aus. Alle ${n0(P.CCHECK_FH)} Flugstunden steht ein C-Check an; ein eigener Hangar an der Basis verkürzt ihn.</p>`;
   return html;
 };
+/** Charter: Pool, Kalender mit freien Zeiträumen, filterbare Anfragen. */
+const grpOf = (t) => P.AIRCRAFT_TYPES[t].group;
+function acmiGain(pl, o, a) {
+  const rate = SM.acmiRateFor(o, a.type_id), T = P.AIRCRAFT_TYPES[a.type_id], maint = (T.maint_bh * 8 + T.maint_cycle * 3) * cpi();
+  const routes = acMode(a) === 'charter' ? [] : [...new Set(a.assigned || [])].map((id) => pl.routes.find((r) => r.id === id)).filter(Boolean);
+  const lost = routes.reduce((x, r) => x + Math.max(0, SM.routeDb(r, 30, pl) / Math.max(1, Math.min(30, r.hist.length))) * Math.min(1, (a.used_hours || 0) / Math.max(1, pl.rotH(r) * r.freq)), 0);
+  return { rate, net: rate - maint - lost, lost, total: (rate - maint - lost) * (o.end - o.start) };
+}
+/** Kann Flugzeug a den Auftrag o fliegen (Familie, Lieferung, keine Überschneidung)? */
+function acmiFits(a, o) { return grpOf(a.type_id) === grpOf(o.type) && a.delivery_day <= o.start && !SM.acmiList(a, W.day).some((b) => o.start < b.end && o.end > b.start) && !((a.status === 'ccheck' || a.status === 'aog') && a.until > o.start); }
+function acmiCalendar(pl, rows, F) {
+  const from = W.day, span = F.range, to = from + span, pc = (d) => ((Math.max(from, Math.min(to, d)) - from) / span * 100).toFixed(2);
+  // Monatsköpfe
+  const heads = []; for (let d = from; d < to;) { const p = dateParts(d), nxt = (() => { let e = d + 1; while (e < to && dateParts(e).m === p.m) e++; return e; })(); heads.push(`<span style="left:${pc(d)}%;width:${(pc(nxt) - pc(d)).toFixed(2)}%">${MONTHS[p.m].slice(0, 3)}${p.m === 0 || d === from ? ' ' + String(p.y).slice(2) : ''}</span>`); d = nxt; }
+  const weeks = []; for (let d = from + ((7 - ((from + 4) % 7)) % 7); d < to; d += 7) weeks.push(`<i style="left:${pc(d)}%"></i>`);
+  const evs = (W.events || []).filter((e) => e.mega && e.end > from && e.start < to).slice(0, 6).map((e) => `<span class="cal-ev" style="left:${pc(e.start)}%;width:${Math.min(100 - pc(e.start), Math.max(0.8, pc(e.end) - pc(e.start))).toFixed(2)}%" title="${esc(e.title || e.text || 'Großereignis')}"></span>`).join('');
+  const row = (a) => {
+    const bk = SM.acmiList(a, from).filter((b) => b.start < to), gaps = SM.acmiGaps(a, from, to), sel = F.gap && F.gap.ac === a.id;
+    const bars = bk.map((b) => `<span class="cal-b${b.ev ? ' ev' : ''}" style="left:${pc(b.start)}%;width:${Math.min(100 - pc(b.start), Math.max(0.6, pc(b.end) - pc(b.start))).toFixed(2)}%" title="${esc(b.client)} · ${dateShort(b.start)}–${dateShort(b.end)} · ${eur(b.rate)}/Tag">${b.end - b.start >= span / 12 ? esc(b.client) : ''}</span>`).join('');
+    const mt = (a.status === 'ccheck' || a.status === 'aog') && a.until > from ? `<span class="cal-m" style="left:0;width:${pc(a.until)}%" title="${a.status === 'ccheck' ? 'C-Check' : 'Reparatur'} bis ${dateShort(a.until)}"></span>` : '';
+    const dl = a.delivery_day > from ? `<span class="cal-m" style="left:0;width:${pc(a.delivery_day)}%" title="Lieferung ${dateShort(a.delivery_day)}"></span>` : '';
+    const gp = gaps.map(([g0, g1]) => `<button class="cal-g${sel && F.gap.from === g0 ? ' on' : ''}" data-act="acmigap" data-ac="${a.id}" data-from="${g0}" data-to="${g1}" style="left:${pc(g0)}%;width:${Math.min(100 - pc(g0), Math.max(0.6, pc(g1) - pc(g0))).toFixed(2)}%" title="frei ${dateShort(g0)}–${g1 >= to ? 'offen' : dateShort(g1)} (${g1 - g0}${g1 >= to ? '+' : ''} Tage) – antippen: passende Anfragen zeigen">${g1 - g0 >= span / 10 ? `frei ${g1 - g0}${g1 >= to ? '+' : ''} T.` : ''}</button>`).join('');
+    const pool = acMode(a) === 'charter', freeDays = gaps.reduce((x, [g0, g1]) => x + g1 - g0, 0), busy = span - freeDays;
+    return `<div class="cal-row"><div class="cal-l"><b class="mono">${acName(a.id)}</b><span class="small muted">${a.type_id} · ${a.base}${pool ? '' : ' · Linie'}</span><span class="small ${busy ? 'pos' : 'muted'}">${pct(busy / span)} gebucht</span></div><div class="cal-t">${weeks.join('')}${gp}${dl}${mt}${bars}</div></div>`;
+  };
+  return `<div class="cal"><div class="cal-row cal-head"><div class="cal-l"></div><div class="cal-t">${heads.join('')}${evs}</div></div>${rows.map(row).join('')}</div>
+    <div class="cal-free">${rows.map((a) => { const g = SM.acmiGaps(a, from, to).filter(([g0, g1]) => g1 - g0 >= 2); return g.length ? `<div class="row small" style="gap:6px;flex-wrap:wrap;align-items:center"><b class="mono">${acName(a.id)}</b> frei: ${g.map(([g0, g1]) => `<button class="chip-t pick" aria-pressed="${!!(F.gap && F.gap.ac === a.id && F.gap.from === g0)}" data-act="acmigap" data-ac="${a.id}" data-from="${g0}" data-to="${g1}">${dateShort(g0)}–${g1 >= to ? 'offen' : dateShort(g1)} · ${g1 - g0}${g1 >= to ? '+' : ''} T.</button>`).join('')}</div>` : `<div class="small"><b class="mono">${acName(a.id)}</b> <span class="muted">im Zeitraum ausgebucht</span></div>`; }).join('')}</div>
+    <div class="cal-key small muted"><span><i class="cal-b"></i>gebucht</span><span><i class="cal-b ev"></i>Großereignis</span><span><i class="cal-g"></i>frei – antippen filtert die Anfragen</span><span><i class="cal-m"></i>Werft/Lieferung</span><span><i class="cal-e"></i>Großereignis im Kalender</span></div>`;
+}
 VIEWS.fleetAcmi = function viewFleetAcmi() {
-  const pl = W.player, grp = (t) => P.AIRCRAFT_TYPES[t].group;
-  const offers = W.acmiOffers.slice().sort((a, b) => (!!b.ev - !!a.ev) || (pl.fleet.some((x) => grp(x.type_id) === grp(b.type)) - pl.fleet.some((x) => grp(x.type_id) === grp(a.type))) || a.start - b.start);
-  const mine = pl.fleet.filter((a) => a.acmi && a.acmi.end > W.day);
-  let html = `<h2 class="sec">Charter (ACMI) <small>${offers.length} Anfragen${offers.some((o) => o.ev) ? ` · ${offers.filter((o) => o.ev).length} zu Großereignissen` : ''}</small></h2>`;
-  html += `<p class="small ink2">ACMI heißt: Sie stellen Flugzeug, Crew, Wartung und Versicherung, der Kunde zahlt eine Tagesrate und trägt Treibstoff und Gebühren. Ein Muster derselben Familie passt auch (Rate nach Sitzen angepasst). Zu Großereignissen – WM, Olympia, Hadsch, Oktoberfest – zahlen Veranstalter deutlich mehr. In der Charterzeit fehlt das Flugzeug im eigenen Flugplan.</p>`;
-  if (mine.length) html += `<div class="callout info"><b>Ihre Charter</b>${mine.map((a) => `${acName(a.id)}: ${esc(a.acmi.client)} ${a.acmi.start > W.day ? 'ab ' + dateShort(a.acmi.start) : 'bis ' + dateShort(a.acmi.end)} · ${eur(a.acmi.rate)}/Tag`).join('<br>')}</div>`;
-  html += offers.length ? offers.map((o) => {
-    const cands = pl.fleet.filter((a) => grp(a.type_id) === grp(o.type) && a.delivery_day <= o.start && !(a.acmi && a.acmi.end > o.start));
+  const pl = W.player, F = ui.acf = ui.acf || { ac: '', fit: true, fam: '', ev: false, sort: 'start', gap: null, range: 120 };
+  const pool = pl.fleet.filter((a) => acMode(a) === 'charter'), withBk = pl.fleet.filter((a) => acMode(a) !== 'charter' && SM.acmiList(a, W.day).length);
+  const calRows = [...pool, ...withBk];
+  if (F.gap && !pl.fleet.some((a) => a.id === F.gap.ac)) F.gap = null;
+  let html = `<h2 class="sec">Charter (ACMI) <small>${W.acmiOffers.length} Anfragen${W.acmiOffers.some((o) => o.ev) ? ` · ${W.acmiOffers.filter((o) => o.ev).length} zu Großereignissen` : ''}</small></h2>
+    <p class="small ink2">ACMI: Sie stellen Flugzeug, Crew, Wartung und Versicherung, der Kunde zahlt eine Tagesrate und trägt Treibstoff und Gebühren. Ein Muster derselben Familie passt auch. Ein Flugzeug kann mehrere Aufträge hintereinander haben – der Kalender zeigt, wo noch Platz ist.</p>`;
+  // Charter-Pool
+  const others = pl.fleet.filter((a) => acMode(a) !== 'charter');
+  html += `<div class="card pad stack"><div class="spread"><h3>Charter-Flotte <small class="muted">${pool.length} Flugzeug${pool.length === 1 ? '' : 'e'} im Pool</small></h3></div>
+    ${pool.length ? `<div class="row" style="gap:6px;flex-wrap:wrap">${pool.map((a) => `<span class="chip me" style="padding:4px 4px 4px 10px">${acName(a.id)} · ${a.type_id} <button class="btn small ghost" data-act="acmipool" data-id="${a.id}" data-on="0" title="Zurück in die automatische Einsatzplanung">zurück in den Linienflug</button></span>`).join('')}</div>` : '<p class="small muted">Noch kein Flugzeug im Charter-Pool. Flugzeuge im Pool fliegen keine eigenen Strecken mehr und stehen nur für Charter bereit – sinnvoll für Maschinen, die im Netz wenig verdienen.</p>'}
+    ${others.length ? `<div class="row" style="gap:8px;flex-wrap:wrap"><select id="acmi-pooladd" style="width:auto;flex:1;min-width:200px">${others.map((a) => `<option value="${a.id}">${acName(a.id)} · ${a.type_id} · ${a.base} · ${a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Linienflug' : 'ohne Einsatz'}</option>`).join('')}</select><button class="btn small primary" data-act="acmipool" data-on="1">In den Charter-Pool</button></div>
+      <p class="small muted">Fliegt die Maschine Strecken, übernehmen andere Flugzeuge die Umläufe – fehlt Kapazität, fallen Flüge aus.</p>` : ''}</div>`;
+  // Kalender
+  if (calRows.length) html += `<div class="stack"><div class="spread"><h3 class="sec sm">Charterkalender <small>${dateShort(W.day)} bis ${dateShort(W.day + F.range)}</small></h3><div class="seg" role="group">${[60, 120, 240].map((d) => `<button data-act="acmirange" data-v="${d}" aria-pressed="${F.range === d}">${d === 240 ? '8 Mon.' : d / 30 + ' Mon.'}</button>`).join('')}</div></div>${acmiCalendar(pl, calRows, F)}</div>`;
+  // Anfragen filtern
+  const fams = [...new Set(W.acmiOffers.map((o) => grpOf(o.type)))];
+  const target = F.ac ? pl.fleet.filter((a) => a.id === F.ac) : calRows.length ? calRows : pl.fleet;
+  let list = W.acmiOffers.filter((o) => (!F.fam || grpOf(o.type) === F.fam) && (!F.ev || o.ev));
+  if (F.gap) { const a = pl.fleet.find((x) => x.id === F.gap.ac); list = list.filter((o) => o.start >= F.gap.from && o.end <= F.gap.to && a && acmiFits(a, o)); }
+  else if (F.fit) list = list.filter((o) => target.some((a) => acmiFits(a, o)));
+  const best = (o) => { const c = pl.fleet.filter((a) => acmiFits(a, o)); return c.length ? Math.max(...c.map((a) => acmiGain(pl, o, a).total)) : -1e12; };
+  const SORT = { start: (a, b) => a.start - b.start, rate: (a, b) => b.rate - a.rate, total: (a, b) => best(b) - best(a), dur: (a, b) => (b.end - b.start) - (a.end - a.start) };
+  list.sort((a, b) => (!!b.ev - !!a.ev) * (F.sort === 'start' ? 0 : 0) || SORT[F.sort](a, b));
+  html += `<div class="stack"><h3 class="sec sm">Anfragen <small>${list.length} von ${W.acmiOffers.length}</small></h3>
+    <div class="row acf" style="gap:8px;flex-wrap:wrap"><select id="acf-ac" aria-label="Flugzeug"><option value="">${calRows.length ? 'Charter-Flotte' : 'alle Flugzeuge'}</option>${pl.fleet.map((a) => `<option value="${a.id}" ${F.ac === a.id ? 'selected' : ''}>${acName(a.id)} · ${a.type_id}</option>`).join('')}</select>
+      <select id="acf-fam" aria-label="Familie"><option value="">alle Familien</option>${fams.map((g) => `<option value="${g}" ${F.fam === g ? 'selected' : ''}>${esc(P.TYPE_GROUPS[g])}</option>`).join('')}</select>
+      <select id="acf-sort" aria-label="Sortierung">${[['start', 'nach Beginn'], ['total', 'nach Gesamterlös'], ['rate', 'nach Tagesrate'], ['dur', 'nach Dauer']].map(([k, l]) => `<option value="${k}" ${F.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="chk small"><input type="checkbox" id="acf-fit" ${F.fit ? 'checked' : ''}> passt in freie Zeiträume</label><label class="chk small"><input type="checkbox" id="acf-ev" ${F.ev ? 'checked' : ''}> nur Großereignisse</label></div>
+    ${F.gap ? `<div class="callout info row" style="gap:8px;align-items:center"><span>Freier Zeitraum <b>${acName(F.gap.ac)}</b>: ${dateShort(F.gap.from)} bis ${F.gap.to >= W.day + F.range ? 'offen' : dateShort(F.gap.to)}</span><button class="btn small" data-act="acmigap" data-clear="1" style="margin-left:auto">Filter aufheben</button></div>` : ''}`;
+  html += list.length ? list.map((o) => {
+    const cands = pl.fleet.filter((a) => acmiFits(a, o)).sort((a, b) => (acMode(b) === 'charter') - (acMode(a) === 'charter') || acmiGain(pl, o, b).net - acmiGain(pl, o, a).net);
+    const show = F.gap ? cands.filter((a) => a.id === F.gap.ac) : F.ac ? cands.filter((a) => a.id === F.ac) : cands;
     const days = o.end - o.start, t = P.AIRCRAFT_TYPES[o.type];
-    const gain = (a) => { const rate = SM.acmiRateFor(o, a.type_id), maint = (P.AIRCRAFT_TYPES[a.type_id].maint_bh * 8 + P.AIRCRAFT_TYPES[a.type_id].maint_cycle * 3) * cpi();
-      const routes = [...new Set(a.assigned || [])].map((id) => pl.routes.find((r) => r.id === id)).filter(Boolean), lost = routes.reduce((x, r) => x + Math.max(0, SM.routeDb(r, 30, pl) / Math.max(1, Math.min(30, r.hist.length))) * Math.min(1, (a.used_hours || 0) / Math.max(1, pl.rotH(r) * r.freq)), 0);
-      return { rate, net: rate - maint - lost, lost }; };
     return `<div class="card pad stack${o.ev ? ' acmi-ev' : ''}"><div class="spread"><b>${esc(o.client)}</b><span class="row" style="gap:4px">${o.ev ? '<span class="chip good">Großereignis</span>' : ''}<span class="chip">${tlx(o.type)}</span></span></div>
       <div class="small ink2">${dateShort(o.start)} bis ${dateShort(o.end)} (${days} Tage) · <b>${eur(o.rate)} pro Tag</b> · gesamt ${eur(o.rate * days)}${o.apt ? ` · Einsatz rund um ${esc(apName(o.apt))}` : ''}</div>
-      ${cands.length ? `<div class="stack" style="gap:4px">${cands.slice(0, 4).map((a) => { const g = gain(a); return `<div class="spread small"><span>${acName(a.id)} · ${a.type_id}${a.type_id !== o.type ? ' (Familie)' : ''} · ${a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Einsatz' : '<span class="pos">frei</span>'}</span><span>${eur(g.rate)}/Tag · <b class="${sgn(g.net)}">${eur(g.net, { plus: true })}</b>/Tag ${g.lost > 0 ? 'nach entgangenem Streckenbeitrag' : 'gegenüber Stillstand'}</span></div>`; }).join('')}
-        <div class="row"><select id="acmi-${o.id}" style="width:auto">${cands.map((a) => `<option value="${a.id}">${acName(a.id)} · ${a.type_id}</option>`).join('')}</select><button class="btn small primary" data-act="acmi" data-id="${o.id}">Verchartern</button></div></div>`
-        : `<span class="small muted">Kein passendes Flugzeug der Familie ${esc(P.TYPE_GROUPS[t.group])} frei.</span>`}
+      ${calRows.length ? `<div class="cal-mini" title="Zeitraum im Kalender">${(() => { const l = Math.min(98, Math.max(0, o.start - W.day) / F.range * 100), w = Math.max(2, Math.min(100 - l, (Math.min(o.end, W.day + F.range) - Math.max(o.start, W.day)) / F.range * 100)); return `<span style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></span>`; })()}</div>` : ''}
+      ${show.length ? `<div class="stack" style="gap:6px">${show.slice(0, 4).map((a) => { const g = acmiGain(pl, o, a); return `<div class="acmi-c"><span class="small"><b>${acName(a.id)}</b> · ${a.type_id}${a.type_id !== o.type ? ' (Familie)' : ''} · ${acMode(a) === 'charter' ? '<span class="pos">Charter-Pool, frei</span>' : a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Linienflug' : '<span class="pos">frei</span>'}<br><span class="muted">${eur(g.rate)}/Tag · netto <b class="${sgn(g.net)}">${eur(g.net, { plus: true })}</b>/Tag${g.lost > 0 ? ' nach entgangenem Streckenbeitrag' : ''} · gesamt ${eur(g.total, { plus: true })}</span></span><button class="btn small primary" data-act="acmi" data-id="${o.id}" data-ac="${a.id}">Verchartern · ${eurB(g.rate * days)}</button></div>`; }).join('')}${show.length > 4 ? `<span class="small muted">und ${show.length - 4} weitere passende Flugzeuge</span>` : ''}</div>`
+        : `<span class="small muted">${cands.length ? 'Das gewählte Flugzeug ist in dem Zeitraum nicht frei.' : `Kein Flugzeug der Familie ${esc(P.TYPE_GROUPS[t.group])} in dem Zeitraum frei.`}</span>`}
       <span class="small muted">Angebot gilt bis ${dateShort(o.expires)}</span></div>`;
-  }).join('') : '<p class="small muted">Gerade keine Anfragen. Neue kommen zum Monatswechsel und vor Großereignissen.</p>';
+  }).join('') : `<p class="small muted">${W.acmiOffers.length ? 'Keine Anfrage passt zu den Filtern.' + (F.fit || F.gap ? ' Tipp: „passt in freie Zeiträume“ ausschalten zeigt alle.' : '') : 'Gerade keine Anfragen. Neue kommen zum Monatswechsel und vor Großereignissen.'}</p>`;
+  html += '</div>';
   return html;
 };
 VIEWS.fleetBuy = function viewFleetBuy() {
@@ -1681,16 +1733,18 @@ VIEWS.staff = function viewStaff() {
   html += `<div class="stack"><h2 class="sec">Fachkräfte und Berater <small>${pl.experts.length} angestellt</small></h2>`;
   html += pl.experts.length ? pl.experts.map((e) => `<div class="card pad stack"><div class="spread"><b>${esc(e.name)}</b><span class="chip me">${P.EXPERT_ROLES[e.role].label} · ${LEVEL[e.level]}</span></div>
       <div class="small ink2">Zusage: ${esc(P.EXPERT_ROLES[e.role].effect[e.level - 1])}</div>
+      ${e.note ? `<div class="small named-note">★ ${esc(e.grow && e.level >= e.grow.to ? 'Hat sich vom Junior zum Senior entwickelt.' : e.note)}${e.grow && e.level < e.grow.to ? ` Noch ${Math.max(0, e.grow.days - (W.day - (e.hiredDay ?? W.day)))} Tage.` : ''}</div>` : ''}
       ${expertPerfHtml(e)}
       ${expertContractHtml(e)}
       <div class="spread small muted"><span>${e.years} Jahre Erfahrung, ${esc(e.prev)}, Schwerpunkt ${esc(e.region)}${refsTxt(e)}</span><span>${eur(e.salary * cpi())}/Monat <button class="btn small" data-act="fireexpert" data-id="${e.id}">Freistellen</button></span></div></div>`).join('')
     : '<p class="small muted">Noch niemand. Fachkräfte wirken nach rund 30 Tagen Einarbeitung voll – wie gut genau, zeigt die monatliche Bewertung. Jede Rolle kann einmal besetzt werden (Marktanalyse zweimal).</p>';
   { const taken = SM.P.STAR_CONSULTANTS.map((S) => [S, W.starHolder(S.id)]).filter(([, h]) => h && h.id !== pl.id);
     if (taken.length) html += `<p class="small muted">${taken.map(([S, h]) => `${esc(S.name)} arbeitet gerade für ${esc(h.name)}.`).join(' ')} Wer ihn freistellt oder verliert, gibt ihn wieder frei.</p>`; }
-  html += `<h3>Bewerbungen</h3>${W.candidates.slice().sort((a, b) => (P.EXPERT_ROLES[b.role].unique ? 1 : 0) - (P.EXPERT_ROLES[a.role].unique ? 1 : 0) || a.role.localeCompare(b.role) || b.level - a.level).map((c) => {
+  html += `<h3>Bewerbungen</h3>${W.candidates.filter((c) => c.expires > W.day).sort((a, b) => (P.EXPERT_ROLES[b.role].unique ? 2 : b.named ? 1 : 0) - (P.EXPERT_ROLES[a.role].unique ? 2 : a.named ? 1 : 0) || a.role.localeCompare(b.role) || b.level - a.level).map((c) => {
     const taken = pl.experts.filter((e) => e.role === c.role).length >= P.EXPERT_ROLES[c.role].max;
-    return `<div class="cand"><div class="spread"><b>${esc(c.name)}</b><span class="chip">${P.EXPERT_ROLES[c.role].label} · ${LEVEL[c.level]}</span></div>
+    return `<div class="cand${c.named ? ' named' : ''}"><div class="spread"><b>${esc(c.name)}${c.named ? ' <span class="chip good">bekannt in der Branche</span>' : ''}</b><span class="chip">${P.EXPERT_ROLES[c.role].label} · ${LEVEL[c.level]}</span></div>
       <div class="small ink2">${esc(P.EXPERT_ROLES[c.role].effect[c.level - 1])}</div>
+      ${c.note ? `<div class="small named-note">★ ${esc(c.note)}</div>` : ''}
       ${c.refs && c.refs.length ? `<div class="small">Referenz: ${c.refs.map((x) => `<b class="${x.perf >= 1 ? 'pos' : x.perf < 0.85 ? 'neg' : ''}">${pct(x.perf)}</b> der Zusage bei ${esc(x.airline)}${x.months ? ` (${x.months} Mon.)` : ''}`).join(' · ')} <span class="muted">– bei einem neuen Arbeitgeber kann es anders laufen</span></div>` : ''}
       <div class="spread small"><span class="muted">${c.years} Jahre, ${esc(c.trait)}, ${esc(c.prev)} · kennt ${esc(c.region)} · ${P.EXPERT_ROLES[c.role].unique ? `einmalig in der Welt – verfügbar, bis jemand zugreift · Antrittshonorar ${eur(P.EXPERT_ROLES[c.role].signOn)}` : 'bis ' + dateShort(c.expires)}</span>
         <span><b class="mono">${eur(c.salary)}</b>/Mon. <button class="btn small${taken ? '' : ' primary'}" data-act="hireexpert" data-id="${c.id}" ${taken ? 'disabled title="Rolle besetzt"' : ''}>Einstellen</button></span></div></div>`;
@@ -2695,7 +2749,7 @@ VIEWS.news = function viewNews() {
 };
 
 // ---------- Einsatzplan: Flugzeuge festen Strecken zuweisen ----------
-const MODE_LABEL = { auto: 'Automatisch', manual: 'Feste Strecken', reserve: 'Reserve' };
+const MODE_LABEL = { auto: 'Automatisch', manual: 'Feste Strecken', reserve: 'Reserve', charter: 'Charter-Pool' };
 const ROUTE_HUES = [212, 152, 266, 32, 330, 186, 48, 0, 100, 290];
 const routeColor = (r) => `hsl(${ROUTE_HUES[Math.max(0, W.player.routes.indexOf(r)) % ROUTE_HUES.length]} 75% 58%)`;
 const acMode = (a) => a.mode || 'auto';
@@ -2774,7 +2828,7 @@ function assignEditor(a) {
       <div class="lfrow" style="grid-template-columns:90px 1fr 96px"><span>Betriebszeit</span><div class="bar"><i class="${over ? 'crit' : 'me'}" style="width:${long ? 100 : pctH.toFixed(0)}%"></i></div><span class="num ${over ? 'neg' : ''}">${long ? 'Langstrecke' : `${n1(hours)} / ${win} h`}</span></div>
       ${over ? `<div class="callout crit">Zu viel: ${n1(hours)} Stunden passen nicht ins Betriebsfenster von ${win} Stunden.</div>` : ''}
       <p class="small muted">Grenzen: gleiche Basis, gleicher Flugzeugtyp wie die Strecke, höchstens ${win} Stunden am Tag, nicht mehr Umläufe als die Frequenz. Ein Langstreckenumlauf belegt das Flugzeug ganz. Fällt ein fest zugewiesenes Flugzeug aus, übernehmen Automatik- oder Reserveflugzeuge desselben Typs.</p>`;
-  } else html += `<p class="small muted">${D.mode === 'auto' ? 'Der Planer setzt das Flugzeug dort ein, wo Umläufe offen sind.' : 'Das Flugzeug fliegt nur, wenn sonst ein Umlauf ausfiele (Technik, C-Check, Charter). Bis dahin kostet es Leasing und Versicherung.'}</p>`;
+  } else html += `<p class="small muted">${D.mode === 'charter' ? 'Das Flugzeug fliegt keine eigenen Strecken mehr und steht nur für Charteraufträge bereit – Kalender und passende Anfragen unter Flotte → Charter.' : D.mode === 'auto' ? 'Der Planer setzt das Flugzeug dort ein, wo Umläufe offen sind.' : 'Das Flugzeug fliegt nur, wenn sonst ein Umlauf ausfiele (Technik, C-Check, Charter). Bis dahin kostet es Leasing und Versicherung.'}</p>`;
   html += `<div class="row"><button class="btn primary" data-act="asgsave">Speichern</button><button class="btn" data-act="asgcancel">Abbrechen</button></div></div>`;
   return html;
 }
@@ -3659,7 +3713,7 @@ function assistantHints() {
   const miss = unplacedNow();
   if (miss.length) add('unpl', 'warn', 'ops', `Ohne Flugzeug: ${miss.map(([r, k]) => `${r.base}–${r.dest} (${k}×)`).join(', ')}. Diese Flüge fallen aus.`, 'fleetPlan');
   for (const a of pl.fleet) {
-    if (a.delivery_day <= W.day && !(a.used_hours > 0) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) && a.status !== 'ccheck' && a.status !== 'aog') { add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> (${tl(a.type_id)}) steht ungenutzt und kostet ${eur(acDayCost(a))} pro Tag.`, 'fleetOwn'); break; }
+    if (a.delivery_day <= W.day && !(a.used_hours > 0) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) && a.status !== 'ccheck' && a.status !== 'aog') { if (acMode(a) === 'charter') add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> ist im Charter-Pool, hat heute aber keinen Auftrag – kostet ${eur(acDayCost(a))} pro Tag. ${W.acmiOffers.filter((o) => acmiFits(a, o)).length} passende Anfragen.`, 'fleetAcmi'); else add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> (${tl(a.type_id)}) steht ungenutzt und kostet ${eur(acDayCost(a))} pro Tag.`, 'fleetOwn'); break; }
   }
   for (const a of pl.fleet) {
     const toC = P.CCHECK_FH - (a.fh - a.lastC);
@@ -3921,6 +3975,7 @@ function refreshAll() { W.operableFreq(W.player); buildSchedules(); renderHeader
 // Auf-/Zuklappen merken, damit es beim Neuzeichnen so bleibt
 document.addEventListener('toggle', (e) => { const d = e.target; if (!d || !d.dataset || !d.dataset.keep) return; ui.open = ui.open || {}; ui.open[d.dataset.keep] = d.open; const h = d.querySelector('.fold-hint'); if (h) h.textContent = d.open ? 'einklappen' : 'aufklappen'; }, true);
 document.addEventListener('input', (e) => { const t = e.target; if (t && (t.id === 'slot-apt' || t.id === 'slot-n')) { const st = ui.slotForm = ui.slotForm || { apt: '', n: 1 }; if (t.id === 'slot-apt') st.apt = slotAptOf(t.value) || ''; else st.n = Math.max(1, Math.min(8, Math.round(Number(t.value)) || 1)); const box = $('#slot-q'); if (box) box.innerHTML = slotQuoteHtml(st.apt, st.n); return; } });
+document.addEventListener('change', (e) => { const t = e.target; if (!t || !t.id || !t.id.startsWith('acf-') || !ui.acf) return; const k = t.id.slice(4); ui.acf[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'ac' || k === 'fit') ui.acf.gap = null; renderPane(true); });
 document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.id) return; const fid = t.id.startsWith('dl-cash-') ? t.id.replace('dl-cash-', 'dl-fmt-') : t.dataset && t.dataset.fmt; if (!fid) return; const f = document.getElementById(fid), v = Math.max(0, Math.round(Number(t.value) || 0)); if (f) f.textContent = v ? '= ' + eur(v) : ''; });
 function onPaneClick(e) {
   const mb = e.target.closest('[data-mktbase]');
@@ -4010,7 +4065,10 @@ function onPaneClick(e) {
     }
     case 'askdispose': ui.confirm = 'dispose:' + b.dataset.id; renderPane(true); break;
     case 'dispose': { if (doAction({ type: 'dispose', acId: b.dataset.id }).ok) { ui.confirm = null; toast('Flugzeug abgegeben.'); } refreshAll(); break; }
-    case 'acmi': { const sel = $(`#acmi-${b.dataset.id}`); if (doAction({ type: 'acmi', offerId: b.dataset.id, acId: sel && sel.value }).ok) toast('Charter vereinbart.'); refreshAll(); break; }
+    case 'acmi': { const sel = $(`#acmi-${b.dataset.id}`), acId = b.dataset.ac || (sel && sel.value); if (doAction({ type: 'acmi', offerId: b.dataset.id, acId }).ok) toast(`Charter vereinbart – ${acName(acId)} steht im Kalender.`); refreshAll(); break; }
+    case 'acmipool': { const on = b.dataset.on === '1', id = on ? ($('#acmi-pooladd') || {}).value : b.dataset.id; if (!id) break; const r = doAction({ type: 'assignAircraft', acId: id, mode: on ? 'charter' : 'auto', pins: [] }); if (r.ok) toast(on ? `${acName(id)} ist im Charter-Pool.` : `${acName(id)} fliegt wieder im Netz.`); refreshAll(); break; }
+    case 'acmirange': ui.acf.range = Number(b.dataset.v) || 120; renderPane(true); break;
+    case 'acmigap': ui.acf.gap = b.dataset.clear ? null : { ac: b.dataset.ac, from: Number(b.dataset.from), to: Number(b.dataset.to) }; renderPane(true); if (ui.acf.gap) { const h = [...document.querySelectorAll('#pane h3.sec')].find((x) => /Anfragen/.test(x.textContent)); if (h) h.scrollIntoView({ block: 'start', behavior: 'smooth' }); } break;
     case 'selapt': selectAirport(b.dataset.apt); break;
     case 'marketall': ui.marketAll = !ui.marketAll; renderPane(true); break;
     case 'chall': ui.chAll = !ui.chAll; renderPane(true); break;
