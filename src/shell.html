@@ -97,6 +97,40 @@ nav.main .dot { position: absolute; top: 8px; right: 6px; width: 7px; height: 7p
 .speed button:disabled, .speed select:disabled { opacity: .55; cursor: not-allowed; }
 .iconbtn { border: 0; background: rgba(255,255,255,.06); color: var(--bar-ink); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; position: relative; }
 .iconbtn:hover { background: rgba(255,255,255,.12); }
+.calbtn { align-self: center; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: var(--bar-ink); height: 38px; padding: 0 12px 0 9px; border-radius: 12px; cursor: pointer; min-width: 0; max-width: 300px; margin-right: 12px; font: inherit; }
+.calbtn[hidden] { display: none; }
+.calbtn:hover, .calbtn[aria-expanded="true"] { background: rgba(255,255,255,.13); }
+.calbtn .ic { flex: none; }
+.calnext { display: grid; text-align: left; line-height: 1.15; min-width: 0; }
+.calnext b { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calnext span { font-size: 10.5px; color: var(--bar-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calpop { position: fixed; z-index: 69; top: calc(var(--hh, 64px) + 6px); left: 12px; width: min(400px, calc(100vw - 24px)); max-height: calc(100dvh - var(--hh, 64px) - 24px); overflow: auto; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 14px; display: grid; gap: 12px; }
+.calpop[hidden] { display: none; }
+.cal-hd { display: flex; align-items: center; gap: 6px; }
+.cal-hd b { flex: 1; font-size: 15px; }
+.cal-hd button { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 8px; height: 30px; min-width: 30px; padding: 0 8px; cursor: pointer; font: inherit; font-size: 13px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-grid .wd { font-size: 10.5px; color: var(--ink-3); text-align: center; padding: 2px 0; }
+.cal-grid button { position: relative; border: 0; background: transparent; color: var(--ink); border-radius: 8px; height: 40px; font: inherit; font-size: 12.5px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 5px; gap: 3px; }
+.cal-grid button:hover { background: var(--panel-2); }
+.cal-grid button.past { color: var(--ink-3); }
+.cal-grid button.today { outline: 2px solid var(--accent); outline-offset: -2px; font-weight: 700; }
+.cal-grid button.sel { background: var(--accent-soft); }
+.cal-grid button .dots { display: flex; gap: 2px; height: 6px; }
+.cal-grid button .dots i { width: 6px; height: 6px; border-radius: 50%; }
+.cal-grid button .band { position: absolute; left: 2px; right: 2px; bottom: 3px; height: 3px; border-radius: 2px; opacity: .55; }
+.cal-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-kinds .chip-t { padding: 4px 10px; font-size: 11.5px; }
+.cal-kinds .chip-t i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.cal-list { display: grid; gap: 2px; }
+.cal-list h4 { margin: 6px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); }
+.cal-it { display: grid; grid-template-columns: 62px 4px 1fr; gap: 10px; align-items: start; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 7px 6px; border-radius: 8px; cursor: pointer; font: inherit; }
+.cal-it:hover { background: var(--panel-2); }
+.cal-it > span:first-child { font-size: 12px; font-weight: 600; }
+.cal-it > span:first-child em { display: block; font-style: normal; font-weight: 400; font-size: 10.5px; color: var(--ink-3); }
+.cal-it > i { align-self: stretch; border-radius: 2px; }
+.cal-it b { font-size: 13px; display: block; }
+.cal-it small { font-size: 11.5px; color: var(--ink-2); display: block; }
 .iconbtn .dot { position: absolute; top: 6px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: #fb7185; border: 2px solid var(--bar); }
 .avatar-btn { border: 0; width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #22d3ee, #2f7cf6); color: #04122a; font: 800 13px var(--f-body); }
 .usermenu { position: absolute; right: 12px; top: 58px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 6px; display: grid; min-width: 200px; z-index: 20; }
@@ -696,6 +730,11 @@ select.picked { display: none !important; }
 input[type="password"] { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; }
 .rt.hu { stroke-width: 1.4; opacity: .7; }
 .acmi-ev { border-color: var(--good, #1fa463); }
+.grp { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.grp-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.grp-kv > span { display: flex; flex-direction: column; } .grp-kv em { font-style: normal; font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+.grp-ben { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; color: var(--ink-3); }
+.grp-ben li.on { color: var(--ink); } .grp-ben li.on::first-letter { color: var(--good); }
 .cand.named { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .named-note { color: var(--accent-ink); }
 .cal { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -1055,6 +1094,8 @@ nav.main .lbs { display: none; }
   header.top { position: sticky; top: 0; z-index: 30; flex-wrap: nowrap; min-height: 0; height: var(--hh); align-items: center;
     padding: env(safe-area-inset-top, 0px) max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px)); }
   .logo { padding-right: 4px; } .logo .wm { display: none; } .logo svg { width: 28px; height: 28px; }
+  .calbtn { height: 34px; width: 34px; padding: 0; justify-content: center; margin-right: 4px; border-radius: 50%; } .calnext { display: none; }
+  .calpop { left: 8px; width: calc(100vw - 16px); }
   .topright { gap: 6px; padding-left: 4px; min-width: 0; }
   .date { min-width: 0; } .date span { font-size: 15px; } .date small { font-size: 10px; white-space: nowrap; }
   #themeBtn { display: none; }
@@ -1147,6 +1188,8 @@ nav.main .lbs { display: none; }
       </svg>
       <div class="wm"><b>SKYMARKET</b><span>Build · Connect · Grow</span></div>
     </div>
+    <button class="calbtn" id="calBtn" type="button" hidden aria-label="Kalender mit wichtigen Terminen" aria-expanded="false" title="Kalender: Slotvergaben, Großereignisse, eigene Termine"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2.2"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/></svg><span class="calnext" id="calNext"></span></button>
+    <div class="calpop" id="calPop" hidden role="dialog" aria-label="Kalender"></div>
     <div class="topright">
       <div class="date" id="date">–</div>
       <div class="speed" role="group" aria-label="Spielgeschwindigkeit">

@@ -775,12 +775,101 @@ function clockText() {
   const mins = Math.floor((ui.t % 1) * 1440);
   return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 }
+// ---------------------------------------------------------------------------
+// Kalender oben links: Slotvergaben, öffentlich bekannte Großereignisse, angekündigte Ereignisse, eigene Termine
+// ---------------------------------------------------------------------------
+const CAL_KIND = { slot: ['Slotvergabe', 'var(--c-strecken)'], mega: ['Großereignisse', 'var(--accent)'], event: ['Angekündigt', 'var(--c-markt)'], own: ['Eigene Termine', 'var(--c-flotte)'] };
+const dayOfYMD = (y, m, d) => (y - 2027) * 365 + SM.MONTH_STARTS[m] + d - 1;
+function calItems(from, to) {
+  const pl = W.player, out = [], add = (it) => { if ((it.end ?? it.day) >= from && it.day <= to) out.push(it); };
+  // Slotvergaben (feste Termine)
+  for (let d = from - 200; ;) { const n = SM.nextSlotDay(d); if (n.day > to) break; add({ day: n.day, kind: 'slot', label: `Slotvergabe ${n.summer ? 'Sommer' : 'Winter'}flugplan`, detail: 'Jeder Flughafen bekommt einen Slot dazu, die Wartelisten werden reihum bedient.', tab: 'slots' }); d = n.day; }
+  // Öffentlich bekannte Großereignisse (Termine stehen lange fest)
+  const y0 = dateParts(from).y - 1, y1 = dateParts(to).y;
+  for (let y = y0; y <= y1; y++) for (const ev of SM.MEGA) {
+    const st = SM.megaStart(ev, y); if (st === null || st === undefined) continue;
+    const where = (ev.airports || []).slice(0, 3).map((c) => (P.AIRPORTS[c] ? P.AIRPORTS[c].name : c)).join(', ') || (ev.countries || []).map((c) => SM.COUNTRY_LABEL[c] || c).join(', ');
+    const live = (W.events || []).some((e) => e.type === 'mega' && e.mega === ev.key + y);
+    add({ day: st, end: st + (ev.dur || 1), kind: 'mega', label: ev.label + (ev.every ? '' : ' ' + y), detail: `${where}${ev.dur ? ` · ${ev.dur} Tage` : ''}${live ? ' · Nachfrage-Effekt angekündigt' : ''} – mehr Nachfrage, Charteranfragen möglich`, tab: 'fleetAcmi' });
+  }
+  // Angekündigte Ereignisse aus den Nachrichten (öffentlich, keine fremden Betriebsinterna)
+  for (const e of W.events || []) {
+    if (e.type === 'mega' || (e.announced ?? 0) > W.day || (e.airline && e.airline !== W.playerId) || e.averted) continue;
+    const t = String(e.text || ''), lbl = t.split(/[:.–]/)[0].slice(0, 60);
+    add({ day: e.start, end: e.end, kind: 'event', label: lbl || 'Ereignis', detail: t, tab: 'news', sev: e.severity });
+  }
+  // Eigene Termine
+  for (const a of pl.fleet) {
+    if (a.delivery_day > W.day) add({ day: a.delivery_day, kind: 'own', label: `Lieferung ${acName(a.id)}`, detail: tl(a.type_id) + ' · Basis ' + a.base, tab: 'fleetOwn' });
+    for (const b of SM.acmiList(a, W.day)) { if (b.start > W.day) add({ day: b.start, kind: 'own', label: `Charter beginnt: ${acName(a.id)}`, detail: `${b.client} · ${eur(b.rate)}/Tag bis ${dateShort(b.end)}`, tab: 'fleetAcmi' }); add({ day: b.end, kind: 'own', label: `Charter endet: ${acName(a.id)}`, detail: `${b.client} – danach wieder frei`, tab: 'fleetAcmi' }); }
+    if ((a.status === 'ccheck' || a.status === 'aog') && a.until > W.day) add({ day: a.until, kind: 'own', label: `${acName(a.id)} wieder einsatzbereit`, detail: a.status === 'ccheck' ? 'C-Check abgeschlossen' : 'Reparatur abgeschlossen', tab: 'fleetOwn' });
+  }
+  for (const r of pl.reports || []) if (r.status === 'running') add({ day: r.ready, kind: 'own', label: 'Marktstudie fertig', detail: `${P.STUDIES.kinds[r.kind].label} (${P.STUDIES.tiers[r.tier].label})`, tab: 'studies' });
+  for (const e of pl.experts || []) if (e.startDay > W.day) add({ day: e.startDay, kind: 'own', label: `${e.name} fängt an`, detail: P.EXPERT_ROLES[e.role].label, tab: 'staff' });
+  { const by = {}; for (const p of (pl.staff && pl.staff.pipeline) || []) if (p.ready > W.day) by[p.ready] = (by[p.ready] || 0) + p.count; for (const [d, n] of Object.entries(by)) add({ day: Number(d), kind: 'own', label: `${n0(n)} neue Crewmitglieder`, detail: 'Einstellungen und Umschulungen treten an', tab: 'staff' }); }
+  for (const r of pl.routes) if (!r.closed && r.opened_day > W.day) add({ day: r.opened_day, kind: 'own', label: `Erstflug ${r.base}–${r.dest}`, detail: `${r.freq}× täglich`, tab: 'routes' });
+  return out.sort((a, b) => a.day - b.day || ['slot', 'mega', 'own', 'event'].indexOf(a.kind) - ['slot', 'mega', 'own', 'event'].indexOf(b.kind));
+}
+/** Lange Lagen (Konjunktur, Pilotenmangel …) nur am Beginn zeigen, nicht als Band über Monate. */
+const calLong = (x) => x.kind === 'event' && x.end && x.end - x.day > 30;
+const calIn = (d) => { const n = d - W.day; return n === 0 ? 'heute' : n === 1 ? 'morgen' : n < 0 ? 'läuft' : `in ${n0(n)} Tagen`; };
+function renderCalBtn() {
+  const el = $('#calNext'); if (!el || !W || !W.player) return;
+  $('#calBtn').hidden = false;
+  const nx = calItems(W.day + 1, W.day + 400).filter((x) => x.day > W.day && (x.kind === 'slot' || x.kind === 'mega' || x.kind === 'own'))[0];
+  setHtml(el, nx ? `<b>${dateShort(nx.day)} · ${esc(nx.label)}</b><span>${calIn(nx.day)} · Kalender öffnen</span>` : '<b>Kalender</b><span>wichtige Termine</span>');
+  if (ui.cal && ui.cal.open) renderCalPop();
+}
+function renderCalPop() {
+  const pop = $('#calPop'), C = ui.cal; if (!pop || !C) return;
+  const p0 = dateParts(W.day), ym = C.ym ?? (p0.y * 12 + p0.m), y = Math.floor(ym / 12), m = ym % 12;
+  const first = dayOfYMD(y, m, 1), len = (m === 11 ? 365 : SM.MONTH_STARTS[m + 1]) - SM.MONTH_STARTS[m], off = ((first % 7) + 7) % 7;
+  const hide = C.hide || {}, items = calItems(first - 40, first + len + 200).filter((x) => !hide[x.kind]);
+  const cells = []; for (let i = 0; i < off; i++) cells.push('<span></span>');
+  for (let d = 1; d <= len; d++) {
+    const day = first + d - 1, starts = items.filter((x) => x.day === day), spans = items.filter((x) => x.end && x.day < day && x.end > day && (x.kind === 'mega' || x.kind === 'event') && !calLong(x));
+    const kinds = [...new Set(starts.map((x) => x.kind))];
+    cells.push(`<button data-cal-day="${day}" class="${day < W.day ? 'past' : ''}${day === W.day ? ' today' : ''}${C.sel === day ? ' sel' : ''}" title="${esc(starts.map((x) => x.label).join(' · '))}"><span>${d}</span><span class="dots">${kinds.map((k) => `<i style="background:${CAL_KIND[k][1]}"></i>`).join('')}</span>${spans.length ? `<span class="band" style="background:${CAL_KIND[spans[0].kind][1]}"></span>` : ''}</button>`);
+  }
+  let list, head;
+  if (C.sel !== null && C.sel !== undefined) { list = items.filter((x) => x.day === C.sel || (x.end && x.day <= C.sel && x.end > C.sel && !calLong(x))); head = `${dateLong(C.sel)}`; }
+  else { list = items.filter((x) => ((x.end ?? x.day) >= W.day && !(calLong(x) && x.day < W.day)) && x.day <= W.day + 120); head = 'Die nächsten 120 Tage'; }
+  const groups = []; for (const x of list) { const k = dateParts(Math.max(x.day, W.day)).y * 12 + dateParts(Math.max(x.day, W.day)).m; let g = groups.find((q) => q.k === k); if (!g) groups.push(g = { k, items: [] }); g.items.push(x); }
+  setHtml(pop, `<div class="cal-hd"><button data-cal="prev" aria-label="Vormonat">‹</button><b>${MONTHS_L[m]} ${y}</b><button data-cal="next" aria-label="Nächster Monat">›</button><button data-cal="today">Heute</button><button data-cal="close" aria-label="Schließen">✕</button></div>
+    <div class="cal-grid">${WD.map((w) => `<span class="wd">${w}</span>`).join('')}${cells.join('')}</div>
+    <div class="cal-kinds">${Object.entries(CAL_KIND).map(([k, [l, c]]) => `<button class="chip-t" data-cal-kind="${k}" aria-pressed="${!hide[k]}"><i style="background:${c}"></i>${l}</button>`).join('')}</div>
+    <div class="cal-list"><div class="spread"><b class="small">${head}</b>${C.sel !== null && C.sel !== undefined ? '<button class="btn small ghost" data-cal="all">alle Termine</button>' : ''}</div>
+      ${list.length ? (C.sel !== null && C.sel !== undefined ? [{ items: list }] : groups).map((g) => `${g.k !== undefined ? `<h4>${MONTHS_L[g.k % 12]} ${Math.floor(g.k / 12)}</h4>` : ''}${g.items.map((x) => `<button class="cal-it" data-cal-go="${x.tab || ''}"><span>${dateShort(x.day)}<em>${x.end && x.end - x.day > 1 ? 'bis ' + dateShort(x.end - 1) : calIn(x.day)}</em></span><i style="background:${CAL_KIND[x.kind][1]}"></i><span><b>${esc(x.label)}</b><small>${esc(x.detail || '')}</small></span></button>`).join('')}`).join('') : '<p class="small muted">Keine Termine.</p>'}</div>`);
+}
+function toggleCal(open) {
+  const pop = $('#calPop'), btn = $('#calBtn'); if (!pop || !btn || !W) return;
+  ui.cal = ui.cal || { open: false, ym: null, sel: null, hide: {} };
+  ui.cal.open = open ?? !ui.cal.open;
+  if (ui.cal.open) { const hb = document.querySelector('header.top'); if (hb) pop.style.top = Math.round(hb.getBoundingClientRect().bottom + 6) + 'px'; ui.cal.ym = null; ui.cal.sel = null; pop._html = null; renderCalPop(); }
+  pop.hidden = !ui.cal.open; btn.setAttribute('aria-expanded', String(ui.cal.open));
+}
+function initCal() {
+  const btn = $('#calBtn'), pop = $('#calPop'); if (!btn || !pop) return;
+  btn.addEventListener('click', (e) => { e.stopPropagation(); toggleCal(); });
+  pop.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const C = ui.cal, p0 = dateParts(W.day), cur = C.ym ?? (p0.y * 12 + p0.m);
+    const a = e.target.closest('[data-cal]'), d = e.target.closest('[data-cal-day]'), k = e.target.closest('[data-cal-kind]'), go = e.target.closest('[data-cal-go]');
+    if (a) { const v = a.dataset.cal; if (v === 'close') return toggleCal(false); if (v === 'prev') C.ym = cur - 1; if (v === 'next') C.ym = cur + 1; if (v === 'today') { C.ym = null; C.sel = null; } if (v === 'all') C.sel = null; renderCalPop(); return; }
+    if (d) { const v = Number(d.dataset.calDay); C.sel = C.sel === v ? null : v; renderCalPop(); return; }
+    if (k) { C.hide = C.hide || {}; C.hide[k.dataset.calKind] = !C.hide[k.dataset.calKind]; renderCalPop(); return; }
+    if (go && go.dataset.calGo) { toggleCal(false); setTab(go.dataset.calGo); }
+  });
+  document.addEventListener('click', (e) => { if (ui.cal && ui.cal.open && !e.target.closest('#calPop') && !e.target.closest('#calBtn')) toggleCal(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.cal && ui.cal.open) toggleCal(false); });
+}
 function renderHeader() {
   if (!W || !W.player) return;
   const pl = W.player, p = dateParts(W.day);
   $('#date').innerHTML = `<b>${p.wd}, ${p.d}. ${MONTHS[p.m]} ${p.y}</b><span id="clock">${clockText()}</span><small><span class="d-day">${preStart() ? `Start in ${leftTxt(preStart() - Date.now() - (mpState.skew || 0))}` : `Tag ${W.day + 1} · ${SM.SPEEDS[speedNow()].short}`}</span><span class="d-date">${p.wd}, ${p.d}. ${MONTHS[p.m]} ${p.y}</span></small>`;
   $('#date').title = `Spieltag ${W.day + 1} · Tempo ${SM.SPEEDS[speedNow()].label}`;
   { const ub = $('#userBtn'), lk = JSON.stringify(logoOf(pl)) + pl.code; if (ub.dataset.lk !== lk) { ub.innerHTML = logoSvg(pl, 36); ub.dataset.lk = lk; } }
+  renderCalBtn();
   applyTheme();
   renderSpeed();
   renderSidebar();
@@ -2689,6 +2778,7 @@ VIEWS.exchange = function viewExchange() {
     ${stakes.map(([id, st]) => { const T = W.airlines[id], mv = SM.mktCap(W, T) * st.f, ma = T.archetype ? SM.maValue(W, T, pl) : null, conf = ui.confirm === 'ma:' + id;
       return `<div class="card pad stack stk"><div class="spread"><b>${logoSvg(T, 20)} ${esc(T.name)}</b><span>${st.f >= C.majority ? '<span class="chip good">Mehrheit</span>' : st.f >= C.blocking ? '<span class="chip">Sperrminorität</span>' : ''} <b>${pct(st.f, 1)}</b></span></div>
         <div class="stk-kv"><span><em>Buchwert</em>${mio(st.book)}</span><span><em>Marktwert</em>${mio(mv)}</span><span><em>anteiliger Gewinn</em><b class="${sgn(st.inc || 0)}">${mio(st.inc || 0)}</b></span><span><em>Dividenden</em>${mio(st.div || 0)}</span></div>
+        ${groupHtml(pl, T, st)}
         <div class="row" style="gap:6px;flex-wrap:wrap">${SM.floatOf(W, T) > 0.009 ? `<button class="btn small" data-act="capbuy" data-t="${id}" data-q="0.05">+5 % für ${mio(SM.stakeBuyPrice(W, pl, T, Math.min(0.05, SM.floatOf(W, T))))}</button>` : ''}<button class="btn small" data-act="capsell" data-t="${id}" data-q="${Math.min(0.05, st.f)}">−5 %</button><button class="btn small" data-act="capsell" data-t="${id}" data-q="${st.f}">alles verkaufen</button>
         ${ma ? (conf ? `<button class="btn small danger" data-act="takeover" data-id="${id}">Ja, ${mio(ma.price)} bieten</button><button class="btn small" data-act="cancelconfirm">Nein</button>` : `<button class="btn small ${st.f >= C.majority ? 'primary' : ''}" data-act="askma" data-id="${id}" title="Angebot für die restlichen ${pct(ma.rest)}">Rest (${pct(ma.rest)}) übernehmen: ${mio(ma.price)}</button>`) : ''}</div></div>`; }).join('')}
     <p class="small muted">Anteiliger Gewinn: Ihr Anteil am Monatsergebnis wird Ihnen jeden Monat gutgeschrieben (Buchwert steigt oder fällt), Dividenden kommen als Geld. Übernahmeangebot für den Rest: mit Mehrheit Börsenwert × ${NF1.format(C.tender)}, ohne Mehrheit × ${NF1.format(C.hostile)}.</p></div>`;
@@ -2702,7 +2792,36 @@ VIEWS.exchange = function viewExchange() {
     </div><p class="small muted">Je mehr Sie schon halten, desto teurer wird jedes weitere Prozent (Kontrollaufschlag ${pct(C.control)} je 100 %). Verkäufe großer Pakete drücken den Preis. Gebühr ${pct(C.fee)} je Kauf und Verkauf. Mitspielende haben nur so viele Aktien frei, wie sie selbst an die Börse gebracht haben.</p></div>`;
   return html;
 };
+/** Konzernvorteile einer Beteiligung: Stufen 25 % (Sperrminorität) und 50 % (Mehrheit), bis zur Übernahme. */
+function groupHtml(pl, T, st) {
+  if (!T.archetype) return '';
+  const C = P.CAPITAL, f = st.f, maj = f >= C.majority, blk = f >= C.blocking, c = SM.capState(T);
+  const last = T.ledger.months.at(-1), res = last ? Object.entries(last.acc).reduce((x, [k, v]) => x + (k.startsWith('cf_') ? 0 : v), 0) / 100 : 0;
+  const ben = (on, t) => `<li class="${on ? 'on' : ''}">${on ? '✓' : '○'} ${t}</li>`;
+  let h = `<div class="grp"><div class="grp-kv small"><span><em>Monatsergebnis</em><b class="${sgn(res)}">${mio(res)}</b></span><span><em>Kasse</em>${mio(T.ledger.cash / 100)}</span><span><em>Flotte · Strecken</em>${T.fleet.length} · ${T.activeRoutes().length}</span><span><em>Basen</em>${T.bases.join(', ')}</span></div>
+    <ul class="grp-ben small">
+      ${ben(blk, 'ab 25 %: greift Ihre Strecken nicht mehr an')}
+      ${ben(blk, `ab 25 %: im Handel ${maj ? 'ohne' : 'nur halber'} Aufschlag`)}
+      ${ben(maj, 'ab 50 %: Konzernallianz – Codeshare auf gemeinsamen Strecken, 2 % günstigeres Kerosin')}
+      ${ben(maj, 'ab 50 %: eröffnet keine Strecken gegen Sie und unterbietet Ihre Preise nicht')}
+      ${ben(maj, 'ab 50 %: Sie bestimmen die Ausschüttung und können Sonderausschüttungen verlangen')}
+      ${ben(false, 'erst bei Übernahme (100 %): Flotte, Strecken, Basen und Personal gehen auf Sie über')}
+    </ul>`;
+  if (maj) {
+    const q = SM.groupSpecialQuote(W, T), mine = q.total * f;
+    h += `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><span class="small muted">Ausschüttung vom Monatsgewinn:</span><div class="seg">${C.group.divOpts.map((v) => `<button data-act="grpdiv" data-t="${T.id}" data-v="${v}" aria-pressed="${Math.abs((c.div ?? 0) - v) < 1e-6}">${pct(v)}</button>`).join('')}</div>
+      <span class="small muted">${res > 0 ? `≈ ${mio(res * (c.div ?? 0) * f)} im Monat an Sie` : 'zurzeit kein Gewinn'}</span></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><button class="btn small primary" data-act="grpspec" data-t="${T.id}" ${q.wait || q.total < 1e5 ? 'disabled' : ''}>Sonderausschüttung · ${mio(mine)} an Sie</button>
+        <button class="btn small" data-act="grpdeal" data-t="${T.id}">Konzernhandel: Angebot an ${esc(T.name)}</button>
+        <span class="small muted">${q.wait ? `wieder möglich in ${q.wait} Tagen` : q.total < 1e5 ? 'keine freie Liquidität über der Betriebsreserve' : `${pct(C.group.specShare)} der freien Liquidität (${mio(SM.groupFreeCash(W, T))}), alle ${C.group.specGap} Tage`}</span></div>
+      <p class="small muted">Hohe Ausschüttungen bringen Ihnen Geld, bremsen aber das Wachstum der Tochter. Flugzeuge, Slots und Crews übernehmen Sie im Konzernhandel zum fairen Wert, ohne Aufschlag.</p>`;
+  } else h += `<p class="small muted">${blk ? `Noch ${pct(C.majority - f, 1)} bis zur Mehrheit.` : `Noch ${pct(C.blocking - f, 1)} bis zur Sperrminorität.`}</p>`;
+  return h + '</div>';
+}
 function onCapClick(act, b) {
+  if (act === 'grpdiv') { const r = doAction({ type: 'groupDiv', t: b.dataset.t, v: Number(b.dataset.v) }); if (r.ok) toast(`Ausschüttung ${pct(Number(b.dataset.v))} festgelegt.`); refreshAll(); return true; }
+  if (act === 'grpspec') { const r = doAction({ type: 'groupSpecial', t: b.dataset.t }); if (r.ok) toast(`Sonderausschüttung: ${mio(r.mine)} an Sie.`); refreshAll(); return true; }
+  if (act === 'grpdeal') { startDeal(b.dataset.t); return true; }
   if (!act.startsWith('cap')) return false;
   const pl = W.player, q = Number(b.dataset.q);
   let r = null;
@@ -5619,6 +5738,7 @@ function boot(hotData) {
   initMap();
   $('#pane').addEventListener('click', onPaneClick);
   $('#pane').addEventListener('change', onPaneChange);
+  initCal();
   $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'); if (bt) bt.textContent = `Basis eröffnen · einmalig ${eurB(SM.baseSetupCost(W, e.target.value) * SM.softX(W.player, 'base') + (W.player.stations[e.target.value] ? 0 : SM.licenceFee(W, e.target.value)) + SM.baseSlotCost(W, e.target.value, W.player))} inkl. ${P.BASE_SLOTS.n} Slots`; } });
   $('#pane').addEventListener('input', (e) => {
     if (onCabRange(e, false) || onFltInput(e.target)) return;

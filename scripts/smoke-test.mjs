@@ -409,6 +409,23 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const mg = pn.experts.find((e) => e.id === 'NMG'); assert.equal(mg.level, 1, 'Grillkalt startet als Junior');
   while (wn.day < 95 + 400) wn.step(); assert.equal(mg.level, 2, 'Grillkalt wird Senior');
   console.log('0.17.7 ok: Flitz −4 Min. Bodenzeit, Son hebt die Premium-Wahrnehmung, Grillkalt nach einem Jahr Senior'); }
+// 0.17.9: Konzernvorteile bei Mehrheit an einer KI-Airline
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const wg = SMx.newGame({ seed: 4, base: 'HAM' }), pg = wg.player, A = (a) => SMx.applyAction(wg, pg.id, a);
+  pg.ledger.cashOnly(2e9, 't'); A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); for (let i = 0; i < 60; i++) wg.step();
+  const T = wg.list.filter((a) => a.archetype && a.status === 'active').sort((a, b) => SMx.mktCap(wg, a) - SMx.mktCap(wg, b))[3];
+  for (let n = 0; n < 20 && SMx.stakeOf(pg, T) < 0.55; n++) A({ type: 'buyStake', target: T.id, q: 0.1 });
+  assert.equal(SMx.parentOf(wg, T), pg, 'Mutterkonzern erkannt');
+  const tr = T.activeRoutes()[0]; assert.ok(tr, 'Tochter fliegt');
+  const o = A({ type: 'openRoute', base: 'HAM', dest: tr.dest === 'HAM' ? tr.base : tr.dest, typeId: 'A20N', freq: 1 });
+  { const mr = pg.activeRoutes()[0]; if (mr) { const before = wg.competitorFares('NOPE', mr.base, mr.dest).length, sub = wg.competitorFares(T.id, mr.base, mr.dest).length; assert.ok(sub < before || before === 0, 'Tochter zählt die Mutter nicht als Preiskonkurrenz'); } }
+  assert.equal(A({ type: 'groupDiv', t: T.id, v: 0.6 }).ok, true, 'Ausschüttung steuern');
+  const c0 = pg.ledger.cash, sp = A({ type: 'groupSpecial', t: T.id });
+  assert.equal(sp.ok, true, 'Sonderausschüttung: ' + sp.msg); assert.ok(pg.ledger.cash > c0, 'Geld fließt');
+  assert.equal(A({ type: 'groupSpecial', t: T.id }).ok, false, 'nur alle 90 Tage');
+  const ac = T.fleet[0], v = SMx.aiDealValue(wg, T, { from: pg.id, to: T.id, give: [{ k: 'cash', amount: 1 }], take: [{ k: 'ac', id: ac.id }] });
+  assert.equal(v.margin, 0, 'Konzernhandel ohne Aufschlag');
+  console.log('0.17.9 ok: Mehrheit an', T.name, '– Ausschüttung gesteuert, Sonderausschüttung', Math.round(sp.mine / 1e5) / 10, 'Mio. €, Konzernhandel zum fairen Wert', o.ok ? '' : ''); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 // Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
 { const SMx = (await import('../shared/engine.cjs')).default;

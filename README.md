@@ -183,6 +183,19 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.17.9: Konzernvorteile bei Beteiligungen
+
+Beteiligungen an KI-Airlines bringen jetzt gestaffelte Vorteile – deutlich weniger als eine Übernahme, bei der alles übergeht:
+- **ab 25 % (Sperrminorität):** Die Airline greift Ihre Strecken nicht an (wie bisher); im Handel verlangt sie nur den halben Aufschlag.
+- **ab 50 % (Mehrheit):** Konzernallianz mit Codeshare und 2 % günstigerem Kerosin (wie bisher). Neu: Die Tochter eröffnet keine Strecken auf Ihren Verbindungen und unterbietet Ihre Preise nicht. Sie handelt mit Ihnen zum fairen Wert ohne Aufschlag (Flugzeuge, Slots, Crews), auch Low-Cost-Töchter. Sie bestimmen die Ausschüttung vom Monatsgewinn (0/30/60/90 %) und können alle 90 Tage eine Sonderausschüttung verlangen: 20 % der freien Liquidität über der Betriebsreserve, jeder Aktionär bekommt seinen Anteil.
+- **100 % (Übernahme):** wie bisher – Flotte, Strecken, Basen und Personal gehen über.
+- In der Börse zeigt jede Beteiligung an einer KI-Airline Monatsergebnis, Kasse, Flotte, Strecken und Basen der Tochter, welche Vorteile aktiv sind und die Steuerung (Ausschüttung, Sonderausschüttung, Konzernhandel).
+
+## Neu in 0.17.8: Kalender oben links, Dschidda halbiert
+
+- **Kalender:** Oben links neben dem Logo steht der nächste wichtige Termin („10. Mai · Hadsch, in 16 Tagen“); ein Klick öffnet einen Monatskalender mit Markierungen und einer Liste der nächsten 120 Tage. Enthalten: Slotvergaben (1. April, 1. Oktober), alle öffentlich bekannten Großereignisse (WM, Olympia, Hadsch, Oktoberfest, Karneval …, mit Ort und Dauer), angekündigte Ereignisse aus den Nachrichten und eigene Termine (Lieferungen, Charterbeginn und -ende, Werft fertig, Marktstudien, neue Crews, Erstflüge, Antritt von Fachkräften). Arten lassen sich ein- und ausblenden, ein Tag antippen zeigt nur dessen Termine, ein Termin antippen führt zum passenden Reiter. Auf dem Handy als Kalender-Knopf in der Kopfzeile.
+- **Dschidda halbiert:** Passagiere (53 → 26,5 Mio.) und Einzugsgebiet (4,5 → 2,25 Mio.) – damit die gesamte Nachfrage ab Dschidda (rund −50 %), dazu Slotkapazität, Lizenz- und Slotpreise. Dschidda liegt jetzt auf dem Niveau von Riad.
+
 ## Neu in 0.17.7: Bekannte Köpfe und Bordprodukt
 
 - **Neue Fachrolle „Bordprodukt und Service“** (Junior/Senior/Experte): Kabinenstimmung +3/+6/+9 Punkte, bessere Wahrnehmung vor allem bei Geschäftsreisenden (+4/+7/+10 %), dafür Catering 12/24/36 % teurer. Erscheint auch bei normalen Bewerbungen.
