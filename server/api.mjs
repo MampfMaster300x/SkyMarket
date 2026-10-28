@@ -285,6 +285,7 @@ export async function handle(req, { store }) {
     }
     if (path === '/games/lookup' && method === 'GET') {
       const code = String(url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (code === MAIN_CODE) await ensureMain(store);   // Einladungslink zur Hauptwelt funktioniert auch, bevor jemand die Lobby geöffnet hat
       const id = code ? await store.get(K.code(code)) : null;
       const meta = id ? await loadMeta(store, id) : null;
       if (!meta) return fail(404, `Kein Spiel mit dem Code ${code || '–'} gefunden.`);

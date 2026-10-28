@@ -331,6 +331,33 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.equal(pr.status, 'insolvent', 'Insolvenz'); assert.ok(pr.liq && pr.fleet.length === 0 && wr.acMarket.length > n0m, 'Masse geht an den Markt');
   assert.ok(wr.acMarket.some((o) => o.from === pr.name), 'Insolvenzangebote markiert');
   console.log('Sanierung ok: Sale & Lease-back, Stundung, Sanierungskredit · Insolvenz:', JSON.stringify(pr.liq)); }
+// 0.17.2: Gehalt relativ zum Markt, Personalhandel nur mit vorhandenem Personal, Großereignisse, Kaufkraft
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const wq = SMx.newGame({ seed: 9, base: 'IST' }), pq = wq.player, A = (a) => SMx.applyAction(wq, pq.id, a);
+  assert.equal(A({ type: 'pay', rel: 1.05 }).ok, true, 'Gehalt +5 %');
+  for (let i = 0; i < 200; i++) wq.step();
+  assert.ok(Math.abs(pq.staff.pay / wq.macro.wage - 1.05) < 0.002, 'bleibt +5 % zum Markt (' + (pq.staff.pay / wq.macro.wage).toFixed(3) + ')');
+  const h2 = SMx.addHuman(wq, { id: 'P2', name: 'Zwei', code: 'ZW', base: 'ADB' });
+  const tooMany = SMx.applyAction(wq, pq.id, { type: 'dealPropose', to: 'P2', give: [{ k: 'staff', role: 'cabin', n: (pq.staff.cab || 0) + 5 }], take: [{ k: 'cash', amount: 1000 }] });
+  assert.equal(tooMany.ok, false, 'mehr Personal anbieten als vorhanden geht nicht');
+  const mg = SMx.MEGA.find((e) => e.key === 'oly28'), S0 = SMx.megaStart(mg, 2028);
+  const wm = SMx.newWorld({ seed: 4 }); wm.playerId = null; while (wm.day < S0 - mg.lead + 31) wm.step();
+  assert.ok(wm.events.some((e) => e.mega === 'oly282028'), 'Olympia 2028 angekündigt');
+  assert.ok(wm.demandMult('FRA', 'LAX', 'leisure', S0 + 2) > 2, 'Olympia treibt Nachfrage nach Los Angeles');
+  assert.ok(SMx.refPrice('IST', 'ADB') < SMx.refPrice('HAM', 'MUC') * 0.8, 'Kaufkraft: Inlandstarif Türkei unter Deutschland');
+  assert.ok(SMx.wageX('IST') < 0.7 && SMx.wageX('HAM') > 0.95, 'Lohnniveau nach Basis');
+  console.log('0.17.2 ok: Gehalt bleibt +5 % zum Markt, Personalhandel geprüft, Olympia 2028 angekündigt (Tag', S0, '), Kaufkraft und Lohnniveau'); }
+// 0.17.3: Saudi-Arabien entschärft, Charter mit Familie und Großereignis-Anfragen
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  assert.ok(SMx.refPrice('RUH', 'JED') < 85, 'regulierte Inlandstarife Saudi-Arabien');
+  const ws = SMx.newGame({ seed: 4, base: 'HAM' }), ps = ws.player, A = (a) => SMx.applyAction(ws, ps.id, a);
+  assert.ok(ws.airlines.NJD && ws.airlines.NJD.activeRoutes().some((r) => r.dest === 'JED'), 'Najd Air fliegt Riad–Dschidda');
+  A({ type: 'acquire', typeId: 'A21N', mode: 'lease', base: 'HAM' });
+  for (let i = 0; i < 240; i++) ws.step();
+  assert.ok(ws.acmiOffers.some((o) => o.ev), 'Charteranfragen zu Großereignissen');
+  const o = ws.acmiOffers.find((x) => SMx.P.AIRCRAFT_TYPES[x.type].group === 'A32F' && x.type !== 'A21N' && x.start >= ws.day);
+  if (o) { const ac = ps.fleet[0]; const r = A({ type: 'acmi', offerId: o.id, acId: ac.id }); assert.equal(r.ok, true, 'Familie passt: ' + r.msg); assert.ok(ac.acmi.rate !== o.rate || o.type === ac.type_id, 'Rate nach Sitzen angepasst'); }
+  console.log('0.17.3 ok: Riad–Dschidda', Math.round(SMx.refPrice('RUH', 'JED')), '€ mit Najd Air als Konkurrenz,', ws.acmiOffers.filter((x) => x.ev).length, 'Großereignis-Charter,', o ? 'Familien-Charter angenommen' : 'keine passende Familienanfrage'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 // Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
 { const SMx = (await import('../shared/engine.cjs')).default;

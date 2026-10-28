@@ -183,6 +183,56 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.17.4: Feste Slottermine, Reiter „Pläne“, flüssiger auf 4x
+
+- **Slotvergabe zu festen Terminen:** Nur noch zum 1. April (Sommerflugplan) und 1. Oktober (Winterflugplan). Dann bekommt jeder koordinierte Flughafen einen Slot dazu, und die Wartelisten werden reihum bedient (je Eintrag ein Slot, dann der Nächste). Freie Slots ohne Warteschlange kann man weiter jederzeit kaufen. Eine Meldung fasst jede Vergabe zusammen und nennt den nächsten Termin.
+- **Slot-Übersicht neu:** Unter Strategie → Slots steht oben der nächste Termin mit Countdown und den Regeln in vier Sätzen. Jeder Flughafen ist eine eigene Karte mit freien Slots und Preis, Reserve, Wartelistenplatz („Platz 2 von 5“) und einer **Prognose**, wie viele Slots man beim nächsten Termin voraussichtlich bekommt.
+- **Strecken → Pläne:** Neuer dritter Reiter neben Netz und Planung mit allen gespeicherten, noch nicht umgesetzten Strecken und Frequenzerhöhungen: fehlende Slots mit Wartelistenplatz und Prognose, passende Flugzeuge an der Basis, Kosten beim Umsetzen direkt am Knopf, „Im Planer öffnen“, „auf Warteliste setzen“, automatisch umsetzen, löschen. Im Planer gibt es „Als Plan speichern“ jetzt immer. Wartelisteneinträge aus einem Plan hängen am Plan.
+- **Kein Springen beim Scrollen:** Während man scrollt, tippt oder ein Feld bearbeitet, wird der Reiter nicht neu gezeichnet; die Aktualisierung kommt kurz danach. Unterreiter, Navigation und linke Spalte werden nur noch neu aufgebaut, wenn sich etwas ändert, und behalten ihre Scrollposition.
+- **Weniger Ruckler auf 4x:** Die KI plant nicht mehr alle am Monatsanfang, sondern verteilt über den Monat. Große Marktstudien rechnen in zwei Durchgängen (grob, dann fein), höchstens zwei werden pro Tag fertig. Flugzeuge auf der Karte werden bei großen Netzen seltener neu gezeichnet und gar nicht, wenn die Karte nicht sichtbar ist.
+- **Beitreten:** Der Einladungslink zur Hauptwelt funktioniert auch, bevor sie angelegt ist. Nach der Registrierung über einen Link geht es direkt zum Beitritt statt zur Anleitung. Der Knopf „Beitreten“ bleibt in allen Formularen unten sichtbar (auch auf dem Handy), das Kürzel wird schon beim Tippen auf Doppelungen geprüft und ein freies vorgeschlagen, Fehler erscheinen direkt am Knopf.
+- **Handel:** Geldbeträge zeigen beim Tippen den formatierten Wert („= 250.000 €“), dazu Schnellwahl 50 Tsd. / 250 Tsd. / 1 Mio. / 5 Mio. Gleiches für Marktplatz-Preise, Auktionsgebote und den Kreditbetrag im Szenario-Rechner.
+
+## Neu in 0.17.3: Saudi-Arabien entschärft, Charter lohnt sich
+
+**Riad, Dschidda und Co.**
+- Riad–Dschidda war die einträglichste Strecke im Spiel: riesiger Inlandsmarkt ohne simulierte Konkurrenz, westliche Preise, billiger Treibstoff. Jetzt:
+  - **Neue KI-Airline Najd Air** (Billigflieger, Basis Riad) fliegt Riad–Dschidda 5× täglich, dazu Dammam, Medina, Dubai, Kairo und Doha.
+  - **Regulierte Inlandstarife** in Saudi-Arabien (Riad–Dschidda rund 80 € statt 94 €), Kerosin dort nur noch 7 % unter Weltmarkt (vorher 15 %).
+  - Weniger Inlandsnachfrage auf den vier Flughäfen im Spiel (Saudi-Arabien hat viele weitere Inlandsflughäfen), mehr Umsteiger in Riad.
+- Test (Startnetz Riad oder Dschidda, 18 Monate): −3 bis +1 Mio. € statt +3,5 bis +5 Mio. €.
+
+**Charter (Flotte → Charter)**
+- **Mehr Anfragen** (sechs im Monat), überwiegend für Muster, die Spielende tatsächlich fliegen; dazu kurze Einsätze (7–14 Tage) mit Aufschlag.
+- **Familie reicht**: Eine A320neo kann eine A321neo-Anfrage übernehmen (Rate nach Sitzen angepasst).
+- **Rund 12 % höhere Raten**.
+- **Großereignisse**: Mit jeder Ankündigung kommen Charteranfragen – Fanreisen und Nationalmannschaften zu WM und EM, Sender und Teams zu Olympia, Pilgerreisen zum Hadsch, Pakete zum Oktoberfest – zu 30–55 % über der üblichen Rate. Wer ein passendes Flugzeug hat, bekommt eine Meldung.
+- Die Ansicht zeigt für jedes passende Flugzeug, was der Charter **gegenüber Stillstand** bringt bzw. **nach entgangenem Streckenbeitrag**, wenn das Flugzeug gerade fliegt; Großereignis-Anfragen stehen oben.
+
+## Neu in 0.17.2: Zwischenmaß, Kaufkraft, Großereignisse, Saison, bessere Planung
+
+**Schwieriger als 0.17.1, leichter als 0.17**
+- Strecken eröffnen bleibt günstig (Station statt Lizenz, Slots günstig solange frei).
+- Zurückgenommen: neue Strecken füllen sich etwas langsamer, Zusatzerlöse (Basic 21 €, Standard 12 €), Garantie-Rabatt auf Wartung 18 %, Anlaufrabatt mindestens 15 % (Drehkreuze 8 %).
+- **Kaufkraft**: Auf Kurz- und Mittelstrecke richten sich die Preise nach dem Einkommen (Türkei rund −15 %, Thailand −20 %, Indien −30 %, USA/Skandinavien leicht darüber); auf Langstrecke gleichen sie sich an. Dafür sind Crew und Technik dort günstiger (Türkei rund 62 %, Indien 36 % der deutschen Löhne). Vorher waren Märkte wie Istanbul, Bangkok oder São Paulo viel zu einträglich, weil dort Westpreise bei niedrigen Entgelten galten.
+- Test mit festem Startnetz (Dash + A320neo, 18 Monate, Preisautomatik): Hamburg, Istanbul, Madrid und São Paulo liegen jetzt in einer ähnlichen Spanne; wer schlecht plant, verliert Geld.
+
+**Großereignisse nach Kalender** (Monate vorher angekündigt, stark erhöhte Nachfrage zu den Austragungsorten, etwas mehr im ganzen Land)
+- Jährlich: Oktoberfest (München), Karneval in Rio, Hadsch (Dschidda, Medina – wandert jedes Jahr rund elf Tage), Chinesisches Neujahr (Familienbesuche in China, Taiwan, Hongkong, Singapur, Malaysia), Großer Preis von Monaco (Nizza).
+- 2027 Frauenfußball-WM Brasilien, Cricket-WM Südafrika, Rugby-WM Australien · 2028 Olympia und Paralympics Los Angeles, Fußball-EM Großbritannien/Irland · 2030 Winterspiele Französische Alpen, Fußball-WM Spanien/Portugal/Marokko (Eröffnung in Südamerika), Asienspiele Doha, Expo Riad · 2031 Frauen-WM Nordamerika · 2032 Olympia Brisbane, EM Italien/Türkei · 2034 WM Saudi-Arabien.
+
+**Saison sichtbar**
+- Die Streckenplanung zeigt den Saisonverlauf der Strecke (Nachfrage je Monat, Hoch- und Tiefsaison) und angekündigte Ereignisse an beiden Enden.
+
+**Planung**
+- **Streckenplanung**: Vorschläge aus Ihren Streckenanalysen für die gewählte Basis (Ziel, Typ, Beitrag laut Studie) – ein Klick übernimmt sie; ohne Studie ein Link zur passenden Marktstudie.
+- **Markt → Nachfrage**: neue Tabelle **„Chancen ab Ihren Basen“** – Märkte mit Potenzial, die Sie noch nicht fliegen und auf denen wenig KI-Konkurrenz ist, bewertet nach Ihrem Marktwissen (unsicher, solange nicht studiert), mit „Planen“.
+- **Einsatzplan**: Filter nach Flugzeugtyp und Basis, Auslastung der Flotte in Stunden und Hinweis auf kaum genutzte Flugzeuge. Bei festen Zuweisungen stehen passende Strecken (gleiche Basis, gleicher Typ) oben, die übrigen eingeklappt; Strecken mit z. B. 2× pro Woche werden als solche angezeigt und nur anteilig auf die Betriebszeit angerechnet.
+
+**Personal**
+- **Gehaltspolitik bleibt relativ**: „+5 % über Markt“ bleibt +5 %, auch wenn die Marktlöhne steigen (vorher galt der Betrag vom Tag der Einstellung).
+- **Handel**: Personal lässt sich nur anbieten, soweit es wirklich da ist – die Auswahl zeigt den Bestand, die Menge wird gekürzt, mehrere Posten werden zusammengezählt; auch KI-Angebote werden geprüft.
+
 ## Neu in 0.17.1: Aufbau lohnt sich – günstiger starten, schneller rentabel, Konkurrenz schont Angeschlagene
 
 **Strecken eröffnen kostet kein Vermögen mehr**
