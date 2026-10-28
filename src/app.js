@@ -643,7 +643,7 @@ const icon = (k, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hi
 const SECTIONS = [
   { key: 'karte', label: 'Karte', sub: 'Live-Lage und Überblick', icon: 'globe', tabs: [['dashboard', 'Dashboard'], ['strategy', 'Strategie'], ['history', 'Verlauf'], ['cockpit', 'Übersicht'], ['departures', 'Abflüge'], ['news', 'Meldungen']] },
   { key: 'flotte', label: 'Flotte', sub: 'Jedes Flugzeug zählt', icon: 'plane', tabs: [['fleetOwn', 'Ihre Flotte'], ['fleetPlan', 'Einsatzplan'], ['fleetBuy', 'Beschaffung'], ['fleetAcmi', 'Charter']] },
-  { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung'], ['plans', 'Pläne']] },
+  { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung'], ['plans', 'Pläne'], ['slots', 'Slots']] },
   { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['rescue', 'Sanierung'], ['cfo', 'CFO-Beratung']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['exchange', 'Börse'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
   { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Ziele & Phasen'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
@@ -737,12 +737,14 @@ function renderPane(force = false) {
   pane.style.minHeight = pane.offsetHeight + 'px';   // Seite nicht kurz zusammenfallen lassen (sonst springt das Handy nach oben)
   pane.innerHTML = VIEWS[ui.tab]();
   if (isPhone()) wrapTables(pane);
+  if (ui.tab === 'plan' && ui.planner) updateForecast();   // Prognose vor dem Zurückscrollen füllen, sonst ist die Seite kurz zu kurz
   pane.scrollTop = st;
   const els = pane.querySelectorAll(KEEP_SCROLL); for (let i = 0; i < els.length && i < inner.length; i++) { if (inner[i][0]) els[i].scrollTop = inner[i][0]; if (inner[i][1]) els[i].scrollLeft = inner[i][1]; }
   pane.style.minHeight = '';
   if (Math.abs(window.scrollY - wy) > 2) window.scrollTo(0, wy);
   ui.lastPaneRender = performance.now();
-  if (ui.tab === 'plan' && ui.planner) updateForecast();
+  // Nachzügler (Bilder, Schriften): Position im nächsten Frame noch einmal setzen
+  if (st > 0 || wy > 0) requestAnimationFrame(() => { if (performance.now() - userScrollAt < 300) return; if (Math.abs(pane.scrollTop - st) > 2 && pane.scrollHeight - pane.clientHeight >= st) pane.scrollTop = st; if (Math.abs(window.scrollY - wy) > 2 && document.documentElement.scrollHeight - innerHeight >= wy) window.scrollTo(0, wy); });
 }
 /** Ansichten mit laufenden Zahlen – nur diese werden bei laufender Zeit neu gezeichnet. */
 const LIVE_TABS = new Set(['cockpit', 'dashboard', 'routes', 'fleetOwn', 'fleetPlan', 'finance', 'credit', 'rescue', 'cfo', 'news', 'history', 'players', 'staff', 'exchange', 'departures', 'milestones', 'world']);
@@ -1039,6 +1041,7 @@ VIEWS.plans = function viewPlans() {
   const pl = W.player, plans = pl.plans || [];
   let html = `<h2 class="sec">Pläne <small>gespeichert, noch nicht umgesetzt</small></h2>
     <div class="callout info"><b>Nächste Slotvergabe: ${slotDateTxt()}</b><span class="small">Zum 1. April und 1. Oktober kommt an jedem koordinierten Flughafen ein Slot dazu, und die Wartelisten werden der Reihe nach bedient (je Wartendem ein Slot, dann der Nächste). Freie Slots ohne Warteschlange können Sie jederzeit kaufen. Pläne mit „automatisch“ starten, sobald alle Slots da sind.</span></div>`;
+  html += `<p class="small"><a href="#" data-act="tab" data-tab="slots">Slots ohne Strecke kaufen oder auf die Warteliste → Strecken → Slots</a></p>`;
   if (!plans.length) return html + `<p class="small muted">Keine Pläne. In der <a href="#" data-act="tab" data-tab="plan">Planung</a> können Sie jede Strecke „als Plan speichern“ – etwa, wenn Slots fehlen oder Sie sie später eröffnen wollen.</p>`;
   html += `<div class="stack">${plans.map((x) => {
     const miss = W.planMissing(pl, x) || {}, r = x.route ? pl.routes.find((y) => y.id === x.route) : null, ready = !Object.keys(miss).length;
@@ -1171,7 +1174,7 @@ function studySuggest(base) {
     for (const x of rep.res.rows) { if (x.o !== base || flown.has(SM.pairKey(x.o, x.d))) continue; const cur = best.get(x.d); if (!cur || rep.ready >= cur.day) best.set(x.d, { ...x, day: rep.ready }); }
   }
   const list = [...best.values()].sort((a, b) => b.db2 - a.db2).slice(0, 6);
-  if (!list.length) return `<p class="small muted">Noch keine Streckenanalyse für ${base}. <a href="#" data-act="plstudy">Marktstudie beauftragen</a> – sie schlägt Ziele mit Prognose vor und verbessert Ihr Marktwissen.</p>`;
+  if (!list.length) return `<p class="small muted">Noch keine Streckenanalyse für ${base}. <a href="#" data-act="plstudy" data-base="${base}">Streckenanalyse ab ${base} beauftragen</a> – sie schlägt Ziele mit Prognose vor und verbessert Ihr Marktwissen.</p>`;
   return `<div class="stack" style="gap:6px"><span class="small muted">Aus Ihren Marktstudien (Beitrag pro Tag laut Studie, Stand ${dateShort(list[0].day)}):</span><div class="row" style="gap:6px;flex-wrap:wrap">${list.map((x) => `<button class="btn small${x.db2 > 0 ? '' : ' ghost'}" data-act="plpick" data-d="${x.d}" data-t="${x.type}" title="${esc(apName(x.d))} · ${n0(x.km)} km · Auslastung ${pct(x.lf)}">${x.d} · ${x.type} · <span class="${sgn(x.db2)}">${eur(x.db2, { plus: true })}</span></button>`).join('')}</div></div>`;
 }
 function viewPlanner() {
@@ -1744,15 +1747,15 @@ VIEWS.stations = function viewStations() {
     <p class="small ink2">An jedem Flughafen mieten Sie Schalter und Gates und kaufen die Abfertigung ein. Billige Bereiche sparen Miete und Entgelte, kosten aber Bodenzeit und Geschäftsreisende.</p>${cards.join('')}`;
   const cand = SM.AP_CODES.filter((c) => !pl.bases.includes(c));
   const L = SM.careerOf(pl), lvB = SM.careerLv(pl);
-  const baseCost = (c) => SM.baseSetupCost(W, c) * SM.softX(pl, 'base') + (pl.stations[c] ? 0 : SM.licenceFee(W, c));
+  const baseCost = (c) => SM.baseSetupCost(W, c) * SM.softX(pl, 'base') + (pl.stations[c] ? 0 : SM.licenceFee(W, c)) + SM.baseSlotCost(W, c, pl);
   const bx = SM.softX(pl, 'base');
   const lim = L && bx > 1 ? (() => { const nx = SM.CAREER.levels.findIndex((x) => x.bases > pl.bases.length); return `Für Phase ${lvB + 1} „${L.label}“ ist eine weitere Basis ein großer Schritt: Einrichtung ×${NF1.format(bx)}, laufende Kosten aller Basen +${n0(SM.CAREER.soft.baseDayX * 100 * (pl.bases.length + 1 - L.bases))} %.${nx > 0 ? ` Ohne Aufschlag ab Phase ${nx + 1} „${SM.CAREER.levels[nx].label}“ (${SM.needTxt(SM.CAREER.levels[nx].need)}).` : ''}`; })() : '';
   html += `<div class="card pad stack"><h3>Neue Basis eröffnen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Einrichtung, Betriebslizenz und laufende Kosten (Leitung, Crewräume) wachsen mit der Größe des Flughafens: Bremen kostet einen Bruchteil von Frankfurt. Flugzeuge lassen sich im Tab Flotte umstationieren.</p>
     ${lim ? `<div class="callout warn">${esc(lim)}</div>` : ''}
-    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)); return `<option value="${c}" ${c === ui.newBasePick ? 'selected' : ''}>${c} · ${apName(c)} · einmalig ${eur(baseCost(c))}, ${eur(SM.baseDayCost(c) * 30.4 * cpi())}/Monat${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase" id="openbaseBtn">Basis eröffnen · einmalig ${eurB(baseCost(cand.includes(ui.newBasePick) ? ui.newBasePick : cand[0]))}</button></div></div>`;
+    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)); return `<option value="${c}" ${c === ui.newBasePick ? 'selected' : ''}>${c} · ${apName(c)} · einmalig ${eur(baseCost(c))}, ${eur(SM.baseDayCost(c) * 30.4 * cpi())}/Monat${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase" id="openbaseBtn">Basis eröffnen · einmalig ${eurB(baseCost(cand.includes(ui.newBasePick) ? ui.newBasePick : cand[0]))} inkl. ${P.BASE_SLOTS.n} Slots</button></div></div>`;
   const slotApts = Object.keys(pl.stations).filter((c) => P.AIRPORTS[c]).sort();
   html += `<div class="stack"><h2 class="sec">Slots <small>Flughäfen in Ihrem Netz</small></h2><table class="t"><thead><tr><th>Flughafen</th><th class="r">für Sie frei</th><th class="r">Entgelt je Bewegung</th></tr></thead><tbody>${slotApts.map((c) => `<tr><td>${c} · ${apName(c)}</td><td class="r">${slotTxt(c)}</td><td class="r">${eur(SM.apx(c).slotFee * cpi())}</td></tr>`).join('')}</tbody></table>
-    <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Im April und Oktober (Sommer- und Winterflugplan) kommen neue Slots dazu; wer eine Strecke einstellt, gibt seine frei.</p></div>`;
+    <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Zu jeder neuen Basis gehören drei Slots (im Eröffnungspreis enthalten). Neue Slots gibt es zum 1. April und 1. Oktober; wer eine Strecke einstellt, behält seine Slots in der Reserve.</p></div>`;
   return html;
 };
 
@@ -1930,7 +1933,8 @@ VIEWS.market = function viewMarket() {
  */
 function chancesHtml() {
   const pl = W.player, flown = new Set(pl.activeRoutes().map((r) => SM.pairKey(r.base, r.dest))), out = [];
-  for (const base of pl.bases) for (const d of SM.AP_CODES) {
+  const hide = new Set((ui.chHide || []).filter((b) => pl.bases.includes(b))); if (hide.size >= pl.bases.length) hide.clear();
+  for (const base of pl.bases.filter((b) => !hide.has(b))) for (const d of SM.AP_CODES) {
     if (d === base || !SM.routeKmOk(base, d) || flown.has(SM.pairKey(base, d)) || SM.gcDistanceKm(base, d) > 9000) continue;
     const kp = W.knownPot(pl, base, d), pot = kp.sum / 2; if (pot < 150) continue;
     const comp = W.competitorOffers(W.playerId, base, d), ai = comp.reduce((x, o) => x + o.freq * (o.seats || 180), 0);
@@ -1941,6 +1945,7 @@ function chancesHtml() {
   const top = out.slice(0, ui.chAll ? 30 : 8);
   if (!top.length) return '';
   return `<div class="card pad stack"><div class="spread"><h3>Chancen ab Ihren Basen</h3><span class="small muted">noch nicht geflogen, wenig KI-Konkurrenz</span></div>
+    ${pl.bases.length > 1 ? `<div class="row" style="gap:6px;flex-wrap:wrap">${pl.bases.map((b) => `<button class="chip-t" data-act="chbase" data-v="${b}" aria-pressed="${!hide.has(b)}"><b class="mono">${b}</b> ${esc(apName(b))}</button>`).join('')}</div>` : ''}
     <div class="tw"><table class="t"><thead><tr><th>Markt</th><th class="r">Potenzial/Tag</th><th>Konkurrenz (KI)</th><th></th></tr></thead><tbody>
     ${top.map((x) => `<tr><td><b>${x.base}–${x.d}</b> <span class="small muted">${esc(apName(x.d))} · ${n0(SM.gcDistanceKm(x.base, x.d))} km</span></td><td class="r">${x.kp.lv >= 2 ? '≈ ' : ''}${potTxt(x.kp, 2)} ${kbar(x.kp.lv)}</td>
       <td class="small">${x.comp.length ? x.comp.map((o) => `<span class="sw" style="background:${colorOf(W.airlines[o.airline])}"></span> ${o.freq < 1 ? n0(o.freq * 7) + 'x/Wo.' : o.freq + 'x'}`).join(' ') : '<span class="pos">keine</span>'}</td>
@@ -2061,38 +2066,74 @@ VIEWS.strategy = function viewStrategy() {
   html += `<div class="stack"><h2 class="sec sm">Drehkreuze <small>Umsteiger über Ihre Basen</small></h2><div class="tw"><table class="t"><thead><tr><th>Basis</th><th class="r">Strecken</th><th class="r" title="Reisende pro Tag, die über die Basis umsteigen (je Reise einmal gezählt) / so viele wollten">Umsteiger/Tag</th><th>Stufe</th><th>Ausbau</th></tr></thead><tbody>${hubRows}</tbody></table></div>
     <div class="hub-lv">${P.HUB.slice(1).map((x, i) => `<div><b>${i + 1}. ${x.label}</b><span>${x.desc}</span><em>ab ${x.minRoutes} Strecken · ${eur(x.monthly * cpi())}/Monat</em></div>`).join('')}</div>
     <p class="small muted">Jede Stufe macht Umsteigen bequemer (kürzere Umsteigezeit, abgestimmte Wellen, mehr sinnvolle Verbindungen) und bringt Geschäftsreisenden am Drehkreuz einen Heimvorteil. So wird auch ein kleinerer Flughafen zum Drehkreuz – Sie sind nicht auf London oder Frankfurt angewiesen. Umsteiger füllen freie Plätze: Am meisten bringt der Ausbau, wenn Ihre Flüge nicht schon voll sind.</p></div>`;
-  // Slots und Marktkontrolle
-  const myWait = (W.slotWait || []).filter((e) => e.al === pl.id);
-  const net = [...new Set([...pl.bases, ...pl.activeRoutes().flatMap((r) => [r.base, r.dest]), ...(ui.slotExtra || []), ...myWait.map((e) => e.apt), ...Object.keys(pl.slotHold || {})])];
-  const coord = net.filter((c) => P.AIRPORTS[c]).sort();
-  const nsd = SM.nextSlotDay(W.day), nsIn = nsd.day - W.day;
-  const slotRows = coord.map((c) => {
-    const free = Math.max(0, W.slotsFree(c) - W.waitBlock(c, pl)), bought = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day).reduce((a, h) => a + h.n, 0);
-    const mine = myWait.filter((e) => e.apt === c), q = (W.slotWait || []).filter((e) => e.apt === c), qn = q.reduce((a, e) => a + e.n, 0);
-    const fc = q.length ? W.waitForecast(c) : null;
-    const waitTxt = (mine.length ? mine.map((e) => `Platz ${W.waitPos(e)} von ${q.length} · ${e.n} Slot${e.n > 1 ? 's' : ''}${e.plan ? ' (Plan)' : ''} <button class="btn small" data-act="slotleave" data-id="${e.id}" title="austragen">✕</button>`).join('<br>') : qn ? `<span class="small muted">${q.length} warten (${qn} Slots)</span>` : '–');
-    const fcTxt = mine.length ? mine.map((e) => { const g = fc.byId[e.id] || 0; return `<span class="chip ${g >= e.n ? 'good' : g ? 'warn' : 'crit'}">${g} von ${e.n}</span>`; }).join('<br>') : q.length ? `<span class="small muted">${Math.min(fc.total, qn)} von ${qn} vergeben</span>` : '<span class="small muted">–</span>';
-    const served = pl.activeRoutes().some((r) => r.base === c || r.dest === c) || pl.bases.includes(c);
-    const X = SM.apx(c);
-    const buy = free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen · ${eurB(W.slotBuyPrice(c, 1))}</button>${free > 1 ? ` <button class="btn small primary" data-act="slotbuy" data-apt="${c}" data-n="all">Alle ${free} · ${eurB(W.slotBuyPrice(c, free))}</button>` : ''}` : `<button class="btn small" data-act="slotwait" data-apt="${c}" title="Freie Slots gehen zum 1. April und 1. Oktober reihum an die Wartenden">${mine.length ? 'Warteliste +1 Slot' : 'Auf die Warteliste'}</button>`;
-    return `<div class="slotrow"><div class="slothead"><div><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}${served ? '' : ' · noch nicht im Netz'}</span></div><span class="small muted" title="1 Slot je 200.000 Passagiere im Jahr. Einen Teil halten Airlines außerhalb des Spiels (Bestandsverkehr).">${W.slotCap[c] ?? X.simCap} im Spiel · ${pct(X.incShare || 0)} bei etablierten Airlines</span></div>
-      <div class="slotstats"><div><span>frei</span><b class="${free <= 0 ? 'neg' : ''}">${free}</b>${free > 0 ? `<em>je ${eurB(W.slotBuyPrice(c, 1))}</em>` : '<em>voll</em>'}</div><div><span>Ihre Reserve</span><b>${bought || '–'}</b></div><div><span>Warteliste</span><b class="small">${waitTxt}</b></div><div><span>Prognose ${dateShort(nsd.day)}</span><b class="small">${fcTxt}</b></div></div>
-      <div class="row" style="gap:6px;flex-wrap:wrap">${buy}${bought ? ` <button class="btn small" data-act="slotsell" data-apt="${c}">Reserve zurückgeben</button>` : ''}</div></div>`;
-  }).join('');
-  const lockRows = coord.filter((c) => pl.bases.includes(c) || pl.activeRoutes().some((r) => r.base === c || r.dest === c)).map((c) => {
-    const own = pl.gateLock && pl.gateLock[c], other = W.lockOwner(c), big = false, price = W.gateLockPrice(c);
+  // Marktkontrolle (Slots haben einen eigenen Reiter unter Strecken)
+  const coordS = [...new Set([...pl.bases, ...pl.activeRoutes().flatMap((r) => [r.base, r.dest])])].filter((c) => P.AIRPORTS[c]).sort();
+  const lockRows = coordS.map((c) => {
+    const own = pl.gateLock && pl.gateLock[c], other = W.lockOwner(c), price = W.gateLockPrice(c);
     return `<tr><td><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))} · ${NF1.format(P.AIRPORTS[c].pax || 0)} Mio. Pax/Jahr</span></td>
-      <td>${own ? '<span class="chip good">alle Gates bei Ihnen</span>' : other && other !== pl ? `<span class="chip crit">${esc(other.name)}</span>` : big ? '<span class="small muted">zu groß</span>' : `${eur(price)} + ${eur(price * P.GATE_LOCK.monthlyRate)}/Monat`}</td>
-      <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !big && !other ? `<button class="btn small primary" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag · ${eurB(price)}</button>` : ''}</td></tr>`;
+      <td>${own ? '<span class="chip good">alle Gates bei Ihnen</span>' : other && other !== pl ? `<span class="chip crit">${esc(other.name)}</span>` : `${eur(price)} + ${eur(price * P.GATE_LOCK.monthlyRate)}/Monat`}</td>
+      <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !other ? `<button class="btn small primary" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag · ${eurB(price)}</button>` : ''}</td></tr>`;
   }).join('');
   html += `<div class="stack"><h2 class="sec sm">Slots und Marktkontrolle</h2>
-    <div class="slotdate"><div><span class="small muted">Nächste Slotvergabe</span><b>${dateLong(nsd.day)}</b><span class="small">${nsd.summer ? 'Sommerflugplan' : 'Winterflugplan'} · in ${nsIn} Tag${nsIn === 1 ? '' : 'en'}</span></div>
-      <ol class="small"><li>Feste Termine: <b>1. April</b> und <b>1. Oktober</b>.</li><li>Jeder koordinierte Flughafen bekommt dann einen Slot dazu.</li><li>Freie Slots gehen reihum an die Warteliste – je einer pro Eintrag, dann der Nächste – und werden beim Zuteilen bezahlt.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen.</li></ol></div>
-    ${coord.length ? `<div class="stack" style="gap:8px">${slotRows}</div>` : '<p class="small muted">Noch kein Flughafen im Netz.</p>'}
-    <div class="row" style="gap:8px;flex-wrap:wrap"><span class="small muted">Slots für später sichern – auch an Flughäfen, die Sie noch nicht anfliegen:</span><select id="slot-add" style="width:auto">${SM.AP_CODES.filter((c) => !coord.includes(c)).sort().map((c) => `<option value="${c}">${c} · ${esc(apName(c))} (${Math.max(0, W.slotsFree(c))} frei)</option>`).join('')}</select><button class="btn small" data-act="slotadd">Hinzufügen</button></div>
-    <p class="small muted">Jede neue Strecke und jeder zusätzliche Flug kauft die nötigen Slots zum Tagespreis – außer Sie haben sie schon in Ihrer Reserve. Ist ein Flughafen voll, tragen Sie sich auf die Warteliste ein oder speichern die Strecke als Plan (Strecken → Pläne). Vergeben wird nur zu den festen Terminen.</p>
+    <div class="callout info row" style="gap:8px;align-items:center"><span><b>Slots kaufen, Wartelisten und Vergabetermine</b> finden Sie jetzt unter Strecken → Slots. Nächste Vergabe: ${slotDateTxt()}.</span><button class="btn small" data-act="tab" data-tab="slots" style="margin-left:auto">Zu den Slots</button></div>
     ${lockRows ? `<div class="tw"><table class="t"><thead><tr><th>Flughafen in Ihrem Netz</th><th>Gate-Exklusivvertrag</th><th></th></tr></thead><tbody>${lockRows}</tbody></table></div>` : ''}
-    <p class="small muted">Kaufen Sie alle freien Slots, kann niemand an dem Flughafen zusätzliche Flüge anbieten – bestehende Konkurrenzflüge bleiben, deren Slots gibt es nur im Handel. Je knapper der Rest, desto teurer der nächste Slot; ungenutzte gekaufte Slots kosten die übliche Slotgebühr. Jeder Flughafen in Ihrem Netz kann einen Gate-Exklusivvertrag bekommen: Andere Airlines können dort keine neuen Flüge mehr anbieten. Der Preis richtet sich nach der Größe – an Großflughäfen ein Vermögen.</p></div>`;
+    <p class="small muted">Jeder Flughafen in Ihrem Netz kann einen Gate-Exklusivvertrag bekommen: Andere Airlines können dort keine neuen Flüge mehr anbieten, bestehende bleiben. Der Preis richtet sich nach der Größe – an Großflughäfen ein Vermögen.</p></div>`;
+  return html;
+};
+// ---------------------------------------------------------------------------
+// Strecken → Slots: kaufen und Warteliste ohne Streckenplanung, feste Vergabetermine
+// ---------------------------------------------------------------------------
+/** Reihum-Vergabe simulieren: total Slots auf die Einträge (Liste von Wünschen) verteilen. */
+function rrAlloc(total, wants) { const got = wants.map(() => 0); let left = total, guard = 0; while (left > 0 && got.some((g, i) => g < wants[i]) && guard++ < 80) for (let i = 0; i < wants.length && left > 0; i++) if (got[i] < wants[i]) { got[i]++; left--; } return got; }
+const slotAptOf = (v) => { const t = String(v || '').trim(), c = t.slice(0, 3).toUpperCase(); if (P.AIRPORTS[c] && (t.length === 3 || /^[A-Za-z]{3}\b/.test(t))) return c; const l = t.toLowerCase(); if (l.length < 3) return null; return SM.AP_CODES.find((x) => apName(x).toLowerCase() === l) || SM.AP_CODES.find((x) => apName(x).toLowerCase().startsWith(l)) || null; };
+/** Vorschau im Formular „Slots sichern“. */
+function slotQuoteHtml(apt, n) {
+  const pl = W.player; if (!apt) return '<p class="small muted">Flughafen eingeben – Code (z. B. FRA) oder Name.</p>';
+  n = Math.max(1, Math.min(8, Math.round(n) || 1));
+  const free = Math.max(0, W.slotsFree(apt) - W.waitBlock(apt, pl)), q = (W.slotWait || []).filter((e) => e.apt === apt), qn = q.reduce((a, e) => a + e.n, 0);
+  const nsd = SM.nextSlotDay(W.day), total = Math.max(0, W.slotsFree(apt)) + 1;
+  const mineE = q.find((e) => e.al === pl.id && !e.plan), wants = q.map((e) => (e === mineE ? e.n + n : e.n)); if (!mineE) wants.push(n);
+  const got = rrAlloc(total, wants)[mineE ? q.indexOf(mineE) : wants.length - 1], held = pl.heldAt(apt, W.day);
+  const buyN = Math.min(n, free);
+  return `<div class="slotq"><div class="slotstats"><div><span>sofort frei</span><b class="${free ? '' : 'neg'}">${free}</b>${free ? `<em>ab ${eurB(W.slotBuyPrice(apt, 1))} je Slot</em>` : '<em>voll</em>'}</div><div><span>Ihre Reserve</span><b>${held || '–'}</b></div><div><span>Warteliste</span><b>${q.length ? `${q.length} Einträge · ${qn} Slots` : 'leer'}</b></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${total}</b><em>1 neuer + ${total - 1} freie</em></div></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap">${buyN ? `<button class="btn small primary" data-act="slotbuy" data-apt="${apt}" data-n="${buyN}">${buyN} sofort kaufen · ${eurB(W.slotBuyPrice(apt, buyN))}</button>` : ''}
+      ${n > free || !free ? `<button class="btn small${buyN ? '' : ' primary'}" data-act="slotwait" data-apt="${apt}" data-n="${n - buyN || n}">${n - buyN || n} auf die Warteliste${mineE ? ' (zu Ihrem Eintrag)' : ` · Platz ${q.length + 1}`}</button>` : ''}</div>
+    ${n > free || !free ? `<p class="small ${got >= (n - buyN || n) ? 'pos' : 'warnc'}">Prognose für ${dateLong(nsd.day)}: Sie bekämen voraussichtlich <b>${got} von ${n - buyN || n}</b> Slot${(n - buyN || n) > 1 ? 's' : ''}. Bezahlt wird erst bei der Zuteilung (Tagespreis).</p>` : '<p class="small muted">Gekaufte Slots liegen in Ihrer Reserve, bis eine Strecke sie nutzt. Ungenutzt kosten sie die übliche Slotgebühr; zurückgeben bringt den halben Buchwert.</p>'}</div>`;
+}
+function slotCardHtml(c, pl, nsd) {
+  const free = Math.max(0, W.slotsFree(c) - W.waitBlock(c, pl)), bought = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day).reduce((a, h) => a + h.n, 0);
+  const q = (W.slotWait || []).filter((e) => e.apt === c), qn = q.reduce((a, e) => a + e.n, 0), mine = q.filter((e) => e.al === pl.id);
+  const fc = q.length ? W.waitForecast(c) : null, total = Math.max(0, W.slotsFree(c)) + 1;
+  const used = pl.activeRoutes().reduce((a, r) => a + (r.base === c || r.dest === c ? r.freq : 0), 0);
+  const X = SM.apx(c), isBase = pl.bases.includes(c);
+  const myTxt = mine.length ? mine.map((e) => { const g = fc.byId[e.id] || 0; return `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><span>Platz <b>${W.waitPos(e)}</b> von ${q.length} · ${e.n} Slot${e.n > 1 ? 's' : ''}${e.plan ? ' für einen Plan' : ''}</span><span class="chip ${g >= e.n ? 'good' : g ? 'warn' : 'crit'}">am ${dateShort(nsd.day)} voraussichtlich ${g} von ${e.n}</span><button class="btn small ghost" data-act="slotleave" data-id="${e.id}">austragen</button></div>`; }).join('') : '';
+  const queue = q.length ? `<details class="fold" data-keep="sq-${c}" ${ui.open && ui.open['sq-' + c] ? 'open' : ''}><summary><span class="small"><b>Warteliste ${c}</b> · ${q.length} Einträge, ${qn} Slots angefragt</span><span class="fold-hint">${ui.open && ui.open['sq-' + c] ? 'einklappen' : 'Reihenfolge'}</span></summary>
+      <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
+  const buy = free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen · ${eurB(W.slotBuyPrice(c, 1))}</button>${free > 1 ? ` <button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="all">alle ${free} · ${eurB(W.slotBuyPrice(c, free))}</button>` : ''}` : `<button class="btn small primary" data-act="slotwait" data-apt="${c}" data-n="1">${mine.some((e) => !e.plan) ? '+1 auf der Warteliste' : 'Auf die Warteliste'}</button>`;
+  return `<div class="slotrow"><div class="slothead"><div><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}${isBase ? ' · Basis' : used ? '' : ' · noch nicht im Netz'}</span></div><span class="small muted" title="1 Slot je 200.000 Passagiere im Jahr. Einen Teil halten Airlines außerhalb des Spiels (Bestandsverkehr).">${W.slotCap[c] ?? X.simCap} Slots im Spiel</span></div>
+    <div class="slotstats"><div><span>von Ihnen genutzt</span><b>${used}</b><em>tägliche Flüge</em></div><div><span>Ihre Reserve</span><b>${bought || '–'}</b><em>${bought ? 'frei für neue Flüge' : 'keine'}</em></div><div><span>sofort frei</span><b class="${free <= 0 ? 'neg' : ''}">${free}</b><em>${free > 0 ? 'je ' + eurB(W.slotBuyPrice(c, 1)) : q.length ? 'gehen an die Warteliste' : 'voll'}</em></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${q.length ? Math.min(total, qn) : '–'}</b><em>${q.length ? `an ${q.length} Wartende` : 'keine Warteliste'}</em></div></div>
+    ${myTxt}${queue}
+    <div class="row" style="gap:6px;flex-wrap:wrap">${buy}${bought ? ` <button class="btn small ghost" data-act="slotsell" data-apt="${c}">Reserve zurückgeben</button>` : ''}</div></div>`;
+}
+VIEWS.slots = function viewSlots() {
+  const pl = W.player, nsd = SM.nextSlotDay(W.day), nsIn = nsd.day - W.day;
+  const allQ = W.slotWait || [], myQ = allQ.filter((e) => e.al === pl.id);
+  const qApts = [...new Set(allQ.map((e) => e.apt))];
+  let give = 0, ask = 0; for (const a of qApts) { const q = allQ.filter((e) => e.apt === a), n = q.reduce((s, e) => s + e.n, 0); ask += n; give += Math.min(n, Math.max(0, W.slotsFree(a)) + 1); }
+  let myGot = 0, myAsk = 0; for (const e of myQ) { myAsk += e.n; myGot += W.waitForecast(e.apt).byId[e.id] || 0; }
+  const coord = [...new Set([...pl.bases, ...pl.activeRoutes().flatMap((r) => [r.base, r.dest]), ...(ui.slotExtra || []), ...myQ.map((e) => e.apt), ...Object.keys(pl.slotHold || {})])].filter((c) => P.AIRPORTS[c]).sort((a, b) => (pl.bases.includes(b) - pl.bases.includes(a)) || a.localeCompare(b));
+  const st = ui.slotForm = ui.slotForm || { apt: '', n: 1 };
+  let html = `<h2 class="sec">Slots <small>kaufen, Warteliste, Vergabetermine</small></h2>
+    <div class="slotdate"><div><span class="small muted">Nächste Slotvergabe</span><b>${dateLong(nsd.day)}</b><span class="small">${nsd.summer ? 'Sommerflugplan' : 'Winterflugplan'} · in ${nsIn} Tag${nsIn === 1 ? '' : 'en'}</span></div>
+      <div class="slotsum"><div><span>Flughäfen mit Warteliste</span><b>${qApts.length}</b></div><div><span>angefragt / vergeben</span><b>${ask} / ${give}</b></div><div><span>Ihre Einträge</span><b>${myQ.length ? `${myGot} von ${myAsk}` : '–'}</b><em>${myQ.length ? 'Slots voraussichtlich' : 'keine'}</em></div></div>
+      <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
+    <div class="card pad stack"><h3>Slots sichern <small class="muted">ohne Streckenplanung</small></h3>
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="f" style="flex:3;min-width:200px"><span>Flughafen</span><input type="search" id="slot-apt" list="slot-apts" placeholder="Code oder Name, z. B. FRA" value="${esc(st.apt ? st.apt + ' · ' + apName(st.apt) : '')}" autocomplete="off"></label>
+        <label class="f" style="flex:1;min-width:90px"><span>Anzahl</span><input type="number" id="slot-n" min="1" max="8" value="${st.n}"></label></div>
+      <datalist id="slot-apts">${SM.AP_CODES.slice().sort((a, b) => apName(a).localeCompare(apName(b))).map((c) => `<option value="${c} · ${esc(apName(c))}">`).join('')}</datalist>
+      <div id="slot-q">${slotQuoteHtml(st.apt, st.n)}</div></div>`;
+  html += `<h3 class="sec sm">Ihre Flughäfen <small>Basen, Strecken, Reserven und Wartelisten</small></h3>${coord.length ? `<div class="stack" style="gap:8px">${coord.map((c) => slotCardHtml(c, pl, nsd)).join('')}</div>` : '<p class="small muted">Noch kein Flughafen im Netz.</p>'}
+    <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Zu jeder Basis gehören drei Slots, die bei der Eröffnung gekauft werden. Neue Strecken nutzen zuerst Ihre Reserve, fehlende Slots werden zum Tagespreis gekauft – je knapper ein Flughafen, desto teurer. Ist er voll, tragen Sie sich hier auf die Warteliste ein oder speichern die Strecke als Plan (Strecken → Pläne).</p>`;
   return html;
 };
 function strategySummary(pl) {
@@ -2102,9 +2143,8 @@ function strategySummary(pl) {
     <span><em>Drehkreuze</em><b>${hubs.length ? hubs.map(([a, v]) => `${a} ${v}`).join(', ') : 'keins'}</b></span></div>`;
 }
 function onStrategyClick(act, b) {
-  if (!['cabpre', 'cabsave', 'cabreset', 'mktp', 'loyalty', 'hubup', 'slotbuy', 'slotsell', 'gatelock', 'slotwait', 'slotleave', 'slotadd'].includes(act)) return false;
-  if (act === 'slotadd') { const v = $('#slot-add') && $('#slot-add').value; if (v) ui.slotExtra = [...new Set([...(ui.slotExtra || []), v])]; refreshAll(); return true; }
-  if (act === 'slotwait') { const r = doAction({ type: 'slotWait', apt: b.dataset.apt, n: 1 }); if (r.ok) toast(`Warteliste ${b.dataset.apt}: Platz ${r.pos}.`); refreshAll(); return true; }
+  if (!['cabpre', 'cabsave', 'cabreset', 'mktp', 'loyalty', 'hubup', 'slotbuy', 'slotsell', 'gatelock', 'slotwait', 'slotleave'].includes(act)) return false;
+  if (act === 'slotwait') { const n = Math.max(1, Number(b.dataset.n) || 1), r = doAction({ type: 'slotWait', apt: b.dataset.apt, n }); if (r.ok) { ui.slotExtra = [...new Set([...(ui.slotExtra || []), b.dataset.apt])]; toast(`Warteliste ${b.dataset.apt}: Platz ${r.pos} · Vergabe ${dateShort(SM.nextSlotDay(W.day).day)}.`); } refreshAll(); return true; }
   if (act === 'slotleave') { doAction({ type: 'slotWaitLeave', id: b.dataset.id }); refreshAll(); return true; }
   const pl = W.player, h = b.dataset.h;
   if (act === 'cabpre') { ui.cabDraft = ui.cabDraft || cabCur(pl); ui.cabDraft[h] = { f: Number(b.dataset.f), b: Number(b.dataset.b) }; renderPane(true); return true; }
@@ -2113,7 +2153,7 @@ function onStrategyClick(act, b) {
   if (act === 'mktp') { doAction({ type: 'marketingPct', v: Number(b.dataset.v) }); refreshAll(); return true; }
   if (act === 'loyalty') { const v = Number(b.dataset.v), r = doAction({ type: 'loyalty', lv: v }); if (r.ok) toast(v ? `${P.LOYALTY[v].label} aktiv.` : 'Programm eingestellt.'); refreshAll(); return true; }
   if (act === 'hubup') { const r = doAction({ type: 'hubLevel', apt: b.dataset.apt, lv: Number(b.dataset.v) }); if (r.ok) toast(`${b.dataset.apt}: ${P.HUB[Number(b.dataset.v)].label}.`); refreshAll(); return true; }
-  if (act === 'slotbuy') { const n = b.dataset.n === 'all' ? 'all' : Number(b.dataset.n), r = doAction({ type: 'buySlots', apt: b.dataset.apt, n }); if (r.ok) toast(`${r.n} Slot${r.n > 1 ? 's' : ''} in ${b.dataset.apt} gekauft.`); refreshAll(); return true; }
+  if (act === 'slotbuy') { const n = b.dataset.n === 'all' ? 'all' : Number(b.dataset.n), r = doAction({ type: 'buySlots', apt: b.dataset.apt, n }); if (r.ok) ui.slotExtra = [...new Set([...(ui.slotExtra || []), b.dataset.apt])]; if (r.ok) toast(`${r.n} Slot${r.n > 1 ? 's' : ''} in ${b.dataset.apt} gekauft.`); refreshAll(); return true; }
   if (act === 'slotsell') { const r = doAction({ type: 'sellSlots', apt: b.dataset.apt, n: 'all' }); if (r.ok) toast(`${r.n} Slots zurückgegeben (${eur(r.back)}).`); refreshAll(); return true; }
   if (act === 'gatelock') { const on = b.dataset.on === '1', r = doAction({ type: 'gateLock', apt: b.dataset.apt, on }); if (r.ok && on) toast(`Alle Gates in ${b.dataset.apt} gehören jetzt Ihnen.`); refreshAll(); return true; }
   return false;
@@ -3270,9 +3310,9 @@ VIEWS.trade = function viewTrade() {
   const ags = (W.agreements || []).filter((g) => g.until > W.day && (g.airline === me.id || g.partner === me.id));
   if (ags.length) html += `<div class="stack"><h2 class="sec">Vereinbarungen <small>Wettbewerbsverzicht</small></h2><table class="t"><tbody>${ags.map((g) => `<tr><td>${g.airline === me.id ? `<b>Sie</b> verzichten gegenüber ${esc(W.airlines[g.partner].name)}` : `<b>${esc(W.airlines[g.airline].name)}</b> verzichtet zu Ihren Gunsten`}</td><td>${g.pair.replace('-', '–')}</td><td class="r">bis ${dateY(g.until)}</td></tr>`).join('')}</tbody></table></div>`;
   const holds = Object.keys(me.slotHold || {}).map((apt) => [apt, me.heldAt(apt, W.day), Math.min(...me.slotHold[apt].filter((h) => h.until > W.day).map((h) => h.until))]).filter((x) => x[1] > 0);
-  html += `<div class="stack"><h2 class="sec">Ihre Slot-Reserve <small>freie Slots, die Ihnen gehören</small></h2>${holds.length ? `<table class="t"><tbody>${holds.map(([apt, n, until]) => `<tr><td><b>${apt}</b> ${esc(apName(apt))}</td><td class="r">${n} ${n === 1 ? 'Slot' : 'Slots'}</td><td class="r small muted">verfällt ab ${dateY(until)}</td><td class="r"><button class="btn small" data-act="dealslots" data-apt="${apt}">Verkaufen</button></td></tr>`).join('')}</tbody></table>` : '<p class="small muted">Keine. Wenn Sie an einem koordinierten Flughafen eine Strecke einstellen oder Flüge streichen, behalten Sie die Slots 180 Tage – zum Wiederverwenden oder Verkaufen. Per Handel erworbene Slots gelten 365 Tage.</p>'}</div>`;
+  html += `<div class="stack"><h2 class="sec">Ihre Slot-Reserve <small>freie Slots, die Ihnen gehören</small></h2>${holds.length ? `<table class="t"><tbody>${holds.map(([apt, n, until]) => `<tr><td><b>${apt}</b> ${esc(apName(apt))}</td><td class="r">${n} ${n === 1 ? 'Slot' : 'Slots'}</td><td class="r small muted">${until > 1e8 ? 'gekauft, unbefristet' : 'verfällt ab ' + dateY(until)}</td><td class="r"><button class="btn small" data-act="dealslots" data-apt="${apt}">Verkaufen</button></td></tr>`).join('')}</tbody></table>` : '<p class="small muted">Keine. Freie Slots, die Ihnen gehören – gekaufte, die drei Basis-Slots oder Slots eingestellter Strecken –, erscheinen hier und lassen sich an andere Airlines verkaufen. Kaufen und Wartelisten: Strecken → Slots.</p>'}</div>`;
   const hist = myDeals().filter((d) => d.status !== 'open').sort((a, b) => (b.resolvedDay ?? b.day) - (a.resolvedDay ?? a.day)).slice(0, 12);
-  if (hist.length) html += `<div class="stack"><h2 class="sec">Verlauf</h2>${hist.map(dealCard).join('')}</div>`;
+  if (hist.length) html += `<details class="fold" data-keep="tradeHist" ${ui.open && ui.open.tradeHist ? 'open' : ''}><summary><h2 class="sec">Verlauf <small>${hist.length} abgeschlossene Angebote</small></h2><span class="fold-hint">${ui.open && ui.open.tradeHist ? 'einklappen' : 'aufklappen'}</span></summary><div class="stack">${hist.map(dealCard).join('')}</div></details>`;
   return html;
 };
 function dealOpts(side) {
@@ -3878,6 +3918,9 @@ function doAction(act) {
   return res;
 }
 function refreshAll() { W.operableFreq(W.player); buildSchedules(); renderHeader(); renderTabs(); renderMapRoutes(true); renderPane(true); }
+// Auf-/Zuklappen merken, damit es beim Neuzeichnen so bleibt
+document.addEventListener('toggle', (e) => { const d = e.target; if (!d || !d.dataset || !d.dataset.keep) return; ui.open = ui.open || {}; ui.open[d.dataset.keep] = d.open; const h = d.querySelector('.fold-hint'); if (h) h.textContent = d.open ? 'einklappen' : 'aufklappen'; }, true);
+document.addEventListener('input', (e) => { const t = e.target; if (t && (t.id === 'slot-apt' || t.id === 'slot-n')) { const st = ui.slotForm = ui.slotForm || { apt: '', n: 1 }; if (t.id === 'slot-apt') st.apt = slotAptOf(t.value) || ''; else st.n = Math.max(1, Math.min(8, Math.round(Number(t.value)) || 1)); const box = $('#slot-q'); if (box) box.innerHTML = slotQuoteHtml(st.apt, st.n); return; } });
 document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.id) return; const fid = t.id.startsWith('dl-cash-') ? t.id.replace('dl-cash-', 'dl-fmt-') : t.dataset && t.dataset.fmt; if (!fid) return; const f = document.getElementById(fid), v = Math.max(0, Math.round(Number(t.value) || 0)); if (f) f.textContent = v ? '= ' + eur(v) : ''; });
 function onPaneClick(e) {
   const mb = e.target.closest('[data-mktbase]');
@@ -3886,6 +3929,7 @@ function onPaneClick(e) {
   if (b.tagName === 'SELECT') return;
   e.preventDefault();
   const act = b.dataset.act, pl = W.player;
+  if (act === 'chbase') { const v = b.dataset.v, h = new Set(ui.chHide || []); if (h.has(v)) h.delete(v); else if (h.size + 1 < W.player.bases.length) h.add(v); else { toast('Mindestens eine Basis bleibt eingeblendet.'); return; } ui.chHide = [...h]; renderPane(true); return; }
   if (act === 'dealcashq') { const i = $(`#dl-cash-${b.dataset.side}`); if (i) { i.value = b.dataset.v; i.dispatchEvent(new Event('input', { bubbles: true })); } return; }
   if (act === 'pltype') { const sel = $('#pl-type'); if (sel) { sel.value = b.dataset.t; sel.dispatchEvent(new Event('change', { bubbles: true })); } return; }
   if (act === 'tour') { startTour(); return; }
@@ -3894,7 +3938,7 @@ function onPaneClick(e) {
   if (act === 'plall') { ui.plAll = true; renderPane(); return; }
   if (act === 'plroutes') { ui.plOpen = ui.plOpen || {}; ui.plOpen[b.dataset.al] = !ui.plOpen[b.dataset.al]; renderPane(true); return; }
   if (act === 'chatto') { chat.to = b.dataset.al; toggleChat(true); return; }
-  if (/^st(kind|tier|order|plan|ac|base|basecheck|cfo)$/.test(act) && onStudyClick(act, b)) return;
+  if (/^st(kind|tier|order|plan|ac|base|basecheck|cfo|basetog|baseall)$/.test(act) && onStudyClick(act, b)) return;
   if (act.startsWith('cfo') && onCfoClick(act, b)) return;
   if (act.startsWith('h') && onHistClick(act, b)) return;
   if (onStrategyClick(act, b)) return;
@@ -3938,7 +3982,7 @@ function onPaneClick(e) {
     case 'suggest': suggestPrice(); break;
     case 'plrole': readPlanner(); if (ui.planner) { ui.planner.role = b.dataset.v; renderPane(true); } break;
     case 'plpick': { const base = ui.planner ? ui.planner.base : W.player.bases[0]; ui.planner = { ...defaultPlanner(b.dataset.d, base), type: b.dataset.t }; ui.selApt = b.dataset.d; renderPane(true); break; }
-    case 'plstudy': ui.study = { kind: 'routes', tier: 'small', ft: 'apt', fv: ui.planner ? ui.planner.base : W.player.bases[0] }; setTab('studies'); break;
+    case 'plstudy': { const bb = b.dataset.base || (ui.planner ? ui.planner.base : W.player.bases[0]); ui.study = { kind: 'routes', tier: 'small', ft: '', fv: '', bases: [bb], knownBases: W.player.bases.slice() }; setTab('studies'); toast(`Streckenanalyse ab ${bb} vorbereitet – Paket wählen und beauftragen.`); break; }
     case 'openroute-new': openNewRoute(); break;
     case 'plansave': { readPlanner(); const p = ui.planner; const miss = !(slotsMine(p.base) >= p.freq && slotsMine(p.dest) >= p.freq); const r = doAction({ type: 'savePlan', base: p.base, dest: p.dest, typeId: p.type, freq: p.freq, fo: p.fo, fi: p.fi, service: p.service, buffer: p.buffer, term: p.term, auto: miss });
       if (r.ok) toast(`${p.base}–${p.dest} gespeichert (Strecken → Pläne)${r.waits && r.waits.length ? ' · Warteliste ' + r.waits.join(', ') + ' · Vergabe ' + slotDateTxt() : ''}.`); refreshAll(); break; }
@@ -4011,6 +4055,8 @@ let fcTimer = null;
 // Marktstudien (Beratungsaufträge) – Auftrag, Status, Berichte
 // ---------------------------------------------------------------------------
 const STK = () => SM.P.STUDIES;
+/** Basen, ab denen die Studie sucht (Standard: alle). */
+function stBases() { const pl = W.player, f = ui.study; if (!f.bases) f.bases = pl.bases.slice(); f.bases = f.bases.filter((b) => pl.bases.includes(b)); if (!f.bases.length) f.bases = pl.bases.slice(); for (const b of pl.bases) if (f.knownBases && !f.knownBases.includes(b) && !f.bases.includes(b)) f.bases.push(b); f.knownBases = pl.bases.slice(); return f.bases; }
 const focusOpts = (t, v) => {
   if (t === 'region') return SM.REGION_ORDER.map((r) => `<option value="${r}" ${r === v ? 'selected' : ''}>${r}</option>`).join('');
   if (t === 'country') return SM.COUNTRIES.slice().sort((a, b) => (SM.COUNTRY_LABEL[a] || a).localeCompare(SM.COUNTRY_LABEL[b] || b)).map((c) => `<option value="${c}" ${c === v ? 'selected' : ''}>${esc(SM.COUNTRY_LABEL[c] || c)}</option>`).join('');
@@ -4026,6 +4072,7 @@ function studyForm() {
   return `<div class="card pad stack"><div class="spread"><b>Neue Studie beauftragen</b><span class="small muted">${running}/${S.maxRunning} laufen</span></div>
     <div class="stack" style="gap:6px"><span class="small muted">Art der Studie</span><div class="opts st-opts">${Object.entries(S.kinds).map(([k, x]) => `<button data-act="stkind" data-v="${k}" aria-pressed="${f.kind === k}"><b>${esc(x.label)}</b><span>${esc(x.desc)}</span></button>`).join('')}</div></div>
     <div class="stack" style="gap:6px"><span class="small muted">Paket</span><div class="opts st-opts st-tiers">${Object.entries(S.tiers).map(([k, x]) => { const pr = W.studyPrice(pl, k); return `<button data-act="sttier" data-v="${k}" aria-pressed="${f.tier === k}"><b>${esc(x.label)}</b><span class="mono">${eur(pr.cost)} · ${pr.days} Tage</span><span>${scope[k]} · ${x.top} Vorschläge</span></button>`; }).join('')}</div></div>
+    ${(f.kind === 'routes' || f.kind === 'fleet') ? (() => { const sel = stBases(); return `<div class="stack" style="gap:6px"><span class="small muted">Ab welchen Basen? <span class="ink2">(antippen zum Ein- und Ausblenden)</span></span><div class="row" style="gap:6px;flex-wrap:wrap">${pl.bases.map((b) => `<button class="chip-t" data-act="stbasetog" data-v="${b}" aria-pressed="${sel.includes(b)}"><b class="mono">${b}</b> ${esc(apName(b))}</button>`).join('')}${pl.bases.length > 1 ? `<button class="btn small ghost" data-act="stbaseall">${sel.length === pl.bases.length ? 'nur erste' : 'alle'}</button>` : ''}</div></div>`; })() : ''}
     <div class="row" style="gap:8px"><label class="f" style="flex:1;min-width:150px"><span>Schwerpunkt</span><select id="st-ft"><option value="">weltweit / ab allen Basen</option><option value="region" ${f.ft === 'region' ? 'selected' : ''}>Region</option><option value="country" ${f.ft === 'country' ? 'selected' : ''}>Land</option><option value="apt" ${f.ft === 'apt' ? 'selected' : ''}>Flughafen</option></select></label>
       ${f.ft ? `<label class="f" style="flex:2;min-width:180px"><span>${f.ft === 'region' ? 'Region' : f.ft === 'country' ? 'Land' : 'Flughafen'}</span><select id="st-fv">${focusOpts(f.ft, f.fv)}</select></label>` : ''}</div>
     <p class="small muted">${f.kind === 'routes' ? 'Mit Flughafen als Schwerpunkt: ist es eine Ihrer Basen, werden Ziele ab dort gesucht, sonst Verbindungen von Ihren Basen dorthin.' : f.kind === 'base' ? 'Der Schwerpunkt grenzt die möglichen Standorte ein, etwa „Australien“ oder „Ozeanien“.' : f.kind === 'gaps' ? 'Der Schwerpunkt grenzt die untersuchten Märkte ein.' : 'Der Schwerpunkt grenzt die neuen Kandidaten-Strecken ein; Ihre eigenen Strecken sind immer dabei.'}${lv ? ` Ihre Marktanalyse (Stufe ${lv}) senkt Preis und Dauer.` : ''}</p>
@@ -4093,9 +4140,11 @@ function onStudyClick(act, b) {
   const f = ui.study = ui.study || { kind: 'routes', tier: 'extended', ft: '', fv: '' };
   if (act === 'stkind') { f.kind = b.dataset.v; renderPane(true); return true; }
   if (act === 'sttier') { f.tier = b.dataset.v; renderPane(true); return true; }
+  if (act === 'stbasetog') { const sel = stBases(), v = b.dataset.v; if (sel.includes(v)) { if (sel.length > 1) f.bases = sel.filter((x) => x !== v); else toast('Mindestens eine Basis muss dabei sein.'); } else f.bases = [...sel, v]; renderPane(true); return true; }
+  if (act === 'stbaseall') { const pl = W.player; f.bases = stBases().length === pl.bases.length ? [pl.bases[0]] : pl.bases.slice(); renderPane(true); return true; }
   if (act === 'storder') {
     const focus = f.ft ? { t: f.ft, v: f.fv } : null;
-    const r = doAction({ type: 'orderStudy', kind: f.kind, tier: f.tier, focus });
+    const r = doAction({ type: 'orderStudy', kind: f.kind, tier: f.tier, focus, bases: (f.kind === 'routes' || f.kind === 'fleet') ? stBases() : null });
     if (r.ok) toast(`Studie beauftragt – Bericht in ${r.days} Tagen.`);
     refreshAll(); return true;
   }
@@ -4655,7 +4704,7 @@ const BP_COST = new Map();
 function bpCost(c) {
   if (BP_COST.has(c)) return BP_COST.get(c);
   const a = P.AIRPORTS[c], S = P.SLOT_RULE, fake = { macro: { cpi: 1 } };
-  const v = { lic: SM.licenceFee(fake, c), base: SM.baseDayCost(c) * 30.4, slot: S.priceBase * Math.max(0.3, a.pax || 0.3) ** S.priceExp, fee: (a.paxfee || 0) + (a.tax || 0), inc: SM.incentiveAt(c) };
+  const v = { lic: SM.licenceFee(fake, c), base: SM.baseDayCost(c) * 30.4, slot: S.priceBase * Math.max(0.3, a.pax || 0.3) ** S.priceExp, slots3: SM.baseSlotCost(fake, c), fee: (a.paxfee || 0) + (a.tax || 0), inc: SM.incentiveAt(c) };
   BP_COST.set(c, v); return v;
 }
 /** Konkurrenz an einem Flughafen: KI-Basen (aus der laufenden Welt oder der Startaufstellung) und Mitspielende, die dort starten. */
@@ -4672,7 +4721,7 @@ function baseInfoHtml(c, st = null) {
   const a = P.AIRPORTS[c], k = bpCost(c), sz = bpSize(c), cp = bpComp(c, st);
   return `<div class="bp-selhead"><b class="mono">${c}</b><div style="min-width:0"><b>${esc(apName(c))}</b> <span class="small muted">${esc(SM.COUNTRY_LABEL[a.country] || a.country)} · ${esc(a.region)}</span>
       <div class="small">${NF1.format(a.pax || 0)} Mio. Passagiere im Jahr · Einzugsgebiet ${NF1.format(a.pop || 0)} Mio. Menschen</div></div></div>
-    <div class="bp-kpis"><div><span>Lizenz beim Start</span><b>${eur(k.lic)}</b></div><div><span>Basis im Monat</span><b>${eur(k.base)}</b></div><div><span>Slot ab</span><b>${eur(k.slot)}</b></div><div><span>Entgelte + Steuer je Gast</span><b>${eur(k.fee)}</b></div>${k.inc > 0.05 ? `<div><span>Anlaufrabatt</span><b class="pos">${pct(k.inc)}</b></div>` : ''}</div>
+    <div class="bp-kpis"><div><span>Lizenz beim Start</span><b>${eur(k.lic)}</b></div><div title="Drei Slots am Basisflughafen gehören zur Gründung – damit sind die ersten drei täglichen Abflüge sicher. Weitere Slots kosten je nach Knappheit mehr."><span>${P.BASE_SLOTS.n} Basis-Slots</span><b>${eur(k.slots3)}</b></div><div><span>Start gesamt</span><b>${eur(k.lic + k.slots3)}</b></div><div><span>Basis im Monat</span><b>${eur(k.base)}</b></div><div><span>Entgelte + Steuer je Gast</span><b>${eur(k.fee)}</b></div>${k.inc > 0.05 ? `<div><span>Anlaufrabatt</span><b class="pos">${pct(k.inc)}</b></div>` : ''}</div>
     <div class="small">${sz === 's' ? '<span class="pos">Regionalflughafen: günstiger Einstieg, kleine Märkte, wenig Slotdruck.</span>' : sz === 'm' ? '<span class="ink2">Mittlerer Flughafen: solide Nachfrage, spürbare Kosten.</span>' : '<span class="warnc">Großer Flughafen: teuer, starke Konkurrenz, Slots knapp – am Anfang ein großes Risiko.</span>'}
       ${cp.ai.length ? ` · KI-Basis: <b>${cp.ai.map(esc).join(', ')}</b>` : ' · keine KI-Basis'}${cp.hum.length ? ` · Hier starten auch: <b>${cp.hum.map(esc).join(', ')}</b>` : ''}</div>`;
 }
@@ -5512,7 +5561,7 @@ function boot(hotData) {
   initMap();
   $('#pane').addEventListener('click', onPaneClick);
   $('#pane').addEventListener('change', onPaneChange);
-  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'); if (bt) bt.textContent = `Basis eröffnen · einmalig ${eurB(SM.baseSetupCost(W, e.target.value) * SM.softX(W.player, 'base') + (W.player.stations[e.target.value] ? 0 : SM.licenceFee(W, e.target.value)))}`; } });
+  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'); if (bt) bt.textContent = `Basis eröffnen · einmalig ${eurB(SM.baseSetupCost(W, e.target.value) * SM.softX(W.player, 'base') + (W.player.stations[e.target.value] ? 0 : SM.licenceFee(W, e.target.value)) + SM.baseSlotCost(W, e.target.value, W.player))} inkl. ${P.BASE_SLOTS.n} Slots`; } });
   $('#pane').addEventListener('input', (e) => {
     if (onCabRange(e, false) || onFltInput(e.target)) return;
     if (e.target.id && e.target.id.startsWith('hire-')) { const k = e.target.id.slice(5), bt = $('#hirebtn-' + k), n = Math.floor(Number(e.target.value)); if (bt && n > 0) bt.textContent = hireLbl(bt.dataset.role, n); }
@@ -5578,7 +5627,7 @@ function boot(hotData) {
   }
   applyOnlineChrome();
   requestAnimationFrame(frame);
-  if (location.hash === '#debug') window.skymarketDebug = { world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
+  if (location.hash === '#debug') window.skymarketDebug = { world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
 }
 if (window.claude?.hot?.ready) window.claude.hot.ready(boot); else boot(window.claude?.hot?.data ?? {});
 })();

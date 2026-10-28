@@ -183,6 +183,14 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.17.5: Basis-Slots, Reiter „Slots“, Studien je Basis
+
+- **Drei Slots pro Basis:** Wer eine Basis eröffnet (auch die Heimatbasis beim Start), kauft dort drei Slots mit – garantiert verfügbar, auch an vollen Flughäfen. Der Festpreis wächst mit der Größe: Bremen rund 19 Tsd. €, Hannover 50 Tsd. €, Hamburg 135 Tsd. €, Frankfurt 570 Tsd. €, London 756 Tsd. €. Die Basisauswahl zeigt „3 Basis-Slots“ und „Start gesamt“, der Knopf „Basis eröffnen“ den Gesamtpreis inkl. Slots. Laufende Welten: Fehlende Basis-Slots werden beim nächsten Laden zugeteilt (zum Basispreis, ohne Kosten, wenn das Geld nicht reicht).
+- **Strecken → Slots:** Neuer Reiter mit dem nächsten Vergabetermin und einer Übersicht (Flughäfen mit Warteliste, angefragt/vergeben, Ihre voraussichtliche Zuteilung). „Slots sichern“ funktioniert ohne Streckenplanung: Flughafen per Code oder Name eintippen, Anzahl wählen – sofort kaufen, soweit frei, sonst auf die Warteliste, mit Platz und Prognose für den Termin. Jeder eigene Flughafen ist eine Karte mit genutzten Slots, Reserve, freien Slots, „am Termin zu vergeben“ und aufklappbarer Wartelisten-Reihenfolge mit allen Airlines.
+- **Marktstudien je Basis:** Bei Streckenanalyse und Flugzeugbeschaffung wählt man per Antippen, ab welchen Basen gesucht wird. Der Link im Planer bereitet eine Streckenanalyse ab der gerade gewählten Basis vor. Auch „Chancen ab Ihren Basen“ lässt sich je Basis ein- und ausblenden.
+- **Scrollen im Planer:** Beim Neuzeichnen (online bei jedem Serverstand) sprang die Planung nach oben, weil die Prognose erst danach gefüllt wurde. Jetzt bleibt die Position in allen Reitern und Fenstergrößen.
+- **Handel:** Der Verlauf abgeschlossener Angebote ist eingeklappt und lässt sich aufklappen; die Einstellung bleibt erhalten. Gekaufte Slots in der Reserve zeigen „unbefristet“ statt eines Fantasiedatums.
+
 ## Neu in 0.17.4: Feste Slottermine, Reiter „Pläne“, flüssiger auf 4x
 
 - **Slotvergabe zu festen Terminen:** Nur noch zum 1. April (Sommerflugplan) und 1. Oktober (Winterflugplan). Dann bekommt jeder koordinierte Flughafen einen Slot dazu, und die Wartelisten werden reihum bedient (je Eintrag ein Slot, dann der Nächste). Freie Slots ohne Warteschlange kann man weiter jederzeit kaufen. Eine Meldung fasst jede Vergabe zusammen und nennt den nächsten Termin.

@@ -358,6 +358,27 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const o = ws.acmiOffers.find((x) => SMx.P.AIRCRAFT_TYPES[x.type].group === 'A32F' && x.type !== 'A21N' && x.start >= ws.day);
   if (o) { const ac = ps.fleet[0]; const r = A({ type: 'acmi', offerId: o.id, acId: ac.id }); assert.equal(r.ok, true, 'Familie passt: ' + r.msg); assert.ok(ac.acmi.rate !== o.rate || o.type === ac.type_id, 'Rate nach Sitzen angepasst'); }
   console.log('0.17.3 ok: Riad–Dschidda', Math.round(SMx.refPrice('RUH', 'JED')), '€ mit Najd Air als Konkurrenz,', ws.acmiOffers.filter((x) => x.ev).length, 'Großereignis-Charter,', o ? 'Familien-Charter angenommen' : 'keine passende Familienanfrage'); }
+// 0.17.4/0.17.5: feste Slottermine, Basis-Slots, Studien je Basis
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const wf = SMx.newGame({ seed: 6, base: 'FRA' }), pf = wf.player, A = (a) => SMx.applyAction(wf, pf.id, a);
+  assert.equal(pf.heldAt('FRA', wf.day), 3, 'drei Basis-Slots in Frankfurt');
+  assert.ok(SMx.baseSlotCost(wf, 'FRA') > 5 * SMx.baseSlotCost(wf, 'HAJ'), 'Basis-Slots an Drehkreuzen viel teurer');
+  pf.ledger.cashOnly(2e8, 't');
+  assert.equal(A({ type: 'openBase', apt: 'MUC' }).ok, true, 'zweite Basis');
+  assert.equal(pf.heldAt('MUC', wf.day), 3, 'drei Basis-Slots in München');
+  A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'FRA' }); for (let i = 0; i < 15; i++) wf.step();
+  const ro = A({ type: 'openRoute', base: 'FRA', dest: 'PMI', typeId: 'A20N', freq: 1 });
+  assert.equal(ro.ok, true, 'Strecke ab voller Basis dank Basis-Slots: ' + ro.msg);
+  const so = A({ type: 'orderStudy', kind: 'routes', tier: 'small', focus: null, bases: ['MUC'] });
+  assert.equal(so.ok, true, 'Studie nur ab München'); for (let i = 0; i < 6; i++) wf.step();
+  const rep = pf.reports.find((r) => r.id === so.id);
+  assert.ok(rep.status === 'done' && rep.res.rows.length && rep.res.rows.every((x) => x.o === 'MUC'), 'Studie sucht nur ab München');
+  const free = wf.slotsFree('LHR'); wf.slotCap.LHR -= Math.max(0, free);
+  const jw = A({ type: 'slotWait', apt: 'LHR', n: 2 }); assert.equal(jw.ok, true, 'Warteliste ohne Strecke');
+  const t = SMx.nextSlotDay(wf.day).day; while (wf.day < t - 1) wf.step();
+  assert.equal(pf.heldAt('LHR', wf.day), 0, 'vor dem Termin keine Zuteilung'); wf.step(); wf.step();
+  assert.ok(pf.heldAt('LHR', wf.day) >= 1, 'am Termin zugeteilt');
+  console.log('0.17.5 ok: 3 Basis-Slots (FRA', Math.round(SMx.baseSlotCost(wf, 'FRA') / 1000), 'Tsd. €), Strecke ab voller Basis, Studie ab gewählter Basis, Warteliste am', t, 'bedient'); }
 console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage · Neustart Isar Jet → Phoenix');
 // Version 0.16: Karriere, Marktwissen, Slots als Vermögen, Übernahme, Pixel-Logo, Frequenz unter täglich
 { const SMx = (await import('../shared/engine.cjs')).default;
