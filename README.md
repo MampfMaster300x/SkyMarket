@@ -183,6 +183,11 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.18.1: Betriebslizenz nach Größenklasse
+
+- Die Lizenz für eine Basis ist jetzt nach Größe gestaffelt: klein (bis 8 Mio. Pax) 20–100 Tsd. €, mittel (8–20) 100–500 Tsd. €, groß (20–50) 1–2 Mio. €, Drehkreuz (über 50) 2,5–4 Mio. €. Beispiele: Bremen 36 Tsd., Belgrad 100 Tsd., Hamburg 333 Tsd., Düsseldorf 500 Tsd., Berlin 1,17 Mio., München 1,73 Mio., Frankfurt 2,89 Mio., London-Heathrow 3,52 Mio., Atlanta 4 Mio. Slotpreise unverändert.
+- Schlupfloch geschlossen: Wer an einem Flughafen schon eine Station hat (weil er ihn anfliegt), bekommt beim Basisausbau nur die Stationsgebühr angerechnet statt die ganze Lizenz zu sparen.
+
 ## Neu in 0.18.0: Börse ohne Schlupfloch, mehr Konkurrenz, Flughäfen geprüft
 
 - **Börsenwert neu:** Eigenkapital plus 5 × operatives Jahresergebnis (Schnitt der letzten bis zu 12 abgeschlossenen Monate, ohne Sondereffekte und ohne Beteiligungserträge, die schon im Buchwert stecken; Verluste zählen doppelt), mindestens 60 % des Eigenkapitals. Der Kurs wird nur zum Monatswechsel festgestellt und bewegt sich höchstens +25 %/−20 % je Monat. Kapitalerhöhungen, Rückkäufe, Dividenden und Kapitalkorrekturen der Spielleitung verschieben ihn sofort um das bewegte Geld. Damit hängt er nicht mehr am Tagesergebnis.

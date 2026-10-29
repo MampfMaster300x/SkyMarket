@@ -3435,7 +3435,7 @@ const SM = (() => {
     }
     openBase(al, apt) {
       if (al.bases.includes(apt)) return { ok: false, msg: 'Dort sind Sie schon.' };
-      const lic = al.stations[apt] ? 0 : licenceFee(this, apt), bx = softX(al, 'base');
+      const lic = Math.max(0, licenceFee(this, apt) - (al.stations[apt] ? stationFee(this, apt) : 0)), bx = softX(al, 'base');   // wer dort schon eine Station hat, zahlt nur die Differenz
       const setup = baseSetupCost(this, apt) * bx, sl = al.isPlayer ? baseSlotCost(this, apt, al) : 0;
       if (al.spendable(this.macro.bank ?? 1) < setup + lic + sl) return { ok: false, msg: `Für die Basis (${Math.round((setup + lic + sl) / 1000)} Tsd. EUR${lic ? ' inkl. Lizenz' : ''}${sl ? ' und drei Slots' : ''}) reicht auch der Dispo nicht.` };
       al.bases.push(apt); al.station(apt);
@@ -4780,7 +4780,16 @@ const SM = (() => {
   /** Erster Flug zu einem neuen Ziel: Station einrichten (Abfertigungsvertrag, Zulassung) – deutlich weniger als eine Basis. */
   function stationFee(w, apt) { const S = P.SLOT_RULE; return Math.round(S.stationBase * Math.max(0.3, ap(apt).pax || 0.3) ** S.stationExp * w.macro.cpi / 1000) * 1000; }
   /** Lizenz/Stationseröffnung für Spielende beim ersten Anflug eines Flughafens. */
-  function licenceFee(w, apt) { const S = P.SLOT_RULE; return Math.round(S.licenceBase * Math.max(0.3, ap(apt).pax || 0.3) ** S.licenceExp * w.macro.cpi / 1000) * 1000; }
+  /** Betriebslizenz und Gründung an einem Basisflughafen, gestaffelt nach Größe:
+   *  klein (bis 8 Mio. Pax) bis 100 Tsd., mittel (8–20) 100–500 Tsd., groß (20–50) 1–2 Mio., Drehkreuz (über 50) 2,5–4 Mio. EUR. */
+  function licenceBase(pax) {
+    const x = Math.max(0.3, pax || 0.3);
+    if (x <= 8) return 20e3 + 80e3 * (x / 8) ** 1.2;
+    if (x <= 20) return 100e3 + 400e3 * (x - 8) / 12;
+    if (x <= 50) return 1e6 + 1e6 * (x - 20) / 30;
+    return Math.min(4e6, 2.5e6 + 1.5e6 * (x - 50) / 50);
+  }
+  function licenceFee(w, apt) { return Math.round(licenceBase(ap(apt).pax) * (w.macro ? w.macro.cpi : 1) / 1000) * 1000; }
   function staffUnitCost(role, group) { const S = P.STAFF; const sal = role === 'pilot' ? S.pilotSalary[group] : role === 'cabin' ? S.cabinSalary : S.techSalary; return S.recruit[role] + sal; }
   const pairRoute = (al, pair) => al.activeRoutes().find((r) => pairKey(r.base, r.dest) === pair);
   function barred(w, alId, a, b) { const k = pairKey(a, b); return (w.agreements || []).some((g) => g.airline === alId && g.pair === k && g.until > w.day); }

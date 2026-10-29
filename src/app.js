@@ -1890,10 +1890,10 @@ VIEWS.stations = function viewStations() {
     <p class="small ink2">An jedem Flughafen mieten Sie Schalter und Gates und kaufen die Abfertigung ein. Billige Bereiche sparen Miete und Entgelte, kosten aber Bodenzeit und Geschäftsreisende.</p>${cards.join('')}`;
   const cand = SM.AP_CODES.filter((c) => !pl.bases.includes(c));
   const L = SM.careerOf(pl), lvB = SM.careerLv(pl);
-  const baseCost = (c) => SM.baseSetupCost(W, c) * SM.softX(pl, 'base') + (pl.stations[c] ? 0 : SM.licenceFee(W, c)) + SM.baseSlotCost(W, c, pl);
+  const baseCost = (c) => SM.baseSetupCost(W, c) * SM.softX(pl, 'base') + Math.max(0, SM.licenceFee(W, c) - (pl.stations[c] ? SM.stationFee(W, c) : 0)) + SM.baseSlotCost(W, c, pl);
   const bx = SM.softX(pl, 'base');
   const lim = L && bx > 1 ? (() => { const nx = SM.CAREER.levels.findIndex((x) => x.bases > pl.bases.length); return `Für Phase ${lvB + 1} „${L.label}“ ist eine weitere Basis ein großer Schritt: Einrichtung ×${NF1.format(bx)}, laufende Kosten aller Basen +${n0(SM.CAREER.soft.baseDayX * 100 * (pl.bases.length + 1 - L.bases))} %.${nx > 0 ? ` Ohne Aufschlag ab Phase ${nx + 1} „${SM.CAREER.levels[nx].label}“ (${SM.needTxt(SM.CAREER.levels[nx].need)}).` : ''}`; })() : '';
-  html += `<div class="card pad stack"><h3>Neue Basis eröffnen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Einrichtung, Betriebslizenz und laufende Kosten (Leitung, Crewräume) wachsen mit der Größe des Flughafens: Bremen kostet einen Bruchteil von Frankfurt. Flugzeuge lassen sich im Tab Flotte umstationieren.</p>
+  html += `<div class="card pad stack"><h3>Neue Basis eröffnen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Einrichtung, Betriebslizenz und laufende Kosten (Leitung, Crewräume) wachsen mit der Größe des Flughafens: Betriebslizenz nach Größe: klein bis 100 Tsd. €, mittel 100–500 Tsd. €, groß 1–2 Mio. €, Drehkreuz 2,5–4 Mio. € – Bremen kostet einen Bruchteil von Frankfurt. Haben Sie dort schon eine Station, wird deren Gebühr angerechnet. Flugzeuge lassen sich im Tab Flotte umstationieren.</p>
     ${lim ? `<div class="callout warn">${esc(lim)}</div>` : ''}
     <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)); return `<option value="${c}" ${c === ui.newBasePick ? 'selected' : ''}>${c} · ${apName(c)} · einmalig ${eur(baseCost(c))}, ${eur(SM.baseDayCost(c) * 30.4 * cpi())}/Monat${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase" id="openbaseBtn">Basis eröffnen · einmalig ${eurB(baseCost(cand.includes(ui.newBasePick) ? ui.newBasePick : cand[0]))} inkl. ${P.BASE_SLOTS.n} Slots</button></div></div>`;
   const slotApts = Object.keys(pl.stations).filter((c) => P.AIRPORTS[c]).sort();
@@ -4748,7 +4748,7 @@ async function showStart(canClose = false) {
     <div class="grid2"><label class="f"><span>Name der Airline</span><input type="text" id="ngName" maxlength="28" value="Hanse Air"></label>
       <label class="f"><span>Kürzel (2 Zeichen)</span><input type="text" id="ngCode" maxlength="2" value="HX" style="text-transform:uppercase"></label></div>
     ${basePicker('ng', sel.base)}
-    <p class="small muted">${SM.AP_CODES.length} Flughäfen weltweit. Regionalflughäfen (bis ${SM.CAREER.startMaxPax} Mio. Passagiere) sind der günstige Einstieg: niedrige Lizenz, billige Slots, Anlaufrabatte. Großflughäfen kosten ein Vermögen. In einer KI-Basis treffen Sie vom ersten Tag auf starke Konkurrenz; in Afrika sind die Märkte klein.</p>
+    <p class="small muted">${SM.AP_CODES.length} Flughäfen weltweit. Regionalflughäfen (bis ${SM.CAREER.startMaxPax} Mio. Passagiere) sind der günstige Einstieg: niedrige Lizenz, billige Slots, Anlaufrabatte. Großflughäfen kosten ein Vermögen: Lizenz klein bis 100 Tsd. €, mittel bis 500 Tsd. €, groß 1–2 Mio. €, Drehkreuz 2,5–4 Mio. €. In einer KI-Basis treffen Sie vom ersten Tag auf starke Konkurrenz; in Afrika sind die Märkte klein.</p>
     <div class="stack"><span class="small muted" style="text-transform:uppercase;letter-spacing:.07em;font-size:10.5px">Schwierigkeit</span><div class="seg wrap" id="ngDiff">
       ${Object.entries(SM.DIFFICULTY).map(([k, d]) => `<button type="button" data-diff="${k}" aria-pressed="${k === sel.diff}">${d.label} · ${n0(d.equity / 1e6)} Mio. €</button>`).join('')}</div>
       <p class="small muted">Zugänglich: mehr Kapital, mildere Zyklen. Realistisch: knappes Kapital, spürbare Krisen. Experte: wenig Kapital, tiefe Krisen.</p></div>
@@ -5749,7 +5749,7 @@ function boot(hotData) {
   $('#pane').addEventListener('click', onPaneClick);
   $('#pane').addEventListener('change', onPaneChange);
   initCal();
-  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'); if (bt) bt.textContent = `Basis eröffnen · einmalig ${eurB(SM.baseSetupCost(W, e.target.value) * SM.softX(W.player, 'base') + (W.player.stations[e.target.value] ? 0 : SM.licenceFee(W, e.target.value)) + SM.baseSlotCost(W, e.target.value, W.player))} inkl. ${P.BASE_SLOTS.n} Slots`; } });
+  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'); if (bt) bt.textContent = `Basis eröffnen · einmalig ${eurB(SM.baseSetupCost(W, e.target.value) * SM.softX(W.player, 'base') + Math.max(0, SM.licenceFee(W, e.target.value) - (W.player.stations[e.target.value] ? SM.stationFee(W, e.target.value) : 0)) + SM.baseSlotCost(W, e.target.value, W.player))} inkl. ${P.BASE_SLOTS.n} Slots`; } });
   $('#pane').addEventListener('input', (e) => {
     if (onCabRange(e, false) || onFltInput(e.target)) return;
     if (e.target.id && e.target.id.startsWith('hire-')) { const k = e.target.id.slice(5), bt = $('#hirebtn-' + k), n = Math.floor(Number(e.target.value)); if (bt && n > 0) bt.textContent = hireLbl(bt.dataset.role, n); }
