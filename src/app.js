@@ -949,7 +949,7 @@ VIEWS.dashboard = function viewDashboard() {
   // Kennzahlen
   html += `<div class="tiles dtiles">
     ${tile('Ergebnis ' + MONTHS[dateParts(W.day).m] + ' (lfd.)', eur(cur.net, { plus: true }), sgn(cur.net), `gestern <span class="${sgn(L.lastDay || 0)}">${eur(L.lastDay || 0, { plus: true })}</span>${prev ? ` · Vormonat <span class="${sgn(prev.net)}">${eur(prev.net, { plus: true })}</span>` : ''}`, 'history')}
-    ${tile('Kontostand', eur(nc), nc < 0 ? 'neg' : '', `${nc < 0 ? 'im Dispo · ' : ''}frei ${eur(pl.spendable(W.macro.bank ?? 1))}`)}
+    ${tile('Kontostand', eur(nc), nc < 0 ? 'neg' : '', `${nc < 0 ? 'im Dispo · ' : ''}mit Dispo verfügbar ${eur(pl.spendable(W.macro.bank ?? 1))}`)}
     ${tile('Auslastung 7 Tage', lf7 === null ? '–' : pct(lf7), lf7 !== null && lf7 < 0.65 ? 'warnc' : '', dem ? `abgewiesen ${pct(spill / dem)} der Nachfrage` : 'noch keine Flüge')}
     ${tile('Pünktlichkeit', otp === null ? '–' : pct(otp), otp !== null && otp < 0.75 ? 'warnc' : '', `Marke ${n0(pl.brand * 100)} · Rating ${pl.rating}`)}
   </div>`;
@@ -1048,7 +1048,7 @@ VIEWS.cockpit = function viewCockpit() {
   if (pl.status === 'restructuring') html += `<div class="callout crit"><b>Restrukturierung läuft</b>Ohne positiven Kontostand innerhalb von ${P.RESTRUCT.humanDays - pl.distressDays} Tagen folgt die Insolvenz. <button class="btn small" data-act="tab" data-tab="rescue">Sanierung öffnen</button></div>`;
   const stg = pl.stage(), next = P.STAGES.find((s) => s.min > pl.fleet.length);
   html += `<div class="tiles">
-    <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>Dispo bis ${eur(-pl.creditLimit(W.macro.bank ?? 1))} · frei ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
+    <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>Dispo bis ${eur(-pl.creditLimit(W.macro.bank ?? 1))} · mit Dispo verfügbar ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
     <div class="tile"><span>Eigenkapital</span><b>${eur(bs.equity)}</b><em>Start ${eur(pl.ledger.equityContrib / 100)}</em></div>
     <div class="tile"><span>Reichweite</span><b class="${pl.runway < 60 ? 'warnc' : ''}">${pl.runway === undefined || !isFinite(pl.runway) ? 'stabil' : `${n0(pl.runway)} Tage`}</b><em>beim Abfluss der letzten 30 Tage</em></div>
     <div class="tile"><span>Auslastung 7 T.</span><b>${seats ? pct(pax / seats) : '–'}</b><em>${n0(pax / 7)} Pax pro Tag</em></div>
@@ -2577,7 +2577,7 @@ VIEWS.finance = function viewFinance() {
   const used = new Set(PNL_ROWS.filter(([k]) => k !== 'grp' && !['ebit', 'net'].includes(k) && (L.pnl[k] || L.month[k])).map(([k]) => k));
   let html = `<h2 class="sec">Ergebnis und Bilanz <small>EBIT-Marge seit Start ${tot.rev ? pct(tot.ebit / tot.rev, 1) : '–'}</small></h2>`;
   html += `<div class="tiles">
-    <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>${netCash(pl) < 0 ? 'im Dispo' : 'Guthaben'} · frei ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
+    <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>${netCash(pl) < 0 ? 'im Dispo' : 'Guthaben'} · mit Dispo verfügbar ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
     <div class="tile"><span>Dispo genutzt</span><b class="${pl.creditUsed > 0 ? 'neg' : ''}">${pl.creditUsed > 0 ? eur(-pl.creditUsed) : eur(0)}</b><em>Rahmen ${eur(pl.creditLimit(W.macro.bank ?? 1))}, ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins</em></div>
     <div class="tile tlink" data-act="tab" data-tab="history" role="button" tabindex="0" title="Verlauf Tag für Tag"><span>Ergebnis gestern <i class="tl-go">↗</i></span><b class="${sgn(L.lastDay || 0)}">${eur(L.lastDay || 0, { plus: true })}</b><em>${MONTHS[pm]} bisher <span class="${sgn(cur.net)}">${eur(cur.net, { plus: true })}</span></em></div>
   </div>
@@ -4102,6 +4102,7 @@ function refreshAll() { W.operableFreq(W.player); buildSchedules(); renderHeader
 // Auf-/Zuklappen merken, damit es beim Neuzeichnen so bleibt
 document.addEventListener('toggle', (e) => { const d = e.target; if (!d || !d.dataset || !d.dataset.keep) return; ui.open = ui.open || {}; ui.open[d.dataset.keep] = d.open; const h = d.querySelector('.fold-hint'); if (h) h.textContent = d.open ? 'einklappen' : 'aufklappen'; }, true);
 document.addEventListener('input', (e) => { const t = e.target; if (t && (t.id === 'slot-apt' || t.id === 'slot-n')) { const st = ui.slotForm = ui.slotForm || { apt: '', n: 1 }; if (t.id === 'slot-apt') st.apt = slotAptOf(t.value) || ''; else st.n = Math.max(1, Math.min(8, Math.round(Number(t.value)) || 1)); const box = $('#slot-q'); if (box) box.innerHTML = slotQuoteHtml(st.apt, st.n); return; } });
+document.addEventListener('change', (e) => { const t = e.target; if (t && t.id === 'st-fresh' && ui.study) { ui.study.fresh = t.checked; } });
 document.addEventListener('change', (e) => { const t = e.target; if (!t || !t.id || !t.id.startsWith('acf-') || !ui.acf) return; const k = t.id.slice(4); ui.acf[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'ac' || k === 'fit') ui.acf.gap = null; renderPane(true); });
 document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.id) return; const fid = t.id.startsWith('dl-cash-') ? t.id.replace('dl-cash-', 'dl-fmt-') : t.dataset && t.dataset.fmt; if (!fid) return; const f = document.getElementById(fid), v = Math.max(0, Math.round(Number(t.value) || 0)); if (f) f.textContent = v ? '= ' + eur(v) : ''; });
 function onPaneClick(e) {
@@ -4258,10 +4259,11 @@ function studyForm() {
     <div class="stack" style="gap:6px"><span class="small muted">Art der Studie</span><div class="opts st-opts">${Object.entries(S.kinds).map(([k, x]) => `<button data-act="stkind" data-v="${k}" aria-pressed="${f.kind === k}"><b>${esc(x.label)}</b><span>${esc(x.desc)}</span></button>`).join('')}</div></div>
     <div class="stack" style="gap:6px"><span class="small muted">Paket</span><div class="opts st-opts st-tiers">${Object.entries(S.tiers).map(([k, x]) => { const pr = W.studyPrice(pl, k); return `<button data-act="sttier" data-v="${k}" aria-pressed="${f.tier === k}"><b>${esc(x.label)}</b><span class="mono">${eur(pr.cost)} · ${pr.days} Tage</span><span>${scope[k]} · ${x.top} Vorschläge</span></button>`; }).join('')}</div></div>
     ${(f.kind === 'routes' || f.kind === 'fleet') ? (() => { const sel = stBases(); return `<div class="stack" style="gap:6px"><span class="small muted">Ab welchen Basen? <span class="ink2">(antippen zum Ein- und Ausblenden)</span></span><div class="row" style="gap:6px;flex-wrap:wrap">${pl.bases.map((b) => `<button class="chip-t" data-act="stbasetog" data-v="${b}" aria-pressed="${sel.includes(b)}"><b class="mono">${b}</b> ${esc(apName(b))}</button>`).join('')}${pl.bases.length > 1 ? `<button class="btn small ghost" data-act="stbaseall">${sel.length === pl.bases.length ? 'nur erste' : 'alle'}</button>` : ''}</div></div>`; })() : ''}
+    ${(() => { const prevN = (pl.reports || []).filter((r) => r.kind === f.kind && r.status === 'done' && (r.ready ?? 0) > W.day - 365).length; return prevN ? `<label class="chk small"><input type="checkbox" id="st-fresh" ${f.fresh !== false ? 'checked' : ''}> Nur neue Vorschläge: Ergebnisse aus ${prevN === 1 ? 'der früheren Studie' : `${prevN} früheren Studien`} dieser Art auslassen</label>` : ''; })()}
     <div class="row" style="gap:8px"><label class="f" style="flex:1;min-width:150px"><span>Schwerpunkt</span><select id="st-ft"><option value="">weltweit / ab allen Basen</option><option value="region" ${f.ft === 'region' ? 'selected' : ''}>Region</option><option value="country" ${f.ft === 'country' ? 'selected' : ''}>Land</option><option value="apt" ${f.ft === 'apt' ? 'selected' : ''}>Flughafen</option></select></label>
       ${f.ft ? `<label class="f" style="flex:2;min-width:180px"><span>${f.ft === 'region' ? 'Region' : f.ft === 'country' ? 'Land' : 'Flughafen'}</span><select id="st-fv">${focusOpts(f.ft, f.fv)}</select></label>` : ''}</div>
     <p class="small muted">${f.kind === 'routes' ? 'Mit Flughafen als Schwerpunkt: ist es eine Ihrer Basen, werden Ziele ab dort gesucht, sonst Verbindungen von Ihren Basen dorthin.' : f.kind === 'base' ? 'Der Schwerpunkt grenzt die möglichen Standorte ein, etwa „Australien“ oder „Ozeanien“.' : f.kind === 'gaps' ? 'Der Schwerpunkt grenzt die untersuchten Märkte ein.' : 'Der Schwerpunkt grenzt die neuen Kandidaten-Strecken ein; Ihre eigenen Strecken sind immer dabei.'}${lv ? ` Ihre Marktanalyse (Stufe ${lv}) senkt Preis und Dauer.` : ''}</p>
-    <div class="spread"><span class="small">${esc(T.label)}: <b>${eur(price.cost)}</b> · Bericht am <b>${dateShort(W.day + price.days)}</b> · danach frei verfügbar ${eur(free - price.cost)}</span>
+    <div class="spread"><span class="small">${esc(T.label)}: <b>${eur(price.cost)}</b> · Bericht am <b>${dateShort(W.day + price.days)}</b> · danach auf dem Konto ${eur(netCash(pl) - price.cost)}${pl.creditLimit(W.macro.bank ?? 1) - (pl.creditUsed || 0) > 1000 ? ` <span class="muted">(mit Dispo noch ${eur(free - price.cost)} verfügbar)</span>` : ''}</span>
       <button class="btn primary" data-act="storder" ${free < price.cost || running >= S.maxRunning ? 'disabled' : ''}>Studie beauftragen · ${eurB(price.cost)}</button></div>
     ${free < price.cost ? '<div class="callout warn">Für diese Studie reicht die Liquidität nicht – ein kleineres Paket wählen oder später beauftragen.</div>' : ''}</div>`;
 }
@@ -4329,7 +4331,7 @@ function onStudyClick(act, b) {
   if (act === 'stbaseall') { const pl = W.player; f.bases = stBases().length === pl.bases.length ? [pl.bases[0]] : pl.bases.slice(); renderPane(true); return true; }
   if (act === 'storder') {
     const focus = f.ft ? { t: f.ft, v: f.fv } : null;
-    const r = doAction({ type: 'orderStudy', kind: f.kind, tier: f.tier, focus, bases: (f.kind === 'routes' || f.kind === 'fleet') ? stBases() : null });
+    const r = doAction({ type: 'orderStudy', kind: f.kind, tier: f.tier, focus, bases: (f.kind === 'routes' || f.kind === 'fleet') ? stBases() : null, fresh: f.fresh !== false });
     if (r.ok) toast(`Studie beauftragt – Bericht in ${r.days} Tagen.`);
     refreshAll(); return true;
   }

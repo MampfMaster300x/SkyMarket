@@ -183,6 +183,16 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.18.3: Wiederholte Marktstudien liefern Neues
+
+- Gibt man dieselbe Art von Studie erneut in Auftrag, lässt die Beratung die Vorschläge der früheren Studien dieser Art (letzte 365 Tage) aus und liefert die nächstbesten: andere Strecken (Streckenanalyse, Wettbewerb und Marktlücken), andere Standorte (Basisanalyse), andere Kandidaten-Strecken (Flugzeugbeschaffung; eigene Strecken bleiben immer dabei). Der Bericht nennt, wie viele frühere Vorschläge ausgelassen wurden.
+- Im Auftragsformular lässt sich das mit „Nur neue Vorschläge“ abschalten – dann rechnet die Studie alles neu durch, etwa um alte Prognosen zu aktualisieren.
+
+## Neu in 0.18.2: Kontostand und Dispo klar getrennt
+
+- Marktstudie: statt „danach frei verfügbar“ (Konto plus ungenutzter Dispo) steht jetzt „danach auf dem Konto …“ und – falls ein Dispo da ist – „(mit Dispo noch … verfügbar)“.
+- Kontostand-Kacheln (Übersicht, Kredite, Finanzen) sagen „mit Dispo verfügbar“ statt nur „frei“.
+
 ## Neu in 0.18.1: Betriebslizenz nach Größenklasse
 
 - Die Lizenz für eine Basis ist jetzt nach Größe gestaffelt: klein (bis 8 Mio. Pax) 20–100 Tsd. €, mittel (8–20) 100–500 Tsd. €, groß (20–50) 1–2 Mio. €, Drehkreuz (über 50) 2,5–4 Mio. €. Beispiele: Bremen 36 Tsd., Belgrad 100 Tsd., Hamburg 333 Tsd., Düsseldorf 500 Tsd., Berlin 1,17 Mio., München 1,73 Mio., Frankfurt 2,89 Mio., London-Heathrow 3,52 Mio., Atlanta 4 Mio. Slotpreise unverändert.

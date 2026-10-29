@@ -3289,7 +3289,7 @@ const SM = (() => {
       const T = P.STUDIES.tiers[tier], lv = al.skillNom('analyst');
       return { cost: Math.round(T.cost * this.macro.cpi * (1 - 0.1 * Math.min(lv, 3)) / 1000) * 1000, days: Math.max(2, Math.round(T.days * (1 - 0.15 * Math.min(lv, 3)))) };
     }
-    orderStudy(al, kind, tier, focus, bases = null) {
+    orderStudy(al, kind, tier, focus, bases = null, fresh = true) {
       const S = P.STUDIES;
       if (!S.kinds[kind] || !S.tiers[tier]) return { ok: false, msg: 'Unbekannte Studie.' };
       let bs = Array.isArray(bases) ? [...new Set(bases.map(String))].filter((b) => al.bases.includes(b)) : null;
@@ -3303,7 +3303,7 @@ const SM = (() => {
       if (al.spendable(this.macro.bank ?? 1) < cost) return { ok: false, msg: `Für die Studie (${Math.round(cost / 1000)} Tsd. EUR) reicht auch der Dispo nicht.` };
       al.ledger.post('one_off', -cost);
       const id = 'S' + (++this.offerCounter);
-      al.reports.push({ id, kind, tier, focus: f, bases: bs || undefined, day: this.day, ready: this.day + days, status: 'running', cost });
+      al.reports.push({ id, kind, tier, focus: f, bases: bs || undefined, fresh: fresh ? undefined : false, day: this.day, ready: this.day + days, status: 'running', cost });
       al.log(this.day, `${S.tiers[tier].label} „${S.kinds[kind].label}“${bs ? ' ab ' + bs.join(', ') : ''}${f ? ' mit Schwerpunkt ' + focusLabel(f) : ''} beauftragt – Bericht in ${days} Tagen`, 'info');
       return { ok: true, id, days, cost };
     }
@@ -3703,6 +3703,12 @@ const SM = (() => {
       `Tarife: ${T.fares.map((k) => Math.round(k * 100) + ' %').join(' / ')} des Referenzpreises getestet, 1 Flug täglich, Standardprodukt.`];
     const useBases = rep.bases && rep.bases.filter((b) => al.bases.includes(b)).length ? rep.bases.filter((b) => al.bases.includes(b)) : al.bases;
     const res = { focus: focusLabel(f) + (rep.bases ? ` · ab ${useBases.join(', ')}` : ''), rows: [], risks: [], notes: [], assumptions };
+    // Frühere Studien derselben Art (letzte 365 Tage) berücksichtigen: deren Vorschläge werden nicht noch einmal geliefert
+    const prev = rep.fresh === false ? [] : (al.reports || []).filter((r) => r !== rep && r.kind === rep.kind && r.status === 'done' && r.res && (r.ready ?? 0) > w.day - 365);
+    const seen = new Set(), seenApt = new Set();
+    for (const r of prev) { for (const x of [...(r.res.rows || []), ...(r.res.others || [])]) { if (x.o && x.d) seen.add(pairKey(x.o, x.d)); if (x.apt) seenApt.add(x.apt); } for (const k of r.res.pairsNew || []) seen.add(k); }
+    const skipped = { n: 0 }, isSeen = (o, d) => { if (seen.has(pairKey(o, d))) { skipped.n++; return true; } return false; };
+    const seenNote = () => { if (skipped.n && prev.length) res.notes.unshift(`${skipped.n} Vorschläge aus ${prev.length === 1 ? 'der früheren Studie' : `${prev.length} früheren Studien`} wurden ausgelassen – hier stehen nur neue. Die alten Ergebnisse finden Sie in den früheren Berichten.`); };
     if (rep.kind === 'routes') {
       const bases = f && f.t === 'apt' && al.bases.includes(f.v) ? [f.v] : useBases;
       const cand = [];
@@ -3710,9 +3716,11 @@ const SM = (() => {
         if (d === b || !routeKmOk(b, d) || served.has(pairKey(b, d))) continue;
         if (f && !(f.t === 'apt' && al.bases.includes(f.v)) && !inFocus(f, d)) continue;
         if (!studyTypes(w, al, b, d).length) continue;
+        if (isSeen(b, d)) continue;
         cand.push([b, d, potSum(b, d)]);
       }
       cand.sort((a, b) => b[2] - a[2]);
+      seenNote();
       // Zwei Durchgänge (spart Rechenzeit): alle Kandidaten grob zum Referenztarif, die besten dann mit allen Tarifen und Ziehungen
       const T1 = { ...T, fares: [1.0], draws: 1 }, nFine = Math.max(12, T.top * 3);
       const pre = cand.slice(0, T.cand).map(([o, d]) => studyEval(w, al, o, d, T1)).filter(Boolean).sort((a, b) => b.db2 - a.db2);
@@ -3732,9 +3740,11 @@ const SM = (() => {
       // Strecken: eigene (mit heutigem Tarif) plus die besten freien Kandidaten
       const own = al.activeRoutes().slice().sort((a, b) => routeDb(b, 30, al) - routeDb(a, 30, al)).slice(0, T.top + 4).map((r) => ({ o: r.base, d: r.dest, fare: r.fare_out, cur: r.type_id, own: true }));
       const cand = [];
-      for (const b of useBases) for (const d of AP_CODES) { if (d !== b && routeKmOk(b, d) && !served.has(pairKey(b, d)) && inFocus(f, d)) cand.push([b, d, potSum(b, d)]); }
+      for (const b of useBases) for (const d of AP_CODES) { if (d !== b && routeKmOk(b, d) && !served.has(pairKey(b, d)) && inFocus(f, d) && !isSeen(b, d)) cand.push([b, d, potSum(b, d)]); }
       cand.sort((a, b) => b[2] - a[2]);
       const pairs = own.concat(cand.slice(0, Math.max(4, Math.round(T.cand / 8))).map(([o, d]) => ({ o, d, fare: Math.round(refPrice(o, d, w.macro.cpi)), own: false })));
+      res.pairsNew = pairs.filter((p) => !p.own).map((p) => pairKey(p.o, p.d));
+      if (skipped.n && prev.length) res.notes.unshift(`Neue Kandidaten-Strecken statt der ${Math.min(skipped.n, 99)} aus früheren Flottenstudien – Ihre eigenen Strecken sind immer dabei.`);
       const types = Object.keys(P.AIRCRAFT_TYPES).filter((t) => { const X = P.AIRCRAFT_TYPES[t]; return !(X.launch && w.day < X.launch + 365) && (X.stock !== 0 || al.fleet.some((a) => a.type_id === t)); });
       const tab = [];
       for (const t of types) {
@@ -3769,7 +3779,9 @@ const SM = (() => {
       if (res.swaps.length) res.notes.push(`Auf ${res.swaps.length} eigenen Strecken würde ein anderes Muster mehr verdienen – siehe Typwechsel.`);
       res.growth = b && b.sumPos > 30000 ? 'hoch' : b && b.sumPos > 5000 ? 'mittel' : 'gering';
     } else if (rep.kind === 'base') {
-      const cands = AP_CODES.filter((c) => !al.bases.includes(c) && inFocus(f, c) && (ap(c).pax || 0) >= (rep.tier === 'small' ? 8 : 2)).sort((a, b) => (ap(b).pax || 0) - (ap(a).pax || 0)).slice(0, T.baseCand);
+      const cands0 = AP_CODES.filter((c) => !al.bases.includes(c) && inFocus(f, c) && (ap(c).pax || 0) >= (rep.tier === 'small' ? 8 : 2));
+      const cands = cands0.filter((c) => !seenApt.has(c)).sort((a, b) => (ap(b).pax || 0) - (ap(a).pax || 0)).slice(0, T.baseCand);
+      { const nS = cands0.filter((c) => seenApt.has(c)).length; if (nS) res.notes.unshift(`${nS} Standorte aus früheren Basisanalysen wurden ausgelassen – hier stehen nur neue.`); }
       const nDest = rep.tier === 'small' ? 4 : rep.tier === 'extended' ? 6 : 8;
       const tab = [];
       for (const B of cands) {
@@ -3804,6 +3816,7 @@ const SM = (() => {
         if (o === d || !routeKmOk(o, d)) continue;
         const k = pairKey(o, d), e = svc.get(k), pot = potSum(o, d) * 2;
         if (pot < 40) continue;
+        if (isSeen(o, d)) continue;
         const ops = e ? e.ops.filter((q) => !q.me) : [], meOn = e ? e.ops.some((q) => q.me) : false;
         if (meOn) continue;
         const lf = ops.length ? ops.reduce((a2, q) => a2 + (q.lf || 0) * q.freq, 0) / Math.max(1, ops.reduce((a2, q) => a2 + q.freq, 0)) : null;
@@ -3826,7 +3839,7 @@ const SM = (() => {
       const mineP = pool.filter((g) => g.mine), other = pool.filter((g) => !g.mine);
       res.rows = mineP.slice(0, T.top).map(pack).sort((a, b) => (b.entry ? b.entry.db2 : -1e12) - (a.entry ? a.entry.db2 : -1e12));
       res.others = other.slice(0, T.top).map(pack);
-      res.countMine = mineP.length; res.countOther = other.length;
+      res.countMine = mineP.length; res.countOther = other.length; seenNote();
       // Wettbewerb auf eigenen Strecken
       res.mine = al.activeRoutes().map((r) => { const e = svc.get(pairKey(r.base, r.dest)); const ops = e ? e.ops.filter((q) => !q.me) : []; const my = e ? e.ops.find((q) => q.me) : null;
         return { o: r.base, d: r.dest, myFare: Math.round((r.fare_out + r.fare_in) / 2), myLf: my ? my.lf : null, ops: ops.slice(0, 3).map((q) => ({ name: q.name, freq: q.freq, fare: q.fare, lf: q.lf })) }; }).filter((x) => x.ops.length).slice(0, 12);
@@ -5483,7 +5496,7 @@ const SM = (() => {
       case 'study': if (!P.AIRPORTS[a.a] || !P.AIRPORTS[a.b]) return { ok: false, msg: 'Ungültig.' }; return w.commissionStudy(al, a.a, a.b);
       case 'groupDiv': return groupDiv(w, al, String(a.t || ''), a.v);
       case 'groupSpecial': return groupSpecial(w, al, String(a.t || ''));
-      case 'orderStudy': return w.orderStudy(al, String(a.kind || ''), String(a.tier || ''), a.focus || null, Array.isArray(a.bases) ? a.bases : null);
+      case 'orderStudy': return w.orderStudy(al, String(a.kind || ''), String(a.tier || ''), a.focus || null, Array.isArray(a.bases) ? a.bases : null, a.fresh !== false);
       case 'loan': { const years = [3, 5, 8].includes(num(a.years)) ? num(a.years) : 5; return w.takeLoan(al, clamp(num(a.amount), 0, 50e6), years); }
       case 'repay': return w.repayLoan(al, a.id);
       case 'assistant': {
