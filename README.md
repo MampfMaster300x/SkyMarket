@@ -183,6 +183,35 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.19.1: Selbst gemalte Logos auch auf dem Leitwerk
+
+- Ein Pixel-Logo erscheint jetzt auch auf dem Leitwerk aller eigenen Flugzeuge (Flotte, Karte, Einführung, Profil) – bei Mitspielenden ebenso.
+- Profil & Logo zeigt bei aktivem Pixel-Logo dieses groß als Vorschau samt Flugzeug, mit Hinweis, dass Form und Symbol erst gelten, wenn man ein gestaltetes Logo übernimmt. „Gestaltetes Logo übernehmen“ entfernt dann das Pixel-Logo; „Nur Farben übernehmen“ ändert Leitwerk- und Streifenfarben und lässt das Pixel-Logo stehen.
+- Der Zeichenbereich hat eine Leitwerk-Vorschau, die beim Malen mitläuft.
+- Die Assistenz schlägt kein Logo mehr vor, wenn schon ein Pixel-Logo gesetzt ist.
+
+## Neu in 0.19.0: Ansehen statt Stufen, mehr Krisen, neue Geschäftszweige
+
+### Ansehen (Konzept)
+Wachstum wird nicht mehr über freigeschaltete Stufen gebremst, sondern so wie in der echten Branche: Leasinggeber, Banken und Flughäfen prüfen jede Anfrage nach dem **Ansehen** der Airline (0–100, Unternehmen → Ansehen & Ziele).
+
+- **Woraus es sich ergibt:** Erfahrung (Monate im Flugbetrieb, bis 25), Größe (Flotte, logarithmisch, bis 20), Finanzen (Rating plus Eigenkapital gegenüber dem Start, bis 25), Zuverlässigkeit (Pünktlichkeit der letzten Flüge, bis 10, Sanierung −15) und Marke (bis 15). Eine neue Airline startet bei etwa 25.
+- **Leasing wird angefragt:** Jede Musterklasse hat eine Anforderung – Dash 8 0, ATR/E-Jets/kleine Privatjets/ATR-Frachter 10, A320-Familie/737/A220/große Privatjets/A321-Frachter 35, Langstrecke/767-/777-Frachter 55, A380/747/Concorde/A350-1000ULR 72. Liegt das Ansehen darüber: Zusage. Bis 15 Punkte darunter: Zusage unter Auflagen (Rate +2 % je Punkt, mehr Kaution, beim Kauf höherer Eigenanteil). Darunter: Absage – kaufen geht mit 50 % Eigenanteil, ab 30 Punkten Abstand nur aus eigenen Mitteln. Junge Airlines zahlen bis Ansehen 40 zusätzlich 8 % Wartungsrücklage, bis 60 noch 4 %.
+- **Leasinggeber bremsen schnelles Wachstum:** In 90 Tagen machen sie höchstens 2 + Ansehen/10 neue Leasingverträge mit (zum Start 4). Darüber hinaus bleibt nur Kaufen. Damit gibt es einen Grund zu kaufen: Gekaufte Flugzeuge bauen Eigenkapital auf, verbessern das Rating und damit das Ansehen. Die Streckenplanung bietet „kaufen“ jetzt immer als Alternative an.
+- **Basen werden beantragt:** kleine Flughäfen sagen immer zu, mittlere ab Ansehen 20, große ab 45, Drehkreuze ab 65; bis 10 Punkte darunter mit Auflagen (Lizenz ×1,5), sonst Absage. Die Startbasis bleibt frei wählbar. Ohne Aufschlag: eine Basis bis Ansehen 29, dann je 20 Punkte eine mehr, ab 80 beliebig viele.
+- **Start bleibt einfach:** Turboprops und Regionaljets gibt es sofort ohne Auflagen, die A320neo unter Auflagen, Langstrecke erst nach rund einem Jahr solider Arbeit. Einführung und Assistent empfehlen entsprechend ATR oder E195-E2 statt A320neo.
+- Die Phasen bleiben als Etappenziele mit Meilensteinpunkten; jede Phase bringt 2 Punkte Erfahrung.
+
+### Krisen mit echten Folgen
+Neu: **Kreditkrise** (Leitzins +1,5–3 Punkte, Kreditlinien ×0,65, Leasinggeber verlangen +8–12 Ansehen, 12–36 Monate), **Stilllegung** eines Musters oder Triebwerks (12–35 % der betroffenen Flugzeuge 2–9 Monate am Boden, Auslieferungen +45–150 Tage, Hersteller erstattet die Hälfte), **Lieferkettenkrise** (Wartung +12–30 %, neue Leasingverträge +8–20 %, Auslieferungen +30–90 Tage, Leasinggeber-Bestand −30 %, 12–48 Monate), **Tourismusschock** (Reisewarnung: Urlaubsreisen in ein Land −40 bis −60 % – oder das Gegenteil, ein Trendziel), **Arbeitsmarktkrise** (Löhne +4–8 %, Personal knapp), **Naturkatastrophe** (3–10 Tage fast kein Betrieb, langsame Erholung), **Regulierung** (SAF-Quote, Lärmschutzentgelte, Klimaabgaben – dauerhaft). Häufiger und länger: Rezessionen dauern 12–36 Monate, Ölkrisen, Luftraumsperrungen (ein Viertel als monatelanger Konflikt), CO₂-Abgaben, Gesundheitskrisen (bis über ein Jahr), Eurokrise als Variante der Währungskrise. Laufende Effekte stehen unter Welt → Konjunktur.
+
+### Weitere Änderungen
+- **Airbus A350-1000ULR** mit 19.000 km Reichweite (Sydney–London nonstop), nur mit hohem Ansehen.
+- **Neue Geschäftszweige:** Privatjets (Citation Latitude, Challenger 350, Gulfstream G700, Global 7500) und Frachter (ATR 72-600F, A321P2F, 767-300F, 777F). Sie stehen immer im Charter-Pool und bedienen eigene Anfragen – Privatjets kurze, gut bezahlte Einsätze, Frachter lange Verträge mit Weihnachtsspitze. Charter lassen sich nach Geschäftszweig filtern; die Beschaffung ist nach Regional / Kurz- und Mittelstrecke / Langstrecke und Großraum / Frachter / Privatjets gegliedert.
+- **Ankeraktionäre:** Das größte Drittel der KI-Airlines hat 51–65 % in festen Händen (Staat, Gründerfamilie, Fonds), das mittlere 20–45 %. Über die Börse ist dort keine bzw. nur knapp eine Mehrheit zu haben; eine Komplettübernahme verlangt eine Flotte von mindestens der halben Größe und 30 % Aufschlag auf den Ankeranteil. Konzern-Ausschüttung höchstens 50 % (statt 90 %), Sonderausschüttung 15 % der freien Liquidität.
+- **Flughäfen wachsen mit:** Der im Spiel abgewickelte Verkehr wird monatlich gemessen. Liegt er über der Ausgangsgröße, zählt er – etwa für Code F (A380 ab 25 Mio.) und die Größenklasse. Gewachsene Flughäfen bekommen zu den Slotterminen zusätzliche Slots.
+- **Endspiel:** Ab 100 Flugzeugen wächst die Verwaltung überproportional (200 Flugzeuge 200 Tsd. €/Tag, 400 Flugzeuge 520 Tsd. €/Tag). Die Wettbewerbsaufsicht greift ein, wenn eine Airline an einem Flughafen ab 8 Mio. Passagieren über 60 % der Abflüge hat (mindestens 25 täglich): keine neuen Strecken dort, nach 90 Tagen monatliche Bußgelder. Neue Meilensteine bis 250 Flugzeuge, 50 Mio. Passagiere und „Fairer Wettbewerb“.
+
 ## Neu in 0.18.3: Wiederholte Marktstudien liefern Neues
 
 - Gibt man dieselbe Art von Studie erneut in Auftrag, lässt die Beratung die Vorschläge der früheren Studien dieser Art (letzte 365 Tage) aus und liefert die nächstbesten: andere Strecken (Streckenanalyse, Wettbewerb und Marktlücken), andere Standorte (Basisanalyse), andere Kandidaten-Strecken (Flugzeugbeschaffung; eigene Strecken bleiben immer dabei). Der Bericht nennt, wie viele frühere Vorschläge ausgelassen wurden.

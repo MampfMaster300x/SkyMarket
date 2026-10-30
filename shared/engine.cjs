@@ -186,6 +186,11 @@ const SM = (() => {
         turn_min: 90, value_eur: 170e6, lease_month: 1300e3, dispatch_rel: 0.994, delay_cost_min: 135, acmi_day: 98000, age: 2, window: 22, yieldF: 1.08,
         engines: '2 × Rolls-Royce Trent XWB-97', note: 'Größter Zweistrahler von Airbus, für dichte Langstrecken',
         ill: { kind: 'wide', len: 1.0, fin: 'airbus', neo: true } },
+      A35U: { label: 'Airbus A350-1000ULR', maker: 'Airbus', cls: 'Ultralangstrecke, Großraum', group: 'A350', cabin: 10, seats: { basic: 290, standard: 238, premium: 210 }, range_km: 19000, speed_kmh: 860, mtow_t: 322,
+        fuel_cycle_kg: 2100, fuel_bh_kg: 7050, crew_bh: 1900, maint_bh: 1500, maint_cycle: 980, handling: 4500, cargo_kg: 12000,
+        turn_min: 95, value_eur: 188e6, lease_month: 1450e3, dispatch_rel: 0.993, delay_cost_min: 150, acmi_day: 104000, age: 0, window: 22, yieldF: 1.14, stock: 4, maxAge: 4, marketWeight: 0.3,
+        engines: '2 × Rolls-Royce Trent XWB-97, Zusatztank', note: 'Ultralangstrecken-Variante mit Zusatztank und weniger Sitzen – nonstop etwa Sydney–London oder New York–Singapur',
+        ill: { kind: 'wide', len: 1.0, fin: 'airbus', neo: true } },
       B789: { label: 'Boeing 787-9', maker: 'Boeing', cls: 'Langstrecke, Großraum', group: 'B787', cabin: 9, seats: { basic: 340, standard: 296, premium: 260 }, range_km: 14000, speed_kmh: 850, mtow_t: 254,
         fuel_cycle_kg: 1650, fuel_bh_kg: 5600, crew_bh: 1550, maint_bh: 1250, maint_cycle: 850, handling: 3900, cargo_kg: 17000,
         turn_min: 80, value_eur: 145e6, lease_month: 1050e3, dispatch_rel: 0.993, delay_cost_min: 115, acmi_day: 82000, age: 2, window: 22, yieldF: 1.08,
@@ -227,8 +232,50 @@ const SM = (() => {
         supersonic: true, stock: 0, noFactory: true, maxPerAirline: 2, worldMax: 6, marketWeight: 0.25,
         engines: '4 × Rolls-Royce/Snecma Olympus 593 mit Nachbrenner', note: 'Mach 2: London–New York in gut 3,5 Stunden. Geschäftsreisende zahlen für den Zeitgewinn ein Vielfaches, das Flugzeug bringt Prestige für die Marke – Kerosin, Wartung und Ausfälle sind aber surreal teuer. Auf der falschen Strecke ruiniert sie jede Airline. Restaurierte Einzelstücke, höchstens zwei je Airline',
         ill: { kind: 'sst', len: 0.95 } },
+      // 0.19: Privatjets – fliegen nur Charter (Geschäftsleute, Prominente, Regierungen)
+      C68A: { label: 'Cessna Citation Latitude', maker: 'Textron Aviation', cls: 'Privatjet, mittelgroß', group: 'BIZ', role: 'biz', lvl: 1, cabin: 1, seats: { basic: 9, standard: 9, premium: 8 }, range_km: 5000, speed_kmh: 830, mtow_t: 14,
+        fuel_cycle_kg: 90, fuel_bh_kg: 650, crew_bh: 350, maint_bh: 420, maint_cycle: 120, handling: 400, cargo_kg: 400,
+        turn_min: 30, value_eur: 18e6, lease_month: 150e3, dispatch_rel: 0.996, delay_cost_min: 20, acmi_day: 15500, age: 0, stock: 6, marketWeight: 0.4,
+        engines: '2 × Pratt & Whitney PW306D1', note: 'Einstieg ins Privatjet-Geschäft: Europa nonstop, kurze Charter für Geschäftsleute und Delegationen. Fliegt nur Charter, keine Linie',
+        ill: { kind: 'jet', len: 0.05, fin: 'boeing' } },
+      CL35: { label: 'Bombardier Challenger 350', maker: 'Bombardier', cls: 'Privatjet, Super-Midsize', group: 'BIZ', role: 'biz', lvl: 1, cabin: 1, seats: { basic: 10, standard: 10, premium: 9 }, range_km: 5900, speed_kmh: 850, mtow_t: 18.4,
+        fuel_cycle_kg: 110, fuel_bh_kg: 780, crew_bh: 380, maint_bh: 480, maint_cycle: 140, handling: 450, cargo_kg: 500,
+        turn_min: 30, value_eur: 27e6, lease_month: 210e3, dispatch_rel: 0.996, delay_cost_min: 25, acmi_day: 21500, age: 0, stock: 5, marketWeight: 0.4,
+        engines: '2 × Honeywell HTF7350', note: 'Der Klassiker der Charterbranche: transkontinental in den USA, Europa bis Nahost. Fliegt nur Charter, keine Linie',
+        ill: { kind: 'jet', len: 0.12, fin: 'airbus' } },
+      GLF7: { label: 'Gulfstream G700', maker: 'Gulfstream', cls: 'Privatjet, Ultralangstrecke', group: 'BIZ', role: 'biz', lvl: 2, cabin: 2, seats: { basic: 16, standard: 16, premium: 14 }, range_km: 13800, speed_kmh: 900, mtow_t: 48,
+        fuel_cycle_kg: 250, fuel_bh_kg: 1700, crew_bh: 700, maint_bh: 900, maint_cycle: 260, handling: 700, cargo_kg: 900,
+        turn_min: 40, value_eur: 75e6, lease_month: 560e3, dispatch_rel: 0.995, delay_cost_min: 40, acmi_day: 47000, age: 0, stock: 3, marketWeight: 0.3, maxAge: 3,
+        engines: '2 × Rolls-Royce Pearl 700', note: 'Interkontinental ohne Zwischenstopp: Vorstände, Staatsgäste, Sportstars. Hohe Tagesraten, aber teuer im Stillstand. Fliegt nur Charter',
+        ill: { kind: 'jet', len: 0.25, fin: 'boeing' } },
+      GL7T: { label: 'Bombardier Global 7500', maker: 'Bombardier', cls: 'Privatjet, Ultralangstrecke', group: 'BIZ', role: 'biz', lvl: 2, cabin: 2, seats: { basic: 17, standard: 17, premium: 14 }, range_km: 14200, speed_kmh: 900, mtow_t: 52,
+        fuel_cycle_kg: 260, fuel_bh_kg: 1750, crew_bh: 720, maint_bh: 920, maint_cycle: 270, handling: 720, cargo_kg: 1000,
+        turn_min: 40, value_eur: 78e6, lease_month: 580e3, dispatch_rel: 0.995, delay_cost_min: 40, acmi_day: 48500, age: 0, stock: 3, marketWeight: 0.3, maxAge: 6,
+        engines: '2 × GE Passport', note: 'Die größte Kabine am Privatjet-Markt, vier Bereiche, Schlafzimmer. Fliegt nur Charter',
+        ill: { kind: 'jet', len: 0.28, fin: 'airbus' } },
+      // 0.19: Frachter – fliegen nur Fracht-Charter (Paketdienste, Spediteure, Hilfsorganisationen)
+      AT7F: { label: 'ATR 72-600F', maker: 'ATR', cls: 'Frachter, Turboprop', group: 'ATR', role: 'cargo', lvl: 1, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 1500, speed_kmh: 510, mtow_t: 23,
+        fuel_cycle_kg: 100, fuel_bh_kg: 640, crew_bh: 300, maint_bh: 320, maint_cycle: 160, handling: 500, cargo_kg: 9000,
+        turn_min: 35, value_eur: 24e6, lease_month: 170e3, dispatch_rel: 0.995, delay_cost_min: 15, acmi_day: 11500, age: 0, stock: 4, marketWeight: 0.3,
+        engines: '2 × Pratt & Whitney PW127M', note: 'Expressfracht auf kurzen Strecken, Paketdienste in der Nacht. Selbe Musterberechtigung wie die ATR 72. Fliegt nur Fracht-Charter',
+        ill: { kind: 'prop', len: 0.68, tt: true, fin: 'atr', cargo: true } },
+      A21F: { label: 'Airbus A321P2F', maker: 'Airbus', cls: 'Frachter, Schmalrumpf (umgebaut)', group: 'A32F', role: 'cargo', lvl: 2, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 3700, speed_kmh: 820, mtow_t: 93.5,
+        fuel_cycle_kg: 480, fuel_bh_kg: 2500, crew_bh: 520, maint_bh: 760, maint_cycle: 290, handling: 1300, cargo_kg: 28000,
+        turn_min: 50, value_eur: 34e6, lease_month: 290e3, dispatch_rel: 0.994, delay_cost_min: 30, acmi_day: 21000, age: 14, stock: 4, marketWeight: 0.4,
+        engines: '2 × CFM56-5B', note: 'Umgebauter A321 für Onlinehandel und Expressfracht. Piloten der A320-Familie fliegen ihn ohne Umschulung. Fliegt nur Fracht-Charter',
+        ill: { kind: 'jet', len: 0.98, fin: 'airbus', cargo: true } },
+      B76F: { label: 'Boeing 767-300F', maker: 'Boeing', cls: 'Frachter, Großraum', group: 'B767', role: 'cargo', lvl: 3, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 6000, speed_kmh: 850, mtow_t: 187,
+        fuel_cycle_kg: 1100, fuel_bh_kg: 5000, crew_bh: 700, maint_bh: 1150, maint_cycle: 520, handling: 2600, cargo_kg: 52000,
+        turn_min: 70, value_eur: 95e6, lease_month: 640e3, dispatch_rel: 0.993, delay_cost_min: 70, acmi_day: 41000, age: 4, stock: 3, marketWeight: 0.3,
+        engines: '2 × GE CF6-80C2', note: 'Arbeitspferd der Paketdienste zwischen Kontinenten. Fliegt nur Fracht-Charter',
+        ill: { kind: 'wide', len: 0.85, fin: 'boeing', cargo: true } },
+      B77F: { label: 'Boeing 777F', maker: 'Boeing', cls: 'Frachter, Großraum, Langstrecke', group: 'B777', role: 'cargo', lvl: 3, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 9000, speed_kmh: 870, mtow_t: 347,
+        fuel_cycle_kg: 2100, fuel_bh_kg: 7400, crew_bh: 850, maint_bh: 1600, maint_cycle: 1000, handling: 4300, cargo_kg: 102000,
+        turn_min: 90, value_eur: 190e6, lease_month: 1300e3, dispatch_rel: 0.993, delay_cost_min: 120, acmi_day: 82000, age: 0, stock: 2, marketWeight: 0.2,
+        engines: '2 × GE90-110B1', note: 'Der größte Zweistrahl-Frachter: 102 t über 9.000 km. Piloten der 777 fliegen ihn ohne Umschulung. Fliegt nur Fracht-Charter',
+        ill: { kind: 'wide', len: 1.0, fin: 'boeing', cargo: true } },
     },
-    TYPE_GROUPS: { ATR: 'ATR 72', DH8: 'Dash 8', EJET: 'Embraer E2', A220: 'Airbus A220', A32F: 'Airbus A320-Familie', B737: 'Boeing 737', A330: 'Airbus A330', A350: 'Airbus A350', B787: 'Boeing 787', B777: 'Boeing 777', A380: 'Airbus A380', B747: 'Boeing 747', CONC: 'Concorde' },
+    TYPE_GROUPS: { BIZ: 'Privatjets', B767: 'Boeing 767', ATR: 'ATR 72', DH8: 'Dash 8', EJET: 'Embraer E2', A220: 'Airbus A220', A32F: 'Airbus A320-Familie', B737: 'Boeing 737', A330: 'Airbus A330', A350: 'Airbus A350', B787: 'Boeing 787', B777: 'Boeing 777', A380: 'Airbus A380', B747: 'Boeing 747', CONC: 'Concorde' },
     AGE: { maint: 0.02, fuel: 0.003, fail: 1 / 15, value: 0.045, lease: 0.03 },
     TAXI_BASE_H: 0.30, CLIMB_DESCENT_OVERHEAD_H: 0.20, OPERATING_WINDOW_H: 17.0, CREW_MIN_BH_PER_DAY: 6.0,
     INSURANCE: { basic: { label: 'Basis', rate: 0.0015, deductible: 400e3 }, comfort: { label: 'Komfort', rate: 0.0035, deductible: 75e3 } },
@@ -239,7 +286,7 @@ const SM = (() => {
       robust: { label: 'Robust', extra_turn_min: 30, mean_delay_min: 6, otp: 0.88 },
     },
     CANCEL_CARE_COST_PAX: 45.0, EU261_COMP: [[1500, 250.0], [3500, 400.0]], EU261_CLAIM_RATE: 0.3,
-    ACMI: { n: 6, humanShare: 0.6, rate: 1.12, ev: { min: 1.3, max: 1.55 } },   // Charter: Anfragen pro Monat, Anteil passend zu Spielerflotten, Ratenaufschlag, Großereignis-Aufschlag
+    ACMI: { n: 6, humanShare: 0.6, rate: 1.12, ev: { min: 1.3, max: 1.55 }, biz: 4, cargo: 4 },   // Charter: Anfragen pro Monat, Anteil passend zu Spielerflotten, Ratenaufschlag, Großereignis-Aufschlag
     WARRANTY: { days: 730, maxAge: 3, maint: 0.82 },   // junge Flugzeuge: Herstellergarantie und frische Triebwerke senken die Wartung in den ersten zwei Jahren
     TERMINALS: {
       lcc: { label: 'Low-Cost-Bereich', desc: 'Außenposition mit Bus, einfache Schalter', rent: 4500, paxF: 0.75, turn: 10, u: { leisure: -0.03, business: -0.20, vfr: -0.03 } },
@@ -248,7 +295,7 @@ const SM = (() => {
     },
     OWN_HANDLING_DAY: 2400, OWN_HANDLING_SHARE: 0.35, HANGAR_MONTH: 60000, HANGAR_MAINT: 0.94, HANGAR_CHECK_DAYS: 3,
     STAFF: {
-      pilotSalary: { ATR: 9000, DH8: 9500, EJET: 11500, A220: 13500, A32F: 14500, B737: 14500, A330: 17000, A350: 18000, B787: 17500, B777: 18000, A380: 19500, B747: 19000, CONC: 26000 }, cabinSalary: 4600, techSalary: 6200,
+      pilotSalary: { BIZ: 12500, B767: 16000, ATR: 9000, DH8: 9500, EJET: 11500, A220: 13500, A32F: 14500, B737: 14500, A330: 17000, A350: 18000, B787: 17500, B777: 18000, A380: 19500, B747: 19000, CONC: 26000 }, cabinSalary: 4600, techSalary: 6200,
       // Crew nach Blockstunden: Ein Pilot / eine Flugbegleiterin fliegt im Schnitt 3 Blockstunden am Tag
       // (Ruhezeiten, freie Tage, Urlaub, Krankheit – rund 1.100 im Jahr). Je Flugzeug mindestens eine volle Besetzung,
       // Piloten einer Musterfamilie und die Kabine werden über die ganze Flotte gemeinsam eingeplant.
@@ -329,7 +376,8 @@ const SM = (() => {
     },
     START_EQUITY_EUR: 20e6, OVERHEAD_PER_AIRCRAFT_DAY: 650.0, STATION_COST_DAY_AI: 600.0,
     // Verwaltungskosten (EUR/Tag) für Spielende: wächst mit der Flotte, kleine Gründungen bleiben bezahlbar
-    HQ_CURVE: [[0, 800], [5, 3000], [15, 10000], [30, 26000], [100, 80000]],
+    HQ_CURVE: [[0, 800], [5, 3000], [15, 10000], [30, 26000], [100, 80000], [200, 200000], [400, 520000]],   // ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte (Konzernstrukturen)
+    ANTITRUST: { share: 0.6, minDeps: 25, minPax: 8, grace: 90, fine: 0.005 },
     STAGES: [
       { key: 'startup', label: 'Startup', min: 0, hq: 6000 },
       { key: 'regional', label: 'Regional', min: 6, hq: 12000 },
@@ -351,6 +399,10 @@ const SM = (() => {
         { key: 'global', label: 'Global Player', types: 'all', bases: 99, basePax: 999, hub: 3, acq: 99, ma: true, need: { fleet: 50, days: 900, profit: 12, equity: 2, pax: 5e6 } },
       ],
     },
+    // Ansehen (0–100) statt fester Phasen-Grenzen: Leasinggeber, Banken und Flughäfen entscheiden nach Erfahrung, Größe, Finanzen, Zuverlässigkeit und Marke.
+    // req: nötiges Ansehen je Musterklasse (Turboprop, Regionaljet, Mittelstrecke, Langstrecke, A380/747/Concorde/ULR); cond: Spanne für „Zusage unter Auflagen“
+    STANDING: { req: [0, 10, 35, 55, 72], cond: 15, baseReq: { s: 0, m: 20, l: 45, x: 65 }, baseCond: 10, baseCondX: 1.5, leaseWin: 90, leaseBase: 2, leasePer: 10,
+      young: [[40, 1.08], [60, 1.04]], rating: { A: 20, BBB: 16, BB: 11, B: 6, CCC: 0 } },
     // Übernahmen (M&A): Kaufpreis = (Eigenkapital + earnX × Jahresgewinn) × premium, mindestens min
     MA: { premium: 1.3, earnX: 4, min: 5e6 },
     // Abwerben: Personal in größeren Gruppen, Fachkräfte auch bei KI-Airlines, Firmenkunden je Flughafen
@@ -358,7 +410,8 @@ const SM = (() => {
     // Kapitalmarkt: Börsenwert = Eigenkapital + peX × Jahresergebnis (mind. floorEq × Eigenkapital) × Stimmung.
     // control: Aufschlag je Anteil, den die Käuferin schon hält (Kontrolle wird teuer); tender/hostile: Übernahmeangebot für den Rest mit/ohne Mehrheit.
     CAPITAL: { peX: 5, peNeg: 2, floorEq: 0.6, minCap: 2e6, control: 0.25, impact: 0.3, fee: 0.01, sellImpact: 0.15, smooth: 0.5, maxUp: 0.25, maxDown: 0.2, lockDays: 180, buybackMax: 0.1, buybackGap: 90, buybackHist: 6, tender: 1.3, hostile: 1.5, blocking: 0.25, majority: 0.5,
-      group: { divOpts: [0, 0.3, 0.6, 0.9], specShare: 0.2, specGap: 90, reserveDays: 120 },
+      group: { divOpts: [0, 0.3, 0.5], specShare: 0.15, specGap: 90, reserveDays: 120 },
+      anchor: { top: [0.35, 0.49], mid: [0.55, 0.8], buyerSize: 0.5, prem: 0.3 },
       issueDisc: [0.35, 0.25, 0.15, 0.1, 0.1], issueFee: 0.03, issueMax: 0.2, extMax: 0.49, issueGap: 90, divAI: 0.3, divOpts: [0, 0.25, 0.5], buybackX: 1.05,
       bond: { spread: { A: 0.015, BBB: 0.025, BB: 0.04, B: 0.065, CCC: 0.11 }, maxEq: 1.0, min: 1e6, years: [3, 5, 7], fee: 0.01, early: 0.02 } },
     // Basen der Spielenden: Einrichtung und laufende Kosten wachsen mit der Größe des Flughafens
@@ -514,7 +567,11 @@ const SM = (() => {
   // Kerosinzuschlag im Markt: Steigt Kerosin dauerhaft, geben alle Airlines einen Teil weiter – das Preisniveau (Referenzpreis) folgt.
   // Wird von der Welt vor jedem Tag gesetzt (gleitender Kerosinindex); Anteil wächst mit der Distanz (Langstrecke verbraucht mehr).
   let FUEL_X = 0;
-  const setFuelX = (w) => { FUEL_X = w && w.macro ? clamp((w.macro.fuelIdx ?? 1) - 1, -0.3, 1.5) : 0; return FUEL_X; };
+  /** Im Spiel gemessener Verkehr je Flughafen (Mio. Passagiere im Jahr) der aktuell gerechneten Welt. */
+  let APT_OBS = {};
+  const setFuelX = (w) => { APT_OBS = (w && w.aptObs) || {}; FUEL_X = w && w.macro ? clamp((w.macro.fuelIdx ?? 1) - 1, -0.3, 1.5) : 0; return FUEL_X; };
+  /** Wirksame Flughafengröße: Basiswert oder – wenn größer – der im Spiel tatsächlich abgewickelte Verkehr. */
+  const paxEff = (c) => Math.max((P.AIRPORTS[c] && P.AIRPORTS[c].pax) || 0, APT_OBS[c] || 0);
   const fuelSurShare = (k) => P.FUEL_PASS.base + P.FUEL_PASS.long * Math.min(1, k / 8000);
   /** Aufschlag auf den Referenzpreis für Regionalstrecken: je kleiner der kleinere Flughafen und je kürzer die Strecke, desto höher. */
   /** Lohnniveau am Heimatflughafen (Crew, Technik): Türkei rund 62 %, Indien 36 %, Deutschland 100 %. */
@@ -850,8 +907,8 @@ const SM = (() => {
   const crewFor = (seats, cabin, bh) => ({ pil: Math.max(seats, seats * bh / P.STAFF.pilotH), cab: Math.max(cabin, cabin * bh / P.STAFF.cabinH) });
   const routeKmOk = (o, d) => gcDistanceKm(o, d) >= P.MIN_ROUTE_KM;
   /** Flughafen tauglich für das Muster? (A380 braucht Code-F-Flughäfen) */
-  const aptOk = (o, d, typeId) => { const m = P.AIRCRAFT_TYPES[typeId].minAptPax; return !m || ((ap(o).pax || 0) >= m && (ap(d).pax || 0) >= m); };
-  const aptWhy = (o, d, typeId) => { const t = P.AIRCRAFT_TYPES[typeId], m = t.minAptPax; if (!m) return ''; const bad = [o, d].filter((c) => (ap(c).pax || 0) < m); return bad.length ? `Die ${t.label} braucht Code-F-Flughäfen (ab ${m} Mio. Passagieren im Jahr) – ${bad.map((c) => ap(c).name).join(' und ')} ${bad.length > 1 ? 'sind' : 'ist'} zu klein.` : ''; };
+  const aptOk = (o, d, typeId) => { const m = P.AIRCRAFT_TYPES[typeId].minAptPax; return !m || (paxEff(o) >= m && paxEff(d) >= m); };
+  const aptWhy = (o, d, typeId) => { const t = P.AIRCRAFT_TYPES[typeId], m = t.minAptPax; if (!m) return ''; const bad = [o, d].filter((c) => paxEff(c) < m); return bad.length ? `Die ${t.label} braucht Code-F-Flughäfen (ab ${m} Mio. Passagieren im Jahr) – ${bad.map((c) => `${ap(c).name} (${String(Math.round(paxEff(c) * 10) / 10).replace('.', ',')} Mio.)`).join(' und ')} ${bad.length > 1 ? 'sind' : 'ist'} zu klein. Wächst der Verkehr dort im Spiel über ${m} Mio., baut der Flughafen aus.` : ''; };
   const rangeOk = (o, d, typeId) => gcDistanceKm(o, d) * P.ROUTE_DETOUR <= P.AIRCRAFT_TYPES[typeId].range_km && aptOk(o, d, typeId);
   /** Überschall: Zeitgewinn gegenüber einem Langstrecken-Jet macht Geschäftsreisende zahlungsbereit. */
   function sstBonus(o, d) {
@@ -1062,7 +1119,8 @@ const SM = (() => {
       if (!this.isPlayer) return this.stage().hq;
       const n = this.fleet.length, C = P.HQ_CURVE;
       for (let i = 1; i < C.length; i++) if (n <= C[i][0]) { const [x0, y0] = C[i - 1], [x1, y1] = C[i]; return y0 + (y1 - y0) * (n - x0) / (x1 - x0); }
-      return C[C.length - 1][1];
+      const [xa, ya] = C[C.length - 2], [xb, yb] = C[C.length - 1];
+      return yb + (yb - ya) / (xb - xa) * 1.1 * (n - xb);
     }
     otp(buffer) {
       const base = P.BUFFER_POLICY[buffer].otp + lv3([0, 0.03, 0.05, 0.08], this.skill('ops'));
@@ -1121,7 +1179,7 @@ const SM = (() => {
       this.acCounter++;
       return Object.assign({ id: `${this.id}-${String(this.acCounter).padStart(3, '0')}`, type_id: typeId, base, owned: false, flex: false,
         delivery_day: 0, lease_start: 0, nbv: 0, loan: 0, loanRate: 0, used_hours: 0, idle_days: 0, deposit: 0, age0: P.AIRCRAFT_TYPES[typeId].age,
-        bornDay: 0, fh: 0, lastC: 0, status: 'ok', until: null, mode: 'auto', pins: [], leaseUsd: P.AIRCRAFT_TYPES[typeId].lease_month * P.EURUSD, leaseMonth: P.AIRCRAFT_TYPES[typeId].lease_month, acmi: null, assigned: [] }, o);
+        bornDay: 0, fh: 0, lastC: 0, status: 'ok', until: null, mode: P.AIRCRAFT_TYPES[typeId].role ? 'charter' : 'auto', pins: [], leaseUsd: P.AIRCRAFT_TYPES[typeId].lease_month * P.EURUSD, leaseMonth: P.AIRCRAFT_TYPES[typeId].lease_month, acmi: null, assigned: [] }, o);
     }
     acquire(day, typeId, base, mode = 'lease', offerData = null, world = null) {
       const t = P.AIRCRAFT_TYPES[typeId], L = this.ledger;
@@ -1150,9 +1208,9 @@ const SM = (() => {
         ac.flex = mode === 'flex';
         ac.delivery_day = day + (offerData ? offerData.delivery : (world ? leaseDelivery(world, typeId, 'lease') : P.LEASE_DELIVERY_DAYS));
         ac.lease_start = ac.delivery_day;
-        ac.leaseUsd = (offerData ? offerData.lease_month : t.lease_month) * P.EURUSD * duty * oldF * rk.lease;
+        ac.leaseUsd = (offerData ? offerData.lease_month : t.lease_month) * P.EURUSD * duty * oldF * rk.lease * (offerData ? 1 : shockX(world, 'lease'));
         ac.leaseMonth = ac.leaseUsd / eurusd;
-        if (rk.gap) ac.riskPrem = rk.lease;
+        if (rk.lease > 1.001) ac.riskPrem = rk.lease;
         if (!ac.flex) { ac.deposit = rk.dep * ac.leaseMonth; L.cashOnly(-ac.deposit, 'deposit'); }
       }
       this.fleet.push(ac);
@@ -1374,11 +1432,43 @@ const SM = (() => {
   // Ereignisse
   // ===========================================================================
   const EVENT_TYPES = {
-    fuel_spike: { p: 0.06 }, fuel_drop: { p: 0.035 }, recession: { p: 0.045 }, boom: { p: 0.035 }, atc_strike: { p: 0.08 },
-    airport_strike: { p: 0.07 }, volcano: { p: 0.006 }, big_event: { p: 0.07 }, tax_change: { p: 0.04 }, rate_change: { p: 0.09 },
-    health: { p: 0.006 }, pilot_shortage: { p: 0.04 }, fx_shock: { p: 0.05 },
-    trade_war: { p: 0.05 }, trade_deal: { p: 0.03 }, airspace: { p: 0.03 }, carbon: { p: 0.02 }, fee_hike: { p: 0.04 }, currency_crisis: { p: 0.03 }, oil_crisis: { p: 0.012 },
+    fuel_spike: { p: 0.06 }, fuel_drop: { p: 0.035 }, recession: { p: 0.05 }, boom: { p: 0.035 }, atc_strike: { p: 0.08 },
+    airport_strike: { p: 0.07 }, volcano: { p: 0.01 }, big_event: { p: 0.07 }, tax_change: { p: 0.04 }, rate_change: { p: 0.09 },
+    health: { p: 0.007 }, pilot_shortage: { p: 0.04 }, fx_shock: { p: 0.05 },
+    trade_war: { p: 0.05 }, trade_deal: { p: 0.03 }, airspace: { p: 0.045 }, carbon: { p: 0.03 }, fee_hike: { p: 0.04 }, currency_crisis: { p: 0.04 }, oil_crisis: { p: 0.018 },
+    // 0.19: weitere Schocks mit echten Folgen für die Rechnung
+    credit_crunch: { p: 0.018 }, grounding: { p: 0.022 }, supply_chain: { p: 0.02 }, tourism: { p: 0.045 }, labor_crisis: { p: 0.025 }, disaster: { p: 0.015 }, regulation: { p: 0.02 },
   };
+  /** Motoren- und Musterprobleme, die zu Stilllegungen führen können. */
+  const GROUNDING_SETS = [
+    { types: ['A20N', 'A21N', 'A21X', 'BCS3'], what: 'Getriebefan-Triebwerke (Pulverschmiede-Rückruf)' },
+    { types: ['B38M'], what: 'Boeing 737 MAX (Fehler in der Flugsteuerung)' },
+    { types: ['B789'], what: 'Boeing 787 (Schaufelrisse im Triebwerk)' },
+    { types: ['A339'], what: 'A330neo (Triebwerksverschleiß)' },
+    { types: ['A359', 'A35K', 'A35U'], what: 'A350 (Lackschäden und Triebwerksinspektion)' },
+    { types: ['E295'], what: 'E195-E2 (Triebwerksinspektion)' },
+    { types: ['B77W', 'B779'], what: 'Boeing 777 (Triebwerksbefund)' },
+    { types: ['AT76', 'DH8D'], what: 'Turboprops (Propellerbefund)' },
+  ];
+  /** Aktive Effekte laufender Schocks (für Lieferzeit, Leasing, Wartung). */
+  function shockX(w, key, typeId = null) {
+    const add = key === 'delay' || key === 'req';
+    if (!w || !w.events) return add ? 0 : 1;
+    const ck = key + (typeId || ''), C = w._sx && w._sx.d === w.day && w._sx.n === w.events.length ? w._sx : (w._sx = { d: w.day, n: w.events.length, m: {} });
+    if (C.m[ck] !== undefined) return C.m[ck];
+    return (C.m[ck] = shockCalc(w, key, typeId, add));
+  }
+  function shockCalc(w, key, typeId, add) {
+    let x = add ? 0 : 1;
+    for (const e of w.events) {
+      if (e.start > w.day || e.end <= w.day || e.cancelled) continue;
+      if (key === 'delay' && (e.type === 'supply_chain' || (e.type === 'grounding' && typeId && e.types.includes(typeId)))) x = Math.max(x, e.delay || 0);
+      if (key === 'lease' && e.type === 'supply_chain') x *= e.leaseX || 1;
+      if (key === 'mx' && e.type === 'supply_chain') x *= e.mxX || 1;
+      if (key === 'req' && e.type === 'credit_crunch') x = Math.max(x, e.req || 0);
+    }
+    return x;
+  }
   // Handelsblöcke für Zölle: EU-Länder gemeinsam, sonst jedes Land für sich
   const EU = new Set(['FR', 'ES', 'IT', 'PT', 'NL', 'DE', 'AT', 'IE', 'DK', 'GR', 'BE', 'PL', 'SE', 'FI', 'CZ', 'HU', 'RO', 'BG', 'HR', 'LV', 'LT', 'EE', 'MT', 'CY']);
   const blocOf = (cc) => (EU.has(cc) ? 'EU' : cc === 'HK' ? 'CN' : cc);
@@ -1392,8 +1482,9 @@ const SM = (() => {
   /** Lieferzeit bei Leasinggebern und Herstellern: Wer viel bestellt, verlängert die Warteschlange für alle. */
   function leaseDelivery(w, typeId, mode) {
     const q = (w && w.lessorQueue && w.lessorQueue[typeId]) || 0;
-    if (mode === 'factory') return P.FACTORY_DELIVERY_DAYS + Math.min(360, 30 * Math.floor(q / 6));
-    return P.LEASE_DELIVERY_DAYS + Math.min(70, 7 * Math.floor(q / 4));
+    const sd = shockX(w, 'delay', typeId);
+    if (mode === 'factory') return P.FACTORY_DELIVERY_DAYS + Math.min(360, 30 * Math.floor(q / 6)) + 2 * sd;
+    return P.LEASE_DELIVERY_DAYS + Math.min(70, 7 * Math.floor(q / 4)) + sd;
   }
   const ACADEMY = {
     pilot: { label: 'Flugschule', ramp: 120, cost: [0, 60000, 120000, 220000], out: [0, 2, 4, 7] },
@@ -1431,6 +1522,12 @@ const SM = (() => {
     { id: 'alliance', label: 'Partner gefunden', desc: 'Codeshare oder Allianz geschlossen.', pts: 15, brand: 0.01, test: (c) => c.w.coopsOf(c.al.id).length > 0 },
     { id: 'auction', label: 'Erstkunde', desc: 'Eine Auktion um Lieferpositionen gewonnen.', pts: 20, brand: 0.01, test: (c) => (c.w.auctions || []).some((a) => a.winners && a.winners.includes(c.al.id)) },
     { id: 'academy', label: 'Eigener Nachwuchs', desc: 'Eine Akademie gefördert.', pts: 15, test: (c) => c.al.academy && Object.values(c.al.academy).some((x) => x.lv > 0) },
+    { id: 'pax50m', label: '50 Millionen Passagiere', desc: 'Eine der Großen.', pts: 90, brand: 0.03, test: (c) => c.pax >= 5e7 },
+    { id: 'fleet100', label: 'Hundert Flugzeuge', desc: '100 Flugzeuge – ab hier wird die Verwaltung zum eigenen Gegner.', pts: 80, brand: 0.02, test: (c) => c.al.fleet.length >= 100 },
+    { id: 'fleet250', label: 'Weltkonzern', desc: '250 Flugzeuge.', pts: 120, brand: 0.03, test: (c) => c.al.fleet.length >= 250 },
+    { id: 'world7', label: 'Alle Kontinente', desc: 'Flughäfen in allen Weltregionen.', pts: 90, brand: 0.03, test: (c) => c.regions.size >= REGION_ORDER.length },
+    { id: 'crisis3', label: 'Wetterfest', desc: 'Drei Gewinnmonate in Folge während einer Krise.', pts: 70, brand: 0.02, test: (c) => c.crisis && c.res.length >= 3 && c.res.slice(-3).every((x) => x > 0) },
+    { id: 'clean', label: 'Fairer Wettbewerb', desc: '50 Flugzeuge, aber nirgends marktbeherrschend.', pts: 60, brand: 0.02, test: (c) => c.al.fleet.length >= 50 && !(c.al.antitrust && Object.keys(c.al.antitrust).length) },
     { id: 'hub', label: 'Drehkreuz', desc: 'Zwei Basen.', pts: 20, brand: 0.01, test: (c) => c.al.bases.length >= 2 },
   ];
   // ---------------------------------------------------------------------------
@@ -1440,7 +1537,7 @@ const SM = (() => {
   const careerLv = (al) => (al && al.prog ? clamp(al.prog.lv | 0, 0, CAREER.levels.length - 1) : null);
   const careerOf = (al) => { const lv = careerLv(al); return lv === null ? null : CAREER.levels[lv]; };
   /** Ab welcher Phase ein Muster freigeschaltet ist. */
-  function typeLevel(type) { for (let i = 0; i < CAREER.levels.length; i++) { const t = CAREER.levels[i].types; if (t === 'all' || t.includes(type)) return i; } return CAREER.levels.length - 1; }
+  function typeLevel(type) { const T0 = P.AIRCRAFT_TYPES[type]; if (T0 && T0.lvl !== undefined) return T0.lvl; for (let i = 0; i < CAREER.levels.length; i++) { const t = CAREER.levels[i].types; if (t === 'all' || t.includes(type)) return i; } return CAREER.levels.length - 1; }
   function typeAllowed(al, type) { const lv = careerLv(al); return lv === null || typeLevel(type) <= lv || al.fleet.some((x) => x.type_id === type); }
   function needTxt(n) {
     if (!n) return '';
@@ -1475,42 +1572,77 @@ const SM = (() => {
     return { lv, next: lv + 1, label: next.label, checks: out, ready: out.every((c) => c.ok) };
   }
   /** Was eine Phase freischaltet (Text). */
-  function careerUnlockTxt(i) {
-    const L = CAREER.levels[i], parts = [];
-    parts.push('normale Leasing- und Bankkonditionen für ' + (L.types === 'all' ? 'alle Muster bis A380, 747 und Concorde' : L.types.map((t) => P.AIRCRAFT_TYPES[t].label).join(', ')));
-    parts.push(L.bases >= 99 ? 'beliebig viele Basen ohne Aufschlag' : `${L.bases} Basen ohne Aufschlag`);
-    if (L.hub && !(i > 0 && CAREER.levels[i - 1].hub >= L.hub)) parts.push(`${P.HUB[L.hub].label} ohne Aufschlag`);
-    parts.push(L.acq >= 99 ? 'Flottenwachstum ohne Aufschlag' : `${L.acq} neue Flugzeuge je 30 Tage ohne Aufschlag`);
-    if (L.ma && !(i > 0 && CAREER.levels[i - 1].ma)) parts.push('Übernahmen ohne Aufschlag');
-    return parts.join(' · ');
+  function careerUnlockTxt(i) { return `${CAREER.levels[i].label} – Ansehen +2 für Erfahrung. Was Leasinggeber und Flughäfen zusagen, hängt am Ansehen (Unternehmen → Ansehen & Ziele)`; }
+  /** Ansehen in der Branche (0–100) mit Einzelteilen. Nur für Spielende; KI-Airlines gelten als etabliert. */
+  function standingOf(al, day = null) {
+    if (!al || !al.isPlayer) return { v: 100, parts: [] };
+    const d = day ?? al._day ?? 0, S = P.STANDING;
+    if (al._st && al._st.day === d && al._st.n === al.fleet.length) return al._st.r;
+    if (al.firstFlight === undefined || al.firstFlight === null) { const f = al.routes.filter((r) => r.opened_day <= d).map((r) => r.opened_day); if (f.length) al.firstFlight = Math.min(...f); }
+    const months = al.firstFlight !== undefined && al.firstFlight !== null ? Math.max(0, (d - al.firstFlight) / 30) : 0;
+    const lv = careerLv(al) || 0;
+    const exp = Math.min(25, months * 1.05 + lv * 2);
+    const size = Math.min(20, 20 * Math.log(1 + al.fleet.filter((a) => a.delivery_day <= d).length) / Math.log(51));
+    const startEq = (DIFFICULTY[al.difficulty] || DIFFICULTY.normal).equity, eq = balanceSheet(al).equity;
+    const fin = (S.rating[al.rating] ?? 11) + (eq >= startEq ? 5 : eq >= 0.5 * startEq ? 2 : 0);
+    const otp = al.otpHist && al.otpHist.length >= 10 ? al.otpHist.reduce((a, b) => a + b, 0) / al.otpHist.length : null;
+    const rel = (otp === null ? 5 : 10 * clamp((otp - 0.65) / 0.25, 0, 1)) - (al.status === 'restructuring' ? 15 : 0);
+    const brand = 15 * clamp(al.brand ?? 0.4, 0, 1);
+    const v = Math.round(clamp(exp + size + fin + rel + brand, 0, 100));
+    const r = { v, parts: [['Erfahrung', exp, 25, `${Math.floor(months)} Monate im Flugbetrieb${lv ? `, Phase ${lv + 1}` : ''}`], ['Größe', size, 20, `${al.fleet.length} Flugzeuge`], ['Finanzen', fin, 25, `Rating ${al.rating || 'BB'}${eq >= startEq ? ', Eigenkapital über Start' : ''}`],
+      ['Zuverlässigkeit', Math.max(0, rel), 10, otp === null ? 'noch zu wenige Flüge' : `Pünktlichkeit ${Math.round(otp * 100)} %${al.status === 'restructuring' ? ', in Sanierung' : ''}`], ['Marke', brand, 15, `Bekanntheit ${Math.round((al.brand ?? 0.4) * 100)}`]] };
+    al._st = { day: d, n: al.fleet.length, r };
+    return r;
   }
-  function careerAcqLeft(w, al) {
-    const L = careerOf(al); if (!L) return Infinity;
-    const recent = (al.prog.acq || []).filter((d) => d > w.day - 30).length;
-    return Math.max(0, L.acq - recent);
+  const standing = (al, day) => standingOf(al, day).v;
+  /** Neue Leasingverträge in den letzten 90 Tagen und was die Leasinggeber noch mitmachen. */
+  function leaseRoom(al, day = null) {
+    const d = day ?? al._day ?? 0, S = P.STANDING, recent = ((al.prog && al.prog.leases) || []).filter((x) => x > d - S.leaseWin).length;
+    const max = S.leaseBase + Math.floor(standing(al, d) / S.leasePer);
+    return { recent, max, left: Math.max(0, max - recent) };
   }
-  /** Konditionen bei Leasinggebern und Banken: je größer das Muster im Verhältnis zur Phase, desto teurer. */
+  function careerAcqLeft(w, al) { return al.isPlayer ? leaseRoom(al, w.day).left : Infinity; }
+  /** Konditionen bei Leasinggebern und Banken nach Ansehen und Musterklasse: Zusage, Zusage unter Auflagen oder Absage. */
   function riskTerms(al, typeId) {
-    const lv = careerLv(al), R = CAREER.risk;
-    if (lv === null || !al.isPlayer) return { ...R[0], gap: 0, conc: 0 };
-    const gap = clamp(typeLevel(typeId) - lv, 0, R.length - 1), L = CAREER.levels[lv], S = CAREER.soft;
-    // Konzentration: mehr neue Flugzeuge in 30 Tagen, als die Phase hergibt → jeder weitere Vertrag teurer
-    const day = al._day ?? 0, recent = (al.prog.acq || []).filter((d) => d > day - 30).length, conc = Math.max(0, recent + 1 - L.acq);
-    const r = R[gap];
-    return { lease: r.lease * (1 + S.acqLease * conc), dep: r.dep + S.acqDep * conc, down: Math.min(0.9, r.down + 0.05 * conc), gap, conc };
+    if (!al || !al.isPlayer) return { lease: 1, dep: 2, down: 0.2, gap: 0, conc: 0, req: 0, st: 100, reject: null };
+    const S = P.STANDING, cls = typeLevel(typeId), req = S.req[clamp(cls, 0, S.req.length - 1)] + (cls > 0 ? (al._crunch || 0) : 0), st = standing(al), gap = req - st;
+    const young = (S.young.find(([lim]) => st < lim) || [0, 1])[1];
+    const room = leaseRoom(al), conc = room.left <= 0 ? 1 : 0;
+    let out;
+    if (gap <= 0) out = { lease: young, dep: 2, down: 0.2 };
+    else if (gap <= S.cond) out = { lease: young * (1 + 0.02 * gap), dep: 2 + Math.ceil(gap / 5), down: Math.min(0.5, 0.2 + 0.015 * gap), cond: true };
+    else out = { lease: young * 1.3, dep: 6, down: gap > 30 ? 1 : 0.5, reject: `Die Leasinggeber lehnen ab: Für ${P.AIRCRAFT_TYPES[typeId].label} verlangen sie ein Ansehen von ${req}, Ihre Airline hat ${st}. ${gap > 30 ? 'Auch Banken finanzieren nichts – Kauf nur aus eigenen Mitteln.' : 'Kaufen geht – mit 50 % Eigenanteil.'}` };
+    if (!out.reject && conc) out.reject = `Die Leasinggeber bremsen: ${room.recent} neue Verträge in ${S.leaseWin} Tagen, bei Ihrem Ansehen (${st}) machen sie höchstens ${room.max} mit. Kaufen geht, oder später erneut anfragen.`;
+    return { ...out, gap: Math.max(0, gap), conc, req, st, cls };
   }
-  /** Aufschlag für Basen, Drehkreuze und Übernahmen, die über die Phase hinausgehen. */
+  /** Größenklasse eines Flughafens (wie in der Basisauswahl). */
+  const aptClass = (apt) => { const x = paxEff(apt); return x > 50 ? 'x' : x > 20 ? 'l' : x > 8 ? 'm' : 's'; };
+  /** Antrag auf eine neue Basis: Zusage, Auflagen (Lizenz ×1,5) oder Absage nach Ansehen und Flughafengröße. */
+  function baseApproval(al, apt) {
+    if (!al || !al.isPlayer) return { ok: true, x: 1 };
+    const S = P.STANDING, cls = aptClass(apt), req = S.baseReq[cls], st = standing(al), gap = req - st;
+    const lbl = { s: 'kleiner Flughafen', m: 'mittlerer Flughafen', l: 'großer Flughafen', x: 'Drehkreuz' }[cls];
+    if (gap <= 0) return { ok: true, x: 1, req, st, cls, lbl };
+    if (gap <= S.baseCond) return { ok: true, x: S.baseCondX, cond: true, req, st, cls, lbl, msg: `Zusage unter Auflagen: ${ap(apt).name} (${lbl}) verlangt ein Ansehen von ${req}, Sie haben ${st} – Lizenz ×${String(S.baseCondX).replace('.', ',')}.` };
+    return { ok: false, req, st, cls, lbl, msg: `Die Flughafengesellschaft ${ap(apt).name} lehnt ab: Als ${lbl} verlangt sie ein Ansehen von mindestens ${req - S.baseCond} (ohne Auflagen ${req}), Ihre Airline hat ${st}.` };
+  }
+  /** Basen ohne Aufschlag nach Ansehen: 1 bis 29, dann je 20 Punkte eine mehr, ab 80 beliebig. */
+  const basesFree = (st) => (st >= 80 ? 99 : st < 30 ? 1 : 1 + Math.floor((st - 10) / 20));
+  /** Ansehen, ab dem n Basen ohne Aufschlag gehen. */
+  const basesFreeAt = (n) => (n <= 1 ? 0 : n >= 5 ? 80 : 10 + 20 * (n - 1));
+  /** Aufschlag für Basen, Drehkreuze und Übernahmen, die über das Ansehen hinausgehen. */
   function softX(al, kind, x = 0) {
-    const L = careerOf(al), S = CAREER.soft; if (!L) return 1;
-    if (kind === 'base') { const ex = Math.max(0, al.bases.length + 1 - L.bases); return 1 + S.baseX * ex; }
-    if (kind === 'baseDay') { const ex = Math.max(0, al.bases.length - L.bases); return 1 + S.baseDayX * ex; }
-    if (kind === 'hub') { const ov = Math.max(0, x - L.hub); return 1 + S.hubX * ov; }
-    if (kind === 'ma') return L.ma ? 1 : 1 + S.maX;
+    if (!al || !al.isPlayer) return 1;
+    const S = CAREER.soft, st = standing(al), bases = basesFree(st), hub = Math.min(3, Math.floor(st / 25));
+    if (kind === 'base') { const ex = Math.max(0, al.bases.length + 1 - bases); return 1 + S.baseX * ex; }
+    if (kind === 'baseDay') { const ex = Math.max(0, al.bases.length - bases); return 1 + S.baseDayX * ex; }
+    if (kind === 'hub') { const ov = Math.max(0, x - hub); return 1 + S.hubX * ov; }
+    if (kind === 'ma') return st >= 40 ? 1 : 1 + S.maX;
     return 1;
   }
   const baseSetupCost = (w, apt) => { const B = P.BASE_COST; return Math.round((B.setupMin + B.setupK * Math.max(0.3, ap(apt).pax || 0.3) ** B.setupExp) * w.macro.cpi / 1000) * 1000; };
   const baseDayCost = (apt) => { const B = P.BASE_COST; return B.dayMin + B.dayK * Math.max(0.3, ap(apt).pax || 0.3) ** B.dayExp; };
-  function careerNoteAcq(w, al) { if (!al.prog) return; al.prog.acq = [...(al.prog.acq || []).filter((d) => d > w.day - 30), w.day]; }
+  function careerNoteAcq(w, al, lease = false) { if (!al.prog) return; al.prog.acq = [...(al.prog.acq || []).filter((d) => d > w.day - 30), w.day]; if (lease) al.prog.leases = [...(al.prog.leases || []).filter((d) => d > w.day - P.STANDING.leaseWin), w.day]; }
   /** Phase für eine bestehende Airline aus ihrer heutigen Größe bestimmen (ohne Meldungen). */
   function careerMigrate(w, al) {
     al.prog = { lv: 0, since: w.day, acq: [] };
@@ -1596,7 +1728,7 @@ const SM = (() => {
   }
   function acmiRateFor(o, typeId) {
     if (!typeId || typeId === o.type) return o.rate;
-    const a = P.AIRCRAFT_TYPES[typeId].seats.standard, b = P.AIRCRAFT_TYPES[o.type].seats.standard;
+    const cg = P.AIRCRAFT_TYPES[o.type].role === 'cargo', a = cg ? P.AIRCRAFT_TYPES[typeId].cargo_kg : P.AIRCRAFT_TYPES[typeId].seats.standard, b = cg ? P.AIRCRAFT_TYPES[o.type].cargo_kg : P.AIRCRAFT_TYPES[o.type].seats.standard;
     return Math.round(o.rate * clamp(a / b, 0.8, 1.15) / 100) * 100;
   }
   const MEGA_CLIENT = { okt: 'Reiseveranstalter mit Oktoberfest-Paketen', rio: 'Karnevals-Reiseveranstalter', hajj: 'Pilgerreise-Veranstalter (Hadsch)', cny: 'Reisebüro für Familienreisen zum Neujahrsfest', f1mc: 'Rennstall und VIP-Gäste zum Grand Prix', expo30: 'Expo-Delegationen' };
@@ -1699,7 +1831,7 @@ const SM = (() => {
       const e = this.events.find((x) => x.id === eid), day = this.day, M = this.macro;
       if (!e) return { ok: false, msg: 'Ereignis nicht gefunden (vielleicht schon zu alt).' };
       if (e.cancelled) return { ok: false, msg: 'Dieses Ereignis ist schon annulliert.' };
-      if (e.end + (e.recovery || 0) <= day && !['tax_change', 'carbon', 'fee_hike', 'rate_change', 'fx_shock', 'fuel_spike', 'fuel_drop', 'trade_deal'].includes(e.type)) return { ok: false, msg: 'Dieses Ereignis ist schon vorbei.' };
+      if (e.end + (e.recovery || 0) <= day && !['tax_change', 'carbon', 'fee_hike', 'rate_change', 'fx_shock', 'fuel_spike', 'fuel_drop', 'trade_deal', 'labor_crisis'].includes(e.type)) return { ok: false, msg: 'Dieses Ereignis ist schon vorbei.' };
       const started = e.start <= day, months = Math.max(0, (day - e.start) / 30);
       if (e.applied) {
         if (e.taxDelta) for (const c of e.countries) M.taxDelta[c] -= e.taxDelta;
@@ -1711,7 +1843,10 @@ const SM = (() => {
         if (e.refF) M.fuelRefUsd /= e.refF;
         if (e.rateD) M.rate = clamp(M.rate - e.rateD, 0, 0.08);
         if (e.fxF) M.eurusd /= e.fxF;
-        if (e.type === 'pilot_shortage') M.laborTight = Math.min(M.laborTight, Math.max(1, e.laborPrev ?? 1));
+        if (e.type === 'pilot_shortage' || e.type === 'labor_crisis') M.laborTight = Math.min(M.laborTight, Math.max(1, e.laborPrev ?? 1));
+        if (e.wageF) M.wage /= e.wageF;
+        if (e.type === 'credit_crunch' && e.eased) M.rate = clamp(M.rate + 0.7 * e.rateD, 0, 0.08);
+        if (e.type === 'grounding') for (const al of this.list) for (const a of al.fleet) if (a.grounded === e.id && a.status === 'aog') a.until = day;
         if (e.type === 'recession' || e.type === 'boom') for (const c of e.countries || []) if (M.econ[c] !== undefined) M.econ[c] += (e.type === 'recession' ? 1 : -1) * (e.depth || e.boost || 0.06) * (1 - Math.pow(0.7, months));
         if (e.type === 'trade_deal' && e.warId) { const war = this.events.find((x) => x.id === e.warId); if (war && e.warEnd > day) war.end = e.warEnd; }
       }
@@ -1734,13 +1869,16 @@ const SM = (() => {
       else if (roll('fuel_drop')) { const f = r.range(0.75, 0.88); M.fuelUsd *= f; this.addEvent({ type: 'fuel_drop', fuelF: f, scope: 'all', end: day + 60, text: `Ölpreis fällt: Kerosin ${Math.round((1 - f) * 100)} % günstiger.`, severity: 'good' }); }
       if (roll('recession')) {
         const cs = [...new Set(r.random() < 0.3 ? COUNTRIES : [r.pick(COUNTRIES), r.pick(COUNTRIES), r.pick(COUNTRIES)])];
-        const depth = r.range(0.10, 0.20);
-        this.addEvent({ type: 'recession', countries: cs, depth, end: day + 30 + r.int(240, 420), text: `Frühindikatoren brechen ein: Rezession in ${nm(cs)} erwartet. Geschäftsreisen leiden am stärksten.`, severity: cs.length > 3 ? 'crit' : 'warn' }, 30);
+        const depth = r.range(0.08, 0.18);
+        this.addEvent({ type: 'recession', countries: cs, depth, end: day + 30 + r.int(330, 1050), text: `Frühindikatoren brechen ein: Rezession in ${nm(cs)} erwartet. Geschäftsreisen leiden am stärksten.`, severity: cs.length > 3 ? 'crit' : 'warn' }, 30);
       } else if (roll('boom')) {
         const cs = [...new Set([r.pick(COUNTRIES), r.pick(COUNTRIES)])];
         this.addEvent({ type: 'boom', countries: cs, boost: r.range(0.05, 0.10), end: day + 240, text: `Aufschwung in ${nm(cs)}: mehr Geschäftsreisen und Urlaubsbuchungen.`, severity: 'good' });
       }
-      if (roll('currency_crisis')) {
+      if (roll('currency_crisis') && r.random() < 0.35) {
+        const f = r.range(0.82, 0.9), cs = COUNTRIES.filter((c) => blocOf(c) === 'EU'); M.eurusd *= f;
+        this.addEvent({ type: 'recession', fxF: f, countries: cs, depth: r.range(0.04, 0.08), end: day + r.int(180, 720), text: `Eurokrise: Der Euro fällt um ${Math.round((1 - f) * 100)} % auf ${M.eurusd.toFixed(3).replace('.', ',')} USD. Kerosin, Leasingraten und Dollarkredite werden teurer, in der Eurozone schwächelt die Nachfrage.`, severity: 'crit' });
+      } else if (EVENT_TYPES.currency_crisis.p && r.random() < EVENT_TYPES.currency_crisis.p * mult * 0.65) {
         const c = r.pick(['TR', 'BR', 'NG', 'EG', 'ZA', 'IN', 'MX', 'CO', 'KE', 'GH', 'PH', 'ID'].filter((x) => COUNTRIES.includes(x)));
         this.addEvent({ type: 'recession', countries: [c], depth: r.range(0.15, 0.25), end: day + r.int(150, 300), text: `Währungskrise in ${COUNTRY_NAMES[c]}: Die Landeswährung bricht ein, Reisen ins Ausland werden für viele unbezahlbar.`, severity: 'warn' });
       }
@@ -1756,8 +1894,8 @@ const SM = (() => {
       }
       if (roll('airspace')) {
         const c = r.pick(['RU', 'TR', 'EG', 'SA', 'IN', 'CN', 'NG', 'ET', 'KE', 'DZ', 'MX', 'TN', 'QA', 'AE'].filter((x) => COUNTRIES.includes(x)));
-        const lead = r.int(1, 3), dur = r.int(4, 16);
-        this.addEvent({ type: 'airspace', countries: [c], end: day + lead + dur, ops: { cancel: 1.0, delay: 0 }, demand: { leisure: 0.7, business: 0.8, vfr: 0.85 }, airports: AP_CODES.filter((x) => ap(x).country === c), text: `Luftraumsperrung über ${COUNTRY_NAMES[c]}: ${dur} Tage keine Flüge von und nach dort.`, severity: 'crit' }, lead);
+        const lead = r.int(1, 3), long = r.random() < 0.25, dur = long ? r.int(60, 360) : r.int(4, 16);
+        this.addEvent({ type: 'airspace', countries: [c], end: day + lead + dur, ops: { cancel: 1.0, delay: 0 }, demand: { leisure: 0.7, business: 0.8, vfr: 0.85 }, airports: AP_CODES.filter((x) => ap(x).country === c), text: long ? `Geopolitischer Konflikt: Luftraum über ${COUNTRY_NAMES[c]} für voraussichtlich ${Math.round(dur / 30)} Monate gesperrt – keine Flüge von und nach dort.` : `Luftraumsperrung über ${COUNTRY_NAMES[c]}: ${dur} Tage keine Flüge von und nach dort.`, severity: 'crit' }, lead);
       }
       if (roll('carbon')) {
         const bloc = r.random() < 0.55 ? 'EU' : r.pick(['GB', 'US', 'CA', 'JP', 'AU', 'KR', 'CN']), add = r.range(0.04, 0.10);
@@ -1803,13 +1941,59 @@ const SM = (() => {
         if (M.rate + dd >= 0 && M.rate + dd <= 0.08) { M.rate += dd; this.addEvent({ type: 'rate_change', rateD: dd, scope: 'all', end: day + 1, text: `Die Zentralbank ${dd > 0 ? 'erhöht' : 'senkt'} den Leitzins auf ${(M.rate * 100).toFixed(2).replace('.', ',')} %. Kredite werden ${dd > 0 ? 'teurer' : 'günstiger'}.`, severity: dd > 0 ? 'warn' : 'good' }); }
       }
       if (day > 200 && roll('health')) {
-        this.addEvent({ type: 'health', scope: 'all', end: day + 7 + 75, recovery: 180, demand: { leisure: 0.5, business: 0.45, vfr: 0.65 }, text: 'Gesundheitskrise: weltweite Reisewarnungen. Die Nachfrage bricht für Monate ein und erholt sich langsam.', severity: 'crit' }, 7);
+        this.addEvent({ type: 'health', scope: 'all', end: day + 7 + r.int(90, 240), recovery: r.int(180, 360), demand: { leisure: 0.5, business: 0.45, vfr: 0.65 }, text: 'Gesundheitskrise: weltweite Reisewarnungen. Die Nachfrage bricht für Monate ein und erholt sich langsam.', severity: 'crit' }, 7);
       }
       if (roll('pilot_shortage')) { const laborPrev = M.laborTight; M.laborTight = Math.max(M.laborTight, 2.2); this.addEvent({ type: 'pilot_shortage', laborPrev, scope: 'all', end: day + 180, text: 'Weltweiter Pilotenmangel: Neueinstellungen dauern doppelt so lange, kosten mehr und die Löhne steigen.', severity: 'warn' }); }
       if (roll('fx_shock')) {
         const f = r.random() < 0.5 ? r.range(0.88, 0.95) : r.range(1.05, 1.12);
         M.eurusd *= f;
         this.addEvent({ type: 'fx_shock', fxF: f, scope: 'all', end: day + 1, text: `Der Euro ${f < 1 ? 'fällt' : 'steigt'} deutlich: 1 EUR = ${M.eurusd.toFixed(3).replace('.', ',')} USD. Leasingraten und Kerosin werden in Dollar bezahlt.`, severity: f < 1 ? 'warn' : 'good' });
+      }
+      this.newShocks(r, M, day, roll);
+    }
+    /** 0.19: Kreditkrise, Stilllegungen, Lieferketten, Tourismus, Arbeitsmarkt, Naturkatastrophen, Regulierung. */
+    newShocks(r, M, day, roll) {
+      const live = (t) => this.events.some((e) => e.type === t && !e.cancelled && e.end > day);
+      if (day > 90 && !live('credit_crunch') && roll('credit_crunch')) {
+        const dd = r.range(0.015, 0.03), months = r.int(12, 36);
+        M.rate = clamp(M.rate + dd, 0, 0.08);
+        this.addEvent({ type: 'credit_crunch', rateD: dd, req: r.int(8, 12), scope: 'all', end: day + months * 30, text: `Kreditkrise: Banken ziehen sich aus der Luftfahrt zurück, der Leitzins steigt auf ${(M.rate * 100).toFixed(2).replace('.', ',')} %. Kreditlinien schrumpfen, Leasinggeber verlangen mehr Ansehen – voraussichtlich ${months} Monate.`, severity: 'crit' });
+      }
+      if (day > 60 && roll('grounding')) {
+        const g = r.pick(GROUNDING_SETS);
+        if (!this.events.some((e) => e.type === 'grounding' && e.end > day && e.types.some((t) => g.types.includes(t)))) {
+          const months = r.int(2, 9), share = r.range(0.12, 0.35), delay = r.int(45, 150);
+          this.addEvent({ type: 'grounding', types: g.types, share, delay, comp: 0.5, scope: 'all', end: day + 7 + months * 30, text: `Stilllegung angeordnet: ${g.what}. Rund ${Math.round(share * 100)} % der ${g.types.map((t) => P.AIRCRAFT_TYPES[t].label).join(', ')} bleiben bis zu ${months} Monate am Boden, Neuauslieferungen verzögern sich um ${delay} Tage. Der Hersteller erstattet die Hälfte der Ausfallkosten.`, severity: 'crit' }, 7);
+        }
+      }
+      if (day > 60 && !live('supply_chain') && roll('supply_chain')) {
+        const months = r.int(12, 48), mxX = r.range(1.12, 1.3), leaseX = r.range(1.08, 1.2), delay = r.int(30, 90);
+        for (const k in this.lessorStock) this.lessorStock[k] = Math.floor(this.lessorStock[k] * 0.7);
+        this.addEvent({ type: 'supply_chain', mxX, leaseX, delay, scope: 'all', end: day + months * 30, text: `Lieferkettenkrise in der Luftfahrt: Ersatzteile fehlen, Wartung wird ${Math.round((mxX - 1) * 100)} % teurer, neue Leasingverträge ${Math.round((leaseX - 1) * 100)} %, Auslieferungen dauern ${delay} Tage länger – voraussichtlich ${months} Monate.`, severity: 'crit' });
+      }
+      if (roll('tourism')) {
+        const c = r.pick(COUNTRIES), apts = AP_CODES.filter((x) => ap(x).country === c), up = r.random() < 0.4;
+        if (apts.length) {
+          if (up) { const f = r.range(1.2, 1.45), dur = r.int(180, 540); this.addEvent({ type: 'tourism', airports: apts, demand: { leisure: f, vfr: 1.05, business: 1 }, end: day + dur, text: `${COUNTRY_NAMES[c]} ist das Reiseziel der Saison: ${Math.round((f - 1) * 100)} % mehr Urlaubsreisende für etwa ${Math.round(dur / 30)} Monate.`, severity: 'good' }); }
+          else { const f = r.range(0.4, 0.6), dur = r.int(90, 360); this.addEvent({ type: 'tourism', airports: apts, demand: { leisure: f, vfr: 0.85, business: 0.95 }, end: day + dur, recovery: 90, text: `Reisewarnung für ${COUNTRY_NAMES[c]}: Anschläge und Unruhen – Urlaubsreisen dorthin brechen um ${Math.round((1 - f) * 100)} % ein, voraussichtlich ${Math.round(dur / 30)} Monate.`, severity: 'warn' }); }
+        }
+      }
+      if (!live('labor_crisis') && roll('labor_crisis')) {
+        const wf = r.range(1.04, 1.08), months = r.int(6, 24), laborPrev = M.laborTight;
+        M.wage = (M.wage || 1) * wf; M.laborTight = Math.max(M.laborTight, 1.8);
+        this.addEvent({ type: 'labor_crisis', wageF: wf, laborPrev, scope: 'all', end: day + months * 30, text: `Arbeitsmarktkrise: Gewerkschaften setzen ${Math.round((wf - 1) * 100)} % mehr Lohn durch, Personal ist knapp, Streiks werden wahrscheinlicher – voraussichtlich ${months} Monate.`, severity: 'warn' });
+      }
+      if (day > 30 && roll('disaster')) {
+        const center = r.pick(AP_CODES), aps = AP_CODES.filter((c) => gcDistanceKm(c, center) < 350), lat = ap(center).lat;
+        const kind = Math.abs(lat) < 28 ? r.pick(['Hurrikan', 'Taifun', 'Überschwemmungen']) : r.pick(['Erdbeben', 'Überschwemmungen', 'Waldbrände', 'Jahrhundertsturm']);
+        const dur = r.int(3, 10);
+        this.addEvent({ type: 'disaster', airports: aps, end: day + dur, recovery: r.int(30, 90), ops: { cancel: 0.9, delay: 60 }, demand: { leisure: 0.6, business: 0.8, vfr: 1.1 }, text: `${kind} bei ${ap(center).name}: ${dur} Tage fast kein Flugbetrieb an ${aps.length} Flughäfen, danach erholt sich die Nachfrage nur langsam.`, severity: 'crit' });
+      }
+      if (day > 120 && roll('regulation')) {
+        const k = r.pick(['saf', 'noise', 'tax']);
+        if (k === 'saf') { const bloc = r.random() < 0.6 ? 'EU' : r.pick(['GB', 'US', 'JP', 'CA']), add = r.range(0.03, 0.07); this.addEvent({ type: 'carbon', bloc, add, scope: 'all', end: day + 91, text: `SAF-Quote: In ${blocName(bloc)} muss ab 90 Tagen nachhaltiger Treibstoff beigemischt werden – Kerosin dort dauerhaft ${Math.round(add * 100)} % teurer.`, severity: 'warn' }, 90); }
+        else if (k === 'noise') { const c = r.pick(COUNTRIES), aps = AP_CODES.filter((x) => ap(x).country === c && (ap(x).pax || 0) > 5).slice(0, 6), f = r.range(1.15, 1.3); if (aps.length) this.addEvent({ type: 'fee_hike', airports: aps, fee: f, end: day + 61, text: `Lärmschutz in ${COUNTRY_NAMES[c]}: Ab 60 Tagen dauerhaft ${Math.round((f - 1) * 100)} % höhere Entgelte an ${aps.map((x) => ap(x).name).join(', ')}.`, severity: 'warn' }, 60); }
+        else { const cs = [...new Set([r.pick(COUNTRIES), r.pick(COUNTRIES), r.pick(COUNTRIES)])], delta = r.int(5, 18); this.addEvent({ type: 'tax_change', countries: cs, end: day + 91, taxDelta: delta, text: `Klimaabgabe auf Flugtickets in ${cs.map((c) => COUNTRY_NAMES[c]).join(', ')}: ab 90 Tagen dauerhaft +${delta} EUR je Abflug.`, severity: 'warn' }, 90); }
       }
     }
     dailyEvents() {
@@ -1828,10 +2012,31 @@ const SM = (() => {
         if (e.taxDelta) for (const c of e.countries) this.macro.taxDelta[c] += e.taxDelta;
         if (e.type === 'carbon') this.macro.carbon[e.bloc] = (this.macro.carbon[e.bloc] || 0) + e.add;
         if (e.type === 'fee_hike') for (const a of e.airports) this.macro.feeMult[a] = (this.macro.feeMult[a] || 1) * e.fee;
+        if (e.type === 'grounding') this.applyGrounding(e);
         e.applied = true;
       }
+      for (const e of this.events) if (e.type === 'credit_crunch' && !e.eased && !e.cancelled && e.end <= this.day) { e.eased = true; this.macro.rate = clamp(this.macro.rate - 0.7 * e.rateD, 0, 0.08); }
       this.recalcTariffs();
       if (this.events.length > 160) this.events = this.events.filter((e) => e.end + (e.recovery || 0) > this.day - 60);
+    }
+    /** Stilllegung: ein Teil der betroffenen Muster bleibt am Boden; der Hersteller erstattet einen Teil der Kosten. */
+    applyGrounding(e) {
+      const day = this.day;
+      for (const al of this.list) {
+        if (al.status === 'insolvent') continue;
+        let n = 0, comp = 0;
+        for (const a of al.fleet) {
+          if (!e.types.includes(a.type_id) || a.delivery_day > day) continue;
+          if (hashStr(e.id + ':' + a.id) % 1000 >= e.share * 1000) continue;
+          const until = e.end - (hashStr(a.id + e.id) % 30);
+          a.status = 'aog'; a.until = Math.max(a.until || 0, until); a.grounded = e.id; n++;
+          const perDay = a.owned ? (a.value0 || P.AIRCRAFT_TYPES[a.type_id].value_eur) * 0.0003 : (a.leaseMonth || 0) / 30.4;
+          comp += perDay * (until - day) * (e.comp || 0.5);
+        }
+        if (!n) continue;
+        al.ledger.post('one_off', comp);
+        al.log(day, `Stilllegung: ${n} Ihrer Flugzeuge bleiben am Boden (bis ${Math.round((e.end - day) / 30)} Monate). Der Hersteller erstattet ${Math.round(comp / 1000)} Tsd. EUR.`, 'crit');
+      }
     }
     monthlyMacro() {
       const M = this.macro, r = this.rng, day = this.day;
@@ -1862,7 +2067,8 @@ const SM = (() => {
         for (const al of this.list) { const st = al.staff; if (!st || !st.pay) continue; const rel = st.payRel ?? st.pay / w0; st.payRel = Math.round(rel * 1000) / 1000; st.pay = M.wage * st.payRel; } }
       { let se = 0, n = 0; for (const c of COUNTRIES) { se += M.econ[c]; n++; } const avg = se / Math.max(1, n);
         const crisis = this.events.some((e) => (e.type === 'health' || (e.type === 'recession' && e.countries.length > 10)) && e.start <= day && e.end > day);
-        M.bank = clamp(1 - 2.5 * Math.max(0, 1 - avg) - (crisis ? 0.2 : 0), 0.4, 1.05); }
+        const crunch = this.events.some((e) => e.type === 'credit_crunch' && !e.cancelled && e.start <= day && e.end > day);
+        M.bank = clamp(1 - 2.5 * Math.max(0, 1 - avg) - (crisis ? 0.2 : 0) - (crunch ? 0.35 : 0), 0.35, 1.05); }
       // Leasinggeber füllen ihren Bestand nur langsam auf
       for (const [k, t] of Object.entries(P.AIRCRAFT_TYPES)) { if (t.launch && day < t.launch + 365) continue; const cap = capOf(this, k); this.lessorStock[k] = Math.min(cap, (this.lessorStock[k] ?? cap) + Math.ceil(cap * 0.4)); }
       // Akademien entlasten den Arbeitsmarkt
@@ -2034,7 +2240,7 @@ const SM = (() => {
       const c = legCosts(o, d, r.type_id, r.service, r.buffer, pax, fareRev, this.fuelPrice, cpi);
       const age = forecast ? (r.age ?? t.age) : this.ageOf(al, r);
       c.fuel = c._fuelKg * this.fuelPriceFor(al, o) * (1 + P.AGE.fuel * age);
-      let maintF = 1 + P.AGE.maint * age;
+      let maintF = (1 + P.AGE.maint * age) * shockX(this, 'mx');
       if (al.isPlayer) {
         const proc = 1 - lv3([0, 0.03, 0.06, 0.09], al.skill('procurement'));
         const crewN = pilotsFor(c._bh) + t.cabin;
@@ -2215,7 +2421,7 @@ const SM = (() => {
     // Ein Tag
     step() {
       setFuelX(this);
-      for (const al of this.list) al._day = this.day;
+      { const cr = shockX(this, 'req'); for (const al of this.list) { al._day = this.day; al._crunch = cr; } }
       // Warteliste: Vergabe nur zu festen Terminen (1. April, 1. Oktober) – siehe monthEnd. Pläne mit vollständigen Slots werden umgesetzt.
       for (const al of this.humans) if (al.status !== 'insolvent' && al.plans && al.plans.length) this.checkPlans(al);
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.completeDaily(al);
@@ -2685,13 +2891,52 @@ const SM = (() => {
         r.setFares(this.day, nw[0], nw[1]);
       }
     }
+    /** Verkehr im Spiel je Flughafen messen (alle Airlines, letzte 30 Tage, aufs Jahr gerechnet). Flughäfen schrumpfen nur langsam. */
+    measureTraffic() {
+      const t = {};
+      for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.routes) { if (!r.hist || !r.hist.length) continue; const h = r.hist.slice(-30); let p = 0; for (const x of h) p += x.pax || 0; if (!p) continue; const y = p * 365 / Math.max(1, h.length) / 1e6; t[r.base] = (t[r.base] || 0) + y; t[r.dest] = (t[r.dest] || 0) + y; } }
+      const prev = this.aptObs || {}, out = {}, grown = [];
+      for (const c of new Set([...Object.keys(t), ...Object.keys(prev)])) {
+        if (!P.AIRPORTS[c]) continue;
+        const v = Math.max(t[c] || 0, (prev[c] || 0) * 0.97), base = ap(c).pax || 0;
+        if (v > base * 1.02 && v > 0.3) { out[c] = Math.round(v * 100) / 100; if (P.AIRCRAFT_TYPES.A388 && (prev[c] || base) < 25 && v >= 25 && base < 25) grown.push(c); }
+      }
+      this.aptObs = out; setFuelX(this);
+      for (const c of grown) this.pushNews(this.day, `${ap(c).name} baut aus: über 25 Mio. Passagiere im Jahr – jetzt auch für A380 und andere Code-F-Flugzeuge zugelassen`, 'info');
+    }
+    /** Wettbewerbsaufsicht: Wer an einem größeren Flughafen über 60 % der Abflüge hat, bekommt Auflagen (keine neuen Strecken dort) und nach einer Frist monatliche Bußgelder. */
+    antitrustCheck() {
+      const A = P.ANTITRUST, day = this.day, deps = {}, own = {};
+      for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.activeRoutes()) { if (r.opened_day > day) continue; const f = r.freq * (r.wk ? r.wk / 7 : 1); for (const c of [r.base, r.dest]) { deps[c] = (deps[c] || 0) + f; if (al.isPlayer) { own[al.id] = own[al.id] || {}; own[al.id][c] = (own[al.id][c] || 0) + f; } } } }
+      for (const al of this.humans) {
+        if (al.status === 'insolvent' || al.removed) continue;
+        const prev = al.antitrust || {}, now = {};
+        for (const [c, f] of Object.entries(own[al.id] || {})) {
+          const sh = f / Math.max(1, deps[c]);
+          if (f < A.minDeps || paxEff(c) < A.minPax || sh < A.share) continue;
+          now[c] = { since: prev[c] ? prev[c].since : day, share: Math.round(sh * 100) / 100 };
+          if (!prev[c]) { al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie haben ${Math.round(sh * 100)} % aller Abflüge. Neue Strecken dort sind untersagt; liegt Ihr Anteil in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder.`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Abflüge`, 'warn', al.id); }
+          else if (day - now[c].since >= A.grace) {
+            const rev = al.ledger.months.slice(-12).reduce((x, m) => x + (m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0), 0) / 100 * 12 / Math.max(1, Math.min(12, al.ledger.months.length));
+            const fine = Math.round(A.fine * rev * Math.min(2, sh / A.share) / 1e4) * 1e4;
+            if (fine > 0) { al.ledger.post('one_off', -fine); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (Anteil ${Math.round(sh * 100)} %). Weniger Abflüge dort oder mehr Konkurrenz beenden das Verfahren.`, 'crit'); }
+          }
+        }
+        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %.`, 'good');
+        al.antitrust = Object.keys(now).length ? now : undefined;
+      }
+    }
     monthEnd() {
       const m = monthOf(this.day), y = Math.floor(this.day / 365);
+      this.measureTraffic();
+      this.antitrustCheck();
       this.monthlyMacro();
       this.generateMonthlyEvents();
       if (m === 2 || m === 9) {
         // Slotvergabe zum Sommer- (1. April) bzw. Winterflugplan (1. Oktober): neue Slots an jedem Flughafen, dann die Warteliste der Reihe nach
         for (const c in this.slotCap) this.slotCap[c] += 1;
+        // Gewachsene Flughäfen bauen aus: zusätzliche Slots nach Verkehrswachstum
+        for (const [c, v] of Object.entries(this.aptObs || {})) { const base = Math.max(0.3, ap(c).pax || 0); if (v > base * 1.15 && this.slotCap[c] !== undefined && apx(c).slots !== null) this.slotCap[c] += Math.min(12, Math.round(2 + 3 * Math.log2(v / base))); }
         for (const al of this.list) al.cleanHolds(this.day + 1);
         const before = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
         this.allocateWaitlist();
@@ -2813,7 +3058,7 @@ const SM = (() => {
       al.prog.lv = c.next; al.prog.since = this.day;
       al.prog.hist = [...(al.prog.hist || []), { lv: c.next, day: this.day }];
       al.brand = clamp(al.brand + 0.01, 0.05, 0.95);
-      al.log(this.day, `Neue Phase ${c.next + 1}: ${c.label}. Freigeschaltet: ${careerUnlockTxt(c.next)}`, 'good');
+      al.log(this.day, `Neue Phase ${c.next + 1}: ${careerUnlockTxt(c.next)}`, 'good');
       if (this.humans.length > 1) this.pushNews(this.day, `${al.name} steigt auf: Phase ${c.next + 1} „${c.label}“`, 'info', al.id);
       return true;
     }
@@ -2883,7 +3128,7 @@ const SM = (() => {
         const pool = Object.keys(P.AIRCRAFT_TYPES).filter((k) => { const tt = P.AIRCRAFT_TYPES[k]; return !tt.launch && (!tt.worldMax || this.typeCount(k) + this.acMarket.filter((o) => o.type === k).length < tt.worldMax); });
         let typeId = pool[0]; { let tw = 0; for (const k of pool) tw += P.AIRCRAFT_TYPES[k].marketWeight ?? 1; let x = r.random() * tw; for (const k of pool) { x -= P.AIRCRAFT_TYPES[k].marketWeight ?? 1; if (x <= 0) { typeId = k; break; } } }
         const t = P.AIRCRAFT_TYPES[typeId];
-        const age = t.age >= 10 ? r.int(t.age - 3, t.age + 7) : r.random() < 0.3 ? r.int(0, 2) : r.int(3, 16);
+        const age = Math.min(t.maxAge ?? 99, t.age >= 10 ? r.int(t.age - 3, t.age + 7) : r.random() < 0.3 ? r.int(0, 2) : r.int(3, 16));
         const rel = Math.max(0, age - t.age);
         // Verborgener Zustand: 1 = normal, < 1 gepflegt, > 1 verbraucht. Nur ein Gutachter sieht ihn genau; der Preis verrät wenig.
         const cond = age < 3 ? r.range(0.9, 1.05) : r.random() < 0.25 ? r.range(1.3, 1.65) : r.random() < 0.3 ? r.range(0.65, 0.85) : r.range(0.88, 1.15);
@@ -2894,8 +3139,22 @@ const SM = (() => {
       }
       this.acmiOffers = this.acmiOffers.filter((o) => o.expires > day);
       // Charteranfragen: mehr als früher und bevorzugt für Muster, die Spielende auch fliegen
-      const humanTypes = this.humans.filter((h) => !h.removed && h.status !== 'insolvent').flatMap((h) => h.fleet.map((a) => a.type_id));
-      while (this.acmiOffers.filter((o) => !o.ev).length < P.ACMI.n) {
+      const allHT = this.humans.filter((h) => !h.removed && h.status !== 'insolvent').flatMap((h) => h.fleet.map((a) => a.type_id)), humanTypes = allHT.filter((t) => !P.AIRCRAFT_TYPES[t].role);
+      // Privatjet- und Frachtcharter: eigene Kundschaft, eigene Muster
+      for (const kind of ['biz', 'cargo']) {
+        const pool = Object.keys(P.AIRCRAFT_TYPES).filter((k) => P.AIRCRAFT_TYPES[k].role === kind), mine = allHT.filter((t) => P.AIRCRAFT_TYPES[t].role === kind);
+        const want = P.ACMI[kind] + (mine.length ? Math.min(6, Math.ceil(mine.length / 2)) : 0);
+        let guard = 0;
+        while (this.acmiOffers.filter((o) => o.kind === kind).length < want && guard++ < 20) {
+          const typeId = mine.length && r.random() < 0.7 ? r.pick(mine) : r.pick(pool), t = P.AIRCRAFT_TYPES[typeId];
+          const start = day + r.int(5, 30), dur = kind === 'biz' ? r.pick([2, 3, 4, 5, 7, 10, 14]) : r.pick([14, 30, 30, 60, 90, 120, 180]);
+          const client = kind === 'biz' ? r.pick(['Vorstand eines DAX-Konzerns', 'Fußballverein zum Auswärtsspiel', 'Musikstar auf Tournee', 'Regierungsdelegation', 'Investmentbank für eine Roadshow', 'Filmproduktion', 'Familie auf Weltreise', 'Formel-1-Team', 'Organspende-Transport']) : r.pick(['Paketdienst für die Nachtfracht', 'Onlinehändler im Weihnachtsgeschäft', 'Spedition für Autoteile', 'Pharmakonzern (Kühlfracht)', 'Hilfsorganisation nach einer Katastrophe', 'Post für die Briefnacht', 'Expressdienst', 'Blumengroßmarkt (Frischware)']);
+          const short = kind === 'biz' ? (dur <= 4 ? 1.35 : dur <= 7 ? 1.2 : 1.08) : dur <= 30 ? 1.1 : 1;
+          const peak = kind === 'cargo' && [9, 10, 11].includes(monthOf(start)) ? 1.15 : 1;
+          this.acmiOffers.push({ id: 'W' + (++this.offerCounter), kind, client, type: typeId, start, end: start + dur, rate: Math.round(t.acmi_day * P.ACMI.rate * short * peak * r.range(0.9, 1.2) * this.macro.cpi / 100) * 100, expires: start - 2 });
+        }
+      }
+      while (this.acmiOffers.filter((o) => !o.ev && !o.kind).length < P.ACMI.n) {
         const typeId = humanTypes.length && r.random() < P.ACMI.humanShare ? r.pick(humanTypes) : r.pick(['AT76', 'DH8D', 'E295', 'BCS3', 'A20N', 'A20N', 'B38M', 'A21N', 'A339', 'B789', 'A359']), t = P.AIRCRAFT_TYPES[typeId];
         const start = day + r.int(10, 35), dur = r.pick([7, 14, 21, 30, 45, 60, 90]);
         const client = r.pick(['Reiseveranstalter SunTours', 'Netzwerkcarrier mit Flugzeugmangel', 'Sportverband für Mannschaftsflüge', 'Kreuzfahrtreederei', 'Ferienairline in der Hochsaison', 'Regierungsdelegation', 'Airline nach Triebwerksschaden', 'Konzertagentur auf Tournee']);
@@ -3397,7 +3656,7 @@ const SM = (() => {
     }
     /** Großereignis: Charteranfragen für Fans, Mannschaften, Pilger – deutlich über der üblichen Rate. */
     eventCharters(ev, y, S, apts) {
-      const r = this.rng, E = P.ACMI.ev, humanTypes = this.humans.filter((h) => !h.removed && h.status !== 'insolvent').flatMap((h) => h.fleet.map((a) => a.type_id));
+      const r = this.rng, E = P.ACMI.ev, humanTypes = this.humans.filter((h) => !h.removed && h.status !== 'insolvent').flatMap((h) => h.fleet.map((a) => a.type_id)).filter((t) => !P.AIRCRAFT_TYPES[t].role);
       const sport = /WM|EM|Olymp|Paralymp|Spiele|Rugby|Cricket/.test(ev.label);
       const n = ev.key === 'hajj' ? 2 : sport && ev.dur > 20 ? 2 : 1;
       for (let i = 0; i < n; i++) {
@@ -3414,7 +3673,7 @@ const SM = (() => {
     acceptAcmi(al, offerId, acId) {
       const o = this.acmiOffers.find((x) => x.id === offerId), a = al.fleet.find((x) => x.id === acId);
       if (!o || !a) return { ok: false, msg: 'Angebot oder Flugzeug nicht gefunden.' };
-      if (a.type_id !== o.type && P.AIRCRAFT_TYPES[a.type_id].group !== P.AIRCRAFT_TYPES[o.type].group) return { ok: false, msg: `Der Kunde will eine ${P.AIRCRAFT_TYPES[o.type].label} oder ein Muster derselben Familie.` };
+      if (a.type_id !== o.type && (P.AIRCRAFT_TYPES[a.type_id].group !== P.AIRCRAFT_TYPES[o.type].group || (P.AIRCRAFT_TYPES[a.type_id].role || '') !== (P.AIRCRAFT_TYPES[o.type].role || ''))) return { ok: false, msg: `Der Kunde will eine ${P.AIRCRAFT_TYPES[o.type].label} oder ein Muster derselben Familie${P.AIRCRAFT_TYPES[o.type].role === 'cargo' ? ' als Frachter' : P.AIRCRAFT_TYPES[o.type].role === 'biz' ? '' : ' mit Passagierkabine'}.` };
       const clash = acmiList(a, this.day).find((b) => o.start < b.end && o.end > b.start);
       if (clash) return { ok: false, msg: `${a.id} ist vom ${dayDE(clash.start)} bis ${dayDE(clash.end)} schon an ${clash.client} verchartert – der Zeitraum überschneidet sich.`, clash: { start: clash.start, end: clash.end, client: clash.client } };
       if (a.delivery_day > o.start) return { ok: false, msg: 'Das Flugzeug ist bis dahin noch nicht geliefert.' };
@@ -3435,7 +3694,8 @@ const SM = (() => {
     }
     openBase(al, apt) {
       if (al.bases.includes(apt)) return { ok: false, msg: 'Dort sind Sie schon.' };
-      const lic = Math.max(0, licenceFee(this, apt) - (al.stations[apt] ? stationFee(this, apt) : 0)), bx = softX(al, 'base');   // wer dort schon eine Station hat, zahlt nur die Differenz
+      const appr = baseApproval(al, apt); if (!appr.ok) return { ok: false, msg: appr.msg, rejected: true };
+      const lic = Math.max(0, licenceFee(this, apt) * appr.x - (al.stations[apt] ? stationFee(this, apt) : 0)), bx = softX(al, 'base');   // wer dort schon eine Station hat, zahlt nur die Differenz
       const setup = baseSetupCost(this, apt) * bx, sl = al.isPlayer ? baseSlotCost(this, apt, al) : 0;
       if (al.spendable(this.macro.bank ?? 1) < setup + lic + sl) return { ok: false, msg: `Für die Basis (${Math.round((setup + lic + sl) / 1000)} Tsd. EUR${lic ? ' inkl. Lizenz' : ''}${sl ? ' und drei Slots' : ''}) reicht auch der Dispo nicht.` };
       al.bases.push(apt); al.station(apt);
@@ -3745,7 +4005,7 @@ const SM = (() => {
       const pairs = own.concat(cand.slice(0, Math.max(4, Math.round(T.cand / 8))).map(([o, d]) => ({ o, d, fare: Math.round(refPrice(o, d, w.macro.cpi)), own: false })));
       res.pairsNew = pairs.filter((p) => !p.own).map((p) => pairKey(p.o, p.d));
       if (skipped.n && prev.length) res.notes.unshift(`Neue Kandidaten-Strecken statt der ${Math.min(skipped.n, 99)} aus früheren Flottenstudien – Ihre eigenen Strecken sind immer dabei.`);
-      const types = Object.keys(P.AIRCRAFT_TYPES).filter((t) => { const X = P.AIRCRAFT_TYPES[t]; return !(X.launch && w.day < X.launch + 365) && (X.stock !== 0 || al.fleet.some((a) => a.type_id === t)); });
+      const types = Object.keys(P.AIRCRAFT_TYPES).filter((t) => { const X = P.AIRCRAFT_TYPES[t]; return !X.role && !(X.launch && w.day < X.launch + 365) && (X.stock !== 0 || al.fleet.some((a) => a.type_id === t)); });
       const tab = [];
       for (const t of types) {
         let sum = 0, n = 0, best = null;
@@ -4208,6 +4468,7 @@ const SM = (() => {
     w.macro.cycle = { phase: w.rng.range(0, 6.283), period: w.rng.int(40, 70), amp: diff.cycle };
     for (const [id, setup] of Object.entries(AI_SETUP)) bootstrapAi(w, id, setup, RIVALS[w.rivals].sigma);
     w.initSlots();
+    anchorAis(w);
     w.refreshOffers();
     setFuelX(w);
     return w;
@@ -4489,6 +4750,17 @@ const SM = (() => {
   // Kapitalmarkt: Aktien, Beteiligungen, Dividenden, Kapitalerhöhung, Rückkauf, Anleihen
   // ---------------------------------------------------------------------------
   const capState = (al) => al.cap || (al.cap = { ext: al.isPlayer ? 0 : 1, sent: 1, hist: [], div: al.isPlayer ? 0.25 : P.CAPITAL.divAI, last: -999 });
+  /** Ankeraktionäre (Staat, Gründerfamilie, Fonds): Bei großen KI-Airlines ist nur ein Teil der Aktien frei handelbar. Bestehende Beteiligungen bleiben unangetastet. */
+  function anchorAis(w) {
+    const A = P.CAPITAL.anchor, ais = w.list.filter((a) => a.archetype && a.status !== 'insolvent' && !a.removed).sort((a, b) => b.fleet.length - a.fleet.length || (a.id < b.id ? -1 : 1));
+    const n = ais.length;
+    ais.forEach((T, i) => {
+      const c = capState(T); if (c.anchor) return;
+      const g = new Rng(hashStr('anchor:' + T.id + ':' + w.seed)), rg = i < n / 3 ? A.top : i < 2 * n / 3 ? A.mid : null;
+      const target = rg ? Math.round(g.range(rg[0], rg[1]) * 100) / 100 : 1;
+      c.ext = Math.max(target, holdersOf(w, T).reduce((x, h) => x + h.f, 0)); c.anchor = Math.round((1 - c.ext) * 100) / 100 || 0.001;
+    });
+  }
   const stakeOf = (B, T) => (B && T && B.stakes && B.stakes[T.id] ? B.stakes[T.id].f : 0);
   function holdersOf(w, T) { const out = []; for (const B of w.list) if (B !== T && B.stakes && B.stakes[T.id] && B.stakes[T.id].f > 1e-6) out.push({ al: B, f: B.stakes[T.id].f, book: B.stakes[T.id].book }); return out; }
   /** Mutterkonzern einer KI-Airline: Spielende mit der Mehrheit (nur eine möglich). */
@@ -4698,13 +4970,16 @@ const SM = (() => {
   function maValue(w, ai, buyer = null) {
     const bs = balanceSheet(ai), C = P.CAPITAL, cap = mktCap(w, ai), f = buyer ? stakeOf(buyer, ai) : 0, rest = Math.max(0, 1 - f);
     const mult = f >= C.majority ? C.tender : C.hostile;
-    const price = Math.max(P.MA.min * w.macro.cpi * rest, cap * rest * mult) * (buyer ? softX(buyer, 'ma') : 1);
-    return { equity: Math.round(bs.equity), profM: Math.round(annualResult(ai) / 12), cap: Math.round(cap), f, rest, mult, price: Math.round(price / 1e5) * 1e5, fleet: ai.fleet.length, routes: ai.activeRoutes().length, bases: ai.bases.slice() };
+    const anc = Math.min(rest, 1 - capState(ai).ext), ancX = anc > 0.001 ? cap * anc * C.anchor.prem : 0;
+    const price = (Math.max(P.MA.min * w.macro.cpi * rest, cap * rest * mult) + ancX) * (buyer ? softX(buyer, 'ma') : 1);
+    return { anchor: anc, ancX: Math.round(ancX), equity: Math.round(bs.equity), profM: Math.round(annualResult(ai) / 12), cap: Math.round(cap), f, rest, mult, price: Math.round(price / 1e5) * 1e5, fleet: ai.fleet.length, routes: ai.activeRoutes().length, bases: ai.bases.slice() };
   }
   function maBlock(w, al, ai) {
     if (!al.isPlayer) return 'Nur Spielende können übernehmen.';
     if (!ai || ai.isPlayer || !ai.archetype) return 'Übernehmen lassen sich nur KI-Airlines.';
     if (ai.status === 'insolvent') return `${ai.name} ist nicht mehr am Markt.`;
+    { const c = capState(ai), anc = 1 - c.ext;
+      if (anc > 0.001 && al.fleet.length < P.CAPITAL.anchor.buyerSize * ai.fleet.length) return `Die Ankeraktionäre von ${ai.name} (${Math.round(anc * 100)} % der Aktien) verkaufen nur an eine vergleichbar große Airline: Ihre Flotte bräuchte mindestens ${Math.ceil(P.CAPITAL.anchor.buyerSize * ai.fleet.length)} Flugzeuge (jetzt ${al.fleet.length}).`; }
     return null;
   }
   function takeover(w, al, targetId) {
@@ -5240,7 +5515,7 @@ const SM = (() => {
     if (mode === 'buy') return (offer ? offer.price : t.value_eur) * duty * oldF * rk.down + intro;
     if (mode === 'factory') return t.value_eur * 1.08 * duty * rk.down + intro;
     if (mode === 'flex') return intro;
-    return rk.dep * (offer ? offer.lease_month : t.lease_month) * rk.lease * duty * oldF * (P.EURUSD / eurusd) + intro;
+    return rk.dep * (offer ? offer.lease_month : t.lease_month) * rk.lease * duty * oldF * (offer ? 1 : shockX(w, 'lease')) * (P.EURUSD / eurusd) + intro;
   }
   function staffPlanOf(al, horizon, day) {
     const need = al.staffNeedPlanned(horizon, day), st = al.staff;
@@ -5265,6 +5540,7 @@ const SM = (() => {
     const ac = al.fleet.find((x) => x.id === a.acId);
     if (!ac) return { ok: false, msg: 'Flugzeug nicht gefunden.' };
     const mode = ['auto', 'manual', 'reserve', 'charter'].includes(a.mode) ? a.mode : 'auto';
+    if (P.AIRCRAFT_TYPES[ac.type_id].role && mode !== 'charter') return { ok: false, msg: `${P.AIRCRAFT_TYPES[ac.type_id].label} fliegt nur Charter.` };
     const label = ac.id.replace(al.id + '-', (al.code || 'SM') + '-');
     if (mode !== 'manual') {
       ac.mode = mode; ac.pins = [];
@@ -5325,6 +5601,8 @@ const SM = (() => {
       case 'openRoute': {
         const { base, dest } = a, type = a.typeId, wk = a.wk !== undefined && a.wk !== null ? clamp(Math.round(num(a.wk, 7)), 1, 7) : 7, freq = wk < 7 ? 1 : clamp(Math.round(num(a.freq, 1)), 1, 8);
         if (!al.bases.includes(base) || !P.AIRPORTS[dest] || !P.AIRCRAFT_TYPES[type] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
+        { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %).` }; }
+        if (P.AIRCRAFT_TYPES[type].role) return { ok: false, msg: `${P.AIRCRAFT_TYPES[type].label} fliegt keine Linie – ${P.AIRCRAFT_TYPES[type].role === 'cargo' ? 'Frachter' : 'Privatjets'} arbeiten im Charter-Pool (Flotte → Charter).` };
         if (!routeKmOk(base, dest)) return { ok: false, msg: 'Unter 300 km lohnt kein Flug.' };
         if (!aptOk(base, dest, type)) return { ok: false, msg: aptWhy(base, dest, type) };
         if (!rangeOk(base, dest, type)) return { ok: false, msg: 'Reichweite zu kurz.' };
@@ -5399,9 +5677,10 @@ const SM = (() => {
           if (t.maxPerAirline && al.fleet.filter((x) => x.type_id === type).length >= t.maxPerAirline) return { ok: false, msg: `Höchstens ${t.maxPerAirline} × ${t.label} je Airline.` };
           if (!offer && t.stock === 0) return { ok: false, msg: `${t.label} gibt es nur gebraucht – Flotte → Beschaffung → Gebrauchtmarkt.` }; }
         const base = al.bases.includes(a.base) ? a.base : al.bases[0];
+        if (mode === 'lease' || mode === 'flex') { const rk = riskTerms(al, type); if (rk.reject) return { ok: false, msg: rk.reject, rejected: true }; }
         if (al.spendable(w.macro.bank ?? 1) < acquireCost(al, type, mode, offer, w.macro.eurusd, w)) return { ok: false, msg: 'Dafür reicht auch der Dispo nicht.' };
         const x = offer ? w.takeMarketAircraft(al, offer.id, mode, base).ac : al.acquire(day, type, base, mode, null, w);
-        if (x) careerNoteAcq(w, al);
+        if (x) careerNoteAcq(w, al, mode === 'lease' || mode === 'flex');
         if (!x) return { ok: false, msg: `Beim Leasinggeber ist gerade keine ${P.AIRCRAFT_TYPES[type].label} verfügbar – andere Airlines haben den Bestand leer gekauft. Gebrauchtmarkt, Auktion, Werksbestellung oder nächsten Monat erneut versuchen.` };
         return { ok: true, acId: x.id, delivery: x.delivery_day, base };
       }
@@ -5596,7 +5875,7 @@ const SM = (() => {
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      aptObs: w.aptObs || {}, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
@@ -5610,7 +5889,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -5623,7 +5902,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -5675,6 +5954,9 @@ const SM = (() => {
       }
       w.slotV = 3;
     }
+    // 0.19: Ankeraktionäre bei großen KI-Airlines, Konzern-Ausschüttung höchstens 50 %
+    if (!w.list.some((a) => a.archetype && a.cap && a.cap.anchor)) anchorAis(w);
+    for (const T of w.list) if (T.cap && T.archetype && T.cap.div > 0.5) T.cap.div = 0.5;
     // ältere Stände: Airlines ohne Phase bekommen die Phase, die ihrer heutigen Größe entspricht
     w.mode = 'career';
     for (const al of w.list) if (al.isPlayer && !al.prog) careerMigrate(w, al);
@@ -5686,7 +5968,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, baseApproval, aptClass, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;

@@ -364,6 +364,9 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.equal(pf.heldAt('FRA', wf.day), 3, 'drei Basis-Slots in Frankfurt');
   assert.ok(SMx.baseSlotCost(wf, 'FRA') > 5 * SMx.baseSlotCost(wf, 'HAJ'), 'Basis-Slots an Drehkreuzen viel teurer');
   pf.ledger.cashOnly(2e8, 't');
+  { const r0 = A({ type: 'openBase', apt: 'MUC' }); assert.equal(r0.ok, false, 'München lehnt eine junge Airline ab'); assert.ok(r0.rejected && /Ansehen/.test(r0.msg), 'Absage mit Begründung'); }
+  pf.brand = 1; pf._st = null;   // starke Marke: München sagt unter Auflagen zu
+  assert.equal(SMx.baseApproval(pf, 'MUC').cond, true, 'Zusage unter Auflagen');
   assert.equal(A({ type: 'openBase', apt: 'MUC' }).ok, true, 'zweite Basis');
   assert.equal(pf.heldAt('MUC', wf.day), 3, 'drei Basis-Slots in München');
   A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'FRA' }); for (let i = 0; i < 15; i++) wf.step();
@@ -420,7 +423,7 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const tr = T.activeRoutes()[0]; assert.ok(tr, 'Tochter fliegt');
   const o = A({ type: 'openRoute', base: 'HAM', dest: tr.dest === 'HAM' ? tr.base : tr.dest, typeId: 'A20N', freq: 1 });
   { const mr = pg.activeRoutes()[0]; if (mr) { const before = wg.competitorFares('NOPE', mr.base, mr.dest).length, sub = wg.competitorFares(T.id, mr.base, mr.dest).length; assert.ok(sub < before || before === 0, 'Tochter zählt die Mutter nicht als Preiskonkurrenz'); } }
-  assert.equal(A({ type: 'groupDiv', t: T.id, v: 0.6 }).ok, true, 'Ausschüttung steuern');
+  assert.equal(A({ type: 'groupDiv', t: T.id, v: 0.5 }).ok, true, 'Ausschüttung steuern'); assert.equal(A({ type: 'groupDiv', t: T.id, v: 0.9 }).ok, false, 'höchstens 50 %');
   const c0 = pg.ledger.cash, sp = A({ type: 'groupSpecial', t: T.id });
   assert.equal(sp.ok, true, 'Sonderausschüttung: ' + sp.msg); assert.ok(pg.ledger.cash > c0, 'Geld fließt');
   assert.equal(A({ type: 'groupSpecial', t: T.id }).ok, false, 'nur alle 90 Tage');
@@ -449,7 +452,9 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
 { const SMx = (await import('../shared/engine.cjs')).default;
   const w6 = SMx.newGame({ seed: 9, base: 'HAJ', mode: 'career' }), p6 = w6.player, A6 = (a) => SMx.applyAction(w6, p6.id, a);
   assert.equal(SMx.careerLv(p6), 0, 'Karriere startet in Phase 1');
-  assert.ok(SMx.riskTerms(p6, 'B789').lease > 1.5 && SMx.riskTerms(p6, 'DH8D').lease === 1, 'Risikoaufschlag für große Muster');
+  assert.ok(SMx.riskTerms(p6, 'B789').reject && !SMx.riskTerms(p6, 'DH8D').reject && !SMx.riskTerms(p6, 'AT76').cond && !SMx.riskTerms(p6, 'E295').reject, 'Ansehen: 787 abgelehnt, Turboprops und Regionaljets zugesagt');
+  assert.ok(SMx.riskTerms(p6, 'A20N').cond && !SMx.riskTerms(p6, 'A20N').reject && SMx.riskTerms(p6, 'A20N').lease > 1.15, 'A320neo zum Start nur unter Auflagen');
+  { const st0 = SMx.standingOf(p6, w6.day).v; assert.ok(st0 >= 15 && st0 <= 35, 'Startansehen um 25: ' + st0); }
   const k0 = w6.knowOf(p6, 'HAJ', 'MUC'); assert.ok(k0.lv <= 1 && k0.sigma > 0.2, 'ohne Studie nur grobes Marktwissen');
   assert.equal(A6({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAJ' }).ok, true, 'Dash 8 leasen');
   const r6 = A6({ type: 'openRoute', base: 'HAJ', dest: 'NUE', typeId: 'DH8D', freq: 1, wk: 4, fo: 100, fi: 100 }); assert.equal(r6.ok, true, '4x pro Woche: ' + r6.msg);
@@ -459,7 +464,10 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     assert.ok(c0 - p6.ledger.cash > 1.9 * SMx.baseSetupCost(w6, 'BRE') * 100, 'Aufschlag auf die zweite Basis in Phase 1'); }
   const ai6 = w6.list.find((a) => a.archetype && a.status !== 'insolvent');
   assert.ok(SMx.maValue(w6, ai6, p6).price > SMx.maValue(w6, ai6).price * 1.4, 'Übernahme vor Phase 3 mit Aufschlag');
-  { const rA = SMx.riskTerms(p6, 'DH8D'); A6({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAJ' }); const rB = SMx.riskTerms(p6, 'DH8D'); assert.ok(rB.lease > rA.lease, 'schnelles Wachstum kostet Aufschlag'); }
+  { const l0 = SMx.leaseRoom(p6, w6.day).left; A6({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAJ' }); assert.equal(SMx.leaseRoom(p6, w6.day).left, l0 - 1, 'jeder Leasingvertrag zählt');
+    for (let i = 0; i < 8; i++) A6({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAJ' });
+    const rj = A6({ type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'HAJ' }); assert.ok(!rj.ok && rj.rejected, 'Leasinggeber bremsen schnelles Wachstum');
+    p6.ledger.cashOnly(3e7, 't'); assert.equal(A6({ type: 'acquire', typeId: 'DH8D', mode: 'buy', base: 'HAJ' }).ok, true, 'Kaufen geht trotzdem'); }
   { const wL = SMx.newGame({ seed: 4, base: 'LHR' }), pL = wL.player; const ok3 = [0, 1, 2].map(() => SMx.applyAction(wL, pL.id, { type: 'acquire', typeId: 'B789', mode: 'lease', base: 'LHR' }).ok).filter(Boolean).length;
     assert.ok(ok3 < 3, 'zum Start keine drei 787 in London'); }
   const px = Buffer.alloc(2048); px[10] = 0x21; const pr = A6({ type: 'setPixLogo', pal: ['#112233', '#ffcc00'], px: px.toString('base64') }); assert.equal(pr.ok, true, 'Pixel-Logo');
@@ -472,4 +480,59 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   for (let i = 0; i < 5; i++) w7.step();
   const rt = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w6)))); assert.equal(rt.mode, 'career'); assert.ok(rt.player.prog && rt.player.pixLogo && rt.player.mk, 'Speichern/Laden 0.16');
   console.log('0.16 ok: Phasen immer aktiv, Risikoaufschlag, Wachstumsaufschlag, keine drei 787 zum Start, Marktwissen + Studie, 4x/Woche, Slots als Vermögen, Basis mit Aufschlag, Übernahme (' + t7.fleet + ' Flugzeuge), Pixel-Logo'); }
+// 0.19: Ansehen, Schocks, Ankeraktionäre, Flughafenwachstum, Privatjets und Frachter, Endspiel
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newGame({ seed: 21, base: 'HAJ' }), p = w.player, A = (a) => SMx.applyAction(w, p.id, a);
+  // Start bleibt möglich: Turboprop und Regionaljet ohne Auflagen, Strecke eröffnen
+  assert.equal(A({ type: 'acquire', typeId: 'AT76', mode: 'lease', base: 'HAJ' }).ok, true, 'ATR zum Start');
+  assert.equal(A({ type: 'acquire', typeId: 'E295', mode: 'lease', base: 'HAJ' }).ok, true, 'E195-E2 zum Start');
+  const rb = A({ type: 'acquire', typeId: 'B789', mode: 'lease', base: 'HAJ' }); assert.ok(!rb.ok && rb.rejected, '787 wird abgelehnt');
+  for (let i = 0; i < 16; i++) w.step();
+  const ro = ['VIE', 'CPH', 'ZRH', 'AMS', 'BCN', 'NCE', 'PRG'].map((d) => A({ type: 'openRoute', base: 'HAJ', dest: d, typeId: 'E295', freq: 1 })).find((x) => x.ok) || { ok: false, msg: 'keine Strecke' }; assert.equal(ro.ok, true, 'erste Strecke: ' + ro.msg);
+  const ba = SMx.baseApproval(p, 'FRA'); assert.ok(!ba.ok && /Ansehen/.test(ba.msg), 'Frankfurt lehnt Basis ab');
+  assert.ok(SMx.baseApproval(p, 'BRE').ok, 'Bremen sagt zu');
+  for (let i = 0; i < 200; i++) w.step();
+  const st = SMx.standingOf(p, w.day).v; assert.ok(st > 30, 'Ansehen wächst mit Flugbetrieb: ' + st);
+  // A350-1000ULR: Sydney–London nonstop
+  assert.ok(SMx.rangeOk('SYD', 'LHR', 'A35U') && !SMx.rangeOk('SYD', 'LHR', 'A35K'), 'A350-1000ULR schafft SYD–LHR');
+  // Schocks verändern Rechengrundlagen
+  const w2 = SMx.newGame({ seed: 5, base: 'FRA' }), p2 = w2.player; for (let i = 0; i < 100; i++) w2.step();
+  const d0 = SMx.leaseDelivery(w2, 'A20N', 'lease'), r0 = w2.macro.rate;
+  w2.addEvent({ type: 'supply_chain', mxX: 1.25, leaseX: 1.15, delay: 60, scope: 'all', end: w2.day + 400, text: 'Test Lieferkette', severity: 'crit' });
+  w2.addEvent({ type: 'credit_crunch', rateD: 0.02, req: 10, scope: 'all', end: w2.day + 400, text: 'Test Kreditkrise', severity: 'crit' });
+  assert.equal(SMx.leaseDelivery(w2, 'A20N', 'lease'), d0 + 60, 'Lieferkette verlängert Auslieferung');
+  assert.ok(Math.abs(SMx.shockX(w2, 'mx') - 1.25) < 1e-9 && Math.abs(SMx.shockX(w2, 'lease') - 1.15) < 1e-9, 'Wartung und Leasing teurer');
+  w2.step(); assert.ok(SMx.riskTerms(p2, 'A20N').req >= 45, 'Kreditkrise: Leasinggeber verlangen mehr Ansehen');
+  p2.ledger.cashOnly(3e8, 't'); SMx.applyAction(w2, p2.id, { type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'FRA' });
+  for (let i = 0; i < 35; i++) w2.step();
+  const ac = p2.fleet[0]; const g = w2.addEvent({ type: 'grounding', types: ['A20N'], share: 1, delay: 90, comp: 0.5, scope: 'all', end: w2.day + 60, text: 'Test Stilllegung', severity: 'crit' });
+  w2.step(); assert.ok(ac.status === 'aog' && ac.grounded === g.id && ac.until > w2.day + 20, 'Stilllegung: Flugzeug am Boden');
+  assert.ok(SMx.leaseDelivery(w2, 'A20N', 'lease') >= d0 + 90, 'Stilllegung verzögert Auslieferung');
+  // Häufigkeit: in 5 Jahren mehrere der neuen Schocks
+  { const w3 = SMx.newWorld({ seed: 8 }); w3.playerId = null; for (let i = 0; i < 365 * 5; i++) { if (w3.day % 30 === 0) w3.generateMonthlyEvents(); w3.day++; } const ty = new Set(w3.events.map((e) => e.type)); const n = ['credit_crunch', 'grounding', 'supply_chain', 'tourism', 'labor_crisis', 'disaster'].filter((t) => ty.has(t)).length; assert.ok(n >= 3, 'neue Schocks treten auf: ' + [...ty].join(',')); }
+  // Ankeraktionäre: große KI nicht über die Börse zu mehrheitlich
+  const big = w.list.filter((a) => a.archetype).sort((a, b) => b.fleet.length - a.fleet.length)[0];
+  assert.ok(SMx.capState(big).ext < 0.5, 'größte KI hat Ankeraktionäre: ' + SMx.capState(big).ext);
+  assert.ok(/Ankeraktionäre/.test(SMx.maBlock(w, p, big) || ''), 'kleine Airline darf große nicht übernehmen');
+  assert.deepEqual(SMx.P.CAPITAL.group.divOpts, [0, 0.3, 0.5], 'Konzern-Ausschüttung höchstens 50 %');
+  // Flughafen wächst mit dem Verkehr: Code F ab 25 Mio.
+  assert.ok(!SMx.aptOk('HAJ', 'DXB', 'A388'), 'Hannover anfangs zu klein für A380');
+  w.aptObs = { HAJ: 61 }; SMx.setFuelX(w); assert.ok(SMx.aptOk('HAJ', 'DXB', 'A388') && SMx.paxEff('HAJ') === 61, 'gewachsenes Hannover ist Code F');
+  w.aptObs = {}; SMx.setFuelX(w);
+  // Privatjets und Frachter
+  p.ledger.cashOnly(2e8, 't');
+  const bj = A({ type: 'acquire', typeId: 'C68A', mode: 'lease', base: 'HAJ' }); assert.equal(bj.ok, true, 'Privatjet leasen: ' + bj.msg);
+  const jet = p.fleet.find((a) => a.id === bj.acId); assert.equal(jet.mode, 'charter', 'Privatjet steht im Charter-Pool');
+  assert.ok(!A({ type: 'openRoute', base: 'HAJ', dest: 'VIE', typeId: 'C68A', freq: 1 }).ok, 'Privatjet fliegt keine Linie');
+  for (let i = 0; i < 45; i++) w.step();
+  assert.ok(w.acmiOffers.some((o) => o.kind === 'biz') && w.acmiOffers.some((o) => o.kind === 'cargo'), 'Privatjet- und Frachtanfragen');
+  const ob = w.acmiOffers.find((o) => o.kind === 'biz' && o.start > w.day && SMx.P.AIRCRAFT_TYPES[o.type].group === 'BIZ');
+  if (ob) assert.equal(A({ type: 'acmi', offerId: ob.id, acId: jet.id }).ok, true, 'Privatjet-Charter angenommen');
+  const oc = w.acmiOffers.find((o) => o.kind === 'cargo' && o.type === 'AT7F'); const atr = p.fleet.find((a) => a.type_id === 'AT76');
+  if (oc && atr) assert.ok(!A({ type: 'acmi', offerId: oc.id, acId: atr.id }).ok, 'Passagier-ATR fliegt keine Fracht');
+  // Endspiel: Verwaltung wächst überproportional
+  const hq = (n) => { const x = { isPlayer: true, fleet: { length: n } }; return SMx.Airline.prototype.hqDay.call(x); };
+  assert.ok(hq(200) / 200 > 1.2 * hq(100) / 100 && hq(400) / 400 > hq(200) / 200, 'Verwaltung je Flugzeug steigt ab 100');
+  const rt = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(rt.list.some((a) => a.cap && a.cap.anchor > 0.4), 'Ankeraktionäre gespeichert');
+  console.log('0.19 ok: Start mit ATR/E2, 787 abgelehnt, Ansehen', st, '· Schocks wirken · Anker', Math.round((1 - SMx.capState(big).ext) * 100), '% bei', big.name, '· Code F nach Wachstum · Privatjet', ob ? 'verchartert' : 'ohne passende Anfrage', '· HQ', Math.round(hq(100)), '/', Math.round(hq(200)), '/', Math.round(hq(400))); }
 console.log('Alle Prüfungen bestanden.');

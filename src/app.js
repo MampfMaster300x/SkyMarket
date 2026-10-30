@@ -396,7 +396,7 @@ function sstSvg(t, o) {
   let win = ''; for (let x = x0 + 34; x < xe - L * 0.24; x += 5.2) win += `<rect x="${f(x)}" y="${f(cy - 2.6)}" width="2" height="2.6" rx=".9"/>`;
   const gear = `<line x1="${f(x0 + 44)}" y1="${f(bot)}" x2="${f(x0 + 44)}" y2="${f(bot + 10)}" stroke="var(--gear)" stroke-width="1.2"/><circle cx="${f(x0 + 44)}" cy="${f(bot + 11)}" r="2.4" fill="var(--gear)"/>
     <line x1="${f(x0 + L * 0.6)}" y1="${f(bot + 3)}" x2="${f(x0 + L * 0.6)}" y2="${f(bot + 10)}" stroke="var(--gear)" stroke-width="1.6"/><circle cx="${f(x0 + L * 0.6)}" cy="${f(bot + 11.5)}" r="3" fill="var(--gear)"/>`;
-  const label = code ? `<text x="${f(xe - L * 0.065)}" y="${f(top - 11)}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="8" fill="${o.ink || 'var(--on-accent)'}">${esc(code)}</text>` : '';
+  const label = o.pix ? `<image${o.pixId ? ` id="${o.pixId}"` : ''} href="${o.pix}" x="${f(xe - L * 0.065 - 6.5)}" y="${f(top - 20)}" width="13" height="13" style="image-rendering:pixelated"/>` : code ? `<text x="${f(xe - L * 0.065)}" y="${f(top - 11)}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="8" fill="${o.ink || 'var(--on-accent)'}">${esc(code)}</text>` : '';
   return `<svg class="${o.cls || 'acv'}" viewBox="0 0 320 76" role="img" aria-label="${esc(t.label)}">
     <ellipse cx="160" cy="${f(bot + 14)}" rx="${f(L * 0.42)}" ry="2.2" fill="#000" opacity=".1"/>${gear}
     <path d="${fin}" fill="${color}"/><path d="${fus}" fill="var(--fus)" stroke="var(--fus-line)" stroke-width=".9"/>
@@ -422,7 +422,7 @@ function acSvg(id, o = {}) {
   const stab = prop
     ? `M${f(xe - L * 0.11)},${f(top - fh + 1)} L${f(xe - L * 0.0)},${f(top - fh - 1.5)} L${f(xe + 1)},${f(top - fh + 0.5)} L${f(xe - L * 0.1)},${f(top - fh + 2.5)}Z`
     : `M${f(xe - L * 0.14)},${f(top + h * 0.45)} L${f(xe - L * 0.015)},${f(top + h * 0.12)} L${f(xe - L * 0.01)},${f(top + h * 0.3)} L${f(xe - L * 0.11)},${f(top + h * 0.6)}Z`;
-  const cabinX0 = x0 + h * 1.7, cabinX1 = xe - L * 0.25, n = Math.floor((cabinX1 - cabinX0) / 6.3);
+  const cabinX0 = x0 + h * 1.7, cabinX1 = xe - L * 0.25, n = I.cargo ? 0 : Math.floor((cabinX1 - cabinX0) / 6.3);
   let win = '';
   for (let k = 0; k < n; k++) win += I.deck2 ? `<rect x="${f(cabinX0 + k * 6.3)}" y="${f(top + 5)}" width="2.8" height="3.2" rx="1.2"/><rect x="${f(cabinX0 + k * 6.3)}" y="${f(top + 14)}" width="2.8" height="3.4" rx="1.2"/>` : `<rect x="${f(cabinX0 + k * 6.3)}" y="${f(cy - h * 0.2)}" width="2.8" height="3.4" rx="1.2"/>`;
   // 747: Buckel mit Oberdeck vorn
@@ -454,7 +454,7 @@ function acSvg(id, o = {}) {
     gear = `<line x1="${f(x0 + h * 1.45)}" y1="${f(bot - 1)}" x2="${f(x0 + h * 1.45)}" y2="${f(bot + 6)}" stroke="var(--gear)" stroke-width="1.2"/><circle cx="${f(x0 + h * 1.45)}" cy="${f(bot + 7)}" r="2.6" fill="var(--gear)"/>
       <line x1="${f(gx)}" y1="${f(bot - 1)}" x2="${f(gx)}" y2="${f(bot + 5)}" stroke="var(--gear)" stroke-width="1.6"/><circle cx="${f(gx)}" cy="${f(bot + 7)}" r="3.4" fill="var(--gear)"/>`;
   }
-  const label = code ? `<text x="${f((tailX + xe) / 2 + (prop ? 4 : 2))}" y="${f(top - fh * 0.42)}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="${prop ? 8 : 9}" fill="${o.ink || 'var(--on-accent)'}">${esc(code)}</text>` : '';
+  const pixS = prop ? 12 : 14, label = o.pix ? `<image${o.pixId ? ` id="${o.pixId}"` : ''} href="${o.pix}" x="${f((tailX + xe) / 2 + (prop ? 4 : 2) - pixS / 2)}" y="${f(top - fh * 0.42 - pixS * 0.62)}" width="${pixS}" height="${pixS}" style="image-rendering:pixelated" preserveAspectRatio="xMidYMid meet"/>` : code ? `<text x="${f((tailX + xe) / 2 + (prop ? 4 : 2))}" y="${f(top - fh * 0.42)}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="${prop ? 8 : 9}" fill="${o.ink || 'var(--on-accent)'}">${esc(code)}</text>` : '';
   return `<svg class="${o.cls || 'acv'}" viewBox="0 0 320 76" role="img" aria-label="${esc(t.label)}">
     <ellipse cx="160" cy="${f(bot + 10.5)}" rx="${f(L * 0.42)}" ry="2.4" fill="#000" opacity=".1"/>
     ${gear}${prop ? '' : eng}
@@ -560,7 +560,7 @@ function renderPlaneCard() {
   const color = me ? 'var(--accent)' : `var(--ai${al.color})`;
   const hu = !me && !al.archetype;
   box.innerHTML = `<div class="pc-head${me || hu ? '' : ' ai'}"${hu ? ` style="background:linear-gradient(120deg, ${colorOf(al)}, #0b1a33)"` : ''}><div><span class="badge">${ground ? 'Am Boden' : 'In der Luft'}</span><b style="display:block;margin-top:5px">${flightNo(al, l.r, l.dir)}</b><small>${esc(al.name)} · ${t.label}</small></div><button data-pc="close" aria-label="Schließen">×</button></div>
-    ${acSvg(a.type_id, al.logo ? { color: al.logo.c1, ink: al.logo.c2, code: al.code } : { color, code: me ? al.code : al.id.slice(0, 2), ink: me ? 'var(--on-accent)' : '#fff' })}
+    ${acSvg(a.type_id, { ...(al.logo ? { color: al.logo.c1, ink: al.logo.c2, code: al.code } : { color, code: me ? al.code : al.id.slice(0, 2), ink: me ? 'var(--on-accent)' : '#fff' }), pix: al.pixLogo ? pixUrl(al.pixLogo) || null : null })}
     <div class="pc-route"><div><b>${l.a}</b><span>${apName(l.a)}</span></div><i>✈</i><div><b>${l.b}</b><span>${apName(l.b)}</span></div></div>
     <div class="pc-prog"><i style="width:${(f * 100).toFixed(0)}%"></i></div>
     <div class="pc-times"><span>${hhmm((l.t0 % 24 + 24) % 24)}</span><span>${ground ? phase : `${n0(Math.max(0, (1 - f) * (l.t1 - l.t0)) * 60)} Min. verbleibend`}</span><span>${hhmm((l.t1 % 24 + 24) % 24)}</span></div>
@@ -646,7 +646,7 @@ const SECTIONS = [
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung'], ['plans', 'Pläne'], ['slots', 'Slots']] },
   { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['rescue', 'Sanierung'], ['cfo', 'CFO-Beratung']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['exchange', 'Börse'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
-  { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Ziele & Phasen'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
+  { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Ansehen & Ziele'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
 ];
 const TAB_ALIAS = { fleet: 'fleetOwn' };
 const sectionOf = (t) => SECTIONS.find((s) => s.tabs.some(([k]) => k === t)) || SECTIONS[0];
@@ -945,7 +945,7 @@ VIEWS.dashboard = function viewDashboard() {
   const nc = netCash(pl), otp = playerOtp();
   const panel = (title, tab, body, sub = '') => `<section class="dpanel"><div class="dp-head"><b>${title}</b>${sub ? `<span class="small muted">${sub}</span>` : ''}${tab ? `<button class="btn small" data-act="tab" data-tab="${tab}">Öffnen</button>` : ''}</div>${body}</section>`;
   const tile = (l, v, cls, em, go = null) => `<div class="tile${go ? ' tlink' : ''}"${go ? ` data-act="tab" data-tab="${go}" role="button" tabindex="0" title="Verlauf öffnen"` : ''}><span>${l}${go ? ' <i class="tl-go">↗</i>' : ''}</span><b class="${cls || ''}">${v}</b><em>${em || ''}</em></div>`;
-  let html = `<div class="spread"><h2 class="sec">Dashboard <small>${esc(pl.name)} · ${SM.careerOf(pl) ? `Phase ${SM.careerLv(pl) + 1}: ${esc(SM.careerOf(pl).label)}` : pl.stage().label}</small></h2></div>`;
+  let html = `<div class="spread"><h2 class="sec">Dashboard <small>${esc(pl.name)} · Ansehen ${SM.standingOf(pl, W.day).v} · ${SM.careerOf(pl) ? `Phase ${SM.careerLv(pl) + 1}: ${esc(SM.careerOf(pl).label)}` : pl.stage().label}</small></h2></div>`;
   // Kennzahlen
   html += `<div class="tiles dtiles">
     ${tile('Ergebnis ' + MONTHS[dateParts(W.day).m] + ' (lfd.)', eur(cur.net, { plus: true }), sgn(cur.net), `gestern <span class="${sgn(L.lastDay || 0)}">${eur(L.lastDay || 0, { plus: true })}</span>${prev ? ` · Vormonat <span class="${sgn(prev.net)}">${eur(prev.net, { plus: true })}</span>` : ''}`, 'history')}
@@ -1056,6 +1056,7 @@ VIEWS.cockpit = function viewCockpit() {
     <div class="tile"><span>Streckenbeitrag</span><b class="${db2 < 0 ? 'neg' : 'pos'}">${routes.length ? eur(db2, { plus: true }) : '–'}</b><em>pro Tag, Ø 30 Tage</em></div>
     <div class="tile"><span>Marke</span><b>${n0(pl.brand * 100)} / 100</b><em>${pl.maturity(W.day) < 1 ? `wirkt erst zu ${pct(pl.maturity(W.day))} – Bekanntheit wächst im ersten Jahr` : 'Wettbewerber 60–70'}</em></div>
     <div class="tile"><span>Stimmung</span><b class="${pl.staff.morale < 0.5 ? 'warnc' : ''}">${pct(pl.staff.morale)}</b><em>unter 55 % droht Streik</em></div>
+    <div class="tile"><span>Ansehen</span><b>${SM.standingOf(pl, W.day).v} / 100</b><em>Leasinggeber, Banken, Flughäfen</em></div>
     ${SM.careerOf(pl) ? `<div class="tile"><span>Phase</span><b>${SM.careerLv(pl) + 1} · ${esc(SM.careerOf(pl).label)}</b><em>${(() => { const c = SM.careerChecks(W, pl); return c ? `${c.checks.filter((x) => x.ok).length} von ${c.checks.length} Zielen für „${esc(c.label)}“` : 'höchste Phase'; })()}</em></div>` : `<div class="tile"><span>Stufe</span><b>${stg.label}</b><em>${next ? `${next.label} ab ${next.min} Flugzeugen` : 'höchste Stufe'}</em></div>`}
   </div>${careerHtml(pl, true)}`;
   if (last) html += `<p class="small ink2">Abgeschlossener Monat ${MONTHS_L[last.label.m]} ${2027 + last.label.y}: Ergebnis <b class="${lastRes < 0 ? 'neg' : 'pos'}">${eur(lastRes, { plus: true })}</b>.</p>`;
@@ -1105,8 +1106,9 @@ function defaultPlanner(dest, base = null) {
   base = base || (pl.bases.includes(ui.selBase) ? ui.selBase : pl.bases[0]);
   if (dest === base || !dest) dest = bestFreeDest(base);
   const types = [...new Set(pl.fleet.filter((a) => a.base === base).map((a) => a.type_id))];
-  let type = types.find((t) => SM.rangeOk(base, dest, t)) || 'A20N';
-  if (!SM.rangeOk(base, dest, type)) type = 'A20N';
+  const starter = () => ['E295', 'AT76', 'A20N', 'A21N', 'A21X', 'A339', 'B789', 'A359'].find((t) => SM.rangeOk(base, dest, t) && !SM.riskTerms(pl, t).reject) || ['E295', 'A20N', 'B789', 'A359', 'A35U'].find((t) => SM.rangeOk(base, dest, t)) || 'A20N';
+  let type = types.find((t) => SM.rangeOk(base, dest, t)) || starter();
+  if (!SM.rangeOk(base, dest, type)) type = starter();
   const st = pl.stations[dest];
   return { base, dest, type, freq: 1, wk: 7, role: 'mixed', service: 'standard', buffer: 'normal', fo: Math.round(SM.refPrice(base, dest, cpi())), fi: Math.round(SM.refPrice(dest, base, cpi())),
     auto: true, target: 0.85, term: st ? st.terminal : 'std' };
@@ -1269,7 +1271,7 @@ function studySuggest(base) {
 function viewPlanner() {
   const p = ui.planner, pl = W.player, base = p.base;
   const dests = SM.AP_CODES.filter((c) => c !== base && SM.routeKmOk(base, c));
-  const types = Object.keys(P.AIRCRAFT_TYPES);
+  const types = Object.keys(P.AIRCRAFT_TYPES).filter((t) => !P.AIRCRAFT_TYPES[t].role);
   const st = pl.stations[p.dest];
   return `<div class="card pad stack" id="planner">
     <div class="spread"><h2 class="sec">Neue Strecke ${base}–${p.dest} <small>${n0(SM.gcDistanceKm(base, p.dest))} km · ${n1(SM.blockHours(base, p.dest, p.type))} h Flugzeit</small></h2><button class="btn small" data-act="closeplan">Verwerfen</button></div>
@@ -1462,9 +1464,13 @@ function kitHtml(p, x) {
   const leaseOk = n > 0 && !auctionOnly && stock >= n;
   const used = n === 1 ? W.acMarket.filter((o) => o.type === p.type).sort((a, b) => a.delivery - b.delivery).slice(0, 2) : [];
   const opts = [];
-  const rk = SM.riskTerms(pl, p.type);
-  if (leaseOk) opts.push(['lease', `${n > 1 ? n + ' × ' : ''}${tl(p.type)} leasen`, `${eur(t.lease_month * rk.lease * cpi())}/Monat${(rk.gap || rk.conc) ? ` (inkl. ${pct(rk.lease - 1)} Risikoaufschlag${rk.conc ? ', weil Sie gerade schnell wachsen' : ' für junge Airlines'})` : ''}, Kaution ${eur(acquireCost(p.type, 'lease') * n)}, Lieferung in ${SM.leaseDelivery(W, p.type, 'lease')} Tagen`]);
-  for (const o of used) opts.push(['used:' + o.id, `Gebraucht${o.from ? ' (Insolvenzmasse ' + o.from + ')' : ''}: ${o.age} Jahre, ${o.kind === 'lease' ? eur(o.lease_month * pl.oldAcFactor(o.age)) + '/Monat' : 'Kauf ' + eur(o.price * pl.oldAcFactor(o.age))}`, `sofort ${eur(acquireCost(o.type, o.kind === 'lease' ? 'lease' : 'buy', o))}, Lieferung in ${o.delivery} Tagen${pl.oldAcExpert() ? ' · Zustand ' + condWord(o.cond || 1) : ''}`]);
+  const rk = SM.riskTerms(pl, p.type), roomL = SM.leaseRoom(pl, W.day).left;
+  const buyOk = n > 0 && !auctionOnly && t.stock !== 0;
+  const buyOpt = ['buy', `${n > 1 ? n + ' × ' : ''}${tl(p.type)} kaufen`, `${rk.reject ? `Leasing abgelehnt (${esc(rk.reject)}) · ` : roomL < n ? `Die Leasinggeber machen gerade nur noch ${roomL} neue Verträge mit · ` : ''}sofort ${eur(acquireCost(p.type, 'buy') * n)}${rk.down < 1 ? ` Eigenanteil (${pct(rk.down)}), Rest als Bankkredit – baut Eigenkapital auf` : ' – ohne Bankkredit'}`];
+  if (buyOk && (rk.reject || roomL < n)) opts.push(buyOpt);
+  if (leaseOk && !rk.reject && roomL >= n) opts.push(['lease', `${n > 1 ? n + ' × ' : ''}${tl(p.type)} leasen${rk.cond ? ' – unter Auflagen' : ''}`, `${eur(t.lease_month * rk.lease * cpi())}/Monat${rk.lease > 1.001 ? ` (inkl. ${pct(rk.lease - 1)} Aufschlag der Leasinggeber, Ansehen ${rk.st}${rk.cond ? `, verlangt ${rk.req}` : ''})` : ''}, Kaution ${eur(acquireCost(p.type, 'lease') * n)}, Lieferung in ${SM.leaseDelivery(W, p.type, 'lease')} Tagen`]);
+  if (buyOk && !rk.reject && roomL >= n) opts.push(buyOpt);
+  for (const o of used.filter((o) => o.kind !== 'lease' || !rk.reject)) opts.push(['used:' + o.id, `Gebraucht${o.from ? ' (Insolvenzmasse ' + o.from + ')' : ''}: ${o.age} Jahre, ${o.kind === 'lease' ? eur(o.lease_month * pl.oldAcFactor(o.age)) + '/Monat' : 'Kauf ' + eur(o.price * pl.oldAcFactor(o.age))}`, `sofort ${eur(acquireCost(o.type, o.kind === 'lease' ? 'lease' : 'buy', o))}, Lieferung in ${o.delivery} Tagen${pl.oldAcExpert() ? ' · Zustand ' + condWord(o.cond || 1) : ''}`]);
   opts.push(['none', 'Ohne Flugzeug anlegen', 'Die Strecke startet, sobald ein passendes Flugzeug frei ist']);
   if (!opts.some((o) => o[0] === p.acq)) p.acq = n ? opts[0][0] : 'none';
   if (!n) p.acq = 'none';
@@ -1507,7 +1513,7 @@ function kitHtml(p, x) {
 }
 function kitLabel(p) {
   const k = ui.plannerKit || {}, parts = [];
-  if (k.n && p.acq && p.acq !== 'none') parts.push(p.acq === 'lease' ? (k.n > 1 ? `${k.n} Flugzeuge leasen` : 'Flugzeug leasen') : 'Gebrauchtes übernehmen');
+  if (k.n && p.acq && p.acq !== 'none') parts.push(p.acq === 'lease' ? (k.n > 1 ? `${k.n} Flugzeuge leasen` : 'Flugzeug leasen') : p.acq === 'buy' ? (k.n > 1 ? `${k.n} Flugzeuge kaufen` : 'Flugzeug kaufen') : 'Gebrauchtes übernehmen');
   if (k.staffShort && p.hire) parts.push('Personal einstellen');
   const c = planCost(p);
   return `${parts.length ? `Strecke eröffnen · ${parts.join(' · ')}` : 'Strecke eröffnen'}${c.total > 0 ? ` · zusammen ${eurB(c.total)}` : ' · ohne Einmalkosten'}`;
@@ -1521,7 +1527,10 @@ function planCost(p) {
   const sc = W.slotCost(pl, p.base, p.dest, freq).cost; if (sc > 0) parts.push(['Slots', sc]);
   if (k.n && p.acq && p.acq !== 'none') {
     const intro = pl.familyKnown(p.type) ? 0 : P.TYPE_INTRO_COST;
-    if (p.acq === 'lease') {
+    if (p.acq === 'buy') {
+      const one = SM.acquireCost(pl, p.type, 'buy', null, W.macro.eurusd, W);
+      parts.push([`Eigenanteil Kaufpreis${k.n > 1 ? ` ${k.n} Flugzeuge` : ''}`, (one - intro) * k.n]); if (intro) parts.push(['Einführung neues Muster', intro]);
+    } else if (p.acq === 'lease') {
       const one = SM.acquireCost(pl, p.type, 'lease', null, W.macro.eurusd, W), dep = one - intro;
       parts.push([`Kaution${k.n > 1 ? ` ${k.n} Flugzeuge` : ''} (kommt bei Rückgabe zurück)`, dep * k.n]); if (intro) parts.push(['Einführung neues Muster', intro]);
       const rk = SM.riskTerms(pl, p.type); monthly.push(['Leasing', P.AIRCRAFT_TYPES[p.type].lease_month * rk.lease * (1 + SM.acTariff(W, pl, p.type)) * k.n]);
@@ -1560,9 +1569,9 @@ function openNewRoute() {
   const p = ui.planner, base = p.base, kit = ui.plannerKit || {}, done = [];
   // 1. Flugzeug beschaffen (falls gewählt)
   if (kit.n && p.acq && p.acq !== 'none') {
-    if (p.acq === 'lease') {
-      for (let i = 0; i < kit.n; i++) { const r = doAction({ type: 'acquire', typeId: p.type, mode: 'lease', base }); if (!r.ok) { refreshAll(); return; } }
-      done.push(`${kit.n > 1 ? kit.n + ' × ' : ''}${tl(p.type)} geleast`);
+    if (p.acq === 'lease' || p.acq === 'buy') {
+      for (let i = 0; i < kit.n; i++) { const r = doAction({ type: 'acquire', typeId: p.type, mode: p.acq, base }); if (!r.ok) { refreshAll(); return; } }
+      done.push(`${kit.n > 1 ? kit.n + ' × ' : ''}${tl(p.type)} ${p.acq === 'buy' ? 'gekauft' : 'geleast'}`);
     } else {
       const r = doAction({ type: 'acquire', offerId: p.acq.slice(5), base }); if (!r.ok) { refreshAll(); return; }
       done.push(`gebrauchte ${tl(p.type)} übernommen`);
@@ -1614,7 +1623,7 @@ function acRoleChips(pl, a) {
 function acStatus(pl, a) {
   if (a.delivery_day > W.day) return `<span class="chip warn">Lieferung ${dateShort(a.delivery_day)}</span>`;
   if (a.status === 'ccheck' && a.until > W.day) return `<span class="chip warn">C-Check bis ${dateShort(a.until)}</span>`;
-  if (a.status === 'aog' && a.until > W.day) return `<span class="chip crit">Schaden, am Boden bis ${dateShort(a.until)}</span>`;
+  if (a.status === 'aog' && a.until > W.day) return `<span class="chip crit">${a.grounded ? 'Stillgelegt' : 'Schaden, am Boden'} bis ${dateShort(a.until)}</span>`;
   if (a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) return `<span class="chip me">verchartert bis ${dateShort(a.acmi.end)}</span>`;
   if (a.used_hours > 0) return `<span class="chip good">im Einsatz ${n1(a.used_hours)} h/Tag</span>`;
   return `<span class="chip crit">ungenutzt${a.idle_days ? ' seit ' + a.idle_days + ' Tagen' : ''}</span>`;
@@ -1666,7 +1675,7 @@ function acmiGain(pl, o, a) {
   return { rate, net: rate - maint - lost, lost, total: (rate - maint - lost) * (o.end - o.start) };
 }
 /** Kann Flugzeug a den Auftrag o fliegen (Familie, Lieferung, keine Überschneidung)? */
-function acmiFits(a, o) { return grpOf(a.type_id) === grpOf(o.type) && a.delivery_day <= o.start && !SM.acmiList(a, W.day).some((b) => o.start < b.end && o.end > b.start) && !((a.status === 'ccheck' || a.status === 'aog') && a.until > o.start); }
+function acmiFits(a, o) { return grpOf(a.type_id) === grpOf(o.type) && (P.AIRCRAFT_TYPES[a.type_id].role || '') === (P.AIRCRAFT_TYPES[o.type].role || '') && a.delivery_day <= o.start && !SM.acmiList(a, W.day).some((b) => o.start < b.end && o.end > b.start) && !((a.status === 'ccheck' || a.status === 'aog') && a.until > o.start); }
 function acmiCalendar(pl, rows, F) {
   const from = W.day, span = F.range, to = from + span, pc = (d) => ((Math.max(from, Math.min(to, d)) - from) / span * 100).toFixed(2);
   // Monatsköpfe
@@ -1687,16 +1696,16 @@ function acmiCalendar(pl, rows, F) {
     <div class="cal-key small muted"><span><i class="cal-b"></i>gebucht</span><span><i class="cal-b ev"></i>Großereignis</span><span><i class="cal-g"></i>frei – antippen filtert die Anfragen</span><span><i class="cal-m"></i>Werft/Lieferung</span><span><i class="cal-e"></i>Großereignis im Kalender</span></div>`;
 }
 VIEWS.fleetAcmi = function viewFleetAcmi() {
-  const pl = W.player, F = ui.acf = ui.acf || { ac: '', fit: true, fam: '', ev: false, sort: 'start', gap: null, range: 120 };
+  const pl = W.player, F = ui.acf = ui.acf || { ac: '', fit: true, fam: '', kind: '', ev: false, sort: 'start', gap: null, range: 120 };
   const pool = pl.fleet.filter((a) => acMode(a) === 'charter'), withBk = pl.fleet.filter((a) => acMode(a) !== 'charter' && SM.acmiList(a, W.day).length);
   const calRows = [...pool, ...withBk];
   if (F.gap && !pl.fleet.some((a) => a.id === F.gap.ac)) F.gap = null;
   let html = `<h2 class="sec">Charter (ACMI) <small>${W.acmiOffers.length} Anfragen${W.acmiOffers.some((o) => o.ev) ? ` · ${W.acmiOffers.filter((o) => o.ev).length} zu Großereignissen` : ''}</small></h2>
-    <p class="small ink2">ACMI: Sie stellen Flugzeug, Crew, Wartung und Versicherung, der Kunde zahlt eine Tagesrate und trägt Treibstoff und Gebühren. Ein Muster derselben Familie passt auch. Ein Flugzeug kann mehrere Aufträge hintereinander haben – der Kalender zeigt, wo noch Platz ist.</p>`;
+    <p class="small ink2">ACMI: Sie stellen Flugzeug, Crew, Wartung und Versicherung, der Kunde zahlt eine Tagesrate und trägt Treibstoff und Gebühren. Ein Muster derselben Familie passt auch. Drei Geschäftszweige: Passagiercharter, <b>Privatjets</b> (kurze, gut bezahlte Einsätze für Vorstände, Stars und Delegationen) und <b>Fracht</b> (Paketdienste, Spediteure, oft monatelang). Privatjets und Frachter stehen immer im Charter-Pool und fliegen keine Linie. Ein Flugzeug kann mehrere Aufträge hintereinander haben – der Kalender zeigt, wo noch Platz ist.</p>`;
   // Charter-Pool
   const others = pl.fleet.filter((a) => acMode(a) !== 'charter');
   html += `<div class="card pad stack"><div class="spread"><h3>Charter-Flotte <small class="muted">${pool.length} Flugzeug${pool.length === 1 ? '' : 'e'} im Pool</small></h3></div>
-    ${pool.length ? `<div class="row" style="gap:6px;flex-wrap:wrap">${pool.map((a) => `<span class="chip me" style="padding:4px 4px 4px 10px">${acName(a.id)} · ${a.type_id} <button class="btn small ghost" data-act="acmipool" data-id="${a.id}" data-on="0" title="Zurück in die automatische Einsatzplanung">zurück in den Linienflug</button></span>`).join('')}</div>` : '<p class="small muted">Noch kein Flugzeug im Charter-Pool. Flugzeuge im Pool fliegen keine eigenen Strecken mehr und stehen nur für Charter bereit – sinnvoll für Maschinen, die im Netz wenig verdienen.</p>'}
+    ${pool.length ? `<div class="row" style="gap:6px;flex-wrap:wrap">${pool.map((a) => `<span class="chip me" style="padding:4px 4px 4px 10px">${acName(a.id)} · ${a.type_id} ${P.AIRCRAFT_TYPES[a.type_id].role ? `<span class="small muted" style="padding:0 8px">${P.AIRCRAFT_TYPES[a.type_id].role === 'cargo' ? 'Frachter' : 'Privatjet'}</span>` : `<button class="btn small ghost" data-act="acmipool" data-id="${a.id}" data-on="0" title="Zurück in die automatische Einsatzplanung">zurück in den Linienflug</button>`}</span>`).join('')}</div>` : '<p class="small muted">Noch kein Flugzeug im Charter-Pool. Flugzeuge im Pool fliegen keine eigenen Strecken mehr und stehen nur für Charter bereit – sinnvoll für Maschinen, die im Netz wenig verdienen.</p>'}
     ${others.length ? `<div class="row" style="gap:8px;flex-wrap:wrap"><select id="acmi-pooladd" style="width:auto;flex:1;min-width:200px">${others.map((a) => `<option value="${a.id}">${acName(a.id)} · ${a.type_id} · ${a.base} · ${a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Linienflug' : 'ohne Einsatz'}</option>`).join('')}</select><button class="btn small primary" data-act="acmipool" data-on="1">In den Charter-Pool</button></div>
       <p class="small muted">Fliegt die Maschine Strecken, übernehmen andere Flugzeuge die Umläufe – fehlt Kapazität, fallen Flüge aus.</p>` : ''}</div>`;
   // Kalender
@@ -1704,7 +1713,7 @@ VIEWS.fleetAcmi = function viewFleetAcmi() {
   // Anfragen filtern
   const fams = [...new Set(W.acmiOffers.map((o) => grpOf(o.type)))];
   const target = F.ac ? pl.fleet.filter((a) => a.id === F.ac) : calRows.length ? calRows : pl.fleet;
-  let list = W.acmiOffers.filter((o) => (!F.fam || grpOf(o.type) === F.fam) && (!F.ev || o.ev));
+  let list = W.acmiOffers.filter((o) => (!F.fam || grpOf(o.type) === F.fam) && (!F.ev || o.ev) && (!F.kind || (o.kind || 'pax') === F.kind));
   if (F.gap) { const a = pl.fleet.find((x) => x.id === F.gap.ac); list = list.filter((o) => o.start >= F.gap.from && o.end <= F.gap.to && a && acmiFits(a, o)); }
   else if (F.fit) list = list.filter((o) => target.some((a) => acmiFits(a, o)));
   const best = (o) => { const c = pl.fleet.filter((a) => acmiFits(a, o)); return c.length ? Math.max(...c.map((a) => acmiGain(pl, o, a).total)) : -1e12; };
@@ -1712,6 +1721,7 @@ VIEWS.fleetAcmi = function viewFleetAcmi() {
   list.sort((a, b) => (!!b.ev - !!a.ev) * (F.sort === 'start' ? 0 : 0) || SORT[F.sort](a, b));
   html += `<div class="stack"><h3 class="sec sm">Anfragen <small>${list.length} von ${W.acmiOffers.length}</small></h3>
     <div class="row acf" style="gap:8px;flex-wrap:wrap"><select id="acf-ac" aria-label="Flugzeug"><option value="">${calRows.length ? 'Charter-Flotte' : 'alle Flugzeuge'}</option>${pl.fleet.map((a) => `<option value="${a.id}" ${F.ac === a.id ? 'selected' : ''}>${acName(a.id)} · ${a.type_id}</option>`).join('')}</select>
+      <select id="acf-kind" aria-label="Geschäftszweig">${[['', 'alle Geschäftszweige'], ['pax', 'Passagiere'], ['biz', 'Privatjets'], ['cargo', 'Fracht']].map(([k, l]) => `<option value="${k}" ${(F.kind || '') === k ? 'selected' : ''}>${l} (${W.acmiOffers.filter((o) => !k || (o.kind || 'pax') === k).length})</option>`).join('')}</select>
       <select id="acf-fam" aria-label="Familie"><option value="">alle Familien</option>${fams.map((g) => `<option value="${g}" ${F.fam === g ? 'selected' : ''}>${esc(P.TYPE_GROUPS[g])}</option>`).join('')}</select>
       <select id="acf-sort" aria-label="Sortierung">${[['start', 'nach Beginn'], ['total', 'nach Gesamterlös'], ['rate', 'nach Tagesrate'], ['dur', 'nach Dauer']].map(([k, l]) => `<option value="${k}" ${F.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="chk small"><input type="checkbox" id="acf-fit" ${F.fit ? 'checked' : ''}> passt in freie Zeiträume</label><label class="chk small"><input type="checkbox" id="acf-ev" ${F.ev ? 'checked' : ''}> nur Großereignisse</label></div>
@@ -1720,7 +1730,7 @@ VIEWS.fleetAcmi = function viewFleetAcmi() {
     const cands = pl.fleet.filter((a) => acmiFits(a, o)).sort((a, b) => (acMode(b) === 'charter') - (acMode(a) === 'charter') || acmiGain(pl, o, b).net - acmiGain(pl, o, a).net);
     const show = F.gap ? cands.filter((a) => a.id === F.gap.ac) : F.ac ? cands.filter((a) => a.id === F.ac) : cands;
     const days = o.end - o.start, t = P.AIRCRAFT_TYPES[o.type];
-    return `<div class="card pad stack${o.ev ? ' acmi-ev' : ''}"><div class="spread"><b>${esc(o.client)}</b><span class="row" style="gap:4px">${o.ev ? '<span class="chip good">Großereignis</span>' : ''}<span class="chip">${tlx(o.type)}</span></span></div>
+    return `<div class="card pad stack${o.ev ? ' acmi-ev' : ''}"><div class="spread"><b>${esc(o.client)}</b><span class="row" style="gap:4px">${o.ev ? '<span class="chip good">Großereignis</span>' : ''}${o.kind ? `<span class="chip ${o.kind === 'cargo' ? 'warn' : 'me'}">${o.kind === 'cargo' ? 'Fracht' : 'Privatjet'}</span>` : ''}<span class="chip">${tlx(o.type)}</span></span></div>
       <div class="small ink2">${dateShort(o.start)} bis ${dateShort(o.end)} (${days} Tage) · <b>${eur(o.rate)} pro Tag</b> · gesamt ${eur(o.rate * days)}${o.apt ? ` · Einsatz rund um ${esc(apName(o.apt))}` : ''}</div>
       ${calRows.length ? `<div class="cal-mini" title="Zeitraum im Kalender">${(() => { const l = Math.min(98, Math.max(0, o.start - W.day) / F.range * 100), w = Math.max(2, Math.min(100 - l, (Math.min(o.end, W.day + F.range) - Math.max(o.start, W.day)) / F.range * 100)); return `<span style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></span>`; })()}</div>` : ''}
       ${show.length ? `<div class="stack" style="gap:6px">${show.slice(0, 4).map((a) => { const g = acmiGain(pl, o, a); return `<div class="acmi-c"><span class="small"><b>${acName(a.id)}</b> · ${a.type_id}${a.type_id !== o.type ? ' (Familie)' : ''} · ${acMode(a) === 'charter' ? '<span class="pos">Charter-Pool, frei</span>' : a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Linienflug' : '<span class="pos">frei</span>'}<br><span class="muted">${eur(g.rate)}/Tag · netto <b class="${sgn(g.net)}">${eur(g.net, { plus: true })}</b>/Tag${g.lost > 0 ? ' nach entgangenem Streckenbeitrag' : ''} · gesamt ${eur(g.total, { plus: true })}</span></span><button class="btn small primary" data-act="acmi" data-id="${o.id}" data-ac="${a.id}">Verchartern · ${eurB(g.rate * days)}</button></div>`; }).join('')}${show.length > 4 ? `<span class="small muted">und ${show.length - 4} weitere passende Flugzeuge</span>` : ''}</div>`
@@ -1730,6 +1740,8 @@ VIEWS.fleetAcmi = function viewFleetAcmi() {
   html += '</div>';
   return html;
 };
+const newBaseCost = (pl, c) => { const ap0 = SM.baseApproval(pl, c); return SM.baseSetupCost(W, c) * SM.softX(pl, 'base') + Math.max(0, SM.licenceFee(W, c) * (ap0.x || 1) - (pl.stations[c] ? SM.stationFee(W, c) : 0)) + SM.baseSlotCost(W, c, pl); };
+const newBaseBtnTxt = (pl, c) => { const a = SM.baseApproval(pl, c); return a.ok ? `${a.cond ? 'Basis beantragen (Auflagen)' : 'Basis eröffnen'} · einmalig ${eurB(newBaseCost(pl, c))} inkl. ${P.BASE_SLOTS.n} Slots` : `Abgelehnt – Ansehen ${a.st} von ${a.req - SM.P.STANDING.baseCond} nötig`; };
 VIEWS.fleetBuy = function viewFleetBuy() {
   const pl = W.player;
   const base = pl.bases.includes(ui.acqBase) ? ui.acqBase : pl.bases[0];
@@ -1744,7 +1756,11 @@ VIEWS.fleetBuy = function viewFleetBuy() {
       <td style="text-align:right">${(() => { const f = pl.oldAcFactor(o.age), v = o.kind === 'lease' ? o.lease_month : o.price; return `<b class="mono">${eur(v * f)}${o.kind === 'lease' ? '/Mon.' : ''}</b><div class="small muted">${o.kind === 'lease' ? 'Leasing 36 M.' : 'Kauf'}${f < 1 ? ` · <span class="pos" title="statt ${eur(v)}">Luis −10 %</span>` : ''}</div>`; })()}</td>
       <td class="r">${btn(o.type, o.kind === 'lease' ? 'lease' : 'buy', o.kind === 'lease' ? 'Leasen' : 'Kaufen', o)}</td></tr>`).join('')}
   </tbody></table></div><p class="small muted">Leasingraten sind in US-Dollar vereinbart: Fällt der Euro, wird das Leasing teurer. Der Zustand gebrauchter Flugzeuge ist verborgen: Verbrauchte Maschinen verhalten sich wie deutlich ältere. ${pl.oldAcExpert() ? 'Luis Perez begutachtet jedes Angebot ab 8 Jahren.' : 'Ein Gutachter wie Luis Perez (Unternehmen → Personal) sieht ihn genau, Ihre Technik ab Senior grob.'}</p></div>`;
-  html += `<h2 class="sec">Neu vom Leasinggeber oder ab Werk</h2><div class="types">${Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => !t.launch || W.day >= t.launch - 30).map(([id, t]) => {
+  const SEGS = [['reg', 'Regional', 'Turboprops und Regionaljets bis 120 Sitze – der Einstieg für junge Airlines'], ['nb', 'Kurz- und Mittelstrecke', 'Schmalrumpf: A220, A320-Familie, Boeing 737'], ['wb', 'Langstrecke und Großraum', 'Großraumjets, A321XLR und Concorde'], ['cargo', 'Frachter', 'Fliegen nur Fracht-Charter'], ['biz', 'Privatjets', 'Fliegen nur Privatjet-Charter']];
+  const segOf = (t) => t.role || (['ATR', 'DH8', 'EJET'].includes(t.group) ? 'reg' : ['A220', 'A32F', 'B737'].includes(t.group) && t.range_km < 8000 ? 'nb' : 'wb');
+  const segF = ui.buySeg || '';
+  html += `<h2 class="sec">Neu vom Leasinggeber oder ab Werk</h2><div class="seg wrap" role="group" aria-label="Segment"><button data-act="buyseg" data-v="" aria-pressed="${!segF}">Alle</button>${SEGS.map(([k, l]) => `<button data-act="buyseg" data-v="${k}" aria-pressed="${segF === k}">${l}</button>`).join('')}</div>`;
+  for (const [segK, segL, segD] of SEGS) { if (segF && segF !== segK) continue; html += `<h3 class="sec sm">${segL} <small>${segD}</small></h3><div class="types">${Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => (!t.launch || W.day >= t.launch - 30) && segOf(t) === segK).map(([id, t]) => {
     const known = pl.familyKnown(id), fam = P.TYPE_GROUPS[t.group];
     const stock = W.lessorStock && W.lessorStock[id] !== undefined ? W.lessorStock[id] : SM.capOf(W, id), duty = SM.acTariff(W, pl, id), auctionOnly = t.launch && W.day < t.launch + 365;
     const usedOnly = t.stock === 0;
@@ -1752,13 +1768,13 @@ VIEWS.fleetBuy = function viewFleetBuy() {
     const intro = known ? `Familie ${fam} schon in der Flotte, Piloten können wechseln` : `neue Familie ${fam}: ${eur(P.TYPE_INTRO_COST)} Einführung${pl.typesIntroduced.length ? ` + ${eur(P.TYPE_COMPLEXITY_DAY)} pro Tag Komplexität, eigene Musterberechtigung für Piloten` : ''}`;
     return `<div class="type${ui.buyFocus === id ? ' hl' : ''}" id="type-${id}"><div class="type-h"><b>${tlx(id)}</b><span class="small muted">${esc(t.maker)} · ${t.cls}${t.age >= 10 ? ` · ${t.age} J. alt` : ''}</span></div>
       <div class="acv-box">${acSvg(id, { ...myAcColors(), code: pl.code })}</div>
-      <div class="specs"><div><span>Sitze</span><b>${t.seats.basic}/${t.seats.standard}/${t.seats.premium}</b></div><div><span>Reichweite</span><b>${n0(t.range_km)} km</b></div><div><span>Verbrauch</span><b>${n0(t.fuel_bh_kg)} kg/h</b></div><div><span>Crew</span><b>${t.cockpit || 2} + ${t.cabin}</b></div></div>
+      <div class="specs">${t.role === 'cargo' ? `<div><span>Nutzlast</span><b>${n0(t.cargo_kg / 1000)} t</b></div>` : t.role === 'biz' ? `<div><span>Plätze</span><b>${t.seats.standard}</b></div>` : `<div><span>Sitze</span><b>${t.seats.basic}/${t.seats.standard}/${t.seats.premium}</b></div>`}<div><span>Reichweite</span><b>${n0(t.range_km)} km</b></div><div><span>Verbrauch</span><b>${n0(t.fuel_bh_kg)} kg/h</b></div><div><span>Crew</span><b>${t.cockpit || 2} + ${t.cabin}</b></div></div>
       <div class="small ink2">${esc(t.note)}. ${esc(t.engines)}.</div>
       <div class="row" style="gap:6px">${avail}</div>
-      ${usedOnly ? `<div class="small muted">Gebraucht um ${eur(t.value_eur * (1 + duty))} Kaufpreis · Betrieb: ${n0(t.fuel_bh_kg)} kg Kerosin und ${eur(t.maint_bh)} Wartung je Blockstunde · ${known ? '' : `neue Familie ${fam}: ${eur(P.TYPE_INTRO_COST)} Einführung`}</div>` : `${(() => { const rk = SM.riskTerms(pl, id); return rk.gap || rk.conc ? `<div class="small warnc">Für Ihre Phase${rk.conc ? ' und Ihr Wachstumstempo' : ''}: Leasingrate +${pct(rk.lease - 1)}, Kaution ${rk.dep} Monatsraten, Eigenanteil beim Kauf ${pct(rk.down)} – Leasinggeber sehen junge Airlines als Risiko.</div>` : ''; })()}<div class="small muted">Leasing ${eur(t.lease_month * SM.riskTerms(pl, id).lease * (1 + duty) * pl.oldAcFactor(t.age) * P.EURUSD / W.macro.eurusd)}/Monat · Flex ${eur(t.lease_month * SM.riskTerms(pl, id).lease * (1 + duty) * pl.oldAcFactor(t.age) * (1 + P.FLEX_LEASE_PREMIUM) * P.EURUSD / W.macro.eurusd)}/Monat${pl.oldAcFactor(t.age) < 1 ? ' (−10 % durch Luis)' : ''} · ${t.age >= 10 ? `Kauf ${eur(t.value_eur * (1 + duty) * pl.oldAcFactor(t.age))}` : `ab Werk ${eur(t.value_eur * 1.08 * (1 + duty))} in ${SM.leaseDelivery(W, id, 'factory')} Tagen`} · ${intro}</div>`}
-      ${auctionOnly || usedOnly ? '' : `<div class="row">${stock > 0 ? btn(id, 'lease', 'Leasen, 36 Monate', null, true) + btn(id, 'flex', 'Flex-Leasing') : '<span class="small neg">Leasing derzeit nicht möglich</span>'}${t.age >= 10 || t.noFactory ? '' : btn(id, 'factory', 'Ab Werk bestellen')}</div>`}${t.minAptPax ? `<div class="small warnc">Nur zwischen Flughäfen ab ${t.minAptPax} Mio. Passagieren im Jahr (Code F).</div>` : ''}</div>`;
-  }).join('')}</div>
-  <p class="small muted">Leasinggeber haben nur begrenzten Bestand, den sich alle Airlines teilen; viele Bestellungen verlängern die Lieferzeiten. Flugzeuge kosten jeden Tag, auch wenn sie stehen.</p>`;
+      ${usedOnly ? `<div class="small muted">Gebraucht um ${eur(t.value_eur * (1 + duty))} Kaufpreis · Betrieb: ${n0(t.fuel_bh_kg)} kg Kerosin und ${eur(t.maint_bh)} Wartung je Blockstunde · ${known ? '' : `neue Familie ${fam}: ${eur(P.TYPE_INTRO_COST)} Einführung`}</div>` : `${(() => { const rk = SM.riskTerms(pl, id); return rk.reject ? `<div class="small neg">${esc(rk.reject)}</div>` : rk.cond ? `<div class="small warnc">Leasing unter Auflagen (Ansehen ${rk.st}, verlangt ${rk.req}): Rate +${pct(rk.lease - 1)}, Kaution ${rk.dep} Monatsraten, Eigenanteil beim Kauf ${pct(rk.down)}.</div>` : rk.lease > 1.001 ? `<div class="small muted">Junge Airline: Wartungsrücklage +${pct(rk.lease - 1)} auf die Rate.</div>` : ''; })()}<div class="small muted">Leasing ${eur(t.lease_month * SM.riskTerms(pl, id).lease * (1 + duty) * pl.oldAcFactor(t.age) * P.EURUSD / W.macro.eurusd)}/Monat · Flex ${eur(t.lease_month * SM.riskTerms(pl, id).lease * (1 + duty) * pl.oldAcFactor(t.age) * (1 + P.FLEX_LEASE_PREMIUM) * P.EURUSD / W.macro.eurusd)}/Monat${pl.oldAcFactor(t.age) < 1 ? ' (−10 % durch Luis)' : ''} · ${t.age >= 10 ? `Kauf ${eur(t.value_eur * (1 + duty) * pl.oldAcFactor(t.age))}` : `ab Werk ${eur(t.value_eur * 1.08 * (1 + duty))} in ${SM.leaseDelivery(W, id, 'factory')} Tagen`} · ${intro}</div>`}
+      ${auctionOnly || usedOnly ? '' : `<div class="row">${stock > 0 && !SM.riskTerms(pl, id).reject ? btn(id, 'lease', 'Leasen, 36 Monate', null, true) + btn(id, 'flex', 'Flex-Leasing') : stock > 0 ? '<span class="small neg">Leasing abgelehnt</span>' + btn(id, 'buy', 'Kaufen', null, true) : '<span class="small neg">Leasing derzeit nicht möglich</span>'}${t.age >= 10 || t.noFactory ? '' : btn(id, 'factory', 'Ab Werk bestellen')}</div>`}${t.minAptPax ? `<div class="small warnc">Nur zwischen Flughäfen ab ${t.minAptPax} Mio. Passagieren im Jahr (Code F).</div>` : ''}</div>`;
+  }).join('')}</div>`; }
+  html += `<p class="small muted">Leasinggeber haben nur begrenzten Bestand, den sich alle Airlines teilen; viele Bestellungen verlängern die Lieferzeiten. Flugzeuge kosten jeden Tag, auch wenn sie stehen.</p>`;
   return html;
 };
 
@@ -1873,7 +1889,7 @@ VIEWS.stations = function viewStations() {
     const monthly = rent + (s.handling === 'own' ? P.OWN_HANDLING_DAY * x.cost * cpi() * 30.4 : 0) + (hangar ? P.HANGAR_MONTH * x.cost * cpi() * proc : 0);
     total += monthly;
     const slots = slotsMine(apt);
-    return `<div class="card pad stack"><div class="spread"><b>${apt} · ${apName(apt)}</b><span>${isBase ? '<span class="chip me">Basis</span> ' : ''}${isFinite(slots) ? `<span class="chip ${slots < 2 ? 'warn' : ''}">${slotTxt(apt)} Slots frei</span>` : '<span class="chip">ohne Slotvergabe</span>'}</span></div>
+    return `<div class="card pad stack"><div class="spread"><b>${apt} · ${apName(apt)} <span class="small muted">${NF1.format(SM.paxEff(apt))} Mio. Pax/Jahr${W.aptObs && W.aptObs[apt] ? ` – im Spiel gewachsen (ursprünglich ${NF1.format(P.AIRPORTS[apt].pax || 0)} Mio.)${SM.paxEff(apt) >= 25 && (P.AIRPORTS[apt].pax || 0) < 25 ? ', jetzt Code F' : ''}` : ''}</span></b><span>${pl.antitrust && pl.antitrust[apt] ? `<span class="chip crit" title="Wettbewerbsaufsicht: keine neuen Strecken, nach ${P.ANTITRUST.grace} Tagen monatliche Bußgelder">Kartellverfahren · ${pct(pl.antitrust[apt].share)} der Abflüge</span> ` : ''}${isBase ? '<span class="chip me">Basis</span> ' : ''}${isFinite(slots) ? `<span class="chip ${slots < 2 ? 'warn' : ''}">${slotTxt(apt)} Slots frei</span>` : '<span class="chip">ohne Slotvergabe</span>'}</span></div>
       <div class="small muted">${d.n} ${d.n === 1 ? 'Abflug' : 'Abflüge'} pro Tag · Fixkosten ${eur(monthly)} pro Monat</div>
       <div class="stack small"><span class="muted">Terminal</span><div class="opts">${Object.entries(P.TERMINALS).map(([k, t]) => `<button data-act="term" data-apt="${apt}" data-v="${k}" aria-pressed="${s.terminal === k}" title="${esc(t.desc)}"><b>${t.label}</b><span>${eur(t.rent * x.cost * cpi() * proc)}/Mon.</span></button>`).join('')}</div>
         <span class="muted">${esc(P.TERMINALS[s.terminal].desc)}. Passagierentgelte ×${NF2.format(P.TERMINALS[s.terminal].paxF)}, Bodenzeit ${P.TERMINALS[s.terminal].turn > 0 ? '+' : ''}${P.TERMINALS[s.terminal].turn} Min., Geschäftsreisende ${s.terminal === 'prem' ? 'zahlen lieber mehr' : s.terminal === 'lcc' ? 'meiden Sie eher' : 'neutral'}.</span></div>
@@ -1889,13 +1905,13 @@ VIEWS.stations = function viewStations() {
   let html = `<h2 class="sec">Stationen <small>${list.length} Flughäfen · ${eur(total)} pro Monat</small></h2>
     <p class="small ink2">An jedem Flughafen mieten Sie Schalter und Gates und kaufen die Abfertigung ein. Billige Bereiche sparen Miete und Entgelte, kosten aber Bodenzeit und Geschäftsreisende.</p>${cards.join('')}`;
   const cand = SM.AP_CODES.filter((c) => !pl.bases.includes(c));
-  const L = SM.careerOf(pl), lvB = SM.careerLv(pl);
-  const baseCost = (c) => SM.baseSetupCost(W, c) * SM.softX(pl, 'base') + Math.max(0, SM.licenceFee(W, c) - (pl.stations[c] ? SM.stationFee(W, c) : 0)) + SM.baseSlotCost(W, c, pl);
-  const bx = SM.softX(pl, 'base');
-  const lim = L && bx > 1 ? (() => { const nx = SM.CAREER.levels.findIndex((x) => x.bases > pl.bases.length); return `Für Phase ${lvB + 1} „${L.label}“ ist eine weitere Basis ein großer Schritt: Einrichtung ×${NF1.format(bx)}, laufende Kosten aller Basen +${n0(SM.CAREER.soft.baseDayX * 100 * (pl.bases.length + 1 - L.bases))} %.${nx > 0 ? ` Ohne Aufschlag ab Phase ${nx + 1} „${SM.CAREER.levels[nx].label}“ (${SM.needTxt(SM.CAREER.levels[nx].need)}).` : ''}`; })() : '';
-  html += `<div class="card pad stack"><h3>Neue Basis eröffnen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Einrichtung, Betriebslizenz und laufende Kosten (Leitung, Crewräume) wachsen mit der Größe des Flughafens: Betriebslizenz nach Größe: klein bis 100 Tsd. €, mittel 100–500 Tsd. €, groß 1–2 Mio. €, Drehkreuz 2,5–4 Mio. € – Bremen kostet einen Bruchteil von Frankfurt. Haben Sie dort schon eine Station, wird deren Gebühr angerechnet. Flugzeuge lassen sich im Tab Flotte umstationieren.</p>
+  const bx = SM.softX(pl, 'base'), stv = SM.standingOf(pl, W.day).v, SB = P.STANDING;
+  const pick = cand.includes(ui.newBasePick) ? ui.newBasePick : (cand.find((c) => SM.baseApproval(pl, c).ok) || cand[0]), apPick = SM.baseApproval(pl, pick);
+  const lim = bx > 1 ? `Eine weitere Basis ist für Ihr Ansehen (${stv}) ein großer Schritt: Einrichtung ×${NF1.format(bx)}, laufende Kosten aller Basen +${n0(SM.CAREER.soft.baseDayX * 100 * Math.max(1, pl.bases.length + 1 - SM.basesFree(stv)))} %. Ohne Aufschlag ab Ansehen ${SM.basesFreeAt(pl.bases.length + 1)}.` : '';
+  html += `<div class="card pad stack"><h3>Neue Basis beantragen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Die Flughafengesellschaft prüft jeden Antrag nach dem <b>Ansehen</b> Ihrer Airline (jetzt ${stv} von 100): kleine Flughäfen sagen jedem zu, mittlere ab ${SB.baseReq.m}, große ab ${SB.baseReq.l}, Drehkreuze ab ${SB.baseReq.x}. Bis ${SB.baseCond} Punkte darunter gibt es eine Zusage unter Auflagen (Lizenz ×${NF1.format(SB.baseCondX)}), sonst eine Absage. Betriebslizenz nach Größe: klein bis 100 Tsd. €, mittel 100–500 Tsd. €, groß 1–2 Mio. €, Drehkreuz 2,5–4 Mio. €. Haben Sie dort schon eine Station, wird deren Gebühr angerechnet.</p>
     ${lim ? `<div class="callout warn">${esc(lim)}</div>` : ''}
-    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)); return `<option value="${c}" ${c === ui.newBasePick ? 'selected' : ''}>${c} · ${apName(c)} · einmalig ${eur(baseCost(c))}, ${eur(SM.baseDayCost(c) * 30.4 * cpi())}/Monat${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase" id="openbaseBtn">Basis eröffnen · einmalig ${eurB(baseCost(cand.includes(ui.newBasePick) ? ui.newBasePick : cand[0]))} inkl. ${P.BASE_SLOTS.n} Slots</button></div></div>`;
+    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.bases.includes(c)), a = SM.baseApproval(pl, c); return `<option value="${c}" ${c === pick ? 'selected' : ''}>${a.ok ? (a.cond ? '◐ ' : '✓ ') : '✕ '}${c} · ${apName(c)} · ${a.ok ? `einmalig ${eur(newBaseCost(pl, c))}, ${eur(SM.baseDayCost(c) * 30.4 * cpi())}/Monat` : `abgelehnt (Ansehen ${a.req - SB.baseCond} nötig)`}${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button class="btn" data-act="openbase" id="openbaseBtn" ${apPick.ok ? '' : 'disabled'}>${newBaseBtnTxt(pl, pick)}</button></div>
+    <p class="small muted" id="newbaseNote">${apPick.msg ? esc(apPick.msg) : `${apName(pick)}: Zusage ohne Auflagen.`}</p></div>`;
   const slotApts = Object.keys(pl.stations).filter((c) => P.AIRPORTS[c]).sort();
   html += `<div class="stack"><h2 class="sec">Slots <small>Flughäfen in Ihrem Netz</small></h2><table class="t"><thead><tr><th>Flughafen</th><th class="r">für Sie frei</th><th class="r">Entgelt je Bewegung</th></tr></thead><tbody>${slotApts.map((c) => `<tr><td>${c} · ${apName(c)}</td><td class="r">${slotTxt(c)}</td><td class="r">${eur(SM.apx(c).slotFee * cpi())}</td></tr>`).join('')}</tbody></table>
     <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Zu jeder neuen Basis gehören drei Slots (im Eröffnungspreis enthalten). Neue Slots gibt es zum 1. April und 1. Oktober; wer eine Strecke einstellt, behält seine Slots in der Reserve.</p></div>`;
@@ -1958,7 +1974,7 @@ function showAcInfo(id) {
         ${row('Zuverlässigkeit', `${pct(t.dispatch_rel, 1)} pünktlich startklar`)}
       </tbody></table>
       <table class="t"><tbody>
-        ${row('Leasing', `${eur(lease)}/Monat${(rk.gap || rk.conc) ? ` <span class="small warnc" title="Risikoaufschlag der Leasinggeber für junge Airlines – sinkt mit jeder Phase">(+${pct(rk.lease - 1)}, Kaution ${rk.dep} Raten)</span>` : ''}`)}
+        ${row('Leasing', `${eur(lease)}/Monat${rk.reject ? ` <span class="small neg" title="${esc(rk.reject)}">(abgelehnt – Ansehen ${rk.st}, verlangt ${rk.req})</span>` : rk.lease > 1.001 ? ` <span class="small warnc" title="Aufschlag der Leasinggeber nach Ansehen – sinkt, wenn Ihre Airline Erfahrung, Pünktlichkeit und solide Finanzen zeigt">(+${pct(rk.lease - 1)}, Kaution ${rk.dep} Raten)</span>` : ''}`)}
         ${row('Kaufpreis neu', eur(t.value_eur * 1.08))}
         ${row('Wartung', `${eur(t.maint_bh * cpiV)}/Blockstunde`)}
         ${row('Abfertigung', `${eur(t.handling * cpiV)} je Umlauf`)}
@@ -2213,7 +2229,7 @@ VIEWS.strategy = function viewStrategy() {
   const coordS = [...new Set([...pl.bases, ...pl.activeRoutes().flatMap((r) => [r.base, r.dest])])].filter((c) => P.AIRPORTS[c]).sort();
   const lockRows = coordS.map((c) => {
     const own = pl.gateLock && pl.gateLock[c], other = W.lockOwner(c), price = W.gateLockPrice(c);
-    return `<tr><td><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))} · ${NF1.format(P.AIRPORTS[c].pax || 0)} Mio. Pax/Jahr</span></td>
+    return `<tr><td><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))} · ${NF1.format(SM.paxEff(c))} Mio. Pax/Jahr${W.aptObs && W.aptObs[c] ? ` <span title="Im Spiel gewachsen – ursprünglich ${NF1.format(P.AIRPORTS[c].pax || 0)} Mio.">↑</span>` : ''}</span></td>
       <td>${own ? '<span class="chip good">alle Gates bei Ihnen</span>' : other && other !== pl ? `<span class="chip crit">${esc(other.name)}</span>` : `${eur(price)} + ${eur(price * P.GATE_LOCK.monthlyRate)}/Monat`}</td>
       <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !other ? `<button class="btn small primary" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag · ${eurB(price)}</button>` : ''}</td></tr>`;
   }).join('');
@@ -2785,12 +2801,12 @@ VIEWS.exchange = function viewExchange() {
         ${groupHtml(pl, T, st)}
         <div class="row" style="gap:6px;flex-wrap:wrap">${SM.floatOf(W, T) > 0.009 ? `<button class="btn small" data-act="capbuy" data-t="${id}" data-q="0.05">+5 % für ${mio(SM.stakeBuyPrice(W, pl, T, Math.min(0.05, SM.floatOf(W, T))))}</button>` : ''}<button class="btn small" data-act="capsell" data-t="${id}" data-q="${Math.min(0.05, st.f)}">−5 %</button><button class="btn small" data-act="capsell" data-t="${id}" data-q="${st.f}">alles verkaufen</button>
         ${ma ? (conf ? `<button class="btn small danger" data-act="takeover" data-id="${id}">Ja, ${mio(ma.price)} bieten</button><button class="btn small" data-act="cancelconfirm">Nein</button>` : `<button class="btn small ${st.f >= C.majority ? 'primary' : ''}" data-act="askma" data-id="${id}" title="Angebot für die restlichen ${pct(ma.rest)}">Rest (${pct(ma.rest)}) übernehmen: ${mio(ma.price)}</button>`) : ''}</div></div>`; }).join('')}
-    <p class="small muted">Anteiliger Gewinn: Ihr Anteil am Monatsergebnis wird Ihnen jeden Monat gutgeschrieben (Buchwert steigt oder fällt), Dividenden kommen als Geld. Übernahmeangebot für den Rest: mit Mehrheit Börsenwert × ${NF1.format(C.tender)}, ohne Mehrheit × ${NF1.format(C.hostile)}.</p></div>`;
+    <p class="small muted">Anteiliger Gewinn: Ihr Anteil am Monatsergebnis wird Ihnen jeden Monat gutgeschrieben (Buchwert steigt oder fällt), Dividenden kommen als Geld. Übernahmeangebot für den Rest: mit Mehrheit Börsenwert × ${NF1.format(C.tender)}, ohne Mehrheit × ${NF1.format(C.hostile)}. Große Airlines haben Ankeraktionäre (Staat, Gründerfamilie, Fonds): Deren Anteil ist nicht an der Börse zu haben – sie verkaufen nur bei einer Komplettübernahme, nur an eine vergleichbar große Airline (mindestens ${pct(C.anchor.buyerSize)} der Flotte) und mit ${pct(C.anchor.prem)} Aufschlag.</p></div>`;
   // Markt
   const rows = W.list.filter((a) => a.id !== pl.id && a.status !== 'insolvent' && !a.removed).map((a) => ({ a, cap: SM.mktCap(W, a), fl: SM.floatOf(W, a), ann: SM.annualResult(a) })).sort((x, y) => y.cap - x.cap);
   html += `<div class="stack"><h2 class="sec sm">Aktienmarkt <small>${rows.length} Airlines</small></h2><div class="stk-list">
     ${rows.map(({ a, cap: cp, fl: f, ann: an }) => { const mine = SM.stakeOf(pl, a), hs2 = SM.holdersOf(W, a).filter((h) => h.al.id !== pl.id), ch = capChg(a);
-      return `<div class="stk-row"><div class="stk-name">${logoSvg(a, 18)} <b>${esc(a.name)}</b>${a.isPlayer ? ' <span class="chip">Mitspieler</span>' : ''}${mine ? ` <span class="chip me">Sie ${pct(mine, 1)}</span>` : ''}<div class="small muted">KGV ${an > 0 ? NF1.format(cp / an) : '–'} · frei ${pct(f)}${hs2.length ? ' · ' + hs2.map((h) => `${esc(h.al.name)} ${pct(h.f)}`).join(', ') : ''}</div></div>
+      return `<div class="stk-row"><div class="stk-name">${logoSvg(a, 18)} <b>${esc(a.name)}</b>${a.isPlayer ? ' <span class="chip">Mitspieler</span>' : ''}${mine ? ` <span class="chip me">Sie ${pct(mine, 1)}</span>` : ''}<div class="small muted">KGV ${an > 0 ? NF1.format(cp / an) : '–'} · frei ${pct(f)}${a.archetype && SM.capState(a).ext < 0.999 ? ` · <span title="Staat, Gründerfamilie oder Fonds – verkaufen nicht an der Börse">Ankeraktionäre ${pct(1 - SM.capState(a).ext)}</span>` : ''}${hs2.length ? ' · ' + hs2.map((h) => `${esc(h.al.name)} ${pct(h.f)}`).join(', ') : ''}</div></div>
         <div class="stk-val">${miniSpark(a.cap && a.cap.hist)}<span><b>${mio(cp)}</b>${ch !== null ? `<em class="${ch >= 0 ? 'pos' : 'neg'}">${ch >= 0 ? '+' : ''}${pct(ch)}</em>` : ''}</span></div>
         <div class="stk-act">${f >= 0.01 ? [0.05, 0.1].filter((q) => q <= f + 1e-9).map((q) => `<button class="btn small" data-act="capbuy" data-t="${a.id}" data-q="${q}">${pct(q)}: ${mio(SM.stakeBuyPrice(W, pl, a, q))}</button>`).join('') : '<span class="small muted">nichts frei</span>'}</div></div>`; }).join('')}
     </div><p class="small muted">Große Pakete auf einmal treiben den Kurs (je 10 % rund ${pct(C.impact * 0.1)} Aufschlag); für die Anteile, mit denen Sie die Mehrheit überschreiten, kommt einmalig eine Kontrollprämie von ${pct(C.control)} dazu. Verkäufe großer Pakete drücken den Preis. Gebühr ${pct(C.fee)} je Kauf und Verkauf. Mitspielende haben nur so viele Aktien frei, wie sie selbst an die Börse gebracht haben.</p></div>`;
@@ -2846,12 +2862,12 @@ function maHtml() {
   const block = SM.maBlock(W, pl, ais[0]), free = pl.spendable(W.macro.bank ?? 1), mx = SM.softX(pl, 'ma');
   const rows = ais.map((a) => ({ a, v: SM.maValue(W, a, pl) })).sort((x, y) => x.v.price - y.v.price);
   return `<div class="stack"><h2 class="sec">Übernahmen <small>KI-Airlines komplett kaufen</small></h2>
-    ${mx > 1 ? `<div class="callout warn">Ihre Airline ist für Übernahmen noch klein: Verkäufer und Banken verlangen +${n0((mx - 1) * 100)} % auf den Kaufpreis. Ohne Aufschlag ab Phase 3 „${esc(SM.CAREER.levels[2].label)}“.</div>` : ''}
+    ${mx > 1 ? `<div class="callout warn">Ihre Airline ist für Übernahmen noch klein: Verkäufer und Banken verlangen +${n0((mx - 1) * 100)} % auf den Kaufpreis. Ohne Aufschlag ab einem Ansehen von 40 (jetzt ${SM.standingOf(pl, W.day).v}).</div>` : ''}
     <div class="tw"><table class="t"><thead><tr><th>Airline</th><th class="r">Flotte · Strecken</th><th class="r">Eigenkapital · Ergebnis/Monat</th><th class="r">Ihr Anteil · Angebot für den Rest</th></tr></thead><tbody>
     ${rows.map(({ a, v }) => { const c = ui.confirm === 'ma:' + a.id; return `<tr><td><span class="lgi">${logoSvg(a, 18)}</span> ${esc(a.name)}<div class="small muted">Basis ${v.bases.join(', ')}</div></td><td class="r">${v.fleet} · ${v.routes}</td><td class="r">${eur(v.equity)}<div class="small ${v.profM < 0 ? 'neg' : 'pos'}">${eur(v.profM, { plus: true })}</div></td><td class="r">${v.f ? `${pct(v.f, 1)} · ` : ''}<b>${eur(v.price)}</b>
-      <div>${block ? '' : c ? `<span class="small">Wirklich kaufen?</span> <button class="btn small danger" data-act="takeover" data-id="${a.id}">Ja, für ${eurB(v.price)} übernehmen</button> <button class="btn small" data-act="cancelconfirm">Nein</button>` : `<button class="btn small ${free >= v.price ? 'primary' : ''}" data-act="askma" data-id="${a.id}" ${free >= v.price ? '' : 'disabled title="Dafür reicht das Geld nicht"'}>Übernehmen</button>`}</div></td></tr>`; }).join('')}
+      ${v.anchor > 0.001 ? `<div class="small muted">inkl. ${pct(v.anchor)} Ankeraktionäre (+${eurB(v.ancX)})</div>` : ''}<div>${SM.maBlock(W, pl, a) ? `<span class="small muted" title="${esc(SM.maBlock(W, pl, a))}">Ankeraktionäre verkaufen nicht</span>` : c ? `<span class="small">Wirklich kaufen?</span> <button class="btn small danger" data-act="takeover" data-id="${a.id}">Ja, für ${eurB(v.price)} übernehmen</button> <button class="btn small" data-act="cancelconfirm">Nein</button>` : `<button class="btn small ${free >= v.price ? 'primary' : ''}" data-act="askma" data-id="${a.id}" ${free >= v.price ? '' : 'disabled title="Dafür reicht das Geld nicht"'}>Übernehmen</button>`}</div></td></tr>`; }).join('')}
     </tbody></table></div>
-    <p class="small muted">Komplettübernahme: Angebot für alle Aktien, die Sie noch nicht haben – ohne Mehrheit Börsenwert × ${NF1.format(P.CAPITAL.hostile)} (feindlich), mit Mehrheit × ${NF1.format(P.CAPITAL.tender)}${mx > 1 ? `, dazu ×${NF1.format(mx)} für Ihre Phase` : ''}. Günstiger geht es Schritt für Schritt: erst unter <a href="#" data-act="tab" data-tab="exchange">Börse</a> Anteile kaufen (anteiliger Gewinn und Dividenden inklusive), ab 50 % den Rest übernehmen. Sie übernehmen alles: Flugzeuge mit Leasingverträgen und Krediten, Strecken samt Slots, Basen, Personal, Kasse und Bankschulden. Die Prämie über dem Buchwert wird sofort abgeschrieben.</p></div>`;
+    <p class="small muted">Komplettübernahme: Angebot für alle Aktien, die Sie noch nicht haben – ohne Mehrheit Börsenwert × ${NF1.format(P.CAPITAL.hostile)} (feindlich), mit Mehrheit × ${NF1.format(P.CAPITAL.tender)}${mx > 1 ? `, dazu ×${NF1.format(mx)} für Ihr Ansehen` : ''}, Ankeraktionäre großer Airlines +${pct(P.CAPITAL.anchor.prem)} auf ihren Anteil. Günstiger geht es Schritt für Schritt: erst unter <a href="#" data-act="tab" data-tab="exchange">Börse</a> Anteile kaufen (anteiliger Gewinn und Dividenden inklusive), ab 50 % den Rest übernehmen. Sie übernehmen alles: Flugzeuge mit Leasingverträgen und Krediten, Strecken samt Slots, Basen, Personal, Kasse und Bankschulden. Die Prämie über dem Buchwert wird sofort abgeschrieben.</p></div>`;
 }
 
 // ---------- Meldungen ----------
@@ -2885,7 +2901,7 @@ function ganttSvg(a) {
   let body = '';
   const block = (cls, txt) => `<span class="gt-blk ${cls}" style="left:0;width:100%">${txt}</span>`;
   if (a.delivery_day > W.day) body = block('off', `Lieferung ${dateShort(a.delivery_day)}`);
-  else if ((a.status === 'ccheck' || a.status === 'aog') && a.until > W.day) body = block('bad', `${a.status === 'ccheck' ? 'C-Check' : 'Schaden'} bis ${dateShort(a.until)}`);
+  else if ((a.status === 'ccheck' || a.status === 'aog') && a.until > W.day) body = block('bad', `${a.status === 'ccheck' ? 'C-Check' : a.grounded ? 'Stilllegung' : 'Schaden'} bis ${dateShort(a.until)}`);
   else if (a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) body = block('acmi', `Charter für ${esc(a.acmi.client)}`);
   else if (s) for (const l of s.legs) {
     for (const off of [0, 24]) {
@@ -3059,15 +3075,16 @@ VIEWS.profile = function viewProfile() {
     <div class="card pad spread" style="gap:10px;flex-wrap:wrap"><div class="stack" style="gap:2px"><b>Name, Kürzel und Heimatbasis</b><span class="small">${esc(pl.name)} (${esc(pl.code || '')}) · Start in <b class="mono">${esc(pl.bases[0])}</b> ${esc(apName(pl.bases[0]))}</span>
       <span class="small muted">${canRb ? (preStart() ? `Bis zum Start am ${esc(startTxt(preStart()))} jederzeit änderbar.` : 'Änderbar, solange Sie noch kein Flugzeug, keine Strecke und keine Beteiligung haben.') : 'Nicht mehr änderbar – Ihre Airline hat schon Flugzeuge, Strecken oder Beteiligungen.'}</span></div>
       <button class="btn small${canRb ? ' primary' : ''}" data-act="rebase" ${canRb ? '' : 'disabled'}>Name und Basis ändern</button></div>
-    <div class="logo-stage"><div class="logo-big">${logoSvg(demo, 112, L)}</div>
+    <div class="logo-stage"><div class="logo-big">${pl.pixLogo ? logoSvg(pl, 112) : logoSvg(demo, 112, L)}</div>
       <div class="stack" style="gap:6px"><b style="font-size:18px">${esc(pl.name)}</b><span class="small muted">So erscheint Ihr Logo in der Seitenleiste, bei Mitspielenden, im Handel und auf dem Leitwerk.</span>
-      <div class="acv-box" style="max-width:280px">${acSvg('A20N', { color: L.c1, code: pl.code, ink: L.c2 })}</div></div></div>
+      <div class="acv-box" style="max-width:280px">${acSvg('A20N', { color: L.c1, code: pl.code, ink: L.c2, pix: pl.pixLogo ? pixUrl(pl.pixLogo) : null })}</div></div></div>
+    ${pl.pixLogo ? `<div class="callout info"><b>Ihr Pixel-Logo ist aktiv</b><span class="small">Es ersetzt überall das gestaltete Logo – auch auf dem Leitwerk. Die Farben unten bestimmen weiter Leitwerk und Zierstreifen. Ändern können Sie das Pixel-Logo weiter unten; übernehmen Sie stattdessen ein gestaltetes Logo, wird das Pixel-Logo entfernt.</span></div>` : ''}
     <div class="stack"><h3>Form</h3><div class="logo-grid">${Object.keys(LOGO_SHAPE).map((k) => `<button data-act="lg" data-k="shape" data-v="${k}" aria-pressed="${L.shape === k}" title="${k}">${logoSvg(demo, 44, { ...L, shape: k })}</button>`).join('')}</div></div>
     <div class="stack"><h3>Symbol</h3><div class="logo-grid">${Object.keys(LOGO_SYM).map((k) => `<button data-act="lg" data-k="sym" data-v="${k}" aria-pressed="${L.sym === k}" title="${k === 'code' ? 'Kürzel' : k}">${logoSvg(demo, 44, { ...L, sym: k })}</button>`).join('')}</div></div>
     <div class="stack"><h3>Farben</h3><div class="logo-grid">${LOGO_PALETTES.map(([a, b]) => `<button data-act="lgpal" data-a="${a}" data-b="${b}" aria-pressed="${L.c1 === a && L.c2 === b}" title="${a} / ${b}">${logoSvg(demo, 44, { ...L, c1: a, c2: b })}</button>`).join('')}</div>
       <div class="row small"><label class="row" style="gap:6px">Grundfarbe <input type="color" id="lg-c1" value="${L.c1}"></label><label class="row" style="gap:6px">Symbolfarbe <input type="color" id="lg-c2" value="${L.c2}"></label></div></div>
     ${(() => { const tk = SM.logoTaken(W, pl, L); return tk ? `<div class="callout warn"><b>Schon vergeben</b><span class="small">Genau diese Kombination trägt bereits <span class="lgi">${logoSvg(tk, 18)}</span> ${esc(tk.name)}. Ändern Sie Form, Symbol oder eine Farbe.</span></div>` : ''; })()}
-    <div class="row"><button class="btn primary" data-act="lgsave" ${SM.logoTaken(W, pl, L) ? 'disabled' : ''}>Logo übernehmen</button><button class="btn" data-act="lgreset">Zurücksetzen</button></div>
+    <div class="row"><button class="btn primary" data-act="lgsave" ${SM.logoTaken(W, pl, L) ? 'disabled' : ''}>${pl.pixLogo ? 'Gestaltetes Logo übernehmen (ersetzt Pixel-Logo)' : 'Logo übernehmen'}</button>${pl.pixLogo ? '<button class="btn" data-act="lgcolors" title="Nur Leitwerk- und Streifenfarben ändern, Pixel-Logo bleibt">Nur Farben übernehmen</button>' : ''}<button class="btn" data-act="lgreset">Zurücksetzen</button></div>
     <p class="small muted">Ihre Farben erscheinen auch auf dem Leitwerk Ihrer Flugzeuge. Das Logo können Sie jederzeit ändern. Jede Kombination aus Form, Symbol und Farben gibt es pro Welt nur einmal.</p>
     ${!pl.fleet.length && !pl.activeRoutes().length ? `<div class="callout info"><b>Name und Heimatbasis</b><span class="small">Solange Sie noch kein Flugzeug und keine Strecke haben, können Sie Name, Kürzel und Basis ohne Nachteil ändern – es gilt dann die Lizenz des neuen Flughafens. Sie starten in <b>${esc(apName(pl.bases[0]))} (${esc(pl.bases[0])})</b>.</span><div class="row"><button class="btn small" data-act="rebase">Name und Basis ändern</button></div></div>` : ''}
     ${pixEditorHtml(pl)}
@@ -3090,6 +3107,7 @@ function pixEditorHtml(pl) {
         <div class="pix-pal">${S.pal.map((c, i) => `<button data-act="pixcol" data-v="${i + 1}" aria-pressed="${S.col === i + 1}" style="background:${c}" title="Farbe ${i + 1}"></button>`).join('')}</div>
         <label class="row small" style="gap:6px">Gewählte Farbe ändern <input type="color" id="pix-color" value="${S.pal[S.col - 1]}"></label>
         <div class="row" style="gap:6px;flex-wrap:wrap"><span class="small muted">Vorschau:</span><img id="pixprev" width="40" height="40" alt="" class="logo-svg pix"><img id="pixprev2" width="18" height="18" alt="" class="logo-svg pix"></div>
+        <div class="acv-box" style="max-width:240px">${acSvg('A20N', { ...myAcColors(pl), code: pl.code, pix: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', pixId: 'pixtail' })}</div>
       </div></div>
     <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn primary" data-act="pixsave">Pixel-Logo übernehmen</button><button class="btn" data-act="pixclear">Fläche leeren</button>${pl.pixLogo ? '<button class="btn" data-act="pixoff">Pixel-Logo entfernen</button>' : ''}</div>
     <p class="small muted">Zeichnen Sie mit Maus, Stift oder Finger. Das Pixel-Logo ersetzt überall das gestaltete Logo; exakt dasselbe Bild kann pro Welt nur eine Airline tragen.</p></div>`;
@@ -3101,6 +3119,7 @@ function pixPaint() {
   g.putImageData(img, 0, 0);
   const u = pixUrl({ pal: S.pal, px: pixEncode(S.px) });
   for (const id of ['#pixprev', '#pixprev2']) { const e = $(id); if (e) e.src = u; }
+  { const e = $('#pixtail'); if (e) e.setAttribute('href', u); }
 }
 function pixAt(e) { const c = $('#pixc'), r = c.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * 64), Math.floor((e.clientY - r.top) / r.height * 64)]; }
 function pixApply(x, y) {
@@ -3129,12 +3148,13 @@ function onPixClick(act, b) {
 }
 function onLogoClick(act, b) {
   if (onPixClick(act, b)) return true;
-  if (!['lg', 'lgpal', 'lgsave', 'lgreset'].includes(act)) return false;
+  if (!['lg', 'lgpal', 'lgsave', 'lgreset', 'lgcolors'].includes(act)) return false;
+  if (act === 'lgcolors') { const cur = W.player.logo || {}, res = doAction({ type: 'setLogo', ...cur, ...ui.logo, shape: cur.shape || ui.logo.shape, sym: cur.sym || ui.logo.sym, c1: ui.logo.c1, c2: ui.logo.c2 }); if (res.ok) toast('Farben übernommen – Ihr Pixel-Logo bleibt.'); else toast(res.msg); refreshAll(); return true; }
   const L = ui.logo;
   if (act === 'lg') L[b.dataset.k] = b.dataset.v;
   else if (act === 'lgpal') { L.c1 = b.dataset.a; L.c2 = b.dataset.b; }
   else if (act === 'lgreset') ui.logo = null;
-  else { const res = doAction({ type: 'setLogo', ...L }); if (res.ok) toast('Neues Logo übernommen.'); refreshAll(); return true; }
+  else { const res = doAction({ type: 'setLogo', ...L }); if (res.ok) { if (W.player.pixLogo) { doAction({ type: 'setPixLogo', clear: true }); ui.pix = null; } toast('Neues Logo übernommen.'); } refreshAll(); return true; }
   renderPane(true); return true;
 }
 function onLogoChange(t) {
@@ -3142,7 +3162,7 @@ function onLogoChange(t) {
   if (!ui.logo || !/^lg-c[12]$/.test(t.id)) return false;
   ui.logo[t.id === 'lg-c1' ? 'c1' : 'c2'] = t.value; renderPane(true); return true;
 }
-const myAcColors = (pl = W.player) => { const L = pl.logo; return L ? { color: L.c1, ink: L.c2 } : { color: 'var(--accent)', ink: 'var(--on-accent)' }; };
+const myAcColors = (pl = W.player) => { const L = pl.logo, pix = pl.pixLogo ? pixUrl(pl.pixLogo) || null : null; return L ? { color: L.c1, ink: L.c2, pix } : { color: 'var(--accent)', ink: 'var(--on-accent)', pix }; };
 
 // ---------------------------------------------------------------------------
 // Chat (nur im Mehrspieler): an alle oder privat
@@ -3350,16 +3370,20 @@ function careerHtml(pl, compact) {
   const C = SM.CAREER.levels, c = SM.careerChecks(W, pl);
   const steps = `<div class="phases">${C.map((x, i) => `<div class="ph ${i < lv ? 'done' : i === lv ? 'cur' : ''}"><i>${i + 1}</i><span>${esc(x.label)}</span></div>`).join('')}</div>`;
   const checks = c ? `<div class="pchecks">${c.checks.map((x) => { const f = Math.max(0, Math.min(1, x.need ? x.have / x.need : 1)); return `<div class="pc ${x.ok ? 'ok' : ''}"><span>${esc(x.label)}</span><div class="bar"><i class="${x.ok ? 'good' : ''}" style="width:${(f * 100).toFixed(0)}%"></i></div><b>${x.money ? eur(x.have) : n0(x.have)} / ${x.money ? eur(x.need) : n0(x.need)}</b></div>`; }).join('')}</div>` : '<p class="small pos">Höchste Phase erreicht.</p>';
-  const left = SM.careerAcqLeft(W, pl);
-  const S = SM.CAREER.soft;
-  const now = `<p class="small ink2"><b>Ohne Aufschlag jetzt:</b> ${L.bases >= 99 ? 'beliebig viele Basen' : `${L.bases === 1 ? 'eine Basis' : L.bases + ' Basen'}`} · Drehkreuz bis „${P.HUB[L.hub].label}“ · ${L.acq >= 99 ? 'Flottenwachstum frei' : `noch ${left} von ${L.acq} neuen Flugzeugen in den nächsten 30 Tagen`}${L.ma ? ' · Übernahmen' : ''}.</p>
-    <p class="small muted">Alles darüber hinaus geht auch – nur teurer: jedes weitere Flugzeug in 30 Tagen +${n0(S.acqLease * 100)} % Rate und eine Monatsrate mehr Kaution, jede zusätzliche Basis doppelte Einrichtung und +${n0(S.baseDayX * 100)} % laufende Kosten, Drehkreuz-Ausbau über der Phase doppelt so teuer, Übernahmen vor Phase 3 +${n0(S.maX * 100)} % Kaufpreis. Auf der Langstrecke buchen Reisende eine neue Airline im ersten Jahr nur zögerlich.</p>`;
-  if (compact) return `<div class="card pad stack career"><div class="spread"><b>Phase ${lv + 1} von ${C.length}: ${esc(L.label)}</b><button class="btn small" data-act="tab" data-tab="milestones">Ziele ansehen</button></div>${steps}${c ? `<p class="small muted">Für „${esc(c.label)}“:</p>${checks}` : ''}</div>`;
-  const terms = `<div class="tw"><table class="t"><thead><tr><th>Muster</th><th class="r">Rate</th><th class="r">Kaution</th><th class="r">Eigen&shy;anteil</th></tr></thead><tbody>${RISK_CLASSES.map(([t, l]) => { const r = SM.riskTerms(pl, t); return `<tr><td>${l}</td><td class="r ${r.gap || r.conc ? 'warnc' : ''}">${r.gap || r.conc ? '+' + pct(r.lease - 1) : 'normal'}</td><td class="r">${r.dep} Raten</td><td class="r">${pct(r.down)}</td></tr>`; }).join('')}</tbody></table></div>`;
-  return `<div class="stack career"><h2 class="sec">Ihre Airline wächst in Phasen <small>Phase ${lv + 1} von ${C.length}: ${esc(L.label)}</small></h2>${steps}
-    <div class="grid2"><div class="card pad stack"><h3>${c ? `Nächste Phase: ${esc(c.label)}` : 'Ziel erreicht'}</h3>${checks}${c ? `<p class="small ink2">Bringt: ${esc(SM.careerUnlockTxt(c.next))}.</p>` : ''}</div>
-    <div class="card pad stack"><h3>Was Leasinggeber und Banken Ihnen geben</h3>${terms}<p class="small muted">Junge Airlines gelten als Risiko: Je größer das Flugzeug im Verhältnis zu Ihrer Phase, desto höher Rate, Kaution und Eigenanteil. Verboten ist nichts – Sie können überall starten und jedes Muster nehmen. Große Flughäfen und große Flugzeuge kosten am Anfang nur ein Vermögen, und auf der Langstrecke fehlt Ihnen noch das Vertrauen der Reisenden. Mit jeder Phase werden die Konditionen besser.</p></div></div>
-    ${now}</div>`;
+  const st = SM.standingOf(pl, W.day), room = SM.leaseRoom(pl, W.day), SB = P.STANDING;
+  const stBar = `<div class="pchecks">${st.parts.map(([l, v, mx, why]) => `<div class="pc ${v >= mx * 0.8 ? 'ok' : ''}"><span title="${esc(why)}">${esc(l)}</span><div class="bar"><i class="${v >= mx * 0.8 ? 'good' : ''}" style="width:${(Math.max(0, Math.min(1, v / mx)) * 100).toFixed(0)}%"></i></div><b>${n0(v)} / ${mx}</b></div>`).join('')}</div>`;
+  const verdict = (r) => r.reject ? '<span class="neg">Absage</span>' : r.cond ? '<span class="warnc">Auflagen</span>' : '<span class="pos">Zusage</span>';
+  if (compact) return `<div class="card pad stack career"><div class="spread"><b>Ansehen ${st.v} / 100 · Phase ${lv + 1}: ${esc(L.label)}</b><button class="btn small" data-act="tab" data-tab="milestones">Ansehen und Ziele</button></div>
+    <div class="row small" style="gap:6px">${RISK_CLASSES.map(([t, l]) => { const r = SM.riskTerms(pl, t); return `<span class="chip ${r.reject ? 'crit' : r.cond ? 'warn' : ''}" title="${esc(r.reject || (r.cond ? `Ansehen ${r.st}, verlangt ${r.req}: Rate +${pct(r.lease - 1)}, Kaution ${r.dep} Raten` : 'Leasing ohne Auflagen'))}">${l}: ${r.reject ? 'abgelehnt' : r.cond ? 'Auflagen' : 'Zusage'}</span>`; }).join('')}<span class="chip">Leasing: noch ${room.left} von ${room.max} in ${SB.leaseWin} T.</span></div>
+    ${c ? `<p class="small muted">Für Phase „${esc(c.label)}“:</p>${checks}` : ''}</div>`;
+  const terms = `<table class="t"><thead><tr><th>Muster</th><th class="r">Leasinggeber</th></tr></thead><tbody>${RISK_CLASSES.map(([t, l]) => { const r = SM.riskTerms(pl, t); return `<tr><td>${l}<div class="small muted">verlangt Ansehen ${r.req}</div></td><td class="r">${verdict(r)}<div class="small muted">${r.reject ? `Kauf mit ${pct(r.down)} Eigenanteil` : `Rate ${r.lease > 1.001 ? '+' + pct(r.lease - 1) : 'normal'} · ${r.dep} Raten Kaution · Kauf ${pct(r.down)}`}</div></td></tr>`; }).join('')}</tbody></table>`;
+  const bases = `<div class="tw"><table class="t"><thead><tr><th>Basis an …</th><th class="r">verlangt</th><th class="r">Antrag</th></tr></thead><tbody>${[['s', 'kleinem Flughafen (bis 8 Mio. Pax)'], ['m', 'mittlerem Flughafen (bis 20 Mio.)'], ['l', 'großem Flughafen (bis 50 Mio.)'], ['x', 'Drehkreuz (über 50 Mio.)']].map(([k, l]) => { const req = SB.baseReq[k], g = req - st.v; return `<tr><td>${l}</td><td class="r">${req}</td><td class="r">${g <= 0 ? '<span class="pos">Zusage</span>' : g <= SB.baseCond ? `<span class="warnc">Auflagen (Lizenz ×${NF1.format(SB.baseCondX)})</span>` : '<span class="neg">Absage</span>'}</td></tr>`; }).join('')}</tbody></table></div>`;
+  return `<div class="stack career"><h2 class="sec">Ansehen Ihrer Airline <small>${st.v} von 100 – danach entscheiden Leasinggeber, Banken und Flughäfen</small></h2>
+    <div class="grid2"><div class="card pad stack"><h3>Woraus sich das Ansehen ergibt</h3>${stBar}<p class="small muted">Erfahrung wächst mit jedem Monat Flugbetrieb, Größe mit der Flotte. Finanzen: Rating und Eigenkapital. Zuverlässigkeit: Pünktlichkeit der letzten Flüge; eine Sanierung kostet 15 Punkte. Marke: Bekanntheit durch Service und Marketing. Es gibt keine Stufen zum Freischalten – wer solide wirtschaftet, bekommt bessere Partner.</p></div>
+    <div class="card pad stack"><h3>Leasing und Finanzierung</h3>${terms}<p class="small ink2">Neue Leasingverträge: <b>${room.recent} in ${SB.leaseWin} Tagen</b>, die Leasinggeber machen bei Ihrem Ansehen höchstens ${room.max} mit (je 10 Punkte einer mehr). Darüber hinaus oder bei Absage: kaufen – mit Bankkredit für den Rest, sofern der Eigenanteil unter 100 % liegt.</p>
+    <p class="small muted">Bis ${SB.cond} Punkte unter der Anforderung sagen die Leasinggeber unter Auflagen zu: höhere Rate, mehr Kaution. Darunter lehnen sie ab. Gekaufte Flugzeuge bauen Eigenkapital auf, verbessern das Rating und damit das Ansehen.</p></div></div>
+    <div class="grid2"><div class="card pad stack"><h3>Basen beantragen</h3>${bases}<p class="small muted">Die Startbasis ist frei wählbar. Jede weitere Basis wird bei der Flughafengesellschaft beantragt. Ohne Aufschlag führen Sie ${SM.basesFree(st.v) >= 99 ? 'beliebig viele Basen' : SM.basesFree(st.v) === 1 ? 'eine Basis' : SM.basesFree(st.v) + ' Basen'}, Drehkreuz-Ausbau ohne Aufschlag bis „${P.HUB[Math.min(3, Math.floor(st.v / 25))].label}“, Übernahmen ohne Aufschlag ab Ansehen 40.</p></div>
+    <div class="card pad stack"><h3>${c ? `Ziel: Phase „${esc(c.label)}“` : 'Alle Phasen erreicht'}</h3>${steps}${checks}<p class="small muted">Phasen sind Etappenziele mit Meilensteinpunkten. Jede erreichte Phase bringt 2 Punkte Erfahrung im Ansehen.</p></div></div></div>`;
 }
 function worldExtraHtml() {
   const M = W.macro, C = M.cycle || { phase: 0, amp: 0 };
@@ -3373,6 +3397,10 @@ function worldExtraHtml() {
     <div class="tile"><span>Weltkonjunktur</span><b>${trend}</b><em>Zyklus ${n0(lvl * 100)} · ${n0(C.period || 54)} Monate</em></div>
     <div class="tile"><span>Banken</span><b class="${(M.bank ?? 1) < 0.8 ? 'warnc' : ''}">${(M.bank ?? 1) < 0.7 ? 'restriktiv' : (M.bank ?? 1) < 0.9 ? 'vorsichtig' : 'offen'}</b><em>Kreditlinien × ${NF2.format(M.bank ?? 1)}</em></div>
     <div class="tile"><span>Zölle</span><b>${tariffs.length ? tariffs.length + ' Konflikt' + (tariffs.length > 1 ? 'e' : '') : 'keine'}</b><em>Handel und Flugzeuge</em></div></div>`;
+  { const mx = SM.shockX(W, 'mx'), lx = SM.shockX(W, 'lease'), dl = SM.shockX(W, 'delay'), rq = SM.shockX(W, 'req');
+    const gr = W.events.filter((e) => e.type === 'grounding' && !e.cancelled && e.start <= W.day && e.end > W.day);
+    const fx = [mx > 1.001 ? `Wartung +${pct(mx - 1)}` : '', lx > 1.001 ? `neue Leasingverträge +${pct(lx - 1)}` : '', dl ? `Auslieferungen +${dl} Tage` : '', rq ? `Leasinggeber verlangen +${rq} Ansehen` : '', ...gr.map((e) => `stillgelegt: ${e.types.map((t) => tl(t)).join(', ')} (${pct(e.share)})`)].filter(Boolean);
+    if (fx.length) html += `<div class="callout warn"><b>Laufende Krisen wirken auf Ihre Rechnung</b><span>${fx.join(' · ')}</span></div>`; }
   html += `<div class="stack"><h2 class="sec">Konjunktur nach Regionen <small>Zyklen laufen versetzt – Streuung schützt</small></h2><div class="econ">${regs.map(([rg, v]) => `<div><span>${rg}</span><div class="bar"><i class="${v < 0.95 ? 'crit' : v > 1.04 ? 'good' : ''}" style="width:${clampPct((v - 0.7) / 0.6)}%"></i><span class="tgt" style="left:50%"></span></div><b class="num">${n0(v * 100)}</b></div>`).join('')}</div></div>`;
   html += `<div class="stack"><h2 class="sec">Handelskonflikte und Zölle</h2>${tariffs.length ? `<table class="t"><tbody>${tariffs.map(([k, v]) => { const [a, b] = k.split('|'); return `<tr><td>${esc(SM.blocName(a))} ↔ ${esc(SM.blocName(b))}</td><td class="r">${pct(v)}</td></tr>`; }).join('')}</tbody></table><p class="small muted">Zölle senken Geschäftsreisen (stark), Fracht und Urlaubsreisen zwischen den Blöcken und verteuern Flugzeuge aus dem jeweils anderen Block (Airbus/ATR: EU, Boeing: USA, Embraer: Brasilien, Dash 8: Kanada).</p>` : '<p class="small muted">Freier Handel. Das kann sich schnell ändern.</p>'}</div>`;
   if (carbon.length || fees.length) html += `<div class="stack"><h2 class="sec">Abgaben und Entgelte</h2><table class="t"><tbody>${carbon.map(([b, v]) => `<tr><td>CO₂-Abgabe ${esc(SM.blocName(b))}</td><td class="r">Kerosin +${pct(v)}</td></tr>`).join('')}${fees.map(([a, v]) => `<tr><td>Entgelte ${a} · ${esc(apName(a))}</td><td class="r">+${pct(v - 1)}</td></tr>`).join('')}</tbody></table></div>`;
@@ -3580,7 +3608,7 @@ function mktItemOpts() {
   if (k === 'ac') {
     if (sell) { const list = me.fleet.filter((a) => a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day) && !M.items.some((x) => x.k === 'ac' && x.id === a.id));
       f = list.length ? `<select id="mk-ac">${list.map((a) => `<option value="${a.id}">${acName(a.id)} · ${tl(a.type_id)} · ${a.owned ? 'Eigentum' : 'Leasing'} · ${n0(me.acAge(a, W.day))} J.</option>`).join('')}</select>` : '<span class="small muted">Keine Flugzeuge verfügbar.</span>'; }
-    else f = `<select id="mk-type">${Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => !t.launch).map(([id, t]) => `<option value="${id}">${esc(t.label)}</option>`).join('')}</select>
+    else f = `<select id="mk-type">${Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => !t.launch && !t.role).map(([id, t]) => `<option value="${id}">${esc(t.label)}</option>`).join('')}</select>
       <select id="mk-age" style="width:auto"><option value="">jedes Alter</option>${[5, 10, 15, 20].map((y) => `<option value="${y}">bis ${y} Jahre</option>`).join('')}</select>
       <input type="number" id="mk-n" min="1" max="4" value="1" style="width:64px" aria-label="Anzahl">
       <label class="chk small"><input type="checkbox" id="mk-fam"> auch andere Muster der Familie</label>`;
@@ -3823,7 +3851,10 @@ function assistantHints() {
   else if (netCash(pl) < 0 && bs.cash >= 0) add('dispo', 'warn', 'fin', `<b>Konto im Dispo</b> (${eur(netCash(pl))}). Das ist erlaubt, kostet aber ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins – und kürzt die Bank die Linie, wird der Überhang sofort eingezogen.`, 'credit');
   if (bs.cash < 0 && pl.status !== 'restructuring') add('neg', 'crit', 'fin', `<b>Dispo überzogen</b> (${eur(netCash(pl))}). Nach ${P.INSOLVENCY_AFTER_DAYS} Tagen droht die Insolvenz. Kredit aufnehmen oder Verlustbringer schließen.`, 'credit');
   else if (isFinite(pl.runway) && pl.runway < 60 && routes.length) add('runway', 'warn', 'fin', `Das Geld reicht beim jetzigen Abfluss noch etwa <b>${n0(pl.runway)} Tage</b>.`, 'credit');
-  if (!pl.fleet.length) add('nofleet', 'info', 'strat', `Wir brauchen zuerst ein Flugzeug. Zwei <b>A320neo</b> im Leasing sind ein solider Start – das kostet nur die Kaution.`, 'fleetBuy');
+  if (pl.antitrust) for (const [c, x] of Object.entries(pl.antitrust)) add('anti' + c, W.day - x.since >= P.ANTITRUST.grace ? 'crit' : 'warn', 'strat', `Die Wettbewerbsaufsicht hat uns in <b>${apName(c)}</b> im Visier: ${pct(x.share)} aller Abflüge. Neue Strecken dort sind untersagt${W.day - x.since >= P.ANTITRUST.grace ? ', und jeden Monat kommt ein Bußgeld' : `, in ${P.ANTITRUST.grace - (W.day - x.since)} Tagen drohen Bußgelder`}. Abflüge dort reduzieren oder Wachstum an andere Basen verlagern.`, 'stations');
+  { const n = pl.fleet.length; if (n >= 90 && n < 100) add('hq100', 'info', 'strat', `Ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte: Bei 200 Flugzeugen kostet die Zentrale rund ${eur(200000 * cpi())} am Tag. Wachstum lohnt sich dann nur noch mit guten Strecken.`, 'finance'); }
+  if (!pl.fleet.length) { const ok = ['A20N', 'E295', 'AT76', 'DH8D'].map((t) => [t, SM.riskTerms(pl, t)]), free = ok.find(([, r]) => !r.reject && !r.cond), a320 = ok[0][1];
+    add('nofleet', 'info', 'strat', `Wir brauchen zuerst ein Flugzeug. Als junge Airline (Ansehen ${a320.st}) geben uns die Leasinggeber ${free ? `<b>${tl(free[0])}</b> und kleinere ohne Auflagen` : 'nur Turboprops ohne Auflagen'}${a320.reject ? ', die A320neo noch gar nicht' : a320.cond ? `, die A320neo nur unter Auflagen (+${pct(a320.lease - 1)} Rate, ${a320.dep} Monatsraten Kaution)` : ''}. Zwei ${free ? tl(free[0]) : 'Turboprops'} im Leasing sind ein solider Start – das kostet nur die Kaution. Mit Erfahrung, Pünktlichkeit und soliden Finanzen steigt das Ansehen.`, 'fleetBuy'); }
   else if (!routes.length) add('noroute', 'info', 'net', `Die Flotte ist da oder unterwegs, aber es gibt noch <b>keine Strecke</b>. Tippen Sie ein Ziel auf der Karte an.`, 'plan');
   const cov = pl.staff.cov;
   if (cov && Object.values(cov.cancel).some((x) => x > 0)) add('cxstaff', 'crit', 'ops', `<b>Flugausfälle:</b> Heute fehlen Crews${pl.staff.agency ? '' : ', und Agenturpersonal ist abgeschaltet'}.`, 'staff');
@@ -3871,7 +3902,7 @@ function assistantHints() {
   }
   if (routes.length >= 3 && pl.brand < 0.45 && !pl.marketing && !pl.mktPct) add('brand', 'info', 'strat', `Unsere Marke steht bei ${n0(pl.brand * 100)} von 100 – schon 2 % vom Umsatz für Marketing helfen bei der Buchungswahl.`, 'strategy');
   if (routes.length >= 3 && !pl.cabin && W.day > 20) add('cabin', 'info', 'strat', 'Auf Geschäftsstrecken lohnt meist eine kleine <b>Business-Kabine</b> (10–20 %) – Premium-Konkurrenten haben eine. Unter Karte → Strategie sehen Sie die Prognose für Ihr Netz.', 'strategy');
-  if (!pl.logo && W.day > 3) add('logo', 'info', 'strat', 'Geben Sie Ihrer Airline ein Gesicht: Form, Symbol und Farben für Ihr <b>Logo</b> auswählen.', 'profile');
+  if (!pl.logo && !pl.pixLogo && W.day > 3) add('logo', 'info', 'strat', 'Geben Sie Ihrer Airline ein Gesicht: Form, Symbol und Farben für Ihr <b>Logo</b> auswählen.', 'profile');
   if (routes.length && routes.length < 6 && pl.fleet.length) {
     const base = curBase(), d = bestFreeDest(base);
     if (d) add('idea' + d, 'info', 'net', `Noch unbedient ab ${base}: <b>${esc(apName(d))} (${d})</b> hat nach unserer Schätzung viel Potenzial – eine Marktstudie zeigt, ob es stimmt.`, null, { plan: d });
@@ -4195,6 +4226,7 @@ function onPaneClick(e) {
     case 'dispose': { if (doAction({ type: 'dispose', acId: b.dataset.id }).ok) { ui.confirm = null; toast('Flugzeug abgegeben.'); } refreshAll(); break; }
     case 'acmi': { const sel = $(`#acmi-${b.dataset.id}`), acId = b.dataset.ac || (sel && sel.value); if (doAction({ type: 'acmi', offerId: b.dataset.id, acId }).ok) toast(`Charter vereinbart – ${acName(acId)} steht im Kalender.`); refreshAll(); break; }
     case 'acmipool': { const on = b.dataset.on === '1', id = on ? ($('#acmi-pooladd') || {}).value : b.dataset.id; if (!id) break; const r = doAction({ type: 'assignAircraft', acId: id, mode: on ? 'charter' : 'auto', pins: [] }); if (r.ok) toast(on ? `${acName(id)} ist im Charter-Pool.` : `${acName(id)} fliegt wieder im Netz.`); refreshAll(); break; }
+    case 'buyseg': ui.buySeg = b.dataset.v || ''; renderPane(true); break;
     case 'acmirange': ui.acf.range = Number(b.dataset.v) || 120; renderPane(true); break;
     case 'acmigap': ui.acf.gap = b.dataset.clear ? null : { ac: b.dataset.ac, from: Number(b.dataset.from), to: Number(b.dataset.to) }; renderPane(true); if (ui.acf.gap) { const h = [...document.querySelectorAll('#pane h3.sec')].find((x) => /Anfragen/.test(x.textContent)); if (h) h.scrollIntoView({ block: 'start', behavior: 'smooth' }); } break;
     case 'selapt': selectAirport(b.dataset.apt); break;
@@ -4609,7 +4641,7 @@ function projChart(a, b) {
 }
 function scenForm(sc) {
   const pl = W.player, k = sc.k || 'aircraft';
-  const types = Object.keys(P.AIRCRAFT_TYPES).filter((t) => !P.AIRCRAFT_TYPES[t].launch || W.day >= P.AIRCRAFT_TYPES[t].launch + 365);
+  const types = Object.keys(P.AIRCRAFT_TYPES).filter((t) => !P.AIRCRAFT_TYPES[t].role && (!P.AIRCRAFT_TYPES[t].launch || W.day >= P.AIRCRAFT_TYPES[t].launch + 365));
   let f = '';
   if (k === 'aircraft') f = `<label class="f"><span>Muster</span><select id="cs-type">${types.map((t) => `<option value="${t}" ${t === sc.type ? 'selected' : ''}>${esc(tl(t))}</option>`).join('')}</select></label>
     <label class="f"><span>Art</span><select id="cs-mode"><option value="lease" ${sc.mode === 'lease' ? 'selected' : ''}>Leasing</option><option value="flex" ${sc.mode === 'flex' ? 'selected' : ''}>Flex-Leasing</option><option value="buy" ${sc.mode === 'buy' ? 'selected' : ''}>Kauf</option></select></label>
@@ -5012,6 +5044,12 @@ const gApt = (p, label, home = false) => `<g class="gv-apt${home ? ' home' : ''}
 const gPerson = (cls, cap, delay) => `<svg class="gv-person ${cls}" viewBox="0 0 24 32" style="animation-delay:${delay}s" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M3 31c0-7 4-12 9-12s9 5 9 12z"/>${cap ? '<path class="cap" d="M5.5 5.2h13L16.6 1.8H7.4z"/>' : ''}</svg>`;
 
 const SCENES = {
+  standing() {
+    const pl = W && W.player, st = pl ? SM.standingOf(pl, W.day) : { v: 25, parts: [['Erfahrung', 0, 25], ['Größe', 0, 20], ['Finanzen', 16, 25], ['Zuverlässigkeit', 5, 10], ['Marke', 6, 15]] };
+    const vd = (t) => { const r = pl ? SM.riskTerms(pl, t) : null; return r ? (r.reject ? ['neg', 'Absage'] : r.cond ? ['warnc', 'Auflagen'] : ['pos', 'Zusage']) : ['pos', 'Zusage']; };
+    return `<div class="gv-st"><div class="gv-st-bars">${st.parts.map(([l, v, mx], i) => `<div><span>${esc(l)}</span><div class="gv-lf"><i class="gv-grow" style="width:${Math.max(4, Math.round(v / mx * 100))}%;animation-delay:${0.15 * i}s"></i></div></div>`).join('')}<b class="gv-st-v">Ansehen ${st.v} / 100</b></div>
+      <div class="gv-tags">${[['AT76', 'ATR 72'], ['E295', 'E195-E2'], ['A20N', 'A320neo'], ['B789', '787']].map(([t, l]) => { const [c, x] = vd(t); return `<div class="gv-tag${c === 'pos' ? ' on' : ''}"><b>${l}</b><span class="${c}">${x}</span></div>`; }).join('')}</div></div>`;
+  },
   welcome() {
     const H = [250, 112], pts = [[78, 62], [132, 158], [196, 44], [372, 46], [430, 132], [318, 172]];
     const arcs = pts.map((p, i) => `<path class="gv-arc" style="animation-delay:${0.15 * i}s" d="${gArc(H, p, 0.28)}"/>`).join('');
@@ -5019,10 +5057,12 @@ const SCENES = {
       ${pts.map((p) => gApt(p, '')).join('')}${gApt(H, gHome(), true)}${gPlaneOn(gArc(H, pts[3], 0.28), 4.5)}${gPlaneOn(gArc(pts[1], H, 0.28), 5.5, 'var(--plane-ai)', 0.9)}</svg>`;
   },
   aircraft() {
-    const t = P.AIRCRAFT_TYPES.A20N, cp = (W && W.macro.cpi) || 1, lease = t.lease_month * P.EURUSD / ((W && W.macro.eurusd) || P.EURUSD) * cp;
-    return `<div class="gv-ac">${acSvg('A20N', { ...(W && W.player ? myAcColors() : { color: 'var(--accent)' }), code: W && W.player ? W.player.code : 'SM' })}</div>
-      <div class="gv-tags"><div class="gv-tag on"><b>Leasen</b><span>${eur(lease)} im Monat</span><em>+ ${P.LEASE_DEPOSIT_MONTHS} Monatsraten Kaution</em></div>
-      <div class="gv-tag"><b>Kaufen</b><span>${eur(t.value_eur * cp)}</span><em>bindet viel Kapital</em></div></div>`;
+    const t = P.AIRCRAFT_TYPES.E295, cp = (W && W.macro.cpi) || 1, pl = W && W.player, rk = pl ? SM.riskTerms(pl, 'E295') : { lease: 1.08, dep: 2 }, ra = pl ? SM.riskTerms(pl, 'A20N') : null;
+    const lease = t.lease_month * rk.lease * P.EURUSD / ((W && W.macro.eurusd) || P.EURUSD) * cp;
+    return `<div class="gv-ac">${acSvg('E295', { ...(pl ? myAcColors() : { color: 'var(--accent)' }), code: pl ? pl.code : 'SM' })}</div>
+      <div class="gv-tags"><div class="gv-tag on"><b>E195-E2 leasen</b><span>${eur(lease)} im Monat</span><em>Zusage · ${rk.dep} Monatsraten Kaution</em></div>
+      <div class="gv-tag"><b>A320neo</b><span>${ra && ra.reject ? 'abgelehnt' : ra && ra.cond ? 'unter Auflagen' : 'Zusage'}</span><em>${ra && ra.cond ? `Rate +${pct(ra.lease - 1)}, ${ra.dep} Raten Kaution` : 'je nach Ansehen'}</em></div>
+      <div class="gv-tag"><b>Kaufen</b><span>${eur(t.value_eur * cp)}</span><em>${pct(rk.down || 0.2)} Eigenanteil, baut Ansehen auf</em></div></div>`;
   },
   route() {
     const A = [92, 146], B = [408, 70], arc = gArc(A, B, 0.3);
@@ -5031,10 +5071,10 @@ const SCENES = {
       <div class="gv-tap gv-pop" style="animation-delay:.2s">${gIc('target')}<span>antippen</span></div>`;
   },
   crew() {
-    const pil = Array.from({ length: 4 }, (_, i) => gPerson('pil', true, 0.12 * i)).join(''), cab = Array.from({ length: 7 }, (_, i) => gPerson('cab', false, 0.5 + 0.1 * i)).join('');
-    return `<div class="gv-crew"><div class="gv-crew-ac">${acSvg('A20N', { ...(W && W.player ? myAcColors() : { color: 'var(--accent)' }), code: W && W.player ? W.player.code : 'SM' })}<span class="small muted">A320neo · 5 Std. am Tag</span></div>
+    const pil = Array.from({ length: 4 }, (_, i) => gPerson('pil', true, 0.12 * i)).join(''), cab = Array.from({ length: 6 }, (_, i) => gPerson('cab', false, 0.5 + 0.1 * i)).join('');
+    return `<div class="gv-crew"><div class="gv-crew-ac">${acSvg('E295', { ...(W && W.player ? myAcColors() : { color: 'var(--accent)' }), code: W && W.player ? W.player.code : 'SM' })}<span class="small muted">E195-E2 · 5 Std. am Tag</span></div>
       <div class="gv-crew-rows"><div><span class="gv-n">4</span><div class="gv-people">${pil}</div><span class="small muted">Piloten</span></div>
-      <div><span class="gv-n">7</span><div class="gv-people">${cab}</div><span class="small muted">Kabine</span></div></div></div>`;
+      <div><span class="gv-n">6</span><div class="gv-people">${cab}</div><span class="small muted">Kabine</span></div></div></div>`;
   },
   time() {
     const days = Array.from({ length: 8 }, (_, i) => `<span>${i + 1}. Jan</span>`).join('');
@@ -5068,8 +5108,10 @@ const SCENES = {
 const GUIDE_ALL = [
   { k: 'welcome', t: 'Ihre Airline', lead: 'Sie bauen ein Streckennetz auf und verdienen Geld – ohne dass das Konto leerläuft.',
     chips: () => [gChip('globe', `${SM.AP_CODES.length} Flughäfen`), gChip('users', `${Object.keys(SM.AI_SETUP).length} KI-Airlines`), gChip('coin', `Start: ${n0(SM.DIFFICULTY.hard.equity / 1e6)}–${n0(SM.DIFFICULTY.easy.equity / 1e6)} Mio. €`)] },
-  { k: 'aircraft', t: 'Flugzeug holen', lead: 'Leasen schont die Kasse. Zwei A320neo sind ein guter Start.', tab: 'fleetBuy', go: 'Zur Beschaffung',
-    chips: () => [gChip('plane', 'Flotte → Beschaffung'), gChip('tag', 'Leasing = nur Kaution')] },
+  { k: 'aircraft', t: 'Flugzeug holen', lead: 'Leasen schont die Kasse – aber Leasinggeber vertrauen jungen Airlines nicht jedes Flugzeug an. Starten Sie mit Turboprops oder Regionaljets, die A320 gibt es anfangs nur unter Auflagen.', tab: 'fleetBuy', go: 'Zur Beschaffung',
+    chips: () => [gChip('plane', 'Flotte → Beschaffung'), gChip('tag', 'Leasing = Kaution'), gChip('target', 'Kaufen baut Eigenkapital')] },
+  { k: 'standing', t: 'Ansehen aufbauen', lead: 'Leasinggeber, Banken und Flughäfen entscheiden nach Ihrem Ansehen: Erfahrung, Größe, Finanzen, Pünktlichkeit und Marke. Größere Flugzeuge und Basen an großen Flughäfen müssen Sie anfragen – mit Zusage, Auflagen oder Absage.', tab: 'milestones', go: 'Zum Ansehen',
+    chips: () => [gChip('building', 'Firma → Ansehen & Ziele'), gChip('chart', 'Start: rund 25 von 100'), gChip('clock', 'wächst mit jedem Monat')] },
   { k: 'route', t: 'Strecke planen', lead: 'Flughafen auf der Karte antippen und „Strecke planen“ wählen. Grüne Prognose heißt: lohnt sich.', tab: 'plan', go: 'Zur Planung',
     chips: () => [gChip('route', 'Ein Flug am Tag reicht'), gChip('rail', 'Unter 600 km: Bahn')] },
   { k: 'crew', t: 'Crew einstellen', lead: 'Ohne Crew bleibt das Flugzeug am Boden. Neue Leute fangen nach ein paar Tagen an.', tab: 'staff', go: 'Zum Personal',
@@ -5087,7 +5129,7 @@ const GUIDE_ALL = [
   { k: 'areas', t: 'Los geht’s', lead: 'Alles Weitere finden Sie in diesen sechs Bereichen.', final: true, chips: () => [] },
 ];
 const GUIDE = GUIDE_ALL.filter((g) => !g.online || ONLINE);
-const GUIDE_TIPS = ['Klein anfangen: zwei Flugzeuge, vier bis fünf Strecken.', 'Strategie: Business-Kabine auf Geschäftsstrecken, Marketing 2–3 % vom Umsatz, Drehkreuz ab vier Strecken.', 'Erfolg lockt Konkurrenz mit Kampfpreisen.', 'Gehalt unter Marktniveau lädt zum Abwerben ein.',
+const GUIDE_TIPS = ['Klein anfangen: zwei Turboprops oder Regionaljets, vier bis fünf Strecken.', 'Strategie: Business-Kabine auf Geschäftsstrecken, Marketing 2–3 % vom Umsatz, Drehkreuz ab vier Strecken.', 'Erfolg lockt Konkurrenz mit Kampfpreisen.', 'Gehalt unter Marktniveau lädt zum Abwerben ein.',
   'Banken kürzen im Abschwung die Kreditlinie.', 'Markt → Handel: Flugzeuge, Crews und Slots sofort.', 'Neue Muster gibt es im ersten Jahr nur per Auktion.',
   'Großraumjets erst für große Märkte; A380 nur an Großflughäfen.', 'Akademien liefern jeden Monat eigenen Nachwuchs.',
   'Karte: rote Kreise = Streik, Sturm, Sperrung; grüne = Großereignis.', 'Zoomen mit Mausrad oder zwei Fingern.'];
@@ -5751,7 +5793,7 @@ function boot(hotData) {
   $('#pane').addEventListener('click', onPaneClick);
   $('#pane').addEventListener('change', onPaneChange);
   initCal();
-  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'); if (bt) bt.textContent = `Basis eröffnen · einmalig ${eurB(SM.baseSetupCost(W, e.target.value) * SM.softX(W.player, 'base') + Math.max(0, SM.licenceFee(W, e.target.value) - (W.player.stations[e.target.value] ? SM.stationFee(W, e.target.value) : 0)) + SM.baseSlotCost(W, e.target.value, W.player))} inkl. ${P.BASE_SLOTS.n} Slots`; } });
+  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'), a = SM.baseApproval(W.player, e.target.value), nt = $('#newbaseNote'); if (bt) { bt.textContent = newBaseBtnTxt(W.player, e.target.value); bt.disabled = !a.ok; } if (nt) nt.textContent = a.msg || `${apName(e.target.value)}: Zusage ohne Auflagen.`; } });
   $('#pane').addEventListener('input', (e) => {
     if (onCabRange(e, false) || onFltInput(e.target)) return;
     if (e.target.id && e.target.id.startsWith('hire-')) { const k = e.target.id.slice(5), bt = $('#hirebtn-' + k), n = Math.floor(Number(e.target.value)); if (bt && n > 0) bt.textContent = hireLbl(bt.dataset.role, n); }
