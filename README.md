@@ -183,6 +183,40 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.20.1: Rückzahlungen an pleite Partner gehen an den Staat
+
+- Ist der Handelspartner zum Jahresabschluss pleite, von der Spielleitung entfernt oder unter derselben Kennung neu gegründet, zahlt der Begünstigte den Vorteil an die Staatskasse statt an ihn – auch bei Ratenzahlung und Selbstanzeige. Der Geber zahlt dann kein Bußgeld.
+
+## Neu in 0.20.0: Fairer Handel, Wirtschaftsprüfer, ausgeglichenere Strecken
+
+### Handel nur in realistischer Spanne
+Zwischen Airlines von Spielenden dürfen beide Seiten eines Handels höchstens 35 % auseinanderliegen (mindestens 200 Tsd. € Spielraum). Bewertet wird zum Marktwert: Geld, Flugzeuge (Buchwert abzüglich Kredit bzw. Kaution), Personal (Anwerbung plus ein Monatsgehalt), Slots (Slotpreis), Streckenrückzüge (Mittel aus Verlust und Gewinn). Das Angebotsformular zeigt beide Werte und sperrt das Senden bei zu großer Abweichung; der Marktplatz und die Ausführung prüfen ebenso. KI-Airlines verhandeln wie bisher selbst.
+
+### Wirtschaftsprüfer zum Jahresabschluss (Konzept)
+- **Was geprüft wird:** alle Handelsgeschäfte zwischen Spielenden im Geschäftsjahr, je Partner saldiert. Beanstandet wird, wer daraus mehr als 10 % des Handelsvolumens über Marktwert gewonnen hat, mindestens 1 Mio. € und mindestens 15 % des Volumens (so bleiben normale Verhandlungserfolge straffrei).
+- **Rückabwicklung:** Der Vorteil oberhalb der 10 %-Toleranz wird zurückgezahlt – an den Partner, wenn es dieselbe Gesellschaft noch gibt. Ist der Partner pleite, entfernt oder inzwischen neu gegründet, geht das Geld an die Staatskasse (auch offene Raten).
+- **Bußgeld:** 10 % des Vorteils beim ersten Mal, 25 % beim zweiten, 50 % ab dem dritten. Der Geber zahlt 5 % (er hat Werte weit unter Preis abgegeben).
+- **Prüfvermerk:** Ansehen −8 (−15, −25) für ein Jahr – das spürt man bei Leasing und Basisanträgen.
+- **Herauskommen:** Fehlt das Geld, gibt es 12 Monatsraten statt Insolvenz. Nach zwei Jahren ohne neue Beanstandung wird die Zählung gelöscht. Wer vorher freiwillig zurückzahlt (Finanzen → Kredite und Rating → „Zurückzahlen“), bleibt ohne Bußgeld und ohne Vermerk. Die Vorschau zeigt jederzeit, was die Prüfer sehen würden; die Assistenz warnt.
+- Geschäfte aus dem laufenden Jahr vor diesem Update werden nachträglich bewertet und zum Jahresabschluss mitgeprüft.
+
+### Spielleitung, Karte
+- Von der Spielleitung entfernte Airlines sehen nur Spielleitung und Admin unter „Mitspielende“; öffentlich heißt es nur noch „zieht sich vom Markt zurück“ (auch alte Meldungen umformuliert).
+- Insolvente und entfernte Airlines verschwinden aus Karte, Legende, Handelspartnern und Basisliste.
+
+### Strecken-Ökonomie
+- **Preisautomatik nutzt abgewiesene Nachfrage:** Bei vielen Abweisungen steigt der Preis schneller (bis 1,6-fache Schrittweite), auch wenn die Ziel-Auslastung schon erreicht ist. Beispiel Phuket–Bangkok: von 74 € auf rund 90 € in sechs Wochen, Strecke im Plus.
+- **Preisniveau abgelegener Märkte:** Kleine Flughäfen weit weg vom nächsten großen Flughafen (Arktis, Pazifikinseln) haben bis 80 % höhere Ticketpreise, Afrika generell 40 % (wie in der Realität).
+- **Heimatmarkt:** An der eigenen Basis wählen Reisende Ihre Airline lieber – je kleiner der Flughafen, desto stärker (bis +0,35 Nutzen im Urlaubssegment, entspricht rund 10 % Preis).
+- **Phuket** bekommt starke Urlaubsströme aus Russland, Skandinavien, Deutschland, Australien, China, Indien und den Golfstaaten; ebenso Tahiti, Mauritius, Seychellen, Sansibar.
+- Ein Scan aller 386 Flughäfen (beste Strecke je Flughafen, mit passendem Muster und Frequenz) zeigt danach für alle Regionen lohnende Top-Strecken; Afrika liegt nicht mehr deutlich hinten.
+
+### Fachkräfte: Führungsspanne statt Obergrenze
+Eine Airline kann 3 Fachkräfte plus eine je 6 Flugzeuge sinnvoll einbinden. Darüber verlangen Bewerbungen 20 % mehr Gehalt je zusätzlicher Person, ab drei über der Spanne sagen sie ab. Ein überbesetztes Team wirkt schwächer (−8 % je Person, höchstens −30 %), und Unterforderte kündigen gelegentlich und gehen zurück auf den Markt – dort finden andere Airlines sie.
+
+### Wann geht Leasing wieder?
+Bei Absage oder Auflagen zeigen Beschaffung, Planung und „Ansehen & Ziele“, ab wann der Leasingrahmen wieder frei ist und ab wann das Ansehen (bei gleichbleibender Lage, rund 1 Punkt Erfahrung je Monat) für Auflagen bzw. ohne Auflagen reicht – plus was es beschleunigt. Unter Kredite und Rating steht, wann die Bank neu bewertet und welche Kennzahl (Eigenkapitalquote, Zinsdeckung) für die nächste Stufe fehlt.
+
 ## Neu in 0.19.1: Selbst gemalte Logos auch auf dem Leitwerk
 
 - Ein Pixel-Logo erscheint jetzt auch auf dem Leitwerk aller eigenen Flugzeuge (Flotte, Karte, Einführung, Profil) – bei Mitspielenden ebenso.

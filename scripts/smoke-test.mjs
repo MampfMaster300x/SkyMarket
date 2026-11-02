@@ -84,7 +84,8 @@ ok(await call('anna', 'POST', `/games/${g.id}/control`, { speed: 'p' }), 'Pause 
 let ws = JSON.parse(gunzipSync(Buffer.from((await call('ben', 'GET', `/games/${g.id}/state?v=t1`)).data)).toString());
 const benAl = ws.airlines.find((a) => a.name === 'Isar Jet'), annaAl = ws.airlines.find((a) => a.name === 'Hanse Air');
 const benAc = benAl.fleet[0].id;
-r = ok(await call('ben', 'POST', `/games/${g.id}/action`, { action: { type: 'dealPropose', to: annaAl.id, give: [{ k: 'ac', id: benAc }], take: [{ k: 'cash', amount: 250000 }], note: 'Test' } }), 'Angebot');
+const benAcV = Math.round(benAl.fleet[0].owned ? 2e7 : (benAl.fleet[0].deposit || 0) + (benAl.fleet[0].flex ? 0.25 : 0.5) * (benAl.fleet[0].leaseMonth || 0));   // fairer Preis (0.20: Handel nur in realistischer Spanne)
+r = ok(await call('ben', 'POST', `/games/${g.id}/action`, { action: { type: 'dealPropose', to: annaAl.id, give: [{ k: 'ac', id: benAc }], take: [{ k: 'cash', amount: benAcV }], note: 'Test' } }), 'Angebot');
 assert.equal(r.ok, true); assert.equal(r.status, 'open');
 const dealId = r.id;
 r = ok(await call('cleo', 'POST', `/games/${g.id}/action`, { action: { type: 'dealRespond', id: dealId, choice: 'accept' } }), 'fremde Annahme');
@@ -95,7 +96,7 @@ ws = JSON.parse(gunzipSync(Buffer.from((await call('anna', 'GET', `/games/${g.id
 const annaNow = ws.airlines.find((a) => a.name === 'Hanse Air'), benNow = ws.airlines.find((a) => a.name === 'Isar Jet');
 assert.equal(annaNow.fleet.length, 1); assert.equal(benNow.fleet.length, 0);
 assert.equal(ws.deals.find((d) => d.id === dealId).status, 'accepted');
-console.log('Handel: Flugzeug', benAc, '→', annaNow.fleet[0].id, 'für 250.000 EUR');
+console.log('Handel: Flugzeug', benAc, '→', annaNow.fleet[0].id, 'für', benAcV, 'EUR');
 // Handel mit der KI: Rückzug kaufen, Antwort kommt sofort
 r = ok(await call('anna', 'POST', `/games/${g.id}/action`, { action: { type: 'dealPropose', to: 'KES', give: [{ k: 'cash', amount: 10000 }], take: [{ k: 'exit', pair: 'BER-BCN', days: 365 }] } }), 'KI-Angebot');
 console.log('KI antwortet:', r.status, r.reply);
@@ -355,7 +356,7 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   A({ type: 'acquire', typeId: 'A21N', mode: 'lease', base: 'HAM' });
   for (let i = 0; i < 240; i++) ws.step();
   assert.ok(ws.acmiOffers.some((o) => o.ev), 'Charteranfragen zu Großereignissen');
-  const o = ws.acmiOffers.find((x) => SMx.P.AIRCRAFT_TYPES[x.type].group === 'A32F' && x.type !== 'A21N' && x.start >= ws.day);
+  const o = ws.acmiOffers.find((x) => SMx.P.AIRCRAFT_TYPES[x.type].group === 'A32F' && !SMx.P.AIRCRAFT_TYPES[x.type].role && x.type !== 'A21N' && x.start >= ws.day);
   if (o) { const ac = ps.fleet[0]; const r = A({ type: 'acmi', offerId: o.id, acId: ac.id }); assert.equal(r.ok, true, 'Familie passt: ' + r.msg); assert.ok(ac.acmi.rate !== o.rate || o.type === ac.type_id, 'Rate nach Sitzen angepasst'); }
   console.log('0.17.3 ok: Riad–Dschidda', Math.round(SMx.refPrice('RUH', 'JED')), '€ mit Najd Air als Konkurrenz,', ws.acmiOffers.filter((x) => x.ev).length, 'Großereignis-Charter,', o ? 'Familien-Charter angenommen' : 'keine passende Familienanfrage'); }
 // 0.17.4/0.17.5: feste Slottermine, Basis-Slots, Studien je Basis
@@ -507,7 +508,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   for (let i = 0; i < 35; i++) w2.step();
   const ac = p2.fleet[0]; const g = w2.addEvent({ type: 'grounding', types: ['A20N'], share: 1, delay: 90, comp: 0.5, scope: 'all', end: w2.day + 60, text: 'Test Stilllegung', severity: 'crit' });
   w2.step(); assert.ok(ac.status === 'aog' && ac.grounded === g.id && ac.until > w2.day + 20, 'Stilllegung: Flugzeug am Boden');
-  assert.ok(SMx.leaseDelivery(w2, 'A20N', 'lease') >= d0 + 90, 'Stilllegung verzögert Auslieferung');
+  assert.ok(SMx.shockX(w2, 'delay', 'A20N') >= 90 && SMx.shockX(w2, 'delay', 'E295') === 60, 'Stilllegung verzögert Auslieferung des Musters');
   // Häufigkeit: in 5 Jahren mehrere der neuen Schocks
   { const w3 = SMx.newWorld({ seed: 8 }); w3.playerId = null; for (let i = 0; i < 365 * 5; i++) { if (w3.day % 30 === 0) w3.generateMonthlyEvents(); w3.day++; } const ty = new Set(w3.events.map((e) => e.type)); const n = ['credit_crunch', 'grounding', 'supply_chain', 'tourism', 'labor_crisis', 'disaster'].filter((t) => ty.has(t)).length; assert.ok(n >= 3, 'neue Schocks treten auf: ' + [...ty].join(',')); }
   // Ankeraktionäre: große KI nicht über die Börse zu mehrheitlich
@@ -526,8 +527,8 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.ok(!A({ type: 'openRoute', base: 'HAJ', dest: 'VIE', typeId: 'C68A', freq: 1 }).ok, 'Privatjet fliegt keine Linie');
   for (let i = 0; i < 45; i++) w.step();
   assert.ok(w.acmiOffers.some((o) => o.kind === 'biz') && w.acmiOffers.some((o) => o.kind === 'cargo'), 'Privatjet- und Frachtanfragen');
-  const ob = w.acmiOffers.find((o) => o.kind === 'biz' && o.start > w.day && SMx.P.AIRCRAFT_TYPES[o.type].group === 'BIZ');
-  if (ob) assert.equal(A({ type: 'acmi', offerId: ob.id, acId: jet.id }).ok, true, 'Privatjet-Charter angenommen');
+  const ob = w.acmiOffers.find((o) => o.kind === 'biz' && o.start > w.day && o.start >= jet.delivery_day && SMx.P.AIRCRAFT_TYPES[o.type].group === 'BIZ' && !SMx.acmiList(jet, w.day).some((b) => o.start < b.end && o.end > b.start));
+  if (ob) { const ra = A({ type: 'acmi', offerId: ob.id, acId: jet.id }); assert.equal(ra.ok, true, 'Privatjet-Charter angenommen: ' + ra.msg); }
   const oc = w.acmiOffers.find((o) => o.kind === 'cargo' && o.type === 'AT7F'); const atr = p.fleet.find((a) => a.type_id === 'AT76');
   if (oc && atr) assert.ok(!A({ type: 'acmi', offerId: oc.id, acId: atr.id }).ok, 'Passagier-ATR fliegt keine Fracht');
   // Endspiel: Verwaltung wächst überproportional
@@ -535,4 +536,54 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.ok(hq(200) / 200 > 1.2 * hq(100) / 100 && hq(400) / 400 > hq(200) / 200, 'Verwaltung je Flugzeug steigt ab 100');
   const rt = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(rt.list.some((a) => a.cap && a.cap.anchor > 0.4), 'Ankeraktionäre gespeichert');
   console.log('0.19 ok: Start mit ATR/E2, 787 abgelehnt, Ansehen', st, '· Schocks wirken · Anker', Math.round((1 - SMx.capState(big).ext) * 100), '% bei', big.name, '· Code F nach Wachstum · Privatjet', ob ? 'verchartert' : 'ohne passende Anfrage', '· HQ', Math.round(hq(100)), '/', Math.round(hq(200)), '/', Math.round(hq(400))); }
+// 0.20: fairer Handel, Wirtschaftsprüfer, Führungsspanne, Leasing-Ausblick, Preisniveau abgelegener Märkte
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 12 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }), b = SMx.addHuman(w, { id: 'P2', name: 'Beta', code: 'BB', base: 'MUC' }); w.playerId = 'P1';
+  const A = (al, x) => SMx.applyAction(w, al.id, x);
+  for (let i = 0; i < 5; i++) w.step();
+  a.ledger.cashOnly(5e7, 't'); b.staff.cab += 3;
+  // Geschenk über Handel wird abgelehnt
+  const g = A(a, { type: 'dealPropose', to: 'P2', give: [{ k: 'cash', amount: 20000000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] });
+  assert.ok(!g.ok && g.unfair, 'Geschenk über Handel abgelehnt: ' + g.msg);
+  const mk = A(a, { type: 'dealPropose', to: SMx.MARKET, give: [{ k: 'cash', amount: 20000000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] });
+  assert.ok(!mk.ok && mk.unfair, 'auch nicht über den Marktplatz');
+  const f = A(a, { type: 'dealPropose', to: 'P2', give: [{ k: 'cash', amount: 20000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] });
+  assert.equal(f.ok, true, 'fairer Kleinhandel geht: ' + f.msg);
+  assert.equal(A(b, { type: 'dealRespond', id: f.id, choice: 'accept' }).ok, true, 'angenommen');
+  assert.ok(w.xfers.some((x) => x.deal), 'für die Prüfung erfasst');
+  // Altfall: 20 Mio. für eine Flugbegleiterin (vor der Regel) – Prüfer greifen zum Jahresende
+  w.xfers.push({ day: w.day, a: 'P1', b: 'P2', va: 20e6, vb: 8000, old: true });
+  const pv = SMx.auditPreview(w, b).find((e) => e.partner === 'P1'); assert.ok(pv && pv.flagged && pv.excess > 15e6, 'Vorschau zeigt Beanstandung');
+  const ca0 = a.ledger.cash, cb0 = b.ledger.cash;
+  SMx.auditYear(w);
+  assert.ok(b.audit && b.audit.malus === 8 && b.audit.strikes === 1, 'Prüfvermerk für den Begünstigten');
+  assert.ok(a.ledger.cash > ca0, 'Geber bekommt Geld zurück');
+  assert.ok(cb0 - b.ledger.cash > 15e6 || (b.audit.debt && b.audit.debt.left > 0), 'Rückzahlung plus Bußgeld (oder Ratenplan)');
+  assert.ok(SMx.standingOf(b, w.day + 1).parts.find((x) => x[0] === 'Finanzen')[3].includes('Prüfvermerk'), 'Prüfvermerk mindert das Ansehen');
+  // Selbstanzeige: freiwillig zurückzahlen, kein Bußgeld
+  w.xfers.push({ day: w.day + 1, a: 'P1', b: 'P2', va: 5e6, vb: 0 }); b.ledger.cashOnly(2e7, 't');
+  const st = A(b, { type: 'auditSettle', partner: 'P1' }); assert.equal(st.ok, true, 'Selbstanzeige: ' + st.msg);
+  assert.ok(!SMx.auditPreview(w, b).some((e) => e.flagged), 'danach keine Beanstandung mehr: ' + JSON.stringify(SMx.auditPreview(w, b)) + ' from ' + w.auditFrom);
+  // Partner pleite: Rückzahlung geht an die Staatskasse, nicht an die (neu gegründete) Airline
+  { const w3 = SMx.newWorld({ seed: 13 }), x = SMx.addHuman(w3, { id: 'X1', name: 'Wodu', code: 'WD', base: 'HAM' }), y = SMx.addHuman(w3, { id: 'Y1', name: 'Lukas', code: 'LK', base: 'MUC' }); w3.playerId = 'Y1';
+    for (let i = 0; i < 3; i++) w3.step();
+    w3.xfers = [{ day: w3.day, a: 'X1', b: 'Y1', va: 20e6, vb: 8000, old: true }]; w3.auditFrom = 0;
+    x.status = 'insolvent'; const cx = x.ledger.cash, cy = y.ledger.cash;
+    SMx.auditYear(w3);
+    assert.equal(x.ledger.cash, cx, 'pleiter Partner bekommt nichts');
+    assert.ok(cy - y.ledger.cash > 15e6 || (y.audit.debt && y.audit.debt.to === null), 'Begünstigter zahlt an die Staatskasse');
+  }
+  // Admin-Entfernung ist nicht öffentlich
+  const k = SMx.kickHuman(w, 'P2'); assert.ok(k.ok && !w.news.some((n) => /aus dem Spiel genommen/.test(n.text)), 'keine öffentliche Sperrmeldung');
+  // Führungsspanne für Fachkräfte
+  const w2 = SMx.newGame({ seed: 4, base: 'HAM' }), p2 = w2.player; p2.ledger.cashOnly(5e7, 't');
+  const tm = SMx.expertTeam(p2); assert.equal(tm.cap, 3, 'Startspanne 3');
+  let hired = 0, refused = 0;
+  for (let i = 0; i < 6; i++) { w2.monthEnd ? null : null; for (const c of w2.candidates.filter((x) => x.expires > w2.day && !SMx.P.EXPERT_ROLES[x.role].unique)) { const r = SMx.applyAction(w2, p2.id, { type: 'hireExpert', cid: c.id }); if (r.ok) hired++; else if (/Absage/.test(r.msg || '')) refused++; } for (let d = 0; d < 31; d++) w2.step(); }
+  assert.ok(p2.experts.length <= SMx.expertTeam(p2).cap + 2 && refused > 0, `Spanne bremst: ${p2.experts.length} eingestellt, ${refused} Absagen`);
+  // Leasing-Ausblick
+  const lo = SMx.leaseOutlook(p2, 'B789', w2.day); assert.ok(lo.freeNeed > 0 && (lo.freeDay === null || lo.freeDay > w2.day), 'Ausblick für die 787');
+  // Preisniveau: abgelegene Märkte und Afrika teurer, große Drehkreuze unverändert
+  assert.ok(SMx.fareLv('YFB') > 1.4 && SMx.fareLv('FRA') === 1 && SMx.fareLv('NBO') > 1.2, 'Preisniveau abgelegen/Afrika');
+  console.log('0.20 ok: Geschenk-Handel blockiert, Prüfer: Rückzahlung, Bußgeld, Prüfvermerk, Selbstanzeige; Sperre still; Fachkräfte', p2.experts.length, 'von Spanne', SMx.expertTeam(p2).cap, ',', refused, 'Absagen'); }
 console.log('Alle Prüfungen bestanden.');

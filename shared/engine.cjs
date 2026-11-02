@@ -81,8 +81,16 @@ const SM = (() => {
     REF_PRICE_BASE: 50, REF_PRICE_PER_KM: 0.055,
     // Regionalaufschlag: dünne Strecken ab kleinen Flughäfen (ohne Billigflieger-Druck) tragen höhere Durchschnittspreise
     REGIONAL_FARE: { maxPax: 10, bonus: 0.6, fullKm: 900, zeroKm: 2000 },
+    // 0.20: Abgelegene und dünn bediente Märkte (Arktis, Inseln, Afrika) haben in Wirklichkeit hohe Ticketpreise
+    REMOTE_FARE: { a: 1.2, hubPax: 15, near: 500, far: 2200, smallPax: 4, max: 1.9, region: { Afrika: 1.35 } },
+    // Ferienströme, die das Schwerkraftmodell unterschätzt (Urlaub, Überwintern) – Faktor auf das Segment Urlaub
+    HOME_MARKET: { fullPax: 40, leisure: 0.35, vfr: 0.3, business: 0.3 },
+    LEISURE_TIES: { 'HKT-SVO': 3.0, 'HKT-LED': 2.2, 'HKT-PEK': 1.8, 'HKT-PVG': 1.8, 'HKT-CAN': 1.6, 'HKT-CTU': 1.6, 'HKT-SZX': 1.5, 'HKT-SYD': 2.0, 'HKT-PER': 2.4, 'HKT-MEL': 2.0,
+      'HKT-DXB': 1.5, 'HKT-DOH': 1.4, 'HKT-DEL': 2.0, 'HKT-BOM': 1.8, 'HKT-KUL': 1.5, 'HKT-SIN': 1.5, 'HKT-ICN': 1.5, 'HKT-HKG': 1.4,
+      'HKT-FRA': 2.0, 'HKT-MUC': 1.8, 'HKT-ZRH': 1.8, 'HKT-LHR': 1.6, 'HKT-ARN': 2.6, 'HKT-CPH': 2.4, 'HKT-HEL': 2.4, 'HKT-OSL': 2.4, 'HKT-VIE': 1.6,
+      'PPT-LAX': 2.0, 'PPT-CDG': 2.5, 'PPT-NRT': 1.6, 'PPT-AKL': 1.5, 'MRU-CDG': 2.0, 'MRU-JNB': 1.6, 'MRU-DXB': 1.5, 'SEZ-DXB': 1.8, 'SEZ-CDG': 1.6, 'ZNZ-DXB': 1.6, 'ZNZ-FCO': 1.6 },
     // Kaufkraft: Auf Kurz- und Mittelstrecke richten sich Preise nach dem Einkommen (Türkei rund −15 %, Indien −30 %), auf Langstrecke sind sie weltweit ähnlicher
-    INCOME_FARE: { dom: { SA: 0.85 }, ref: 0.9, exp: 0.25, min: 0.7, max: 1.08, fullKm: 2000, farKm: 7000, farShare: 0.3 },
+    INCOME_FARE: { dom: { SA: 0.85 }, ref: 0.9, exp: 0.15, min: 0.85, max: 1.08, fullKm: 2000, farKm: 7000, farShare: 0.3 },   // 0.20: Flugzeuge und Kerosin kosten überall gleich – Tickets in ärmeren Ländern nur moderat billiger
     // Anlaufrabatt kleiner Flughäfen für neue Strecken von Spielenden: Passagier- und Landeentgelte im ersten Jahr reduziert
     ROUTE_INCENTIVE: { maxPax: 10, share: 0.5, days: 365, floor: 0.15, noneAbove: 20 },   // große Flughäfen und Drehkreuze (über 20 Mio. Pax) geben keinen Anlaufrabatt
     // Marktwissen: Wie genau kennen Sie die Nachfrage einer Verbindung? Stufe 0 unbekannt … 4 sehr genau (Unsicherheit als Faktor).
@@ -337,6 +345,8 @@ const SM = (() => {
     // Einarbeitung, monatliche Schwankung, gelegentliche Fehlgriffe und Glücksgriffe. 1 = genau die zugesagte Wirkung.
     EXPERT_PERF: { talentSd: 0.12, fitSd: 0.12, min: 0.45, max: 1.4, rampDays: 30, noiseSd: 0.05, mistakeP: 0.04, mistake: 0.35, luckyP: 0.03, lucky: 1.3, star: [1.02, 1.12] },
     // Schutz gegen Abwerbung: Halteprämie (12 Monate Bindung), Wettbewerbsverbot, Gehalt über Markt
+    // 0.20: Führungsspanne – wie viele Fachkräfte eine Airline sinnvoll einbinden kann (wächst mit der Flotte)
+    EXPERT_TEAM: { base: 3, perAc: 6, salaryX: 0.2, refuseAt: 3, dilute: 0.08, diluteMin: 0.7, quitP: 0.08 },
     EXPERT_CONTRACT: { bindDays: 365, bindCost: 3, bindP: 0.35, ncaSalary: 0.15, ncaP: 0.6, ncaComp: 6, ncaWait: 30, raiseMax: 0.3 },
     STAR_CONSULTANT: { id: 'TK', name: 'Tim Kaminski', role: 'consultant', level: 4, years: 31, region: 'Europa', he: true,
       trait: 'der Beste seines Fachs – und das weiß er', prev: 'saniert und baut Airlines seit drei Jahrzehnten' },
@@ -378,6 +388,9 @@ const SM = (() => {
     // Verwaltungskosten (EUR/Tag) für Spielende: wächst mit der Flotte, kleine Gründungen bleiben bezahlbar
     HQ_CURVE: [[0, 800], [5, 3000], [15, 10000], [30, 26000], [100, 80000], [200, 200000], [400, 520000]],   // ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte (Konzernstrukturen)
     ANTITRUST: { share: 0.6, minDeps: 25, minPax: 8, grace: 90, fine: 0.005 },
+    // 0.20: Handel zwischen Spielenden nur in realistischer Spanne; Wirtschaftsprüfer prüfen zum Jahresende
+    TRADE_FAIR: { rel: 0.35, abs: 200000 },
+    AUDIT: { minGain: 1e6, share: 0.15, tol: 0.10, fine: [0.10, 0.25, 0.5], malus: [8, 15, 25], giverFine: 0.05, months: 12, cleanYears: 2 },
     STAGES: [
       { key: 'startup', label: 'Startup', min: 0, hq: 6000 },
       { key: 'regional', label: 'Regional', min: 6, hq: 12000 },
@@ -520,6 +533,17 @@ const SM = (() => {
     const ramp = e.hiredDay === undefined ? 1 : Math.min(1, 0.6 + 0.4 * Math.max(0, day - e.hiredDay) / E.rampDays);
     return (e.startDay && e.startDay > day) ? 0 : base * ramp;
   }
+  /** Führungsspanne: sinnvolle Zahl an Fachkräften nach Flottengröße; darüber Reibungsverluste, höhere Gehaltsforderungen, Absagen. */
+  function expertTeam(al) {
+    const T = P.EXPERT_TEAM, n = (al.experts || []).length, cap = T.base + Math.floor((al.fleet || []).length / T.perAc), over = Math.max(0, n - cap);
+    return { n, cap, over, eff: over ? Math.max(T.diluteMin, 1 - T.dilute * over) : 1, nextAc: (cap + 1 - T.base) * T.perAc };
+  }
+  /** Bedingungen, zu denen eine Fachkraft (noch) zusagt. */
+  function expertOffer(al, salary) {
+    const T = P.EXPERT_TEAM, t = expertTeam(al), over = t.n + 1 - t.cap;
+    if (over >= T.refuseAt) return { ok: false, msg: `Absage: Ihr Führungsteam ist für eine Airline Ihrer Größe schon groß (${t.n} Fachkräfte bei ${(al.fleet || []).length} Flugzeugen, sinnvoll sind ${t.cap}). Gute Leute wollen gebraucht werden – mit ${t.nextAc} Flugzeugen kommt Platz für eine weitere Person.` };
+    return { ok: true, x: over > 0 ? 1 + T.salaryX * over : 1, over: Math.max(0, over) };
+  }
   /** Fachkraft fängt bei einer Airline an: Passung wird neu ausgewürfelt, Bewertung beginnt von vorn, Vertrag ist neu. */
   function expertJoin(w, e, day) {
     const E = P.EXPERT_PERF, uniq = P.EXPERT_ROLES[e.role] && P.EXPERT_ROLES[e.role].unique;
@@ -592,7 +616,17 @@ const SM = (() => {
     const s = 1 - small / R.maxPax, t = k <= R.fullKm ? 1 : 1 - (k - R.fullKm) / (R.zeroKm - R.fullKm);
     return 1 + R.bonus * s * t;
   }
-  const refPrice = (o, d, cpi = 1) => { const k = gcDistanceKm(o, d); return (P.REF_PRICE_BASE + P.REF_PRICE_PER_KM * k + 0.02 * Math.max(0, k - 4000)) * cpi * (1 + FUEL_X * fuelSurShare(k)) * regionalX(o, d, k) * incomeX(o, d, k); };
+  /** Preisniveau eines Flughafens: abgelegen und klein (weit bis zum nächsten großen Flughafen) = teuer; Afrika generell teurer. */
+  const _fareLv = {};
+  function fareLv(c) {
+    if (_fareLv[c] !== undefined) return _fareLv[c];
+    const R = P.REMOTE_FARE, A = ap(c); if (!R || !A) return 1;
+    let hub = 1e9; if ((A.pax || 0) < R.hubPax) for (const x of AP_CODES) if (x !== c && (ap(x).pax || 0) >= R.hubPax) hub = Math.min(hub, gcDistanceKm(c, x));
+    const remote = (A.pax || 0) >= R.hubPax ? 0 : clamp((hub - R.near) / (R.far - R.near), 0, 1), small = clamp(1 - (A.pax || 0) / R.smallPax, 0, 1);
+    return (_fareLv[c] = Math.min(R.max || 9, 1 + R.a * remote * small) * ((R.region && R.region[A.region]) || 1));
+  }
+  const fareLvX = (o, d) => Math.max(fareLv(o), fareLv(d));
+  const refPrice = (o, d, cpi = 1) => { const k = gcDistanceKm(o, d); return (P.REF_PRICE_BASE + P.REF_PRICE_PER_KM * k + 0.02 * Math.max(0, k - 4000)) * cpi * (1 + FUEL_X * fuelSurShare(k)) * regionalX(o, d, k) * incomeX(o, d, k) * fareLvX(o, d); };
   function railTime(o, d) { const v = P.RAIL_TIME_H[o + '-' + d] ?? P.RAIL_TIME_H[d + '-' + o]; return v === undefined ? null : v; }
   function railShare(o, d) {
     const tr = railTime(o, d);
@@ -626,7 +660,7 @@ const SM = (() => {
     const border = A.country === B.country ? 1 : A.region !== B.region ? crossRegion(dk) : EU.has(A.country) && EU.has(B.country) ? D.eu : D.border;
     const g = P.GRAVITY, f = border * lh * affinity(A.country, B.country) * (P.PAIR_DAMP[o + '-' + d] ?? P.PAIR_DAMP[d + '-' + o] ?? 1);
     return {
-      leisure: f * g.leisure.K * A.pop ** 0.8 * A.income ** 1.5 * B.tour * B.pop ** 0.2 * dist ** D.leisE,
+      leisure: f * (P.LEISURE_TIES[o + '-' + d] ?? P.LEISURE_TIES[d + '-' + o] ?? 1) * g.leisure.K * A.pop ** 0.8 * A.income ** 1.5 * B.tour * B.pop ** 0.2 * dist ** D.leisE,
       business: f * g.business.K * (A.pop * B.pop) ** 0.5 * A.biz * B.biz * A.income ** 0.5 * dist ** D.bizE,
       vfr: f * g.vfr.K * (A.pop * B.pop) ** 0.5 * ties * dist ** D.vfrE,
     };
@@ -1102,7 +1136,7 @@ const SM = (() => {
       return o;
     }
     /** Wirksame Stufe einer Rolle: zugesagte Stufe × tatsächliche Leistung (kann über- oder unterschreiten). */
-    skill(role) { let lv = 0; const d = this._day ?? 0; for (const e of this.experts) if (e.role === role || (P.EXPERT_ROLES[e.role] && P.EXPERT_ROLES[e.role].unique)) lv = Math.max(lv, e.level * expertPerf(e, d)); return lv; }
+    skill(role) { let lv = 0; const d = this._day ?? 0; for (const e of this.experts) if (e.role === role || (P.EXPERT_ROLES[e.role] && P.EXPERT_ROLES[e.role].unique)) lv = Math.max(lv, e.level * expertPerf(e, d)); return lv * expertTeam(this).eff; }
     /** Zugesagte Stufe (für Freischaltungen wie Marktstudien). */
     skillNom(role) { let lv = 0; const d = this._day ?? 0; for (const e of this.experts) if ((e.role === role || (P.EXPERT_ROLES[e.role] && P.EXPERT_ROLES[e.role].unique)) && !(e.startDay > d)) lv = Math.max(lv, e.level); return lv; }
     /** Luis Perez an Bord? Dann kennt die Airline Zustand und Wert älterer Flugzeuge. */
@@ -1142,6 +1176,9 @@ const SM = (() => {
       const u = { leisure: (a.leisure + b.leisure) / 2, business: (a.business + b.business) / 2, vfr: (a.vfr + b.vfr) / 2 };
       const hl = this.hubs ? Math.max(this.hubs[o] || 0, this.hubs[d] || 0) : 0;
       if (hl) { u.business += 0.06 * hl; u.leisure += 0.01 * hl; }   // Heimvorteil am Drehkreuz: Netz, Anschlüsse, Lounges
+      { // 0.20: Heimatmarkt – an der eigenen Basis kennt man die Airline; an kleinen und mittleren Flughäfen wirkt das stark (wenig etablierte Konkurrenz)
+        const H = P.HOME_MARKET, sm = (c) => (this.bases.includes(c) ? clamp(1 - (ap(c).pax || 0) / H.fullPax, 0, 1) : 0), hm = Math.max(sm(o), sm(d));
+        if (hm > 0) { u.leisure += H.leisure * hm; u.vfr += H.vfr * hm; u.business += H.business * hm; } }
       const lv = this.loyalty && this.loyalty.lv, lf = lv ? this.loyaltyFactor(this._day ?? 0) : 0;
       if (lf > 0) { const LU = P.LOYALTY[lv].u; u.leisure += LU.leisure * lf; u.business += LU.business * lf; u.vfr += LU.vfr * lf; }
       // Firmenkunden: gewonnene Verträge (+) oder an die Konkurrenz verlorene (−) an einem Flughafen
@@ -1584,12 +1621,13 @@ const SM = (() => {
     const exp = Math.min(25, months * 1.05 + lv * 2);
     const size = Math.min(20, 20 * Math.log(1 + al.fleet.filter((a) => a.delivery_day <= d).length) / Math.log(51));
     const startEq = (DIFFICULTY[al.difficulty] || DIFFICULTY.normal).equity, eq = balanceSheet(al).equity;
-    const fin = (S.rating[al.rating] ?? 11) + (eq >= startEq ? 5 : eq >= 0.5 * startEq ? 2 : 0);
+    const aud = al.audit && al.audit.until > d ? al.audit.malus || 0 : 0;
+    const fin = (S.rating[al.rating] ?? 11) + (eq >= startEq ? 5 : eq >= 0.5 * startEq ? 2 : 0) - aud;
     const otp = al.otpHist && al.otpHist.length >= 10 ? al.otpHist.reduce((a, b) => a + b, 0) / al.otpHist.length : null;
     const rel = (otp === null ? 5 : 10 * clamp((otp - 0.65) / 0.25, 0, 1)) - (al.status === 'restructuring' ? 15 : 0);
     const brand = 15 * clamp(al.brand ?? 0.4, 0, 1);
     const v = Math.round(clamp(exp + size + fin + rel + brand, 0, 100));
-    const r = { v, parts: [['Erfahrung', exp, 25, `${Math.floor(months)} Monate im Flugbetrieb${lv ? `, Phase ${lv + 1}` : ''}`], ['Größe', size, 20, `${al.fleet.length} Flugzeuge`], ['Finanzen', fin, 25, `Rating ${al.rating || 'BB'}${eq >= startEq ? ', Eigenkapital über Start' : ''}`],
+    const r = { v, parts: [['Erfahrung', exp, 25, `${Math.floor(months)} Monate im Flugbetrieb${lv ? `, Phase ${lv + 1}` : ''}`], ['Größe', size, 20, `${al.fleet.length} Flugzeuge`], ['Finanzen', Math.max(0, fin), 25, `Rating ${al.rating || 'BB'}${eq >= startEq ? ', Eigenkapital über Start' : ''}${aud ? `, Prüfvermerk −${aud}` : ''}`],
       ['Zuverlässigkeit', Math.max(0, rel), 10, otp === null ? 'noch zu wenige Flüge' : `Pünktlichkeit ${Math.round(otp * 100)} %${al.status === 'restructuring' ? ', in Sanierung' : ''}`], ['Marke', brand, 15, `Bekanntheit ${Math.round((al.brand ?? 0.4) * 100)}`]] };
     al._st = { day: d, n: al.fleet.length, r };
     return r;
@@ -1600,6 +1638,28 @@ const SM = (() => {
     const d = day ?? al._day ?? 0, S = P.STANDING, recent = ((al.prog && al.prog.leases) || []).filter((x) => x > d - S.leaseWin).length;
     const max = S.leaseBase + Math.floor(standing(al, d) / S.leasePer);
     return { recent, max, left: Math.max(0, max - recent) };
+  }
+  /** Ab wann Leasing wieder geht: Leasingrahmen (ältester Vertrag fällt aus dem Fenster) und Ansehen (Erfahrung wächst mit der Zeit). */
+  function leaseOutlook(al, typeId, day = null) {
+    const d = day ?? al._day ?? 0, S = P.STANDING, room = leaseRoom(al, d), rk = riskTerms(al, typeId), st = standingOf(al, d);
+    const leases = ((al.prog && al.prog.leases) || []).filter((x) => x > d - S.leaseWin).sort((a, b) => a - b);
+    const roomDay = room.left > 0 ? d : leases.length ? leases[Math.max(0, room.recent - room.max)] + S.leaseWin + 1 : d;
+    const exp = (st.parts.find((x) => x[0] === 'Erfahrung') || [0, 0])[1], perMonth = exp < 25 ? 1.05 : 0;
+    const condNeed = Math.max(0, rk.req - S.cond - st.v), freeNeed = Math.max(0, rk.req - st.v);
+    const when = (need) => (need <= 0 ? d : perMonth > 0 && exp + need <= 25 ? d + Math.ceil(need / perMonth) * 30 : null);
+    return { roomDay, roomLeft: room.left, condDay: when(condNeed), freeDay: when(freeNeed), condNeed, freeNeed, st: st.v, req: rk.req };
+  }
+  /** Rating mit Einzelwerten: Eigenkapitalquote (0–3 Punkte) und Zinsdeckung (−1 bis 2); unter drei Monaten höchstens BBB. */
+  function ratingInfo(al) {
+    const bs = balanceSheet(al), eqRatio = bs.equity / Math.max(bs.assets + bs.leaseLiab, 1), ms = al.ledger.months.slice(-6);
+    let ebit = 0, interest = 0;
+    for (const mm of ms) for (const [k, v] of Object.entries(mm.acc)) { if (k.startsWith('cf_') || k === 'tax') continue; if (k === 'interest') interest -= v; else ebit += v; }
+    const cov = interest > 0 ? ebit / interest : (ebit > 0 ? 10 : 0);
+    const se = eqRatio > 0.35 ? 3 : eqRatio > 0.2 ? 2 : eqRatio > 0.1 ? 1 : eqRatio > 0 ? 0 : -1, sc = cov > 6 ? 2 : cov > 3 ? 1 : cov > 1 ? 0 : -1;
+    let score = se + sc; const young = ms.length < 3; if (young) score = Math.min(score, 2);
+    const rating = score >= 4 ? 'A' : score >= 3 ? 'BBB' : score >= 1 ? 'BB' : score >= 0 ? 'B' : 'CCC';
+    const eqNext = [0, 0.1, 0.2, 0.35].find((x) => eqRatio <= x), covNext = [1, 3, 6].find((x) => cov <= x);
+    return { rating, score, eqRatio, cov, se, sc, young, months: ms.length, eqNext: eqNext ?? null, covNext: covNext ?? null };
   }
   function careerAcqLeft(w, al) { return al.isPlayer ? leaseRoom(al, w.day).left : Infinity; }
   /** Konditionen bei Leasinggebern und Banken nach Ansehen und Musterklasse: Zusage, Zusage unter Auflagen oder Absage. */
@@ -2834,7 +2894,7 @@ const SM = (() => {
           for (const h of last) { seats += h['seats_' + dir] || 0; pax += h['pax_' + dir] || 0; spill += h['spill_' + dir] || 0; dem += h['demand_' + dir] || 0; }
           const lf = seats ? pax / seats : 0, gap = lf - r.ap;
           let step = Math.abs(gap) < A.dead ? 0 : clamp(A.gain * gap, -cfg.spd, cfg.spd);
-          if (dem > 0 && spill / dem > 0.08 && lf > r.ap - A.dead) step = Math.max(step, cfg.spd * 0.7);   // viele Abweisungen: Preis rauf
+          { const sr = dem > 0 ? spill / dem : 0; if (sr > 0.08 && lf > r.ap - A.dead) step = Math.max(step, cfg.spd * (sr > 0.35 ? 1.6 : sr > 0.2 ? 1.1 : 0.7)); }   // viele Abweisungen: Preis rauf – je mehr, desto schneller
           const [o, d] = dir === 'out' ? [r.base, r.dest] : [r.dest, r.base], ref = refPrice(o, d, this.macro.cpi);
           const lo = Math.max(Math.round(priceFloor(o, d, r, this) * 0.9), cfg.min ? Math.round(cfg.min * ref) : 0), hi = Math.max(lo, Math.round(cfg.max * ref));
           let nf = fare * (1 + step);
@@ -2930,6 +2990,8 @@ const SM = (() => {
       const m = monthOf(this.day), y = Math.floor(this.day / 365);
       this.measureTraffic();
       this.antitrustCheck();
+      for (const G of this.humans) if (auditActive(G)) auditInstallment(this, G);
+      if (m === 11) auditYear(this);
       this.monthlyMacro();
       this.generateMonthlyEvents();
       if (m === 2 || m === 9) {
@@ -2992,7 +3054,8 @@ const SM = (() => {
       this.coops = (this.coops || []).filter((c) => c.until > this.day);
       this.newAuctions();
     }
-    updateRating(al) {
+    updateRating(al) { al.rating = ratingInfo(al).rating; }
+    updateRatingOld(al) {
       const bs = balanceSheet(al);
       const eqRatio = bs.equity / Math.max(bs.assets + bs.leaseLiab, 1);
       const ms = al.ledger.months.slice(-6);
@@ -3304,6 +3367,7 @@ const SM = (() => {
       if (T.archetype) this.aiExperts(T);
       const e = T.experts.find((x) => x.id === eid); if (!e) return { ok: false, msg: 'Die Person arbeitet dort nicht mehr.' };
       if (al.experts.filter((x) => x.role === e.role).length >= P.EXPERT_ROLES[e.role].max) return { ok: false, msg: `${P.EXPERT_ROLES[e.role].label} ist bei Ihnen schon besetzt.` };
+      { const of = expertOffer(al, e.salary); if (!of.ok) return { ok: false, msg: `${e.name} – ${of.msg}` }; }
       al.poachLog = al.poachLog || {};
       const key = 'x' + tid;
       if (al.poachLog[key] !== undefined && day - al.poachLog[key] < 30) return { ok: false, msg: 'Erst in einigen Tagen wieder möglich.' };
@@ -3404,7 +3468,18 @@ const SM = (() => {
       this.candidates.push({ ...rest, refs, salary: Math.round(sal / 100) * 100, expires: this.day + this.rng.int(30, 60) });
     }
     /** Monatlich: Leistung der Fachkräfte schwankt, gelegentlich ein Fehlgriff oder Glücksgriff; Bewertung als gleitender Schnitt. */
+    /** Überbesetztes Führungsteam: Unterforderte Fachkräfte wechseln gelegentlich dorthin, wo sie gebraucht werden. */
+    expertOverflow(al) {
+      const t = expertTeam(al); if (!t.over) return;
+      const pool = al.experts.filter((e) => !(P.EXPERT_ROLES[e.role] && P.EXPERT_ROLES[e.role].unique) && !(e.bindUntil > this.day));
+      if (!pool.length || this.rng.random() >= P.EXPERT_TEAM.quitP * t.over) return;
+      const e = pool.sort((a, b) => (a.level - b.level) || ((a.ps ?? 1) - (b.ps ?? 1)))[0];
+      al.experts = al.experts.filter((x) => x !== e);
+      this.expertToMarket(e, al);
+      al.log(this.day, `${e.name} (${P.EXPERT_ROLES[e.role].label}) kündigt: Bei ${t.n} Fachkräften und ${al.fleet.length} Flugzeugen gibt es zu wenig zu tun – sinnvoll sind ${t.cap}.`, 'warn');
+    }
     expertMonth(al) {
+      this.expertOverflow(al);
       const E = P.EXPERT_PERF, r = this.rng, day = this.day;
       for (const e of al.experts) {
         if (e.perf === undefined) { e.talent = expertTalent(e); e.perf = clamp(e.talent, E.min, E.max); e.pm = e.perf; e.ps = null; e.psN = 0; }
@@ -3459,15 +3534,17 @@ const SM = (() => {
       return (e.bindUntil > day ? C.bindP : 1) * (e.nca ? C.ncaP : 1) * payF * tenure;
     }
     hireExpert(al, cid) {
-      const c = this.candidates.find((x) => x.id === cid && x.expires > this.day);
+      let c = this.candidates.find((x) => x.id === cid && x.expires > this.day);
       if (!c) return { ok: false, msg: 'Die Person ist nicht mehr verfügbar.' };
       if (al.experts.filter((e) => e.role === c.role).length >= P.EXPERT_ROLES[c.role].max) return { ok: false, msg: `${P.EXPERT_ROLES[c.role].label} ist schon besetzt. Erst die bisherige Person freistellen.` };
+      const of = expertOffer(al, c.salary); if (!of.ok) return { ok: false, msg: `${c.name} – ${of.msg}` };
+      if (of.x > 1) c = { ...c, salary: Math.round(c.salary * of.x / 100) * 100 };
       const sign = P.EXPERT_ROLES[c.role].signOn || 0;
       if (sign && al.ledger.cash / 100 + al.creditLimit(this.macro.bank ?? 1) - al.creditUsed < sign + c.salary) return { ok: false, msg: `${c.name} verlangt ${Math.round(sign / 1000)} Tsd. € Antrittshonorar plus das erste Monatshonorar im Voraus. Dafür reicht die Liquidität nicht.` };
       if (sign) { al.ledger.post('experts', -sign); this.pushNews(this.day, `${al.name} holt ${c.name} als Berater`, 'ai', al.id); }
       al.experts.push(expertJoin(this, { ...c }, this.day));
       al.ledger.post('experts', -c.salary);
-      this.candidates = this.candidates.filter((x) => x !== c);
+      this.candidates = this.candidates.filter((x) => x.id !== c.id);
       al.log(this.day, `${c.name} beginnt in ${P.EXPERT_ROLES[c.role].label} (${['', 'Junior', 'Senior', 'Expertin/Experte'][c.level]})`, 'staff');
       return { ok: true };
     }
@@ -4535,7 +4612,7 @@ const SM = (() => {
     delete al.gateLock; delete al.hubs; delete al.loyalty;
     al.status = 'insolvent'; al.removed = true; al.removedDay = day; al.owner = null;
     al.log(day, `${by}: Die Airline wurde aus dem Spiel genommen`, 'crit');
-    w.pushNews(day, `${al.name} wurde von der ${by} aus dem Spiel genommen`, 'warn', id);
+    w.pushNews(day, `${al.name} zieht sich vom Markt zurück`, 'info', id);
     return { ok: true, name: al.name };
   }
   /** Spielleitung: Kapital zuschießen oder abziehen (Korrektur), als Eigenkapitalbewegung gebucht. */
@@ -5225,6 +5302,111 @@ const SM = (() => {
     return { vin, vout, margin, value: vin - vout - margin, need: Math.max(0, vout + margin - vin), why };
   }
   const roundTo = (x, s) => Math.ceil(x / s) * s;
+  // ---------------------------------------------------------------------------
+  // 0.20: Fairer Handel zwischen Spielenden und Wirtschaftsprüfung zum Jahresende
+  // ---------------------------------------------------------------------------
+  const mioTxt = (x) => (Math.abs(x) >= 1e6 ? `${(Math.round(x / 1e5) / 10).toLocaleString('de-DE')} Mio. EUR` : `${Math.round(x / 1000).toLocaleString('de-DE')} Tsd. EUR`);
+  /** Marktwert einer Handelsposition aus neutraler Sicht. */
+  function tradeItemValue(w, giver, receiver, it) {
+    if (it.k === 'cash') return it.amount;
+    if (it.k === 'ac') { const a = giver && giver.fleet.find((x) => x.id === it.id); return a ? Math.max(0, acDealValue(w, a)) : 0; }
+    if (it.k === 'acAny') return it.n * P.AIRCRAFT_TYPES[it.type].value_eur * 0.35;
+    if (it.k === 'staff') return it.n * staffUnitCost(it.role, it.group) * w.macro.cpi;
+    if (it.k === 'slots') return it.n * slotValue(w, it.apt);
+    if (it.k === 'exit') return receiver ? (exitLoss(w, giver, it.pair, it.days) + exitGain(w, receiver, giver, it.pair, it.days)) / 2 : exitLoss(w, giver, it.pair, it.days);
+    return 0;   // Kooperationen nützen beiden Seiten
+  }
+  /** Prüft, ob beide Seiten eines Handels in einer realistischen Spanne liegen. */
+  function tradeFairness(w, A, B, give, take) {
+    const T = P.TRADE_FAIR, va = give.reduce((x, it) => x + tradeItemValue(w, A, B, it), 0), vb = take.reduce((x, it) => x + tradeItemValue(w, B, A, it), 0);
+    const hi = Math.max(va, vb), lim = Math.max(T.abs * w.macro.cpi, T.rel * hi), diff = Math.abs(va - vb);
+    return { va: Math.round(va), vb: Math.round(vb), diff: Math.round(diff), lim: Math.round(lim), ok: diff <= lim };
+  }
+  function fairMsg(w, f, A, B) {
+    return `Unrealistischer Handel: ${A.name} gibt Werte von rund ${mioTxt(f.va)}, ${B.name} von rund ${mioTxt(f.vb)}. Zwischen Airlines von Spielenden dürfen beide Seiten höchstens ${Math.round(P.TRADE_FAIR.rel * 100)} % auseinanderliegen (mindestens ${Math.round(P.TRADE_FAIR.abs * w.macro.cpi / 1000)} Tsd. EUR Spielraum) – größere Geschenke würden die Wirtschaftsprüfer beanstanden.`;
+  }
+  /** Bilanz der Handelsgeschäfte zwischen Spielenden seit dem letzten Jahresabschluss (je Partner). */
+  function auditPreview(w, al) {
+    const A = P.AUDIT, from = w.auditFrom || 0, by = {};
+    for (const x of w.xfers || []) {
+      if (x.day < from || (x.a !== al.id && x.b !== al.id)) continue;
+      const other = x.a === al.id ? x.b : x.a, got = x.a === al.id ? x.vb : x.va, gave = x.a === al.id ? x.va : x.vb;
+      const e = by[other] || (by[other] = { partner: other, got: 0, gave: 0, n: 0, first: x.day }); e.got += got; e.gave += gave; e.n++; e.first = Math.min(e.first, x.day);
+    }
+    return Object.values(by).map((e) => {
+      const net = e.got - e.gave, vol = (e.got + e.gave) / 2, excess = Math.max(0, net - A.tol * vol);
+      const flagged = excess >= A.minGain * w.macro.cpi && vol > 0 && net / vol >= A.share;
+      const P0 = w.airlines[e.partner];
+      return { ...e, name: P0 ? P0.name : e.partner, net: Math.round(net), vol: Math.round(vol), excess: Math.round(excess), flagged };
+    }).sort((a, b) => b.excess - a.excess);
+  }
+  const auditActive = (x) => x && x.status !== 'insolvent' && !x.removed;
+  /** Wer die Rückzahlung bekommt: der Handelspartner, wenn es dieselbe Gesellschaft noch gibt – nach Insolvenz, Entfernung oder Neugründung die Staatskasse (null). */
+  const auditPayee = (w, id, since) => { const L = w.airlines[id]; return auditActive(L) && (L.joinedDay || 0) <= since ? L : null; };
+  /** Selbstanzeige: Vorteil aus Geschäften mit einem Partner freiwillig zurückzahlen – ohne Bußgeld und ohne Prüfvermerk. */
+  function auditSettle(w, al, partner) {
+    const e = auditPreview(w, al).find((x) => x.partner === partner);
+    if (!e || e.excess <= 0) return { ok: false, msg: 'Mit dieser Airline gibt es nichts zurückzuzahlen.' };
+    if (al.spendable(w.macro.bank ?? 1) < e.excess) return { ok: false, msg: `Dafür fehlen ${mioTxt(e.excess - al.spendable(w.macro.bank ?? 1))} – auch mit Dispo.` };
+    const B = auditPayee(w, partner, e.first);
+    al.ledger.post('one_off', -e.excess);
+    if (B) { B.ledger.post('one_off', e.excess); B.log(w.day, `${al.name} zahlt freiwillig ${mioTxt(e.excess)} aus früheren Handelsgeschäften zurück`, 'good'); }
+    (w.xfers = w.xfers || []).push({ day: Math.max(w.day, w.auditFrom || 0), a: al.id, b: partner, va: e.excess, vb: 0, settle: true });
+    al.log(w.day, `Selbstanzeige: ${mioTxt(e.excess)} Vorteil aus Geschäften mit ${e.name} zurückgezahlt${B ? '' : ' (an die Staatskasse – die Gesellschaft gibt es nicht mehr)'} – kein Bußgeld, kein Prüfvermerk`, 'good');
+    return { ok: true, amount: e.excess, state: !B };
+  }
+  /** Jahresabschluss: Wirtschaftsprüfer beanstanden einseitige Vermögensverschiebungen zwischen Spielenden. */
+  function auditYear(w) {
+    const A = P.AUDIT, day = w.day, done = new Set();
+    for (const G of w.humans) {
+      if (G.audit && G.audit.strikes && day > (G.audit.until || 0) + A.cleanYears * 365) G.audit.strikes = 0;   // nach zwei sauberen Jahren gelöscht
+      if (!auditActive(G)) continue;
+      for (const e of auditPreview(w, G)) {
+        if (!e.flagged) continue;
+        const key = [G.id, e.partner].sort().join('|'); if (done.has(key)) continue; done.add(key);
+        const L = w.airlines[e.partner], au = G.audit || (G.audit = { strikes: 0, findings: [] });
+        au.strikes = (au.strikes || 0) + 1;
+        const k = Math.min(au.strikes, A.fine.length) - 1, fine = Math.round(e.excess * A.fine[k] / 1e4) * 1e4, claw = e.excess, due = claw + fine;
+        au.malus = A.malus[k]; au.until = day + 365; au.findings = [...(au.findings || []), { day, partner: e.partner, name: e.name, claw, fine }].slice(-6);
+        const payee = auditPayee(w, e.partner, e.first), to = payee ? payee.id : null, cash = G.spendable(w.macro.bank ?? 1);
+        let now = cash >= due ? due : Math.max(0, Math.min(due, Math.round(cash * 0.5 / 1e4) * 1e4));
+        G.ledger.post('one_off', -now);
+        const toPartner = Math.min(claw, now); if (to && toPartner > 0) L.ledger.post('one_off', toPartner);
+        if (due - now > 0) au.debt = { left: due - now, monthly: Math.ceil((due - now) / A.months / 1e3) * 1e3, to, since: e.first, clawLeft: to ? Math.max(0, claw - toPartner) : 0 };
+        G.log(day, `Wirtschaftsprüfung zum Jahresabschluss: Die Geschäfte mit ${e.name} haben Ihnen einen ungerechtfertigten Vorteil von ${mioTxt(claw)} gebracht. Rückzahlung ${mioTxt(claw)} ${to ? `an ${e.name}` : `an die Staatskasse (${e.name} gibt es nicht mehr)`}, Bußgeld ${mioTxt(fine)} (${Math.round(A.fine[k] * 100)} %${au.strikes > 1 ? `, ${au.strikes}. Beanstandung` : ''}), Prüfvermerk: Ansehen −${au.malus} für ein Jahr.${due - now > 0 ? ` Sofort bezahlt ${mioTxt(now)}, der Rest von ${mioTxt(due - now)} in ${A.months} Monatsraten.` : ''}`, 'crit');
+        if (payee) {
+          const gf = Math.round(e.excess * A.giverFine / 1e4) * 1e4;
+          if (gf > 0) { payee.ledger.post('one_off', -gf); payee.log(day, `Wirtschaftsprüfung: Sie haben ${G.name} Werte weit unter Marktpreis überlassen. ${to ? `${G.name} zahlt Ihnen ${mioTxt(claw)} zurück${due - now > 0 ? ' (teilweise in Raten)' : ''}; ` : ''}Bußgeld für Sie ${mioTxt(gf)}.`, 'warn'); }
+        }
+        w.pushNews(day, `Jahresabschluss: Wirtschaftsprüfer beanstanden Handelsgeschäfte von ${G.name} – Rückzahlung und Bußgeld angeordnet`, 'warn', G.id);
+      }
+    }
+    w.auditFrom = day + 1;
+    w.xfers = (w.xfers || []).filter((x) => x.day > day - 400);
+  }
+  /** Monatsrate aus einem Prüfungsbescheid. */
+  function auditInstallment(w, G) {
+    const d = G.audit && G.audit.debt; if (!d || d.left <= 0) return;
+    const pay = Math.min(d.left, d.monthly), L = d.to ? auditPayee(w, d.to, d.since ?? 0) : null, toL = Math.min(pay, d.clawLeft || 0);
+    G.ledger.post('one_off', -pay); d.left -= pay;
+    if (toL > 0) { d.clawLeft -= toL; if (L) L.ledger.post('one_off', toL); }   // Partner pleite oder neu gegründet: Rest geht an die Staatskasse
+    if (d.left <= 0) { delete G.audit.debt; G.log(w.day, 'Prüfungsbescheid vollständig bezahlt', 'good'); }
+  }
+  /** Bestand: Handelsgeschäfte zwischen Spielenden aus dem laufenden Jahr nachträglich bewerten (für die erste Prüfung). */
+  function auditMigrate(w) {
+    if (w.xfers) return; w.xfers = [];
+    const from = Math.floor(w.day / 365) * 365;
+    for (const d of w.deals || []) {
+      if (d.status !== 'accepted' || (d.resolvedDay ?? d.day) < from) continue;
+      const A = w.airlines[d.from], B = w.airlines[d.to]; if (!A || !B || !A.isPlayer || !B.isPlayer) continue;
+      const val = (items, G, R) => items.reduce((x, it) => {
+        if (it.k === 'ac') { const lbl = String(it.desc || ''); const a = R.fleet.find((y) => y.prevOwner === G.name && lbl.startsWith(P.AIRCRAFT_TYPES[y.type_id].label)); return x + (a ? Math.max(0, acDealValue(w, a)) : 0); }
+        return x + tradeItemValue(w, G, R, it);
+      }, 0);
+      w.xfers.push({ day: d.resolvedDay ?? d.day, a: A.id, b: B.id, va: Math.round(val(d.give, A, B)), vb: Math.round(val(d.take, B, A)), deal: d.id, old: true });
+    }
+    w.auditFrom = from;
+  }
   function newDeal(w, from, to, give, take, note, extra = {}) {
     const d = { id: 'D' + (++w.dealCounter), from, to, day: w.day, expires: w.day + DEAL_DAYS, status: 'open', give, take, note: String(note || '').slice(0, 200), ...extra };
     for (const [items, owner] of [[give, w.airlines[from]], [take, w.airlines[to]]]) for (const it of items) if (it.k === 'ac') it.desc = itemText(w, it, owner);
@@ -5238,6 +5420,8 @@ const SM = (() => {
     if (!A || !B || A.status === 'insolvent' || B.status === 'insolvent') return { ok: false, msg: 'Eine der Airlines ist nicht mehr am Markt.' };
     const e1 = checkSide(w, A, B, d.give) || checkSide(w, B, A, d.take);
     if (e1) return { ok: false, msg: e1 };
+    let fair = null;
+    if (A.isPlayer && B.isPlayer) { fair = tradeFairness(w, A, B, d.give, d.take); if (!fair.ok) return { ok: false, msg: fairMsg(w, fair, A, B), unfair: true }; }
     for (const [G, R, items] of [[A, B, d.give], [B, A, d.take]]) {
       for (const it of items) {
         if (it.k === 'cash') { G.ledger.post('trade', -it.amount); R.ledger.post('trade', it.amount); }
@@ -5248,7 +5432,7 @@ const SM = (() => {
           if (!R.familyKnown(a.type_id)) R.ledger.post('one_off', -P.TYPE_INTRO_COST * (R.isPlayer ? 1 : 0.5));
           if (!R.typesIntroduced.includes(a.type_id)) R.typesIntroduced.push(a.type_id);
           R.acCounter++;
-          Object.assign(a, { id: `${R.id}-${String(R.acCounter).padStart(3, '0')}`, base: R.bases.includes(a.base) ? a.base : R.bases[0], assigned: [], used_hours: 0, idle_days: 0, acmi: null, acmiQ: undefined, prevOwner: G.name, mode: 'auto', pins: [] });
+          Object.assign(a, { id: `${R.id}-${String(R.acCounter).padStart(3, '0')}`, base: R.bases.includes(a.base) ? a.base : R.bases[0], assigned: [], used_hours: 0, idle_days: 0, acmi: null, acmiQ: undefined, prevOwner: G.name, mode: P.AIRCRAFT_TYPES[a.type_id].role ? 'charter' : 'auto', pins: [] });
           R.fleet.push(a);
         } else if (it.k === 'staff') {
           const key = it.role === 'pilot' ? null : it.role === 'cabin' ? 'cab' : 'tech';
@@ -5270,6 +5454,7 @@ const SM = (() => {
       }
     }
     w.operableFreq(A); w.operableFreq(B);
+    if (fair) (w.xfers = w.xfers || []).push({ day, a: A.id, b: B.id, va: fair.va, vb: fair.vb, deal: d.id });
     d.status = 'accepted'; d.resolvedDay = day;
     const txt = dealText(w, d);
     A.log(day, `Handel mit ${B.name} abgeschlossen: ${txt}`, 'good');
@@ -5434,6 +5619,7 @@ const SM = (() => {
       if (!sells && !buys) return { ok: false, msg: 'Eine Anzeige braucht etwas, das Sie anbieten oder suchen – nicht nur Geld.' };
       if (sells && buys) return { ok: false, msg: 'Bitte entweder anbieten (gegen Geld) oder suchen (gegen Geld) – Tausch verhandeln Sie direkt mit einer Airline.' };
       const err = checkSide(w, al, null, give); if (err) return { ok: false, msg: err };
+      if (!give.concat(take).some((x) => x.k === 'acAny')) { const f = tradeFairness(w, al, null, give, take); if (!f.ok) return { ok: false, msg: fairMsg(w, f, al, { name: 'die Gegenseite' }), unfair: true }; }
       const d = newDeal(w, al.id, MARKET, give, take, a.note, { market: true, expires: day + 21 });
       const n = marketAiResponses(w, d, 3);
       w.pushNews(day, `Marktplatz: ${al.name} ${take.length ? 'sucht' : 'bietet'} ${(take.length ? take : give).map((x) => itemText(w, x, al)).join(', ')}`, 'trade', al.id);
@@ -5470,7 +5656,7 @@ const SM = (() => {
         if (!orig) return { ok: false, msg: 'Auf dieses Angebot kann nicht mehr geantwortet werden.' };
         if (orig.from !== to.id) return { ok: false, msg: 'Gegenangebote gehen an den ursprünglichen Absender.' };
       }
-      if (to.isPlayer) { const e2 = checkSide(w, to, al, take); if (e2) return { ok: false, msg: e2 }; }
+      if (to.isPlayer) { const e2 = checkSide(w, to, al, take); if (e2) return { ok: false, msg: e2 }; const f = tradeFairness(w, al, to, give, take); if (!f.ok) return { ok: false, msg: fairMsg(w, f, al, to), unfair: true }; }
       const mk = typeof a.marketOf === 'string' ? w.deals.find((x) => x.id === a.marketOf && x.to === MARKET && x.status === 'open' && x.from === to.id) : null;
       const d = newDeal(w, al.id, to.id, give, take, a.note, { ...(orig ? { counterOf: orig.id } : {}), ...(mk ? { marketOf: mk.id } : {}) });
       if (orig) { orig.status = 'countered'; orig.resolvedDay = day; orig.counterId = d.id; }
@@ -5784,7 +5970,8 @@ const SM = (() => {
         al.assistant = { id: a.id, rem: a.rem !== false, rep: a.rep !== false, mon: a.mon !== false };
         return { ok: true };
       }
-      case 'dealPropose': case 'dealRespond': case 'dealWithdraw': return dealAction(w, al, a);
+      case 'dealPropose': case 'dealRespond': case 'dealWithdraw': case 'marketAccept': return dealAction(w, al, a);
+      case 'auditSettle': return auditSettle(w, al, String(a.partner || ''));
       case 'assignAircraft': return assignAircraft(w, al, a);
       case 'bid': return w.bid(al, String(a.lot || ''), num(a.amount));
       case 'takeover': return takeover(w, al, String(a.target || ''));
@@ -5875,7 +6062,7 @@ const SM = (() => {
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      aptObs: w.aptObs || {}, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      aptObs: w.aptObs || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
@@ -5889,7 +6076,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -5902,7 +6089,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      aptObs: s.aptObs || {}, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -5954,6 +6141,9 @@ const SM = (() => {
       }
       w.slotV = 3;
     }
+    // 0.20: Handelsbilanz für die Wirtschaftsprüfung, Admin-Entfernungen nicht mehr öffentlich
+    auditMigrate(w);
+    for (const n of w.news || []) if (n.text && / wurde von der .* aus dem Spiel genommen$/.test(n.text)) n.text = n.text.replace(/ wurde von der .* aus dem Spiel genommen$/, ' zieht sich vom Markt zurück');
     // 0.19: Ankeraktionäre bei großen KI-Airlines, Konzern-Ausschüttung höchstens 50 %
     if (!w.list.some((a) => a.archetype && a.cap && a.cap.anchor)) anchorAis(w);
     for (const T of w.list) if (T.cap && T.archetype && T.cap.div > 0.5) T.cap.div = 0.5;
@@ -5968,7 +6158,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, baseApproval, aptClass, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, auditPreview, auditYear, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;
