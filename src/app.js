@@ -921,7 +921,7 @@ function renderUserMenu() {
   const dark = document.documentElement.dataset.theme !== 'light';
   void dark;
   items.push(['sep'], ['tour', 'Kurzer Rundgang'], ['guide', 'Anleitung'], ['assistant', 'Assistenz einstellen'], ['profile', 'Logo gestalten'], ['theme', `Design: ${THEME_LABEL[themePref()]} (wechseln)`]);
-  if (ONLINE && mpState.user) items.push(['sep'], ['logout', `Abmelden (${mpState.user.name})`]);
+  if (ONLINE && mpState.user) items.push(['sep'], ['password', 'Passwort ändern'], ['logout', `Abmelden (${mpState.user.name})`]);
   m.innerHTML = items.map(([k, l]) => (k === 'sep' ? '<div class="sep"></div>' : `<button data-um="${k}">${esc(l)}</button>`)).join('');
 }
 function onUserMenu(k) {
@@ -935,6 +935,7 @@ function onUserMenu(k) {
   else if (k === 'assistant') setTab('assistant');
   else if (k === 'theme') cycleTheme();
   else if (k === 'profile') setTab('profile');
+  else if (k === 'password') showPwChange({});
   else if (k === 'logout') { api('/logout', { body: {} }).catch(() => {}).finally(() => { mpState.user = null; stopOnline(); showAuth(); }); }
 }
 
@@ -1079,6 +1080,18 @@ VIEWS.cockpit = function viewCockpit() {
 };
 function decisionCard(d) {
   const pl = W.player, monthly = pl.staffMonthly(cpi());
+  if (d.type === 'agm') {
+    const last = pl.ledger.months.at(-1), res = last ? Object.entries(last.acc).reduce((a, [k, v]) => a + (k.startsWith('cf_') ? 0 : v), 0) / 100 : 0, A = P.PAYOUT;
+    const opt = (k) => { const r = d.rate * SM.agmFactor(pl, k); return `${pct(r)} vom Monatsgewinn${res > 0 ? ` (zuletzt ${eur(res * r)} im Monat)` : ''}`; };
+    const ext = (pl.cap && pl.cap.ext) || d.ext || 0;
+    return `<div class="callout warn"><b>Hauptversammlung – Abstimmung bis ${dateShort(d.deadline)}</b><span>${esc(d.text)}</span>
+    <div class="stack small" style="margin-top:6px">
+      <div class="row"><button class="btn small" data-act="decide" data-id="${d.id}" data-choice="yes">Zustimmen</button><span class="muted">${opt('yes')} für ${A.months} Monate · Kurs +${pct(A.yesSent - 1)}</span></div>
+      <div class="row"><button class="btn small primary" data-act="decide" data-id="${d.id}" data-choice="half">Kompromiss</button><span class="muted">Sie stimmen für die Hälfte, die Minderheit für den vollen Antrag: ${opt('half')} für ${A.months} Monate, keine weiteren Folgen</span></div>
+      <div class="row"><button class="btn small danger" data-act="decide" data-id="${d.id}" data-choice="no">Mit Mehrheit ablehnen</button><span class="muted">nur der Anteil der Minderheit: ${opt('no')} für ${A.noMonths} Monate · Kurs −${pct(1 - A.noSent)} · Ansehen −${A.noMalus} für ${A.noMonths} Monate</span></div>
+      <span class="muted">Ihre Stimmen: ${pct(1 - ext)} · außerhalb ${pct(ext)}. Ohne Abstimmung beschließt die Minderheit den Antrag allein. Was ausgeschüttet wird, verlässt die Airline. Wer alle Aktien zurückkauft, entscheidet künftig allein.</span>
+    </div></div>`;
+  }
   if (d.type === 'profit') {
     const last = pl.ledger.months.at(-1), res = last ? Object.entries(last.acc).reduce((a, [k, v]) => a + (k.startsWith('cf_') ? 0 : v), 0) / 100 : 0, R = P.PRESSURE;
     return `<div class="callout warn"><b>Entscheidung bis ${dateShort(d.deadline)}</b><span>${esc(d.text)}</span>
@@ -2320,7 +2333,7 @@ function slotQuoteHtml(apt, n) {
     ${list}
     <div class="row" style="gap:6px;flex-wrap:wrap">${buyN ? `<button class="btn small primary" data-act="slotbuy" data-apt="${apt}" data-n="${buyN}">${buyN} sofort kaufen · ${eurB(W.slotBuyPrice(apt, buyN))}</button>` : ''}
       ${n > free || !free ? `<button class="btn small${buyN ? '' : ' primary'}" data-act="slotwait" data-apt="${apt}" data-n="${ask}">${ask} auf die Warteliste${mineE ? ' (zu Ihrem Eintrag)' : ` · Platz ${q.length + 1}`}</button>` : ''}</div>
-    ${n > free || !free ? `<p class="small ${extra >= ask ? 'pos' : 'warnc'}">Prognose für ${dateLong(nsd.day)}: Mit dieser Anfrage bekämen Sie voraussichtlich <b>${extra} von ${ask}</b> ${myAsk ? 'weiteren ' : ''}Slot${ask > 1 ? 's' : ''}.${why} Bezahlt wird erst bei der Zuteilung (Tagespreis).</p>` : '<p class="small muted">Gekaufte Slots liegen in Ihrer Reserve, bis eine Strecke sie nutzt. Ungenutzt kosten sie die übliche Slotgebühr; zurückgeben bringt den halben Buchwert.</p>'}</div>`;
+    ${n > free || !free ? `<p class="small ${extra >= ask ? 'pos' : 'warnc'}">Prognose für ${dateLong(nsd.day)}: Mit dieser Anfrage bekämen Sie voraussichtlich <b>${extra} von ${ask}</b> ${myAsk ? 'weiteren ' : ''}Slot${ask > 1 ? 's' : ''}.${why} Bezahlt wird erst bei der Zuteilung (Tagespreis).</p>` : '<p class="small muted">Gekaufte Slots liegen in Ihrer Reserve, bis eine Strecke sie nutzt. Ungenutzt kosten sie die übliche Slotgebühr. Zurückgeben bringt 50 % des aktuellen Marktwerts – 80 %, wenn eine Airline vor Ort sie übernimmt.</p>'}</div>`;
 }
 function slotCardHtml(c, pl, nsd) {
   const free = Math.max(0, W.slotsFree(c) - W.waitBlock(c, pl)), bought = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day).reduce((a, h) => a + h.n, 0);
@@ -2648,19 +2661,39 @@ function pnlCol(acc) {
   const ebit = PNL_ACCOUNTS_EBIT.reduce((s, k) => s + v(k), 0);
   return { v, ebit, net: ebit + v('interest') + v('invest') + v('tax'), rev: v('rev_ticket') + v('rev_ancillary') + v('rev_cargo') + v('rev_acmi') };
 }
-/** Gesellschafter, Marktführerschaft und Förderung kleiner Airlines. */
+/** Einzelposten eines P&L-Kontos: laufender Monat, Vormonat, seit Start (seit Beginn der Aufschlüsselung). */
+function pnlDetailRows(pl, k) {
+  const L = pl.ledger, D = L.det; if (!D) return '<tr class="pnl-d"><td colspan="4" class="small muted">Für diesen Spielstand gibt es noch keine Einzelposten.</td></tr>';
+  const last = L.months.at(-1), cm = D.m[k] || {}, pm = last && last.det ? last.det[k] || {} : null, tm = D.p[k] || {};
+  const tags = [...new Set([...Object.keys(cm), ...Object.keys(pm || {}), ...Object.keys(tm)])];
+  const sumOf = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+  // Was vor der Aufschlüsselung gebucht wurde (ältere Spielstände), steht als eigener Posten da
+  const restT = (L.pnl[k] || 0) - sumOf(tm), restP = pm && last ? (last.acc[k] || 0) - sumOf(pm) : 0, restC = (L.month[k] || 0) - sumOf(cm);
+  const rows = tags.map((t) => ({ t, c: cm[t] || 0, p: pm ? pm[t] || 0 : null, a: tm[t] || 0 }));
+  if (Math.abs(restT) >= 100 || Math.abs(restP) >= 100 || Math.abs(restC) >= 100) rows.push({ t: 'vor Beginn der Aufschlüsselung gebucht', c: restC, p: pm ? restP : (last ? last.acc[k] || 0 : null), a: restT, old: true });
+  rows.sort((x, y) => (x.old - y.old) || Math.abs(y.c || 0) - Math.abs(x.c || 0) || Math.abs(y.a) - Math.abs(x.a));
+  const MAX = ui.pnlAll && ui.pnlAll[k] ? 999 : 25, shown = rows.slice(0, MAX), more = rows.slice(MAX);
+  const v = (x) => (x === null ? '<td class="r muted">–</td>' : `<td class="r">${x === 0 ? '<span class="muted">0</span>' : eur(x / 100)}</td>`);
+  const lbl = (t) => { const i = t.lastIndexOf(' › '); return i < 0 ? `<b>${esc(t)}</b>` : `<span class="muted">${esc(t.slice(0, i))} ›</span> <b>${esc(t.slice(i + 3))}</b>`; };
+  let h = shown.map((r) => `<tr class="pnl-d${r.old ? ' old' : ''}"><td>${r.old ? `<span class="muted">${esc(r.t)}</span>` : lbl(r.t)}</td>${v(r.c)}${v(r.p)}${v(r.a)}</tr>`).join('');
+  if (more.length) { const m = (f) => more.reduce((a, r) => a + (r[f] || 0), 0); h += `<tr class="pnl-d more" data-act="pnlall" data-k="${k}" role="button" tabindex="0"><td><span class="link">… ${more.length} weitere Posten anzeigen</span></td>${v(m('c'))}${v(pm ? m('p') : null)}${v(m('a'))}</tr>`; }
+  if (!rows.length) h = '<tr class="pnl-d"><td colspan="4" class="small muted">Keine Buchungen.</td></tr>';
+  return h;
+}
+/** Hauptversammlung, Aufsicht und Förderung. */
 function ownersHtml(pl) {
-  const pr = SM.payoutRate(pl), A = P.PAYOUT, SH = P.SMALL_HELP, d = W.day, sh = (k) => (pl.shocks || []).filter((x) => x.k === k && x.from <= d && x.until > d && !x.silent);
+  const A = P.PAYOUT, SH = P.SMALL_HELP, d = W.day, sh = (k) => (pl.shocks || []).filter((x) => x.k === k && x.from <= d && x.until > d && !x.silent);
   const n = pl.fleet.length, fuel = SH.fuel * Math.max(0, Math.min(1, (SH.fuelZero - n) / (SH.fuelZero - SH.fuelFull))), sub = Math.max(0, Math.min(1, (SH.subZero - n) / (SH.subZero - SH.subFull)));
   const parts = [];
-  if (pl.payoutFrom && pl.payoutFrom > d) parts.push(`<b>Die Gesellschafter wollen mitverdienen:</b> ab ${dateShort(pl.payoutFrom)} werden monatlich ${pct(pr.rate)} des Gewinns ausgeschüttet – je mehr Kapital, desto mehr (höchstens ${pct(A.max)}).`);
-  else if (pl.payoutFrom && pr.rate > 0) parts.push(`<b>Ausschüttung an die Gesellschafter: ${pct(pr.rate)} vom Monatsgewinn.</b> Ihr Eigenkapital liegt beim ${NF1.format(pr.mult)}-fachen des eingebrachten Kapitals – ab dem ${A.from}-fachen ${pct(A.min)}, je weiterem Vielfachen ${pct(A.k)} mehr, höchstens ${pct(A.max)}.`);
+  const ag = pl.agm, agOpen = (pl.decisions || []).some((x) => x.type === 'agm' && !x.resolved);
+  if (agOpen) parts.push('<b>Hauptversammlung:</b> Abstimmung über eine Ausschüttung läuft – siehe Entscheidungen im Cockpit.');
+  else if (ag && ag.until > d) parts.push(`<b>Beschluss der Hauptversammlung</b> bis ${dateShort(ag.until)}: ${pct(ag.rate)} vom Monatsgewinn werden ausgeschüttet (Antrag ${pct(ag.asked)}, ${ag.k === 'yes' ? 'angenommen' : ag.k === 'half' ? 'Kompromiss' : 'mit Mehrheit abgelehnt – Ansehen −' + A.noMalus}).`);
   if (pl.profitShare && pl.profitShare.until > d) parts.push(`<b>Gewinnbeteiligung</b> der Belegschaft: ${pct(pl.profitShare.rate)} vom Monatsgewinn bis ${dateShort(pl.profitShare.until)}.`);
   for (const x of sh('pricecap')) parts.push(`<b>Preisaufsicht in ${esc(apName(x.apt))}</b> bis ${dateShort(x.until)}: dort höchstens das ${NF1.format(P.AL_SHOCKS.pricecap.cap)}-fache des Marktpreises.`);
   for (const x of sh('fuelpool')) if (fuel > 0) parts.push(`<b>Einkaufsgemeinschaft Kerosin</b> bis ${dateShort(x.until)}: ${pct(fuel, 1)} günstiger (voll bis ${SH.fuelFull} Flugzeuge, ab ${SH.fuelZero} entfällt der Vorteil).`);
   for (const x of sh('subsidy')) if (sub > 0) parts.push(`<b>Regionalförderung ${esc(apName(x.apt))}</b> bis ${dateShort(x.until)}: bis ${eur(SH.subsidy * sub * cpi())} je Abflug.`);
   if (!parts.length) return '';
-  return `<div class="card pad stack"><h3>Gesellschafter, Aufsicht und Förderung</h3>${parts.map((x) => `<p class="small">${x}</p>`).join('')}</div>`;
+  return `<div class="card pad stack"><h3>Aktionäre, Aufsicht und Förderung</h3>${parts.map((x) => `<p class="small">${x}</p>`).join('')}</div>`;
 }
 VIEWS.finance = function viewFinance() {
   const pl = W.player, bs = SM.balanceSheet(pl), L = pl.ledger;
@@ -2676,9 +2709,11 @@ VIEWS.finance = function viewFinance() {
     <div class="tile tlink" data-act="tab" data-tab="history" role="button" tabindex="0" title="Verlauf Tag für Tag"><span>Ergebnis gestern <i class="tl-go">↗</i></span><b class="${sgn(L.lastDay || 0)}">${eur(L.lastDay || 0, { plus: true })}</b><em>${MONTHS[pm]} bisher <span class="${sgn(cur.net)}">${eur(cur.net, { plus: true })}</span></em></div>
   </div>
   <div class="stack"><h2 class="sec">Kontostand <small>letzte ${Math.min(netHistOf(pl).length, 365)} Tage</small></h2>${sparkline(netHistOf(pl).slice(-365))}</div>`;
-  html += `<div class="stack"><h2 class="sec">Gewinn- und Verlustrechnung <small>Ergebnis ist nicht Kontostand</small></h2><div class="tw"><table class="t"><thead><tr><th></th><th class="r">${MONTHS[pm]} (lfd.)</th><th class="r">Vormonat</th><th class="r">seit Start</th></tr></thead><tbody>
-    ${PNL_ROWS.filter(([k]) => k === 'grp' || ['ebit', 'net', 'interest', 'tax'].includes(k) || used.has(k)).map(([k, l]) => k === 'grp' ? `<tr class="grp"><td colspan="4">${l}</td></tr>` : `<tr class="${['ebit', 'net'].includes(k) ? 'sum' : ''}"><td>${l}</td>${cell(cur, k)}${cell(prev, k)}${cell(tot, k)}</tr>`).join('')}
-  </tbody></table></div></div>`;
+  const op = ui.pnlOpen || (ui.pnlOpen = {}), canOpen = (k) => !['ebit', 'net'].includes(k) && (L.pnl[k] || L.month[k]);
+  html += `<div class="stack"><h2 class="sec">Gewinn- und Verlustrechnung <small>Ergebnis ist nicht Kontostand · Zeile anklicken für die Einzelposten</small></h2><div class="tw"><table class="t pnl"><thead><tr><th></th><th class="r">${MONTHS[pm]} (lfd.)</th><th class="r">Vormonat</th><th class="r">seit Start</th></tr></thead><tbody>
+    ${PNL_ROWS.filter(([k]) => k === 'grp' || ['ebit', 'net', 'interest', 'tax'].includes(k) || used.has(k)).map(([k, l]) => k === 'grp' ? `<tr class="grp"><td colspan="4">${l}</td></tr>`
+      : `<tr class="${['ebit', 'net'].includes(k) ? 'sum' : ''}${canOpen(k) ? ' pnl-x' : ''}${op[k] ? ' open' : ''}"${canOpen(k) ? ` data-act="pnlx" data-k="${k}" role="button" tabindex="0" aria-expanded="${!!op[k]}"` : ''}><td>${canOpen(k) ? `<i class="pnl-car">${op[k] ? '▾' : '▸'}</i>` : ''}${l}</td>${cell(cur, k)}${cell(prev, k)}${cell(tot, k)}</tr>${op[k] ? pnlDetailRows(pl, k) : ''}`).join('')}
+  </tbody></table></div>${L.det ? '' : ''}</div>`;
   html += `<div class="stack"><h2 class="sec">Bilanz <small>vereinfacht</small></h2><table class="t"><tbody>
     <tr><td>Bank</td><td class="r">${eur(bs.cash)}</td><td>Flugzeugkredite</td><td class="r">${eur(bs.loans)}</td></tr>
     <tr><td>Flugzeuge (Buchwert)</td><td class="r">${eur(bs.nbv)}</td><td>Bankkredite</td><td class="r">${eur(bs.bank)}</td></tr>
@@ -4259,6 +4294,8 @@ function onPaneClick(e) {
   if (act === 'tour') { startTour(); return; }
   if (act === 'restartvol') { showRestart(true); return; }
   if (act === 'plsort') { ui.plSort = b.dataset.v; renderPane(true); return; }
+  if (act === 'pnlx') { const o = ui.pnlOpen || (ui.pnlOpen = {}); o[b.dataset.k] = !o[b.dataset.k]; renderPane(true); return; }
+  if (act === 'pnlall') { const o = ui.pnlAll || (ui.pnlAll = {}); o[b.dataset.k] = true; renderPane(true); return; }
   if (act === 'plall') { ui.plAll = true; renderPane(); return; }
   if (act === 'plroutes') { ui.plOpen = ui.plOpen || {}; ui.plOpen[b.dataset.al] = !ui.plOpen[b.dataset.al]; renderPane(true); return; }
   if (act === 'chatto') { chat.to = b.dataset.al; toggleChat(true); return; }
@@ -4282,7 +4319,7 @@ function onPaneClick(e) {
   if (act === 'fltclear') { if (ui.flts) delete ui.flts[b.dataset.k || 'routes']; renderPane(true); return; }
   if (act.startsWith('mkt') && onMarketClick(act, b)) return;
   if (act.startsWith('deal') && onDealClick(act, b)) return;
-  if ((act.startsWith('asg') || act === 'retype') && onAssignClick(act, b)) return;
+  if ((act.startsWith('asg') || act.startsWith('fp') || act === 'retype') && onAssignClick(act, b)) return;
   if ((act.startsWith('lg') || act.startsWith('pix')) && onLogoClick(act, b)) return;
   if (onHardClick(act, b)) return;
   if (onCapClick(act, b)) return;
@@ -5296,10 +5333,39 @@ function showAuth(mode = 'login') {
     e.preventDefault();
     const username = $('#auUser').value.trim(), password = $('#auPw').value;
     if (mode === 'register' && password !== $('#auPw2').value) { formError('Die Passwörter stimmen nicht überein.'); return; }
-    try { mpState.user = await api(mode === 'login' ? '/login' : '/register', { body: { username, password } }); if (mode === 'register' && !mpState.pendingJoin) showGuide(() => showLobby()); else showLobby(); }
+    try { mpState.user = await api(mode === 'login' ? '/login' : '/register', { body: { username, password } });
+      if (mpState.user.mustChange) showPwChange({ forced: true, current: password, then: () => showLobby() });
+      else if (mode === 'register' && !mpState.pendingJoin) showGuide(() => showLobby()); else showLobby(); }
     catch (err) { formError(err.message); }
   });
   setTimeout(() => $('#auUser') && $('#auUser').focus(), 50);
+}
+
+/** Passwort ändern – freiwillig oder Pflicht nach einem Zurücksetzen durch die Spielleitung. */
+function showPwChange({ forced = false, current = '', then = null } = {}) {
+  const back = then || (() => { $('#modal').hidden = true; });
+  const m = modal(`<div><h1>${forced ? 'Neues Passwort wählen' : 'Passwort ändern'}</h1>
+    <p class="ink2">${forced ? 'Ihr Passwort wurde von der Spielleitung zurückgesetzt. Bitte wählen Sie jetzt ein eigenes – das vorläufige gilt danach nicht mehr.' : 'Nach der Änderung müssen Sie sich auf anderen Geräten neu anmelden.'}</p></div>
+    <form id="pwForm" class="stack">
+      <label class="f"><span>${forced ? 'Vorläufiges Passwort' : 'Bisheriges Passwort'}</span><input type="password" id="pwCur" autocomplete="current-password" required value="${esc(current)}"></label>
+      <label class="f"><span>Neues Passwort</span><input type="password" id="pwNew" autocomplete="new-password" minlength="8" required></label>
+      <label class="f"><span>Neues Passwort wiederholen</span><input type="password" id="pwNew2" autocomplete="new-password" minlength="8" required></label>
+      <p class="small muted">Mindestens 8 Zeichen. Niemand – auch nicht die Spielleitung – kann Ihr Passwort einsehen; gespeichert wird nur ein verschlüsselter Fingerabdruck.</p>
+      <div class="formbar"><p class="small neg" id="formErr" hidden></p>
+      <div class="row">${forced ? '<button class="btn" type="button" id="pwOut">Abmelden</button>' : '<button class="btn" type="button" id="pwCancel">Abbrechen</button>'}<button class="btn primary" type="submit" style="margin-left:auto">Passwort speichern</button></div></div>
+    </form>`, false);
+  const out = m.querySelector('#pwOut'), cancel = m.querySelector('#pwCancel');
+  if (out) out.addEventListener('click', async () => { try { await api('/logout', { body: {} }); } catch (e) { /* egal */ } mpState.user = null; showAuth(); });
+  if (cancel) cancel.addEventListener('click', back);
+  $('#pwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cur = $('#pwCur').value, nx = $('#pwNew').value;
+    if (nx !== $('#pwNew2').value) { formError('Die neuen Passwörter stimmen nicht überein.'); return; }
+    if (nx.length < 8) { formError('Das neue Passwort braucht mindestens 8 Zeichen.'); return; }
+    try { const r = await api('/password', { body: { current: cur, next: nx } }); if (mpState.user) mpState.user.mustChange = false; toast(r.msg || 'Passwort geändert.'); back(); }
+    catch (err) { formError(err.message); }
+  });
+  setTimeout(() => { const f = $(current ? '#pwNew' : '#pwCur'); if (f) f.focus(); }, 50);
 }
 
 // ---------- Lobby ----------
@@ -5307,7 +5373,7 @@ async function showLobby(tab = null) {
   stopOnline();
   setSpeed(0);
   if (mpState.pendingJoin) { const pj = mpState.pendingJoin; mpState.pendingJoin = null; return showJoin(pj.code, pj.token); }
-  const m = modal(`<div class="spread"><h1>Sky<span>market</span></h1><div class="row small"><span class="muted">Angemeldet als <b>${esc(mpState.user.name)}</b>${mpState.user.admin ? ' <span class="chip me">Admin</span>' : ''}</span><button class="btn small" id="lbLogout">Abmelden</button></div></div>
+  const m = modal(`<div class="spread"><h1>Sky<span>market</span></h1><div class="row small"><span class="muted">Angemeldet als <b>${esc(mpState.user.name)}</b>${mpState.user.admin ? ' <span class="chip me">Admin</span>' : ''}</span><button class="btn small" id="lbPw">Passwort ändern</button><button class="btn small" id="lbLogout">Abmelden</button></div></div>
     <section class="mainworld" id="lbMain"><p class="small muted">Lade die Hauptwelt …</p></section>
     <div class="lobby">
       <section class="stack"><div class="spread"><h3>Meine Spiele</h3><button class="btn small primary" id="lbNew">Neues Spiel</button></div><div id="lbMine" class="glist"><p class="small muted">Lade …</p></div></section>
@@ -5321,6 +5387,7 @@ async function showLobby(tab = null) {
     </div>
     <div class="row small"><button class="btn small" id="lbGuide">Anleitung</button><button class="btn small" id="lbSolo">Allein und offline spielen</button><span class="muted">Ein Offline-Spiel bleibt in diesem Browser.</span></div>`);
   $('#lbLogout').addEventListener('click', async () => { try { await api('/logout', { body: {} }); } catch (e) { /* egal */ } mpState.user = null; showAuth(); });
+  $('#lbPw').addEventListener('click', () => showPwChange({ then: () => showLobby() }));
   $('#lbNew').addEventListener('click', showCreate);
   $('#lbSolo').addEventListener('click', () => showStart(false));
   $('#lbGuide').addEventListener('click', () => showGuide(() => showLobby()));
@@ -5409,7 +5476,7 @@ async function showAdmin(id, onBack) {
   const pRow = (p) => `<div class="adm-p"><div style="min-width:0"><b>${esc(p.airlineName)}</b> <span class="small muted mono">${esc(p.code || '')}</span>${p.me ? ' <span class="chip me">Sie</span>' : ''}${p.host ? ' <span class="chip">Leitung</span>' : ''}${p.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}
       <div class="small muted"><i class="pc-dot ${p.online ? 'on' : ''}"></i>${esc(p.name)} · Basis ${esc(p.base || '–')} · ${p.equity === null ? '–' : 'EK ' + eur(p.equity)} · ${p.fleet} Flugzeuge · ${p.routes} Strecken · seit ${new Date(p.joined).toLocaleDateString('de-DE')}</div></div>
     ${p.me ? '' : `<div class="row adm-act"><span class="row" style="gap:4px"><input type="number" class="adm-amt" data-for="${esc(p.airlineId)}" step="1" min="-999" max="999" placeholder="± Mio. € (bis 999)" aria-label="Kapitalkorrektur in Mio. Euro"><button class="btn small" data-adm="grant" data-al="${esc(p.airlineId)}">Kapital buchen</button></span>
-      <button class="btn small danger" data-adm="kick" data-al="${esc(p.airlineId)}">Entfernen</button><button class="btn small danger" data-adm="kick" data-ban="1" data-al="${esc(p.airlineId)}">Entfernen + sperren</button></div>`}</div>`;
+      ${d.admin ? `<button class="btn small" data-adm="pw" data-u="${esc(p.u)}" data-n="${esc(p.name)}">Passwort zurücksetzen</button>` : ''}<button class="btn small danger" data-adm="kick" data-al="${esc(p.airlineId)}">Entfernen</button><button class="btn small danger" data-adm="kick" data-ban="1" data-al="${esc(p.airlineId)}">Entfernen + sperren</button></div>`}</div>`;
   const when = (e) => (e.cancelled ? 'annulliert' : e.start > day ? `ab ${dateShort(e.start)}` : e.end > day ? `bis ${dateShort(e.end)}` : 'wirkt nach');
   const eRow = (e) => `<div class="adm-e${e.cancelled ? ' off' : ''}"><span class="chip ${e.severity === 'crit' ? 'crit' : e.severity === 'good' ? 'good' : 'warn'}">${esc(EV_TYPE[e.type] || e.type)}</span><div style="min-width:0"><span class="small">${esc(e.text)}</span><div class="small muted">${when(e)}${e.airline ? ' · betrifft ' + esc(alName(e.airline)) : ''}</div></div>
     ${e.cancelled ? '' : `<button class="btn small" data-adm="cancel" data-ev="${esc(e.id)}">Annullieren</button>`}</div>`;
@@ -5418,6 +5485,8 @@ async function showAdmin(id, onBack) {
     <section class="stack"><h3>Airlines</h3><div class="adm-list">${d.players.map(pRow).join('') || '<p class="small muted">Niemand spielt mit.</p>'}</div>
       <p class="small muted">„Entfernen“ beendet die Airline sofort: Strecken enden, Leasingflugzeuge gehen zurück, Slots, Gates und offene Angebote verfallen. Die Person kann danach neu beitreten – außer mit „sperren“. Kapital buchen: positiver Betrag schießt zu, negativer zieht ab (z. B. zum Ausgleich eines Fehlers).</p></section>
     ${d.banned.length ? `<section class="stack"><h3>Gesperrt</h3><div class="adm-list">${d.banned.map((b) => `<div class="adm-p"><div><b>${esc(b.name)}</b> <span class="small muted">zuletzt ${esc(b.airlineName || '')} · seit ${new Date(b.at).toLocaleDateString('de-DE')}</span></div><button class="btn small" data-adm="unban" data-u="${esc(b.u)}">Sperre aufheben</button></div>`).join('')}</div></section>` : ''}
+    ${d.admin ? `<section class="stack"><h3>Konto zurücksetzen</h3><div class="row"><input type="text" id="adm-pwu" maxlength="20" placeholder="Benutzername" style="flex:1;min-width:160px" autocomplete="off"><button class="btn small" data-adm="pw">Vorläufiges Passwort erzeugen</button></div>
+      <p class="small muted">Passwörter kann niemand einsehen – sie sind nur als Fingerabdruck gespeichert. Hier erzeugen Sie ein vorläufiges Passwort für ein beliebiges Konto. Geben Sie es der Person weiter; beim nächsten Anmelden muss sie ein eigenes wählen. Ihre bisherigen Sitzungen enden sofort.</p><div id="adm-pwout"></div></section>` : ''}
     ${d.canSpeed ? `<section class="stack"><h3>Tempo</h3><div class="seg wrap">${Object.entries(SM.SPEEDS).filter(([, v]) => !v.local).map(([k, v]) => `<button data-adm="speed" data-v="${k}" aria-pressed="${k === d.speed}">${esc(v.label)}</button>`).join('')}</div>
       <p class="small muted">Gilt sofort für alle in ${d.main ? 'der Hauptwelt' : 'diesem Spiel'}; die Uhr rechnet die angefangene Zeit um. Alle sehen eine Meldung.</p></section>` : ''}
     ${d.startAt ? `<section class="stack"><h3>Geplanter Start</h3><div class="callout info stack"><span><b>${esc(startTxt(d.startAt))}</b> · noch ${leftTxt(d.startAt - Date.now())} – bis dahin können sich alle anmelden, Logo, Name und Basis festlegen; die Uhr steht.</span>
@@ -5435,6 +5504,21 @@ async function showAdmin(id, onBack) {
     const cmd = b.dataset.adm;
     if (cmd === 'close') { m.onclick = null; onBack(); return; }
     if (cmd === 'speed') { try { await api(`/games/${id}/control`, { body: { speed: b.dataset.v, tz: new Date().getTimezoneOffset() } }); toast(`Tempo: ${SM.SPEEDS[b.dataset.v].label}`); if (ui.mp && ui.mp.id === id) await mpPoll(true); } catch (err) { toast(err.message); } showAdmin(id, onBack); return; }
+    if (cmd === 'pw') {
+      const uname = b.dataset.u || ((m.querySelector('#adm-pwu') || {}).value || '').trim(), label = b.dataset.n || uname;
+      if (!uname) { toast('Bitte einen Benutzernamen eingeben.'); return; }
+      if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = `Passwort von ${label} wirklich zurücksetzen?`; b.classList.add('danger'); return; }
+      b.disabled = true;
+      try {
+        const r = await api('/admin/password', { body: { username: uname } });
+        const box = m.querySelector('#adm-pwout') || b.parentElement;
+        const html = `<div class="callout good stack"><span>Vorläufiges Passwort für <b>${esc(r.name)}</b>:</span><div class="row"><input type="text" readonly id="adm-pwtmp" value="${esc(r.temp)}" class="mono" style="flex:1;min-width:160px"><button class="btn small" data-adm="pwcopy">Kopieren</button></div><span class="small">Nur jetzt sichtbar. ${esc(r.name)} muss beim nächsten Anmelden ein eigenes Passwort wählen.${r.self ? ' Das ist Ihr eigenes Konto – Sie werden gleich abgemeldet.' : ''}</span></div>`;
+        if (m.querySelector('#adm-pwout')) { box.innerHTML = html; box.scrollIntoView({ block: 'center' }); } else toast(`Vorläufiges Passwort für ${r.name}: ${r.temp}`);
+        b.textContent = 'Zurückgesetzt'; if (r.self) setTimeout(() => { mpState.user = null; showAuth(); }, 8000);
+      } catch (err) { toast(err.message); b.disabled = false; delete b.dataset.armed; b.textContent = 'Passwort zurücksetzen'; }
+      return;
+    }
+    if (cmd === 'pwcopy') { const i = m.querySelector('#adm-pwtmp'); if (!i) return; try { await navigator.clipboard.writeText(i.value); toast('Passwort kopiert.'); } catch (err) { i.select(); toast('Bitte das markierte Passwort kopieren.'); } return; }
     if (cmd === 'reset' && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Wirklich alles neu starten? Noch einmal klicken.'; return; }
     if (cmd === 'setstart' || cmd === 'startnow') {
       const v = cmd === 'startnow' ? null : new Date(($('#adm-start2') || {}).value || '').getTime();
@@ -5779,7 +5863,8 @@ async function onlineBoot() {
   const q = new URLSearchParams(location.search);
   if (q.get('join')) mpState.pendingJoin = { code: q.get('join').toUpperCase(), token: q.get('t') };
   try { mpState.user = await api('/me'); } catch (e) { mpState.user = null; }
-  if (mpState.user) showLobby(); else showAuth(mpState.pendingJoin ? 'register' : 'login');
+  if (mpState.user && mpState.user.mustChange) showPwChange({ forced: true, then: () => showLobby() });
+  else if (mpState.user) showLobby(); else showAuth(mpState.pendingJoin ? 'register' : 'login');
 }
 
 // ---------------------------------------------------------------------------

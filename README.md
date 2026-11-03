@@ -183,6 +183,37 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.13: Filter im Einsatzplan
+
+- Die Filter im Einsatzplan (Flugzeugtyp, Basis) taten nichts: Der zentrale Klickverteiler gab nur Aktionen mit „asg…“ an die Einsatzplanung weiter, die Filterknöpfe heißen aber „fptype“/„fpbase“. Behoben.
+- Alle übrigen Filter geprüft – im Browser durchgeklickt: Netz (Basis, Muster, Status, Suche), Flotte (Basis, Muster, Status), Dashboard (Basis), Charter-Kalender (Geschäftszweig, Sortierung, „passt in freie Zeiträume“), Verlauf (Ansicht), Karte (Live-Flüge). Alle wirken.
+- Neuer fester Test: Jeder Knopf in der Seitenleiste muss einen Empfänger haben, den der Klickverteiler auch erreicht (179 Aktionen). So fällt ein toter Knopf künftig schon vor der Auslieferung auf.
+
+## Neu in 0.21.12: Hauptversammlung mit Abstimmung
+
+- Die Pflichtausschüttung „Die Gesellschafter wollen mitverdienen“ ist jetzt eine **Hauptversammlung mit Abstimmung nach Anteilen**. Wer z. B. 80 % der eigenen Aktien hält, stimmt mit 80 % ab.
+- Den Antrag stellen die Aktionäre außerhalb (aus Kapitalerhöhungen oder „Schulden gegen Aktien“). Die Höhe richtet sich wie bisher nach dem Vielfachen des eingebrachten Kapitals (20–70 % des Monatsgewinns).
+- Drei Antworten (Entscheidung im Cockpit, 7 Tage Zeit):
+  - **Zustimmen:** voller Antrag für 12 Monate, Börsenkurs +5 %.
+  - **Kompromiss:** Sie stimmen für die Hälfte, die Minderheit für den vollen Antrag – bei 80 % eigenen Aktien also 60 % des Antrags (z. B. 25 % statt 41 %), 12 Monate, keine weiteren Folgen.
+  - **Mit Mehrheit ablehnen:** Die Minderheit bekommt nur ihren Anteil am Antrag (bei 20 % außerhalb z. B. 8 % statt 41 %), 6 Monate, Börsenkurs −10 %, Ansehen −5 für 6 Monate.
+  - Ohne Abstimmung beschließt die Minderheit den Antrag allein.
+- **Alleinige Eigentümer** (keine Aktien außerhalb) bekommen keine Hauptversammlung mehr – über den Gewinn entscheiden sie allein. Gegen Übermacht wirken für sie weiter Gewerkschaft, stille Gegenwehr, Markteintritte und Preisaufsicht.
+- Laufende Spielstände: Bestehende Pflichtausschüttungen enden. Wer Aktien außerhalb hat, bekommt sofort eine Abstimmung (bis dahin wird nichts ausgeschüttet); Alleineigentümer bekommen eine Meldung, dass die Ausschüttung entfällt.
+
+## Neu in 0.21.11: P&L bis ins Detail, Passwort zurücksetzen
+
+- **P&L aufklappbar:** Unter Finanzen lässt sich jede Zeile der Gewinn- und Verlustrechnung anklicken. Darunter stehen die Einzelposten für den laufenden Monat, den Vormonat und seit Start, z. B.:
+  - Erlöse, Treibstoff, Gebühren, Wartung, Bordservice, Störungen **je Strecke** (Umsteiger-Erlöse und Annullierungen mit Grund extra)
+  - Slotentgelte **je Flughafen**, getrennt nach genutzten Slots und ungenutzter Reserve
+  - Leasing, Abschreibung, Versicherung, Finanzierungszinsen **je Flugzeug**
+  - Verwaltung: Zentrale, je Basis, je Flugzeug, mehrere Flugzeugfamilien, Frachtvertrieb
+  - Personal je Gruppe (Piloten je Familie, Kabine, Technik), Einstellungen, Abfindungen, Umschulungen, Boni, Akademie
+  - Fachkräfte je Person (Gehalt, Antritts- und Bindungsprämien, Abfindung), Stationen und Hangars je Flughafen, Marketing, Vielfliegerprogramm, Kerosin-Absicherung, Zinsen je Kredit/Anleihe, alle Einmalkosten mit Anlass
+- Die Einzelposten summieren sich exakt zum Konto. Sie werden nur für Spielende geführt (der Spielstand wächst kaum) und für die letzten 12 abgeschlossenen Monate aufgehoben. Was vor dem Update gebucht wurde, steht als „vor Beginn der Aufschlüsselung gebucht“.
+- **Passwort zurücksetzen (Admin):** In der Verwaltung eines Spiels hat jede Airline den Knopf „Passwort zurücksetzen“, dazu gibt es „Konto zurücksetzen“ für einen beliebigen Benutzernamen. Erzeugt wird ein vorläufiges Passwort (nur einmal sichtbar, mit Kopieren-Knopf). Alle bisherigen Sitzungen des Kontos enden sofort; beim nächsten Anmelden muss die Person ein eigenes Passwort wählen. Passwörter selbst bleiben unsichtbar – gespeichert ist nur ein scrypt-Fingerabdruck.
+- **Passwort ändern:** in der Lobby und im Menü oben rechts. Andere Geräte werden danach abgemeldet.
+
 ## Neu in 0.21.10: Ausfälle sichtbar und wirksam
 
 - **Ausfälle stehen morgens fest:** Ob ein Umlauf ausfällt (Sperrung, Wetter/Streik am Flughafen, eigener Streik, fehlende Crew, Technik, IT), wird je Strecke, Tag und Umlauf mit einem festen Zufallswert bestimmt. Karte, Abflugtafel und Netz zeigen so schon morgens, welche Flüge ausfallen, und die Tagessimulation streicht genau diese – beide Richtungen eines Umlaufs gemeinsam.

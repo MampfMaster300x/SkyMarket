@@ -23,6 +23,22 @@ ok(await call('ben', 'POST', '/register', { username: 'Ben', password: 'passwort
 ok(await call('cleo', 'POST', '/register', { username: 'Cleo', password: 'passwort2' }), 'Registrierung Cleo');
 assert.equal((await call('anon', 'GET', '/games/mine')).status, 401, 'ohne Anmeldung gesperrt');
 assert.equal((await call('ben2', 'POST', '/login', { username: 'ben', password: 'falsch' })).status, 401, 'falsches Passwort');
+// 0.21.11: Admin setzt ein Passwort zurück – vorläufiges Passwort, Pflicht zum Ändern, alte Sitzungen ungültig
+{ ok(await call('tim', 'POST', '/register', { username: 'Tim', password: 'admin1234' }), 'Registrierung Tim (Admin)');
+  assert.equal((await call('anna', 'POST', '/admin/password', { username: 'ben' })).status, 403, 'nur Admins setzen zurück');
+  assert.equal((await call('tim', 'POST', '/admin/password', { username: 'niemand' })).status, 404, 'unbekanntes Konto');
+  const rs = ok(await call('tim', 'POST', '/admin/password', { username: 'Ben' }), 'Zurücksetzen'); assert.ok(rs.temp && rs.temp.length >= 10, 'vorläufiges Passwort');
+  assert.equal((await call('ben', 'GET', '/games/mine')).status, 401, 'alte Sitzung von Ben ungültig');
+  assert.equal((await call('ben', 'POST', '/login', { username: 'ben', password: 'passwort1' })).status, 401, 'altes Passwort gilt nicht mehr');
+  const li = ok(await call('ben', 'POST', '/login', { username: 'ben', password: rs.temp }), 'Login mit vorläufigem Passwort'); assert.equal(li.mustChange, true, 'muss ändern');
+  assert.equal(ok(await call('ben', 'GET', '/me'), 'me').mustChange, true);
+  assert.equal((await call('ben', 'POST', '/password', { current: 'falsch', next: 'passwort1' })).status, 403, 'Ändern braucht das bisherige Passwort');
+  assert.equal((await call('ben', 'POST', '/password', { current: rs.temp, next: 'kurz' })).status, 400, 'zu kurz');
+  ok(await call('ben', 'POST', '/password', { current: rs.temp, next: 'passwort1' }), 'Passwort geändert');
+  assert.equal(ok(await call('ben', 'GET', '/me'), 'me nach Änderung').mustChange, false, 'Pflicht erledigt, Sitzung gilt weiter');
+  ok(await call('ben3', 'POST', '/login', { username: 'ben', password: 'passwort1' }), 'Login mit neuem Passwort');
+  assert.equal((await call('tim', 'GET', '/me')).status, 200, 'Admin-Sitzung unberührt');
+  console.log('0.21.11 ok: Passwort zurücksetzen (Admin), alte Sitzung ungültig, Pflicht zum Ändern'); }
 
 const g = ok(await call('anna', 'POST', '/games', { name: 'Freitagsrunde', password: 'flug', difficulty: 'normal', speed: 'x4', airline: { name: 'Hanse Air', code: 'HX', base: 'HAM' } }), 'Spiel anlegen');
 console.log('Spiel', g);
@@ -139,7 +155,7 @@ assert.equal((await call('ben', 'POST', `/games/${g.id}/action`, { action: { typ
 r = ok(await call('anna', 'POST', `/games/${g.id}/action`, { action: { type: 'setRivals', key: 'hard' } }), 'Konkurrenz stark');
 assert.equal(r.ok, true);
 // Admin Tim: sieht alle Spiele, tritt ohne Passwort bei, darf fremde Spiele löschen
-const tim = ok(await call('tim', 'POST', '/register', { username: 'Tim', password: 'admin1234' }), 'Registrierung Tim');
+const tim = ok(await call('tim', 'POST', '/login', { username: 'Tim', password: 'admin1234' }), 'Anmeldung Tim');
 assert.equal(tim.admin, true, 'Tim ist Admin');
 assert.equal((await call('ben', 'GET', '/admin/games')).status, 403, 'Verwaltung nur für Admins');
 const g2 = ok(await call('ben', 'POST', '/games', { name: 'Geheimrunde', password: 'zuzu', difficulty: 'hard', speed: 'p', airline: { name: 'Isar Zwei', code: 'IZ', base: 'MUC' } }), 'zweites Spiel');
@@ -603,8 +619,14 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const pr = SMx.payoutRate(big); assert.ok(pr.mult > 3.5 && pr.rate > 0.3 && pr.rate <= 0.7, 'Ausschüttung wächst mit dem Vielfachen');
   assert.ok(SMx.attackEligible(big) && !SMx.attackEligible(small), 'Gegenwehr droht jeder Airline mit 2,5-fachem Kapital');
   for (let i = 0; i < 3; i++) big.ledger.months.push({ label: { y: 0, m: i }, acc: { rev_ticket: 5e9, fuel: -3e9 } });   // drei Monate mit 40 % Marge
+  big.cap = { ext: 0.2, sent: 1, hist: [], div: 0, last: -999 };   // 20 % der Aktien außerhalb (Kapitalerhöhung)
   w.day = 100; const c00 = big.ledger.cash; SMx.dominanceMonth(w);
-  assert.ok(big.payoutFrom > w.day && big.ledger.cash === c00, 'Gesellschafter kündigen die Ausschüttung an');
+  const agm = big.decisions.find((x) => x.type === 'agm' && !x.resolved);
+  assert.ok(agm && big.ledger.cash === c00 && !big.agm, 'Hauptversammlung: Abstimmung statt sofortiger Ausschüttung');
+  assert.equal(A(big, { type: 'decide', id: agm.id, choice: 'share' }).ok, false, 'nur Hauptversammlungs-Antworten');
+  assert.equal(A(big, { type: 'decide', id: agm.id, choice: 'half' }).ok, true, 'Kompromiss');
+  assert.ok(Math.abs(big.agm.rate - agm.rate * (0.2 + 0.8 / 2)) < 0.002 && big.agm.until === w.day + 360, 'Kompromiss: Minderheit voll, Sie zur Hälfte – 12 Monate');
+  { const k = SMx.agmFactor(big, 'no'); assert.ok(Math.abs(k - 0.2) < 1e-9 && SMx.agmFactor(big, 'yes') === 1, 'Ablehnung: nur der Anteil der Minderheit'); }
   const negs = big.decisions.filter((x) => x.type === 'profit' && !x.resolved).length + (Object.values(w.attacks).some((a) => a.al === 'B1') ? 1 : 0) + (big.shocks || []).filter((x) => (x.k === 'entrant' || x.k === 'pricecap') && x.from === w.day).length;
   assert.equal(negs, 1, 'genau eine Belastung auf einmal');
   assert.ok(SMx.alShock(small, 'fuelpool', w.day), 'kleine Airline bekommt die Einkaufsgemeinschaft');
@@ -614,8 +636,13 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const logs0 = big.events.length, news0 = w.news.length; w.day += 61; SMx.dominanceMonth(w);
   const att = Object.values(w.attacks).filter((a) => a.al === 'B1');
   if (att.length) assert.ok(!big.events.slice(logs0).some((e) => /wehren|Preisangriff|greif/.test(e.msg || '')) && !w.news.slice(news0).some((n) => /greif|Preiskampf/.test(n.msg)), 'Gegenwehr im Stillen');
-  w.day = big.payoutFrom; const c0 = big.ledger.cash; SMx.dominanceMonth(w);
-  assert.ok(c0 - big.ledger.cash >= 0.3 * 20e6 - 1, 'Ausschüttung gezahlt');
+  { const c0 = big.ledger.cash; SMx.dominanceMonth(w); const paid = (c0 - big.ledger.cash) / 100;
+    assert.ok(Math.abs(paid - big.agm.rate * 20e6) <= 1000, `Ausschüttung laut Beschluss gezahlt (${paid})`);
+    // Ablehnen kostet Ansehen; wer alle Aktien hält, bekommt keine Versammlung
+    const st0 = SMx.standingOf(big, w.day + 1).v; big.agm = { k: 'no', rate: 0.05, asked: 0.4, from: w.day, until: w.day + 180 }; big._st = null;
+    assert.equal(st0 - SMx.standingOf(big, w.day + 1).v, SMx.P.PAYOUT.noMalus, 'Ansehen −' + SMx.P.PAYOUT.noMalus + ' nach Überstimmen der Minderheit');
+    big.agm = null; big.cap.ext = 0; big.decisions = []; SMx.dominanceMonth(w);
+    assert.ok(!big.decisions.some((x) => x.type === 'agm'), 'alleinige Eigentümer: keine Hauptversammlung'); big.cap.ext = 0.2; }
   // Monopol: allein auf einer Strecke mit hoher Marge lockt Konkurrenz an
   big.ledger.cashOnly(2e8, 't'); A(big, { type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'NRT' }); for (let i = 0; i < 35; i++) w.step(); A(big, { type: 'fillStaff' });
   for (const x of ['KMQ', 'TAK', 'OIT', 'KCZ', 'MYJ', 'HKD', 'AOJ', 'ICN']) if (A(big, { type: 'openRoute', base: 'NRT', dest: x, typeId: 'A20N', freq: 1 }).ok) break;
@@ -693,4 +720,37 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   w.operableFreq(pl); assert.equal(r.flyingToday, 0, 'verchartert: heute kein Umlauf'); const n0 = r.hist.length, rev0 = pl.ledger.today ? 0 : 0;
   w.step(); assert.ok(r.hist.length === n0 || r.hist.at(-1).flights === 0, 'verchartert: keine Flüge auf der Strecke');
   console.log('0.21.10 ok: Vorschau = Simulation an', tot, 'Tagen,', some, 'mit Sturmausfällen; Vulkanasche sperrt trotz Fachkraft; verchartert fliegt nicht'); }
+// 0.21.11: P&L bis in die Einzelposten – Summe der Posten = Konto, auch nach Speichern/Laden und Monatswechsel
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const w = SMx.newGame({ seed: 7, base: 'HAM' }), pl = w.player, A = (a) => SMx.applyAction(w, pl.id, a);
+  pl.cash = Math.max(pl.cash, 3e8);
+  A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); A({ type: 'fillStaff' }); for (let i = 0; i < 20; i++) w.step();
+  for (const d of ['PMI', 'BCN']) A({ type: 'openRoute', base: 'HAM', dest: d, typeId: 'A20N', freq: 1 });
+  A({ type: 'buySlots', apt: 'HAM', n: 1 });
+  for (let i = 0; i < 40; i++) w.step();
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))), L = w2.player.ledger, sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+  for (const [k, v] of Object.entries(L.pnl)) assert.equal(sum(L.det.p[k]), v, 'seit Start: Einzelposten = Konto ' + k);
+  const m = L.months.at(-1); for (const [k, v] of Object.entries(m.acc)) if (!k.startsWith('cf_')) assert.equal(sum(m.det[k]), v, 'Vormonat: Einzelposten = Konto ' + k);
+  for (const [k, v] of Object.entries(L.month)) if (!k.startsWith('cf_')) assert.equal(sum(L.det.m[k]), v, 'lfd. Monat: Einzelposten = Konto ' + k);
+  assert.ok(Object.keys(L.det.p.fuel || {}).includes('HAM–PMI') && Object.keys(L.det.p.slots || {}).some((t) => /Slotgebühr genutzt › .*\(PMI\)/.test(t)), 'Treibstoff je Strecke, Slots je Flughafen');
+  assert.ok(Object.keys(L.det.p.lease || {}).some((t) => /HX-001/.test(t)) && Object.keys(L.det.p.overhead || {}).includes('Zentrale (Hauptverwaltung)'), 'Leasing je Flugzeug, Verwaltung aufgeteilt');
+  assert.ok(!Object.keys(L.det.p).some((k) => (L.det.p[k] || {})['ohne Zuordnung']), 'jede Buchung hat eine Herkunft: ' + Object.keys(L.det.p).filter((k) => (L.det.p[k] || {})['ohne Zuordnung']).join(','));
+  assert.ok(!w2.list.some((x) => x.archetype && x.ledger.det), 'KI-Airlines ohne Einzelposten (Speicher)');
+  console.log('0.21.11 ok: P&L-Einzelposten stimmen mit allen Konten überein,', Object.values(L.det.p).reduce((a, o) => a + Object.keys(o).length, 0), 'Posten'); }
+// 0.21.13: Jeder Knopf (data-act) in der Seitenleiste muss einen Empfänger haben, den der zentrale Klickverteiler auch erreicht
+{ const fs = await import('node:fs'); const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const names = new Set([...src.matchAll(/data-act="([a-z][a-z0-9]*)"/gi)].map((m) => m[1]));
+  const body = (name) => { const i = src.indexOf(`function ${name}(`); if (i < 0) return ''; let j = src.indexOf('{', i), d = 0, k = j; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) break; } } return src.slice(j, k + 1); };
+  const pane = body('onPaneClick'), gates = [...pane.matchAll(/\n  if \((?:(.*?) && )?(on[A-Z]\w*Click)\(act, b\)\) return;/g)].map((m) => ({ cond: m[1] || 'true', fn: m[2] }));
+  const handles = (code, n) => new RegExp(`(case '${n}'|act === '${n}'|\\[[^\\]]*'${n}'[^\\]]*\\]\\.includes\\(act\\))`).test(code);
+  let direct = pane; for (const g of gates) direct = direct.replace(`${g.fn}(act, b)`, '');
+  const rest = src.replace(pane, ''), broken = [];
+  for (const n of names) {
+    if (handles(direct, n)) continue;
+    const hits = gates.filter((g) => handles(body(g.fn), n) || (g.fn === 'onLogoClick' && handles(body('onPixClick'), n)));
+    if (hits.length) { if (!hits.some((g) => new Function('act', 'return ' + g.cond)(n))) broken.push(`${n} (Tor ${hits.map((h) => h.cond).join(' / ')})`); continue; }
+    if (!new RegExp(`(act === '${n}'|case '${n}'|'${n}'[,\\]])`).test(rest)) broken.push(`${n} (kein Empfänger)`);
+  }
+  assert.deepEqual(broken, [], 'Knöpfe ohne erreichbaren Empfänger: ' + broken.join(', '));
+  console.log('0.21.13 ok:', names.size, 'Knopf-Aktionen haben einen erreichbaren Empfänger'); }
 console.log('Alle Prüfungen bestanden.');

@@ -51,7 +51,8 @@ async function secret(store) {
   return (secretCache = s);
 }
 async function makeCookie(store, req, user) {
-  const payload = b64u(enc.encode(JSON.stringify({ u: user.key, n: user.name, e: Date.now() + SESSION_DAYS * 864e5 })));
+  // v = Passwortversion: Nach einem Zurücksetzen oder Ändern gelten ältere Sitzungen nicht mehr
+  const payload = b64u(enc.encode(JSON.stringify({ u: user.key, n: user.name, v: user.pv || 0, e: Date.now() + SESSION_DAYS * 864e5 })));
   const sig = createHmac('sha256', await secret(store)).update(payload).digest('base64url');
   const secure = new URL(req.url).protocol === 'https:' ? '; Secure' : '';
   return `sm_session=${payload}.${sig}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${secure}`;
@@ -64,8 +65,22 @@ async function sessionUser(store, req) {
   const good = createHmac('sha256', await secret(store)).update(payload).digest();
   const got = Buffer.from(sig, 'base64url');
   if (got.length !== good.length || !timingSafeEqual(got, good)) return null;
-  try { const d = JSON.parse(Buffer.from(payload, 'base64url').toString()); return d.e > Date.now() ? { key: d.u, name: d.n } : null; } catch (e) { return null; }
+  let d; try { d = JSON.parse(Buffer.from(payload, 'base64url').toString()); } catch (e) { return null; }
+  if (!(d.e > Date.now())) return null;
+  if ((d.v || 0) !== await userPv(store, d.u)) return null;   // Passwort inzwischen zurückgesetzt oder geändert
+  return { key: d.u, name: d.n };
 }
+// Passwortversion je Konto, kurz zwischengespeichert (spart Lesezugriffe bei jeder Anfrage)
+const pvCache = new Map();
+async function userPv(store, key) {
+  const c = pvCache.get(key), now = Date.now();
+  if (c && now - c.t < 30000) return c.v;
+  const u = await store.get(K.user(key), { type: 'json' });
+  const v = u ? (u.pv || 0) : -1;
+  pvCache.set(key, { v, t: now });
+  return v;
+}
+const TEMP_PW_CHARS = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 // ---------------------------------------------------------------------------
 // Speicher: Schlüssel
@@ -226,6 +241,7 @@ export async function handle(req, { store }) {
       const { salt, hash } = hashPw(password);
       const res = await store.setJSON(K.user(key), { key, name, salt, hash, created: Date.now(), games: [] }, { onlyIfNew: true });
       if (res.modified === false) return fail(409, 'Diesen Benutzernamen gibt es schon.');
+      pvCache.set(key, { v: 0, t: Date.now() });
       return json({ name, key, admin: ADMINS.has(key) }, 200, { 'set-cookie': await makeCookie(store, req, { key, name }) });
     }
     if (path === '/login' && method === 'POST') {
@@ -233,13 +249,43 @@ export async function handle(req, { store }) {
       const key = cleanName(username, 20).toLowerCase();
       const u = key ? await store.get(K.user(key), { type: 'json' }) : null;
       if (!u || !checkPw(password || '', u.salt, u.hash)) return fail(401, 'Benutzername oder Passwort stimmt nicht.');
-      return json({ name: u.name, key, admin: ADMINS.has(key) }, 200, { 'set-cookie': await makeCookie(store, req, u) });
+      pvCache.set(key, { v: u.pv || 0, t: Date.now() });
+      return json({ name: u.name, key, admin: ADMINS.has(key), mustChange: !!u.mustChange }, 200, { 'set-cookie': await makeCookie(store, req, u) });
     }
     if (path === '/logout' && method === 'POST') return json({ ok: true }, 200, { 'set-cookie': 'sm_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
 
     const user = await sessionUser(store, req);
-    if (path === '/me') return user ? json({ name: user.name, key: user.key, admin: isAdmin(user) }) : fail(401, 'Nicht angemeldet.');
+    if (path === '/me') {
+      if (!user) return fail(401, 'Nicht angemeldet.');
+      const u = await store.get(K.user(user.key), { type: 'json' });
+      return json({ name: user.name, key: user.key, admin: isAdmin(user), mustChange: !!(u && u.mustChange) });
+    }
     if (!user) return fail(401, 'Bitte zuerst anmelden.');
+
+    // ---- Passwort ändern (eigenes Konto): altes bzw. vorläufiges Passwort bestätigen ----
+    if (path === '/password' && method === 'POST') {
+      const { current, next } = await readJson(req);
+      if (typeof next !== 'string' || next.length < 8 || next.length > 200) return fail(400, 'Das neue Passwort braucht mindestens 8 Zeichen.');
+      const u0 = await store.get(K.user(user.key), { type: 'json' });
+      if (!u0 || !checkPw(current || '', u0.salt, u0.hash)) return fail(403, 'Das bisherige Passwort stimmt nicht.');
+      if (checkPw(next, u0.salt, u0.hash)) return fail(400, 'Bitte ein anderes Passwort als das bisherige wählen.');
+      const { salt, hash } = hashPw(next);
+      const u = await updateJson(store, K.user(user.key), (x) => { if (!x) return undefined; x.salt = salt; x.hash = hash; x.pv = (x.pv || 0) + 1; x.mustChange = false; x.pwChanged = Date.now(); return x; });
+      pvCache.set(user.key, { v: u.pv, t: Date.now() });
+      return json({ ok: true, msg: 'Passwort geändert. Andere Geräte müssen sich neu anmelden.' }, 200, { 'set-cookie': await makeCookie(store, req, u) });
+    }
+    // ---- Admin: Passwort zurücksetzen – vorläufiges Passwort, das beim nächsten Anmelden geändert werden muss ----
+    if (path === '/admin/password' && method === 'POST') {
+      if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+      const body = await readJson(req), key = cleanName(body.username, 20).toLowerCase();
+      if (!key) return fail(400, 'Bitte einen Benutzernamen angeben.');
+      const temp = rnd(10, TEMP_PW_CHARS), { salt, hash } = hashPw(temp);
+      const u = await updateJson(store, K.user(key), (x) => { if (!x) return undefined; x.salt = salt; x.hash = hash; x.pv = (x.pv || 0) + 1; x.mustChange = true; x.pwReset = { at: Date.now(), by: user.key }; return x; });
+      if (!u) return fail(404, `Ein Konto „${body.username}“ gibt es nicht.`);
+      pvCache.set(key, { v: u.pv, t: Date.now() });
+      console.log(`Admin ${user.key} hat das Passwort von ${key} zurückgesetzt.`);
+      return json({ ok: true, name: u.name, temp, self: key === user.key });
+    }
 
     // ---- Hauptwelt: Überblick für die Lobby (legt sie beim ersten Aufruf an) ----
     if (path === '/main' && method === 'GET') {
@@ -361,7 +407,7 @@ export async function handle(req, { store }) {
         const w = r.w || unpackWorld(r.buf);
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
         const now = Date.now();
-        return json({ id, name: meta.name, main: !!meta.main, day: w.day, speed: SM.speedKey(r.md.speed), canSpeed: canControl(meta, user), startAt: waiting(r.md, now) ? r.md.startAt : null,
+        return json({ id, name: meta.name, main: !!meta.main, day: w.day, speed: SM.speedKey(r.md.speed), canSpeed: canControl(meta, user), admin: isAdmin(user), startAt: waiting(r.md, now) ? r.md.startAt : null,
           players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
             return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
               status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null }; }),
