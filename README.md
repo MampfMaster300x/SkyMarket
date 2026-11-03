@@ -183,6 +183,27 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.7: Ereignistexte ohne Hinweis auf die Zielgruppe
+
+- Ereignismeldungen beschreiben nur noch, was passiert – nicht, wen es treffen oder wem es nützen soll. Gestrichen bzw. umformuliert:
+  - Ölschwemme: ohne „Wer nicht abgesichert hat, profitiert sofort.“
+  - Gesellschafterversammlung: ohne „Ihr Eigenkapital hat sich mehr als verdoppelt“ und „je mehr Kapital, desto mehr“.
+  - Einkaufsgemeinschaft Kerosin: nicht mehr „kleiner Airlines“, keine Flottengrenzen in der Meldung.
+  - Regionalförderung: ohne „weil außer Ihnen niemand dorthin fliegt“.
+  - Gewerkschaft: fordert eine Gewinnbeteiligung, ohne die Marge als Grund zu nennen.
+  - Preisaufsicht: nennt nur die Preisgrenze, nicht mehr Abflugsanteil und Preisniveau.
+- Bereits vorhandene Meldungen in laufenden Spielständen werden beim Laden entsprechend umformuliert. Die Konditionen (Sätze, Grenzen) stehen weiterhin in der Karte „Gesellschafter, Aufsicht und Förderung“ unter Finanzen.
+
+## Neu in 0.21.6: Ölschwemme
+
+- Neues Ereignis **Ölschwemme**: Die Förderländer fluten den Markt, Kerosin fällt sofort um rund 25 % und bleibt für die Dauer niedrig (der Referenzpreis sinkt mit), danach erholt sich der Preis langsam. Wer Kerosin abgesichert hat, zahlt weiter seinen festen Preis.
+- In bestehenden Spielständen ist eine Ölschwemme **ab dem 1. Oktober** des laufenden Spieljahres für fünf Monate vorgemerkt – ohne Ankündigung, sie erscheint erst am Tag selbst als Meldung. Neue Spiele bekommen sie nicht fest, dort kann sie wie andere Schocks selten zufällig auftreten (nur wenn Kerosin nicht ohnehin billig ist).
+- Annulliert die Spielleitung eine laufende Ölschwemme: „Die Förderländer drosseln die Produktion …“, Preis und Referenz gehen zurück.
+
+## Neu in 0.21.5: Weltmeldungen nicht mehr doppelt
+
+- Weltereignisse (z. B. „Gericht kippt die CO₂-Abgabe …“) erscheinen in den Meldungen nur noch einmal und nicht mehr zusätzlich mit dem Punkt der eigenen Airline – vorher kam derselbe Text auch aus dem eigenen Logbuch. Gilt auch für alle anderen Weltereignisse, die im Logbuch stehen.
+
 ## Neu in 0.21.4: Annullierte Ereignisse erscheinen als Gegenereignis
 
 - Annulliert die Spielleitung oder der Admin ein Ereignis, steht in Meldungen und Logbuch nicht mehr „annulliert“, sondern ein Ereignis im Spiel, das die Wirkung erklärt – z. B. Ölpreisschock → „Entspannung am Ölmarkt: Die Förderländer drehen die Hähne wieder auf, Kerosin fällt zurück auf das alte Niveau“, Luftraumsperrung → „Waffenruhe vereinbart: Der Luftraum über … ist wieder offen“, Rezession → „Überraschende Erholung in …“, Stilllegung → „Freigabe: Die Behörden heben die Stilllegung … auf“. Noch nicht begonnene Ereignisse: „Doch nicht: …“. Für alle Ereignisarten gibt es passende Texte; die Wirkung wird wie bisher zurückgenommen.

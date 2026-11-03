@@ -630,7 +630,26 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   { const e = w.addEvent({ type: 'fuel_spike', fuelF: 1.5, scope: 'all', end: w.day + 90, text: 'Ölpreisschock: Kerosin +50 %', severity: 'crit' }); w.macro.fuelUsd *= 1.5; w.day++;
     assert.equal(w.cancelEvent(e.id, 'Tim').ok, true, 'Annullieren');
     const m = w.news.at(-1).msg; assert.ok(/Ölmarkt/.test(m) && !/annulliert|Tim/.test(m), 'Annullierung erscheint als Gegenereignis: ' + m);
-    assert.ok(big.events.at(-1).msg === m, 'auch im Logbuch der Spielenden'); }
+    assert.ok(!big.events.some((x) => x.msg === m), 'Weltereignis nicht als eigene Meldung im Logbuch'); }
+  // Ölschwemme ab 1. Oktober (bestehende Spielstände, ohne Ankündigung); Absicherer profitieren nicht
+  { const wg = SMx.newWorld({ seed: 52 }); SMx.addHuman(wg, { id: 'G1', name: 'Glut', code: 'GL', base: 'HAM' }); wg.playerId = 'G1'; for (let i = 0; i < 3; i++) wg.step();
+    const sv = JSON.parse(JSON.stringify(SMx.serialize(wg))); sv.day = 250; delete sv.glutPlanned; const wo = SMx.deserialize(sv);
+    assert.ok(wo.scheduled.some((x) => x.kind === 'oil_glut' && x.day === 273), 'Ölschwemme für den 1. Oktober vorgemerkt');
+    assert.ok(!wo.news.some((n) => /Ölschwemme/.test(n.msg)), 'nicht angekündigt');
+    while (wo.day < 272) wo.step(); const f0 = wo.macro.fuelUsd, r0 = wo.macro.fuelRefUsd; wo.step(); wo.step();
+    assert.ok(wo.macro.fuelUsd < f0 * 0.82 && wo.macro.fuelRefUsd < r0 * 0.8 && wo.news.some((n) => /Ölschwemme/.test(n.msg)), 'Kerosin fällt ab dem 1. Oktober');
+    const gm = wo.news.find((n) => /Ölschwemme/.test(n.msg)).msg; assert.ok(!/abgesichert|profitier/.test(gm), 'Meldung nennt nicht, wen sie treffen soll: ' + gm);
+    const ev = wo.events.find((e) => e.type === 'oil_glut'); while (wo.day < ev.end + 1) wo.step();
+    assert.ok(Math.abs(wo.macro.fuelRefUsd - r0) < 1e-9, 'nach fünf Monaten gilt wieder der alte Referenzpreis');
+    const wn = SMx.newWorld({ seed: 53 }); assert.ok(wn.glutPlanned && !(wn.scheduled || []).length, 'neue Welten bekommen keine vorgemerkte Ölschwemme'); }
+  // 0.21.7: Ereignistexte verraten nicht, wen sie treffen sollen – auch in alten Spielständen
+  { const all = [...big.events.map((e) => e.msg), ...w.news.map((n) => n.msg), ...big.decisions.map((d) => d.text || '')].join('\n');
+    assert.ok(!/kleiner Airlines|niemand dorthin|mehr als verdoppelt|je mehr Kapital|Begehrlichkeiten|Gewinnmarge und|der Abflüge und verlangen/.test(all), 'neue Meldungen neutral');
+    const sv = JSON.parse(JSON.stringify(SMx.serialize(w)));
+    sv.news.push({ day: sv.day, msg: 'Ölschwemme: Die Förderländer fluten den Markt – Kerosin fällt um 25 % und bleibt voraussichtlich 5 Monate niedrig. Wer nicht abgesichert hat, profitiert sofort.', kind: 'good' });
+    sv.news.push({ day: sv.day, msg: 'Preisaufsicht in Hamburg: Sie haben 72 % der Abflüge und verlangen im Schnitt das 1,45-fache des Marktpreises. Für 6 Monate gilt dort höchstens das 1,2-fache.', kind: 'crit' });
+    const wm = SMx.deserialize(sv), t = wm.news.slice(-2).map((n) => n.msg);
+    assert.ok(t[0].endsWith('Monate niedrig.') && t[1] === 'Preisaufsicht in Hamburg: Die Behörde begrenzt Ihre Tarife dort für 6 Monate auf höchstens das 1,2-fache des Marktpreises.', 'alte Meldungen umformuliert: ' + t.join(' | ')); }
   console.log('0.21 ok: Ausschüttung', Math.round(pr.rate * 100), '% bei', pr.mult.toFixed(1) + '-fachem Kapital, eine Belastung zur Zeit, Gegenwehr still auf', att2.length, 'Strecken', ', Kerosin für Kleine', ((1 - fSmall / fNo) * 100).toFixed(1), '% günstiger, Monopolstrecken', mono.length);
   Object.assign(S, keep); }
 console.log('Alle Prüfungen bestanden.');

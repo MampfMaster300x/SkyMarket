@@ -2932,7 +2932,9 @@ function maHtml() {
 function mergedNews() {
   const pl = W.player;
   const a = W.news.map((n) => ({ day: n.day, msg: n.msg, kind: n.kind, who: n.airline, eid: n.eid }));
-  const b = pl.events.map((e) => ({ day: e.day, msg: e.msg, kind: e.kind, who: W.playerId }));
+  // Weltmeldungen stehen oft auch im eigenen Logbuch – dort nicht doppelt und nicht als „eigene“ Meldung zeigen
+  const seen = new Set(W.news.map((n) => n.day + '|' + String(n.msg || '').replace(/^Angekündigt: /, '')));
+  const b = pl.events.filter((e) => !seen.has(e.day + '|' + e.msg)).map((e) => ({ day: e.day, msg: e.msg, kind: e.kind, who: W.playerId }));
   return a.concat(b).sort((x, y) => y.day - x.day);
 }
 function newsRow(n) {

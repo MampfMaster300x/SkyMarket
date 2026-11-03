@@ -2757,7 +2757,7 @@ const SM = (() => {
     health: { p: 0.007 }, pilot_shortage: { p: 0.04 }, fx_shock: { p: 0.05 },
     trade_war: { p: 0.05 }, trade_deal: { p: 0.03 }, airspace: { p: 0.045 }, carbon: { p: 0.03 }, fee_hike: { p: 0.04 }, currency_crisis: { p: 0.04 }, oil_crisis: { p: 0.018 },
     // 0.19: weitere Schocks mit echten Folgen für die Rechnung
-    credit_crunch: { p: 0.018 }, grounding: { p: 0.022 }, supply_chain: { p: 0.02 }, tourism: { p: 0.045 }, labor_crisis: { p: 0.025 }, disaster: { p: 0.015 }, regulation: { p: 0.02 },
+    credit_crunch: { p: 0.018 }, oil_glut: { p: 0.008 }, grounding: { p: 0.022 }, supply_chain: { p: 0.02 }, tourism: { p: 0.045 }, labor_crisis: { p: 0.025 }, disaster: { p: 0.015 }, regulation: { p: 0.02 },
   };
   /** Meldung, wenn ein Ereignis annulliert wird: als Gegenereignis im Spiel formuliert (Ursache und Wirkung). */
   function counterEventText(e, started) {
@@ -2766,6 +2766,7 @@ const SM = (() => {
     const pre = started ? '' : 'Doch nicht: ';
     switch (e.type) {
       case 'fuel_spike': return { sev: 'good', text: started ? 'Entspannung am Ölmarkt: Die Förderländer drehen die Hähne wieder auf, Kerosin fällt zurück auf das alte Niveau.' : 'Doch nicht: Die Förderländer einigen sich, der Ölpreisschock bleibt aus.' };
+      case 'oil_glut': return { sev: 'warn', text: 'Die Förderländer drosseln die Produktion: Das Überangebot am Ölmarkt ist vorbei, Kerosin zieht wieder an.' };
       case 'fuel_drop': return { sev: 'warn', text: 'Ölpreis zieht wieder an: Die Förderländer kürzen die Produktion, der Preisrutsch bei Kerosin ist vorbei.' };
       case 'recession': return e.fxF ? { sev: 'good', text: 'Die Notenbank stützt den Euro mit einem Rettungspaket: Der Kurs erholt sich, Kerosin und Dollarkredite werden wieder günstiger.' } : { sev: 'good', text: `${pre}Überraschende Erholung in ${cn(e.countries)}: Die Konjunktur fängt sich schneller als erwartet, Geschäftsreisen ziehen wieder an.` };
       case 'boom': return { sev: 'warn', text: `Der Aufschwung in ${cn(e.countries)} verpufft: Die Nachfrage geht auf das alte Niveau zurück.` };
@@ -3217,8 +3218,8 @@ const SM = (() => {
         if (e.type === 'fee_hike') for (const a of e.airports) M.feeMult[a] = (M.feeMult[a] || 1) / e.fee;
       }
       if (started) {
-        if (e.fuelF) M.fuelUsd /= Math.pow(e.fuelF, Math.pow(0.88, months));   // der Preis hat sich schon teilweise erholt
-        if (e.refF) M.fuelRefUsd /= e.refF;
+        if (e.fuelF && (e.type !== 'oil_glut' || e.applied)) M.fuelUsd /= Math.pow(e.fuelF, Math.pow(0.88, months));   // der Preis hat sich schon teilweise erholt
+        if (e.refF && !e.refDone && (e.type !== 'oil_glut' || e.applied)) M.fuelRefUsd /= e.refF;
         if (e.rateD) M.rate = clamp(M.rate - e.rateD, 0, 0.08);
         if (e.fxF) M.eurusd /= e.fxF;
         if (e.type === 'pilot_shortage' || e.type === 'labor_crisis') M.laborTight = Math.min(M.laborTight, Math.max(1, e.laborPrev ?? 1));
@@ -3235,8 +3236,7 @@ const SM = (() => {
       // Im Spiel erscheint die Annullierung als eigenes Ereignis, das die Wirkung erklärt – nicht als Eingriff der Spielleitung
       const ct = counterEventText(e, started);
       this.pushNews(day, ct.text, ct.sev, e.airline || null);
-      if (e.airline) { const A = this.airlines[e.airline]; if (A) A.log(day, ct.text, ct.sev === 'good' ? 'good' : 'info'); }
-      else for (const h of this.humans) h.log(day, ct.text, ct.sev === 'good' ? 'good' : 'info');
+      if (e.airline) { const A = this.airlines[e.airline]; if (A) A.log(day, ct.text, ct.sev === 'good' ? 'good' : 'info'); }   // Weltereignisse nur als Meldung, nicht im Logbuch jeder Airline
       return { ok: true };
     }
     generateMonthlyEvents() {
@@ -3330,6 +3330,7 @@ const SM = (() => {
         M.eurusd *= f;
         this.addEvent({ type: 'fx_shock', fxF: f, scope: 'all', end: day + 1, text: `Der Euro ${f < 1 ? 'fällt' : 'steigt'} deutlich: 1 EUR = ${M.eurusd.toFixed(3).replace('.', ',')} USD. Leasingraten und Kerosin werden in Dollar bezahlt.`, severity: f < 1 ? 'warn' : 'good' });
       }
+      if (!fuelHigh && M.fuelUsd > 0.85 * M.fuelRefUsd && !this.events.some((e) => e.type === 'oil_glut' && e.end > day) && roll('oil_glut')) this.oilGlut(r.int(4, 7), r.range(0.72, 0.85));
       this.newShocks(r, M, day, roll);
     }
     /** 0.19: Kreditkrise, Stilllegungen, Lieferketten, Tourismus, Arbeitsmarkt, Naturkatastrophen, Regulierung. */
@@ -3377,7 +3378,21 @@ const SM = (() => {
         else { const cs = [...new Set([r.pick(COUNTRIES), r.pick(COUNTRIES), r.pick(COUNTRIES)])], delta = r.int(5, 18); this.addEvent({ type: 'tax_change', countries: cs, end: day + 91, taxDelta: delta, text: `Klimaabgabe auf Flugtickets in ${cs.map((c) => COUNTRY_NAMES[c]).join(', ')}: ab 90 Tagen dauerhaft +${delta} EUR je Abflug.`, severity: 'warn' }, 90); }
       }
     }
+    /** Ölschwemme: Förderländer fluten den Markt – Kerosin fällt und bleibt für die Dauer niedrig, danach erholt sich der Preis langsam. */
+    oilGlut(months = 5, f = 0.75) {
+      return this.addEvent({ type: 'oil_glut', fuelF: f, refF: f, scope: 'all', start: this.day, end: this.day + Math.round(months * 30.4), text: `Ölschwemme: Die Förderländer liefern sich einen Preiskampf und fluten den Markt – Kerosin fällt um ${Math.round((1 - f) * 100)} % und bleibt voraussichtlich ${months} Monate niedrig.`, severity: 'good' });
+    }
     dailyEvents() {
+      // im Stillen vorgemerkte Ereignisse (nicht angekündigt)
+      if (this.scheduled && this.scheduled.length) {
+        const due = this.scheduled.filter((x) => x.day <= this.day); this.scheduled = this.scheduled.filter((x) => x.day > this.day);
+        for (const x of due) if (x.kind === 'oil_glut') this.oilGlut(x.months || 5, x.f || 0.75);
+      }
+      for (const e of this.events) {
+        if (e.type !== 'oil_glut' || e.cancelled) continue;
+        if (!e.glutOn && e.start <= this.day) { e.glutOn = true; this.macro.fuelUsd *= e.fuelF; this.macro.fuelRefUsd *= e.refF; e.applied = true; }
+        if (e.glutOn && !e.refDone && e.end <= this.day) { e.refDone = true; this.macro.fuelRefUsd /= e.refF; }
+      }
       const r = this.rng, m = monthOf(this.day), winter = [9, 10, 11, 0, 1, 2].includes(m);
       if (r.random() < (winter ? 0.014 : 0.006) * this.eventMult) {
         const center = r.pick(AP_CODES);
@@ -5887,6 +5902,7 @@ const SM = (() => {
     w.macro.cycle = { phase: w.rng.range(0, 6.283), period: w.rng.int(40, 70), amp: diff.cycle };
     for (const [id, setup] of Object.entries(AI_SETUP)) bootstrapAi(w, id, setup, RIVALS[w.rivals].sigma);
     w.initSlots();
+    w.glutPlanned = true;
     anchorAis(w);
     w.refreshOffers();
     setFuelX(w);
@@ -6761,6 +6777,24 @@ const SM = (() => {
   /** Aktiver airline-spezifischer Schock einer Art (oder null). */
   const alShock = (al, k, day, f = null) => (al.shocks || []).find((x) => x.k === k && x.from <= day && x.until > day && (!f || f(x))) || null;
   const themeOn = () => true;   // Kompatibilität (0.21.1/2)
+  /** 0.21.7: alte Meldungen in Spielständen von Hinweisen befreien, wen ein Ereignis treffen soll. */
+  function neutralText(t) {
+    if (!t) return t;
+    return String(t)
+      .replace(/ Wer nicht abgesichert hat, profitiert sofort\./, '')
+      .replace(/Gesellschafterversammlung: Ihr Eigenkapital hat sich mehr als verdoppelt\. Die Gesellschafter wollen mitverdienen/, 'Gesellschafterversammlung: Die Gesellschafter wollen am Erfolg mitverdienen')
+      .replace(/ \(je mehr Kapital, desto mehr\)\./, '.')
+      .replace(/Einladung in die Einkaufsgemeinschaft kleiner Airlines: Kerosin wird für ein Jahr günstiger \(bis \d+ Flugzeuge (\d+) %, ab \d+ entfällt der Vorteil\)\./, 'Einladung in eine Einkaufsgemeinschaft für Kerosin: Für ein Jahr tanken Sie bis zu $1 % günstiger.')
+      .replace(/, weil außer Ihnen niemand dorthin fliegt\./, '.')
+      .replace(/^Die Gewerkschaft sieht \d+ % Gewinnmarge und fordert/, 'Die Gewerkschaft fordert')
+      .replace(/^Gewinnbeteiligung gefordert: \d+ % Marge wecken Begehrlichkeiten\./, 'Die Gewerkschaft fordert eine Gewinnbeteiligung.')
+      .replace(/^(Preisaufsicht in [^:]+): Sie haben \d+ % der Abflüge und verlangen im Schnitt das [\d,]+-fache des Marktpreises\. Für (\d+) Monate gilt dort höchstens das ([\d,]+)-fache\./, '$1: Die Behörde begrenzt Ihre Tarife dort für $2 Monate auf höchstens das $3-fache des Marktpreises.');
+  }
+  function neutralTexts(w) {
+    for (const n of w.news || []) n.msg = neutralText(n.msg);
+    for (const e of w.events || []) e.text = neutralText(e.text);
+    for (const al of w.list) { for (const ev of al.events || []) ev.msg = neutralText(ev.msg); for (const d of al.decisions || []) d.text = neutralText(d.text); }
+  }
   function addShock(w, al, x, text, sev = 'warn', news = null) {
     al.shocks = (al.shocks || []).filter((y) => y.until > w.day - 400); al.shocks.push(x);
     if (!text) return;   // stille Gegenwehr der Konkurrenz: keine Meldung
@@ -6795,7 +6829,7 @@ const SM = (() => {
     if (!al.payoutFrom) {   // Gesellschafterversammlung: kommt irgendwann, wenn sich das Kapital verdoppelt hat – erst ankündigen, dann ausschütten
       if (!rate || w.rng.random() >= P.AL_SHOCKS.payout.p) return;
       al.payoutFrom = w.day + P.AL_SHOCKS.payout.lead;
-      addShock(w, al, { k: 'payout', from: w.day, until: 1e9 }, `Gesellschafterversammlung: Ihr Eigenkapital hat sich mehr als verdoppelt. Die Gesellschafter wollen mitverdienen – ab ${dayDE(al.payoutFrom)} werden monatlich ${Math.round(rate * 100)} % des Gewinns ausgeschüttet (je mehr Kapital, desto mehr).`, 'warn', `${al.name}: Gesellschafter fordern Ausschüttungen`);
+      addShock(w, al, { k: 'payout', from: w.day, until: 1e9 }, `Gesellschafterversammlung: Die Gesellschafter wollen am Erfolg mitverdienen – ab ${dayDE(al.payoutFrom)} werden monatlich ${Math.round(rate * 100)} % des Gewinns ausgeschüttet.`, 'warn', `${al.name}: Gesellschafter fordern Ausschüttungen`);
       return;
     }
     if (w.day < al.payoutFrom || !rate) return;
@@ -6834,10 +6868,10 @@ const SM = (() => {
       else if (ps) delete al.profitShare;
       // Hilfe für Kleine (kann neben Belastungen laufen)
       if (al.fleet.length <= P.SMALL_HELP.fuelZero && day >= S.fuelpool.minDay && !alShock(al, 'fuelpool', day) && r.random() < S.fuelpool.p)
-        addShock(w, al, { k: 'fuelpool', from: day, until: day + S.fuelpool.days }, `Einladung in die Einkaufsgemeinschaft kleiner Airlines: Kerosin wird für ein Jahr günstiger (bis ${P.SMALL_HELP.fuelFull} Flugzeuge ${Math.round(P.SMALL_HELP.fuel * 100)} %, ab ${P.SMALL_HELP.fuelZero} entfällt der Vorteil).`, 'good');
+        addShock(w, al, { k: 'fuelpool', from: day, until: day + S.fuelpool.days }, `Einladung in eine Einkaufsgemeinschaft für Kerosin: Für ein Jahr tanken Sie bis zu ${Math.round(P.SMALL_HELP.fuel * 100)} % günstiger.`, 'good');
       if (al.fleet.length < P.SMALL_HELP.subZero && day >= S.subsidy.minDay && r.random() < S.subsidy.p) {
         const cands = [...new Set(al.activeRoutes().flatMap((q) => [q.base, q.dest]))].filter((c) => (ap(c).pax || 0) <= P.SMALL_HELP.subPax && !alShock(al, 'subsidy', day, (x) => x.apt === c) && !w.list.some((x) => x !== al && x.status !== 'insolvent' && x.activeRoutes().some((q) => q.base === c || q.dest === c)));
-        if (cands.length) { const c = r.pick(cands); addShock(w, al, { k: 'subsidy', apt: c, from: day, until: day + S.subsidy.days }, `Förderzusage: Die Region um ${ap(c).name} fördert ein Jahr lang jeden Ihrer Abflüge von dort (bis ${Math.round(P.SMALL_HELP.subsidy)} € je Abflug), weil außer Ihnen niemand dorthin fliegt.`, 'good'); }
+        if (cands.length) { const c = r.pick(cands); addShock(w, al, { k: 'subsidy', apt: c, from: day, until: day + S.subsidy.days }, `Förderzusage: Die Region um ${ap(c).name} fördert ein Jahr lang jeden Ihrer Abflüge von dort (bis ${Math.round(P.SMALL_HELP.subsidy)} € je Abflug).`, 'good'); }
       }
       // Belastungen: nur eine gleichzeitig, danach Atempause
       const pr = al.press || (al.press = { next: 0 });
@@ -6855,8 +6889,8 @@ const SM = (() => {
       if (kind === 'union') {
         pr.lastUnion = day;
         const id = 'U' + (++w.eventCounter);
-        al.decisions.push({ id, type: 'profit', day, deadline: day + 7, margin: Math.round(margin * 100) / 100, text: `Die Gewerkschaft sieht ${Math.round(margin * 100)} % Gewinnmarge und fordert eine Gewinnbeteiligung: ${Math.round(R.unionShare * 100)} % vom Monatsgewinn für ${R.unionMonths} Monate. Sonst droht ein Streik.` });
-        al.log(day, `Gewinnbeteiligung gefordert: ${Math.round(margin * 100)} % Marge wecken Begehrlichkeiten. Entscheidung im Cockpit nötig.`, 'warn');
+        al.decisions.push({ id, type: 'profit', day, deadline: day + 7, margin: Math.round(margin * 100) / 100, text: `Die Gewerkschaft fordert eine Gewinnbeteiligung: ${Math.round(R.unionShare * 100)} % vom Monatsgewinn für ${R.unionMonths} Monate. Sonst droht ein Streik.` });
+        al.log(day, `Die Gewerkschaft fordert eine Gewinnbeteiligung. Entscheidung im Cockpit nötig.`, 'warn');
       } else if (kind === 'attack') {
         const top = al.activeRoutes().filter((q) => q.opened_day <= day).sort((a, b) => routeDb(b, 30, al) - routeDb(a, 30, al)).slice(0, R.attackRoutes);
         if (!top.length) continue;
@@ -6873,7 +6907,7 @@ const SM = (() => {
       } else if (kind === 'pricecap') {
         const rs = al.activeRoutes().filter((q) => q.base === dom.apt || q.dest === dom.apt);
         for (const q of rs) w.fareCaps[pairKey(q.base, q.dest)] = { al: al.id, x: S.pricecap.cap, until: day + S.pricecap.days };
-        addShock(w, al, { k: 'pricecap', apt: dom.apt, from: day, until: day + S.pricecap.days }, `Preisaufsicht in ${ap(dom.apt).name}: Sie haben ${Math.round(dom.share * 100)} % der Abflüge und verlangen im Schnitt das ${String(Math.round(dom.ratio * 100) / 100).replace('.', ',')}-fache des Marktpreises. Für ${Math.round(S.pricecap.days / 30)} Monate gilt dort höchstens das ${String(S.pricecap.cap).replace('.', ',')}-fache.`, 'crit', `Preisaufsicht: ${al.name} muss die Preise in ${ap(dom.apt).name} begrenzen`);
+        addShock(w, al, { k: 'pricecap', apt: dom.apt, from: day, until: day + S.pricecap.days }, `Preisaufsicht in ${ap(dom.apt).name}: Die Behörde begrenzt Ihre Tarife dort für ${Math.round(S.pricecap.days / 30)} Monate auf höchstens das ${String(S.pricecap.cap).replace('.', ',')}-fache des Marktpreises.`, 'crit', `Preisaufsicht: ${al.name} muss die Preise in ${ap(dom.apt).name} begrenzen`);
       }
       pr.next = day + R.cool;
     }
@@ -7548,7 +7582,7 @@ const SM = (() => {
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      aptObs: w.aptObs || {}, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      aptObs: w.aptObs || {}, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
@@ -7575,7 +7609,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      aptObs: s.aptObs || {}, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -7627,6 +7661,8 @@ const SM = (() => {
       }
       w.slotV = 3;
     }
+    // 0.21.6: Ölschwemme ab dem 1. Oktober des laufenden Jahres (ohne Ankündigung)
+    if (!w.glutPlanned) { w.glutPlanned = true; const oct1 = 365 * Math.floor(w.day / 365) + MONTH_STARTS[9]; if (w.day < oct1 + 30) (w.scheduled = w.scheduled || []).push({ day: Math.max(oct1, w.day + 1), kind: 'oil_glut', months: 5, f: 0.75 }); }
     // 0.21.1: Druck und Förderung kommen als Branchenthemen mit Vorlauf statt sofort per Update
     if (!w.themes) { w.themes = {}; w.attacks = {}; for (const al of w.list) if (al.isPlayer && al.divOut) al.payoutFrom = w.day; }
     // 0.20: Handelsbilanz für die Wirtschaftsprüfung, Admin-Entfernungen nicht mehr öffentlich
@@ -7636,6 +7672,8 @@ const SM = (() => {
       if (n.msg && /^[^:]{1,60} annulliert: /.test(n.msg)) n.msg = 'Entwarnung: ' + n.msg.replace(/^[^:]{1,60} annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
     }
     for (const al of w.list) if (al.isPlayer) for (const ev of al.events || []) if (ev.msg && /hat ein Ereignis annulliert: /.test(ev.msg)) ev.msg = 'Entwarnung: ' + ev.msg.replace(/^.*hat ein Ereignis annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
+    // 0.21.7: Ereignistexte nennen nicht mehr, wen sie treffen sollen
+    neutralTexts(w);
     // 0.19: Ankeraktionäre bei großen KI-Airlines, Konzern-Ausschüttung höchstens 50 %
     if (!w.list.some((a) => a.archetype && a.cap && a.cap.anchor)) anchorAis(w);
     for (const T of w.list) if (T.cap && T.archetype && T.cap.div > 0.5) T.cap.div = 0.5;
@@ -10594,7 +10632,9 @@ function maHtml() {
 function mergedNews() {
   const pl = W.player;
   const a = W.news.map((n) => ({ day: n.day, msg: n.msg, kind: n.kind, who: n.airline, eid: n.eid }));
-  const b = pl.events.map((e) => ({ day: e.day, msg: e.msg, kind: e.kind, who: W.playerId }));
+  // Weltmeldungen stehen oft auch im eigenen Logbuch – dort nicht doppelt und nicht als „eigene“ Meldung zeigen
+  const seen = new Set(W.news.map((n) => n.day + '|' + String(n.msg || '').replace(/^Angekündigt: /, '')));
+  const b = pl.events.filter((e) => !seen.has(e.day + '|' + e.msg)).map((e) => ({ day: e.day, msg: e.msg, kind: e.kind, who: W.playerId }));
   return a.concat(b).sort((x, y) => y.day - x.day);
 }
 function newsRow(n) {
