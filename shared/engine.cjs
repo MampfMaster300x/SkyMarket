@@ -1904,13 +1904,47 @@ const SM = (() => {
       }
       return m;
     }
+    /** Betriebslage am Flughafen: cancel (gesamt), soft (Wetter, Streik – Operations-Know-how mildert), hard (Sperrung: Luftraum zu, nichts fliegt). */
     opsAt(apt, day = this.day) {
-      let cancel = 0, delay = 0;
+      let cancel = 0, delay = 0, soft = 0, hard = null, softE = null;
       for (const e of this.events) {
-        if (e.start > day || e.end <= day || !e.ops) continue;
-        if (this.eventAffects(e, apt)) { cancel = 1 - (1 - cancel) * (1 - (e.ops.cancel || 0)); delay += e.ops.delay || 0; }
+        if (e.start > day || e.end <= day || !e.ops || e.cancelled) continue;
+        if (!this.eventAffects(e, apt)) continue;
+        const c = e.ops.cancel || 0;
+        cancel = 1 - (1 - cancel) * (1 - c); delay += e.ops.delay || 0;
+        if (c >= 1) { if (!hard) hard = e; } else if (c > 0) { soft = 1 - (1 - soft) * (1 - c); if (!softE || c > (softE.ops.cancel || 0)) softE = e; }
       }
-      return { cancel, delay };
+      return { cancel, delay, soft, hard, softE };
+    }
+    /**
+     * Ausfallrisiko einer Strecke an einem Tag (beide Richtungen eines Umlaufs gemeinsam). Gewürfelt wird je Umlauf mit
+     * einem festen Zufallswert aus Welt, Tag, Strecke und Umlauf – so zeigen Karte, Abflugtafel und Netz schon morgens,
+     * welche Flüge ausfallen, und die Tagessimulation streicht genau diese.
+     */
+    legRisk(al, r, day = this.day) {
+      const ty = P.AIRCRAFT_TYPES[r.type_id], oO = this.opsAt(r.base, day), oD = this.opsAt(r.dest, day);
+      const lbl = (e, apt) => `${String(e.text || '').replace(/^Angekündigt: /, '').split(':')[0].trim()} (${apt})`;
+      const hard = oO.hard ? lbl(oO.hard, r.base) : oD.hard ? lbl(oD.hard, r.dest) : null;
+      const weather = (1 - (1 - oO.soft) * (1 - oD.soft)) * (1 - lv3([0, 0.2, 0.35, 0.5], al.skill('ops')));
+      const sE = oO.softE && (!oD.softE || oO.softE.ops.cancel >= oD.softE.ops.cancel) ? [oO.softE, r.base] : oD.softE ? [oD.softE, r.dest] : null;
+      const strike = this.events.some((e) => e.type === 'own_strike' && e.airline === al.id && e.start <= day && e.end > day && !e.averted) ? 0.7 : 0;
+      let staff = 0; if (al.isPlayer && al.staff && al.staff.cov) { const c = al.staff.cov.cancel; staff = 1 - (1 - (c[ty.group] || 0)) * (1 - (c.cab || 0)); }
+      let fail = (1 - ty.dispatch_rel) * (1 + P.AGE.fail * this.ageOf(al, r)) * (1 - lv3([0, 0.2, 0.35, 0.5], al.skill('tech')));
+      if (al.isPlayer && al.staff && al.staff.cov && al.staff.cov.tech < 1) fail *= 1 + 2 * (1 - al.staff.cov.tech);
+      const it = this.events.some((e) => e.type === 'it_outage' && e.airline === al.id && e.start <= day && e.end > day) ? 0.1 : 0;
+      return { hard, weather, weatherWhy: sE ? lbl(sE[0], sE[1]) : null, strike, staff, fail, it, delay: oO.delay + oD.delay };
+    }
+    /** Fällt Umlauf i dieser Strecke an diesem Tag aus? → { c, why, kind } */
+    legCancel(al, r, i, day = this.day, risk = null) {
+      const k = risk || this.legRisk(al, r, day);
+      if (k.hard) return { c: true, why: k.hard, kind: 'closed' };
+      const u = (x) => hashStr(`${this.seed}|${day}|${r.id}|${i}|${x}`) / 4294967296;
+      if (k.weather > 0 && u('w') < k.weather) return { c: true, why: k.weatherWhy || 'Wetter', kind: 'weather' };
+      if (k.strike > 0 && u('s') < k.strike) return { c: true, why: 'Streik der Crews', kind: 'strike' };
+      if (k.staff > 0 && u('p') < k.staff) return { c: true, why: 'Crew fehlt', kind: 'staff' };
+      if (k.fail > 0 && u('t') < k.fail) return { c: true, why: 'technischer Defekt', kind: 'tech' };
+      if (k.it > 0 && u('i') < k.it) return { c: true, why: 'IT-Ausfall', kind: 'it' };
+      return { c: false, why: null, kind: null };
     }
     taxAt(apt, dest = null) { const long = dest && gcDistanceKm(apt, dest) > P.LONGHAUL_TAX_KM; return Math.max(0, (long ? COUNTRY_DATA[ap(apt).country].taxLong : ap(apt).tax) + this.macro.taxDelta[ap(apt).country]); }
     /** Verborgener Markttrend je Strecke: fester Grundwert plus langsame Schwankung, aus dem Weltseed abgeleitet (kein Speicherbedarf). */
@@ -2477,6 +2511,8 @@ const SM = (() => {
         if (r.wk > 0 && r.wk < 7) { cnt[r.id] = x > 0 ? r.wk / 7 : 0; continue; }   // seltener als täglich: im Mittel wk/7 Flüge am Tag
         cnt[r.id] = whole + (frac > 1e-6 && Math.floor((d + 1) * frac + 1e-9) > Math.floor(d * frac + 1e-9) ? 1 : 0);
       }
+      // Tagesaktuell: Umläufe mit Flugzeug heute (die Tagessimulation rechnet in buildMarkets genauso) – so sehen Netz und Karte Charter, Werft und Auslieferungen sofort
+      for (const r of al.activeRoutes()) r.flyingToday = r.opened_day > d ? 0 : (cnt[r.id] || 0);
       return cnt;
     }
     offerExtra(al, o, d) { return { brand: al.brandEff(this.day), extraU: al.extraU(o, d), bizPrem: al.bizPrem(), tax: this.taxAt(o, d), human: !!al.isPlayer, mat: al.maturity(this.day) }; }
@@ -2694,15 +2730,7 @@ const SM = (() => {
       const L = al.ledger, ty = P.AIRCRAFT_TYPES[r.type_id], bp = P.BUFFER_POLICY[r.buffer], cpi = this.macro.cpi;
       const f = r.flyingToday, seats = r.seats();
       const paxTotal = l.pax + t.pax, perFlight = paxTotal / f;
-      const opsO = this.opsAt(o), opsD = this.opsAt(d), opsLv = al.skill('ops');
-      const weatherCancel = (1 - (1 - opsO.cancel) * (1 - opsD.cancel)) * (1 - lv3([0, 0.2, 0.35, 0.5], opsLv));
-      const strike = this.events.find((e) => e.type === 'own_strike' && e.airline === al.id && e.start <= this.day && e.end > this.day && !e.averted);
-      const strikeCancel = strike ? 0.7 : 0;
-      let staffCancel = 0;
-      if (al.isPlayer && al.staff.cov) { const c = al.staff.cov.cancel; staffCancel = 1 - (1 - c[ty.group]) * (1 - c.cab); }
-      let failRate = (1 - ty.dispatch_rel) * (1 + P.AGE.fail * this.ageOf(al, r)) * (1 - lv3([0, 0.2, 0.35, 0.5], al.skill('tech')));
-      if (al.isPlayer && al.staff.cov && al.staff.cov.tech < 1) failRate *= 1 + 2 * (1 - al.staff.cov.tech);
-      const itOut = this.events.some((e) => e.type === 'it_outage' && e.airline === al.id && e.start <= this.day && e.end > this.day);
+      const opsLv = al.skill('ops'), risk = this.legRisk(al, r), itOut = risk.it > 0;
       const shareLocal = paxTotal > 0 ? l.pax / paxTotal : 1;
       let flown = 0, flownLocal = 0, flownTr = 0, cancelledHere = 0;
       // Bruchteile (Flüge seltener als täglich): ein Flug mit Gewicht wF steht im Mittel für wF Flüge am Tag
@@ -2710,18 +2738,19 @@ const SM = (() => {
         const wF = Math.min(1, f - i);
         st.flights += wF; st.seats += seats * wF;
         const rr = this.rng;
-        const cancelled = rr.random() < failRate || rr.random() < weatherCancel || rr.random() < strikeCancel || rr.random() < staffCancel || (itOut && rr.random() < 0.1);
-        if (cancelled) {
+        const lc = this.legCancel(al, r, i, this.day, risk);
+        if (lc.c) {
           st.cancelled += wF; cancelledHere += wF;
-          const care = perFlight * wF * (P.CANCEL_CARE_COST_PAX * cpi + P.EU261_CLAIM_RATE * eu261(gcDistanceKm(o, d)) * (weatherCancel > 0.05 ? 0.3 : 1));
+          if (lc.kind === 'closed' || lc.kind === 'weather') st.cxExt = (st.cxExt || 0) + wF;
+          const care = perFlight * wF * (P.CANCEL_CARE_COST_PAX * cpi + P.EU261_CLAIM_RATE * eu261(gcDistanceKm(o, d)) * (lc.kind === 'closed' || lc.kind === 'weather' ? 0.3 : 1));
           L.post('disruption', -care); st.cost += care; al.pushOtp(0);
           continue;
         }
         const yf = ty.yieldF || 1;
         const c = this.costsFor(al, r, o, d, perFlight, perFlight * shareLocal * l.fare * yf);
-        const otpBase = bp.otp + lv3([0, 0.03, 0.05, 0.08], opsLv) - (opsO.delay + opsD.delay) / 120 - (itOut ? 0.4 : 0);
+        const otpBase = bp.otp + lv3([0, 0.03, 0.05, 0.08], opsLv) - risk.delay / 120 - (itOut ? 0.4 : 0);
         const onTime = rr.random() < clamp(otpBase, 0.05, 0.98);
-        const meanLate = Math.max(bp.mean_delay_min / (1 - bp.otp) - 15, 1) * (1 - lv3([0, 0.15, 0.25, 0.35], opsLv)) + opsO.delay + opsD.delay;
+        const meanLate = Math.max(bp.mean_delay_min / (1 - bp.otp) - 15, 1) * (1 - lv3([0, 0.15, 0.25, 0.35], opsLv)) + risk.delay;
         const delay = onTime ? 0 : 15 + rr.expo(1 / meanLate);
         al.pushOtp(onTime ? 1 : 0);
         if (!onTime) st.late++;
@@ -5621,7 +5650,7 @@ const SM = (() => {
       const ms = al.ledger.months.slice(-3), rev = ms.reduce((a, m) => a + monthRev(m), 0), res = ms.reduce((a, m) => a + monthRes(m), 0), margin = rev > 0 ? res / rev : 0;
       const opts = [];
       if (ms.length >= 3 && margin >= R.unionMargin && !(pr.lastUnion > day - 365)) opts.push(['union', S.union.p]);
-      if (attackEligible(al)) opts.push(['attack', S.attack.p]);
+      if (attackEligible(al) && al.activeRoutes().some((q) => q.opened_day <= day)) opts.push(['attack', S.attack.p]);   // Preisangriff braucht Strecken, die man angreifen kann
       const mono = monopolyRoutes(w, al); if (mono.length) opts.push(['entrant', S.entrant.p]);
       const dom = dominatedAirport(w, al); if (dom) opts.push(['pricecap', S.pricecap.p]);
       const hit = opts.filter(([, p]) => r.random() < p); if (!hit.length) continue;

@@ -605,7 +605,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   for (let i = 0; i < 3; i++) big.ledger.months.push({ label: { y: 0, m: i }, acc: { rev_ticket: 5e9, fuel: -3e9 } });   // drei Monate mit 40 % Marge
   w.day = 100; const c00 = big.ledger.cash; SMx.dominanceMonth(w);
   assert.ok(big.payoutFrom > w.day && big.ledger.cash === c00, 'Gesellschafter kündigen die Ausschüttung an');
-  const negs = big.decisions.filter((x) => x.type === 'profit' && !x.resolved).length + Object.values(w.attacks).filter((a) => a.al === 'B1').length;
+  const negs = big.decisions.filter((x) => x.type === 'profit' && !x.resolved).length + (Object.values(w.attacks).some((a) => a.al === 'B1') ? 1 : 0) + (big.shocks || []).filter((x) => (x.k === 'entrant' || x.k === 'pricecap') && x.from === w.day).length;
   assert.equal(negs, 1, 'genau eine Belastung auf einmal');
   assert.ok(SMx.alShock(small, 'fuelpool', w.day), 'kleine Airline bekommt die Einkaufsgemeinschaft');
   const fSmall = w.fuelPriceFor(small, 'HAJ'); small.shocks = []; const fNo = w.fuelPriceFor(small, 'HAJ'); assert.ok(fSmall < fNo * 0.97, 'Kerosin günstiger');
@@ -636,7 +636,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     const sv = JSON.parse(JSON.stringify(SMx.serialize(wg))); sv.day = 250; delete sv.glutPlanned; const wo = SMx.deserialize(sv);
     assert.ok(wo.scheduled.some((x) => x.kind === 'oil_glut' && x.day === 273), 'Ölschwemme für den 1. Oktober vorgemerkt');
     assert.ok(!wo.news.some((n) => /Ölschwemme/.test(n.msg)), 'nicht angekündigt');
-    while (wo.day < 272) wo.step(); const f0 = wo.macro.fuelUsd, r0 = wo.macro.fuelRefUsd; wo.step(); wo.step();
+    while (wo.day < 273) wo.step(); const f0 = wo.macro.fuelUsd, r0 = wo.macro.fuelRefUsd; wo.step();
     assert.ok(wo.macro.fuelUsd < f0 * 0.82 && wo.macro.fuelRefUsd < r0 * 0.8 && wo.news.some((n) => /Ölschwemme/.test(n.msg)), 'Kerosin fällt ab dem 1. Oktober');
     const gm = wo.news.find((n) => /Ölschwemme/.test(n.msg)).msg; assert.ok(!/abgesichert|profitier/.test(gm), 'Meldung nennt nicht, wen sie treffen soll: ' + gm);
     const ev = wo.events.find((e) => e.type === 'oil_glut'); while (wo.day < ev.end + 1) wo.step();
@@ -668,4 +668,29 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     assert.equal(pl.heldAt('LHR', w.day), 1, 'verpasste Oktober-Vergabe wird nachgeholt'); assert.equal(w.slotRoundDay, 273); }
   { const { w, pl } = mk(310); assert.equal(w.slotRoundDay, 273, 'alter Stand im November: schon vergeben'); w.step(); assert.equal(pl.heldAt('LHR', w.day), 0, 'keine doppelte Vergabe'); }
   console.log('0.21.9 ok: Winter-Slotvergabe am 1. Oktober, Zusage bei Überbuchung, Nachholung im Oktober'); }
+// 0.21.10: Ausfälle stehen morgens fest (Karte, Abflugtafel, Netz = Tagessimulation), Sperrungen gelten trotz Fachkraft, verchartert fliegt nicht
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const w = SMx.newGame({ seed: 4, base: 'HAM' }), pl = w.player, A = (a) => SMx.applyAction(w, pl.id, a);
+  pl.cash = Math.max(pl.cash, 3e8); pl.staff.agency = true;
+  A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); for (let i = 0; i < 20; i++) w.step();
+  const ro = A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 2 }); assert.equal(ro.ok, true, 'Strecke: ' + ro.msg);
+  const r = pl.routes.find((x) => x.base === 'HAM' && x.dest === 'PMI' && !x.closed); while (w.day < r.opened_day + 2) w.step();
+  // Sturm mit 50 %: Vorschau morgens = Ergebnis abends
+  let same = 0, tot = 0, some = 0;
+  const ev = w.addEvent({ type: 'storm', airports: ['PMI'], end: w.day + 12, ops: { cancel: 0.5, delay: 30 }, text: 'Sturm über Palma: Ausfälle', severity: 'warn' });
+  for (let d = 0; d < 10; d++) { w.operableFreq(pl); const f = r.flyingToday, rk = w.legRisk(pl, r); let pre = 0; for (let i = 0; i < Math.ceil(f - 1e-9); i++) if (w.legCancel(pl, r, i, w.day, rk).c) pre += Math.min(1, f - i);
+    w.step(); const h = r.hist.at(-1); tot++; if (Math.abs(h.cancelled - 2 * pre) < 0.11) same++; if (h.cancelled > 0) some++; }
+  assert.equal(same, tot, `Vorschau und Tagessimulation streichen dieselben Umläufe (${same}/${tot})`); assert.ok(some > 0, 'Sturm streicht Flüge');
+  w.events = w.events.filter((e) => e !== ev);
+  // Vulkanasche: Luftraum gesperrt – auch mit Operations-Stufe 3 fliegt nichts
+  pl.skill = (k) => (k === 'ops' ? 3 : 0);
+  w.addEvent({ type: 'volcano', airports: ['PMI'], end: w.day + 3, ops: { cancel: 1.0, delay: 0 }, text: 'Vulkanasche: Luftraum über Palma gesperrt.', severity: 'crit' });
+  w.operableFreq(pl); const lc = w.legCancel(pl, r, 0); assert.ok(lc.c && /Vulkanasche \(PMI\)/.test(lc.why), 'Grund: ' + lc.why);
+  w.step(); { const h = r.hist.at(-1); assert.ok(h.flights > 0 && h.cancelled === h.flights && h.pax === 0, `Sperrung: alle Flüge annulliert (${h.cancelled}/${h.flights})`); }
+  delete pl.skill; for (let i = 0; i < 4; i++) w.step();
+  // Verchartert: das Flugzeug fliegt die Strecke nicht, die Strecke wird nicht verkauft
+  const acs = pl.fleet.filter((a) => a.type_id === 'A20N'); for (const ac of acs) { const o = { id: 'TX' + ac.id, client: 'Test', type: 'A20N', start: w.day, end: w.day + 10, rate: 20000, expires: w.day + 5 }; w.acmiOffers.push(o); assert.equal(A({ type: 'acmi', offerId: o.id, acId: ac.id }).ok, true, 'ACMI'); }
+  w.operableFreq(pl); assert.equal(r.flyingToday, 0, 'verchartert: heute kein Umlauf'); const n0 = r.hist.length, rev0 = pl.ledger.today ? 0 : 0;
+  w.step(); assert.ok(r.hist.length === n0 || r.hist.at(-1).flights === 0, 'verchartert: keine Flüge auf der Strecke');
+  console.log('0.21.10 ok: Vorschau = Simulation an', tot, 'Tagen,', some, 'mit Sturmausfällen; Vulkanasche sperrt trotz Fachkraft; verchartert fliegt nicht'); }
 console.log('Alle Prüfungen bestanden.');

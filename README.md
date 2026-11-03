@@ -183,6 +183,16 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.10: Ausfälle sichtbar und wirksam
+
+- **Ausfälle stehen morgens fest:** Ob ein Umlauf ausfällt (Sperrung, Wetter/Streik am Flughafen, eigener Streik, fehlende Crew, Technik, IT), wird je Strecke, Tag und Umlauf mit einem festen Zufallswert bestimmt. Karte, Abflugtafel und Netz zeigen so schon morgens, welche Flüge ausfallen, und die Tagessimulation streicht genau diese – beide Richtungen eines Umlaufs gemeinsam.
+- **Karte:** Annullierte Umläufe bleiben am Boden, auch bei der Konkurrenz. Bisher flogen alle Flugzeuge weiter, weil die Ausfälle erst beim Tagesabschluss ausgewürfelt wurden.
+- **Sperrungen gelten voll:** Vulkanasche und gesperrter Luftraum streichen alle Flüge. Bisher senkte eine Operations-Fachkraft auch diese Ausfälle um bis zu 50 %; das gilt jetzt nur noch für Wetter und Streiks. Bei Sperrung und Wetter fällt weniger Entschädigung an (außergewöhnliche Umstände).
+- **Netz tagesaktuell:** Jede Strecke zeigt „heute“ (planmäßig, wie viele Umläufe ausfallen und warum, oder warum kein Flugzeug da ist: verchartert, im Charter-Pool, in der Werft, noch nicht geliefert) und „gestern“ (Flüge, Ausfälle, Passagiere, DB1) bzw. „zuletzt geflogen am …“.
+- **Charter sofort sichtbar:** Der Einsatzplan des Tages wird nach jeder Aktion und zu jedem neuen Tag neu gerechnet; bisher zeigte die Strecke nach dem Verchartern bis zum nächsten Tag noch die alten Umläufe. In der Simulation flog ein verchartertes Flugzeug schon vorher nicht und die Strecke wurde nicht verkauft.
+- **Abflugtafel:** annullierte Flüge mit Grund, gelandete Flüge, Zahl der Annullierungen im Kopf; ohne Flugzeug ein Hinweis, warum heute nichts fliegt.
+- Nebenbei: Die stille Gegenwehr (Preisangriff) wird nur noch ausgelost, wenn die Airline Strecken hat – sonst verpuffte die Belastung.
+
 ## Neu in 0.21.9: Slotvergabe zum 1. Oktober repariert
 
 - **Fehler:** Die Winter-Slotvergabe lief erst am Ende des Oktobers (also zum 1. November), angezeigt und angekündigt war der 1. Oktober. Ab dem 1. Oktober zeigte die Slot-Seite schon den 1. April als nächsten Termin, die Wartenden gingen leer aus. Die Sommer-Vergabe zum 1. April war korrekt.

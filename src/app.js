@@ -316,7 +316,7 @@ function visibleAl(al) {
 }
 function renderMapRoutes(force = false) {
   const evs = SM.AP_CODES.map(aptEventState).join(','), dead = deadCountries();
-  const sig = dead.join('') + W.list.map((al) => al.activeRoutes().map((r) => r.id + r.freq + (r.flyingToday || 0)).join(',')).join('|') + ui.showAi + ui.flightFilter + ui.expanded + ui.selApt + evs + W.player.bases.join();
+  const sig = dead.join('') + W.list.map((al) => al.activeRoutes().map((r) => r.id + r.freq + (r.flyingToday || 0)).join(',')).join('|') + ui.showAi + ui.flightFilter + ui.expanded + ui.selApt + evs + W.player.bases.join() + '|' + W.day;
   if (!force && sig === ui.routesSig) return;
   ui.routesSig = sig;
   let ai = '', hum = '', mine = '';
@@ -328,7 +328,7 @@ function renderMapRoutes(force = false) {
       const k = al.id + [r.base, r.dest].sort().join('');
       if (seen.has(k)) continue; seen.add(k);
       const d = lineD(gcLine(r.base, r.dest));
-      if (me) mine += `<path class="rt meglow" d="${d}"/><path class="rt me${(r.flyingToday || 0) < r.freq ? ' wait' : ''}${ui.expanded === r.id ? ' hl' : ''}" d="${d}"/>`;
+      if (me) mine += `<path class="rt meglow" d="${d}"/><path class="rt me${(r.flyingToday || 0) < r.freq || todayOps(r).canc > 0 ? ' wait' : ''}${ui.expanded === r.id ? ' hl' : ''}" d="${d}"/>`;
       else if (!al.archetype) hum += `<path class="rt huglow" d="${d}" stroke="${colorOf(al)}"/><path class="rt hu" d="${d}" stroke="${colorOf(al)}"/>`;
       else ai += `<path class="rt ai" d="${d}" stroke="${colorOf(al)}"/>`;
     }
@@ -477,7 +477,9 @@ function buildSchedules() {
   for (const al of W.list) {
     if (al.status === 'insolvent') continue;
     const byId = Object.fromEntries(al.routes.map((r) => [r.id, r]));
-    const me = al.id === W.playerId;
+    const me = al.id === W.playerId, rotIdx = {}, risks = {};
+    // Ausfälle des Tages: dieselben Würfel wie die Tagessimulation – annullierte Umläufe bleiben am Boden
+    const cx = (r, k) => { const acc = rotIdx[r.id] || 0; rotIdx[r.id] = acc + 1 / k; const i = Math.floor(acc + 1e-9); const rk = risks[r.id] || (risks[r.id] = W.legRisk(al, r)); const x = W.legCancel(al, r, i, W.day, rk); return x.c ? x.why : null; };
     al.fleet.forEach((a, idx) => {
       if (!a.assigned || !a.assigned.length || a.delivery_day > W.day) return;
       const share = {};
@@ -490,13 +492,14 @@ function buildSchedules() {
         if (rot > w) {
           // Langer Umlauf auf mehreren Flugzeugen: jedes startet an jedem k-ten Tag
           const k = SM.kOf(r.type_id, rot) || 1, slot = (share[rid] = share[rid] ?? (idx % k)), dOff = (W.day + slot) % k;
-          const t0 = 8 + (idx % 3) - 24 * dOff;
-          legs.push({ a: r.base, b: r.dest, t0, t1: t0 + bh, r, dir: 'out' });
-          legs.push({ a: r.dest, b: r.base, t0: t0 + bh + turn, t1: t0 + 2 * bh + turn, r, dir: 'in' });
+          const t0 = 8 + (idx % 3) - 24 * dOff, x = cx(r, k);
+          legs.push({ a: r.base, b: r.dest, t0, t1: t0 + bh, r, dir: 'out', x });
+          legs.push({ a: r.dest, b: r.base, t0: t0 + bh + turn, t1: t0 + 2 * bh + turn, r, dir: 'in', x });
           continue;
         }
-        legs.push({ a: r.base, b: r.dest, t0: t, t1: t + bh, r, dir: 'out' }); t += bh + turn;
-        legs.push({ a: r.dest, b: r.base, t0: t, t1: t + bh, r, dir: 'in' }); t += bh + turn;
+        const x = cx(r, 1);
+        legs.push({ a: r.base, b: r.dest, t0: t, t1: t + bh, r, dir: 'out', x }); t += bh + turn;
+        legs.push({ a: r.dest, b: r.base, t0: t, t1: t + bh, r, dir: 'in', x }); t += bh + turn;
       }
       const kind = P.AIRCRAFT_TYPES[a.type_id].ill.kind;
       if (legs.length) schedules.push({ me, al, ac: a, icon: kind === 'prop' ? ICON_PROP : kind === 'wide' ? ICON_WIDE : ICON_JET, legs, lines: legs.map((l) => gcLine(l.a, l.b)) });
@@ -505,7 +508,7 @@ function buildSchedules() {
 }
 function legAt(s, h) {
   for (let i = 0; i < s.legs.length; i++) {
-    const l = s.legs[i];
+    const l = s.legs[i]; if (l.x) continue;   // annulliert: das Flugzeug bleibt am Boden
     for (const off of [0, 24]) if (h + off >= l.t0 && h + off <= l.t1) return [i, (h + off - l.t0) / (l.t1 - l.t0)];
   }
   return null;
@@ -1166,12 +1169,31 @@ VIEWS.plan = function viewPlan() {
   if (!ui.planner) { const pl = W.player; ui.planner = defaultPlanner(ui.selApt && !pl.bases.includes(ui.selApt) ? ui.selApt : null); ui.selApt = ui.planner.dest; setTimeout(() => { renderDraft(); renderMapRoutes(true); }, 0); }
   return viewPlanner();
 };
+/** Heutiger Betrieb einer Strecke: Umläufe mit Flugzeug und Ausfälle mit Grund – dieselben Würfel wie in der Tagessimulation. */
+function todayOps(r, al = W.player) {
+  const f = W.day < r.opened_day ? 0 : (r.flyingToday || 0), n = Math.ceil(f - 1e-9), risk = n ? W.legRisk(al, r) : null, why = {};
+  let canc = 0;
+  for (let i = 0; i < n; i++) { const x = W.legCancel(al, r, i, W.day, risk); if (x.c) { canc += Math.min(1, f - i); why[x.why] = (why[x.why] || 0) + 1; } }
+  return { f, n, canc, all: n > 0 && canc >= f - 1e-6, why: Object.keys(why) };
+}
+/** Warum fehlen einer Strecke heute Flugzeuge? */
+function noAcWhy(r, pl = W.player) {
+  const d = W.day, acs = pl.fleet.filter((a) => a.type_id === r.type_id && a.base === r.base), out = [];
+  if (!acs.length) return `kein ${tl(r.type_id)} in ${r.base}`;
+  const cnt = (f) => acs.filter(f).length;
+  const nC = cnt((a) => a.acmi && a.acmi.start <= d && a.acmi.end > d); if (nC) out.push(`${nC} verchartert`);
+  const nP = cnt((a) => a.mode === 'charter' && !(a.acmi && a.acmi.start <= d && a.acmi.end > d)); if (nP) out.push(`${nP} im Charter-Pool`);
+  const nM = cnt((a) => (a.status === 'ccheck' || a.status === 'aog') && a.until > d); if (nM) out.push(`${nM} in der Werft`);
+  const nD = cnt((a) => a.delivery_day > d); if (nD) out.push(`${nD} noch nicht geliefert`);
+  return out.join(', ') || 'Flugzeuge mit anderen Strecken ausgelastet';
+}
 function routeItem(r) {
   const s7 = rstats(r, 7), s30 = rstats(r, 30), open = ui.expanded === r.id;
-  const waiting = W.day < r.opened_day ? `startet ${dateShort(r.opened_day)}` : r.partial ? `Teilbetrieb: fliegt an ${pct(r.partial)} der Tage` : r.wk && r.wk < 7 ? ((r.flyingToday || 0) < r.wk / 7 - 1e-6 ? `${Math.round((r.flyingToday || 0) * 7)} von ${r.wk} Flügen pro Woche haben ein Flugzeug` : null) : (r.flyingToday || 0) < r.freq ? `heute ${r.flyingToday || 0} von ${r.freq} Umläufen mit Flugzeug${(r.flyingToday || 0) === 0 ? ' (Wartung oder Ausfall?)' : ''}` : null;
+  const waiting = W.day < r.opened_day ? `startet ${dateShort(r.opened_day)}` : r.partial ? `Teilbetrieb: fliegt an ${pct(r.partial)} der Tage` : r.wk && r.wk < 7 ? ((r.flyingToday || 0) < r.wk / 7 - 1e-6 ? `${Math.round((r.flyingToday || 0) * 7)} von ${r.wk} Flügen pro Woche haben ein Flugzeug` : null) : (r.flyingToday || 0) < r.freq ? `heute ${r.flyingToday || 0} von ${r.freq} Umläufen mit Flugzeug (${noAcWhy(r)})` : null;
+  const tdy = todayOps(r), cxTxt = tdy.canc > 0 ? (tdy.all ? `heute fällt alles aus: ${tdy.why.join(', ')}` : `heute ${n0(tdy.canc)} von ${tdy.n} Umläufen annulliert: ${tdy.why.join(', ')}`) : null;
   const lfo = SM.routeLf(r, 7, 'out'), lfi = SM.routeLf(r, 7, 'in');
   let html = `<div class="ritem${open ? ' open' : ''}"><button class="rhead" data-act="toggle" data-id="${r.id}" aria-expanded="${open}">
-    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${freqTxt(r)}${r.role === 'feeder' ? ' · Zubringer' : r.role === 'local' ? ' · Endziel' : ''} · ${tlx(r.type_id)} · ${svcLabel(r.service)}${r.ap ? ` · <span class="chip" title="Preisautomatik: ${esc(apSummary(SM.apCfgOf(r), r.ap))}">Auto ${pct(r.ap)}</span>${r.pm && r.pm !== 1 ? ` <span class="chip" title="Premiumaufschlag">Premium ${pct(r.pm)}</span>` : ''}` : ''}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}</div></div>
+    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${freqTxt(r)}${r.role === 'feeder' ? ' · Zubringer' : r.role === 'local' ? ' · Endziel' : ''} · ${tlx(r.type_id)} · ${svcLabel(r.service)}${r.ap ? ` · <span class="chip" title="Preisautomatik: ${esc(apSummary(SM.apCfgOf(r), r.ap))}">Auto ${pct(r.ap)}</span>${r.pm && r.pm !== 1 ? ` <span class="chip" title="Premiumaufschlag">Premium ${pct(r.pm)}</span>` : ''}` : ''}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}${cxTxt ? ` · <span class="neg">${esc(cxTxt)}</span>` : ''}</div></div>
     <div class="rdb ${s30.db2 < 0 ? 'neg' : 'pos'}">${s30.n ? eur(s30.db2 / s30.n, { plus: true }) : '–'}<small>DB2 pro Tag</small></div>
     <div class="lfrow"><span>hin</span><div class="bar"><i class="me" style="width:${(lfo * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfo) : '–'}</span></div>
     <div class="lfrow"><span>zurück</span><div class="bar"><i class="me" style="width:${(lfi * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfi) : '–'}</span></div>
@@ -1198,6 +1220,17 @@ function insights(r, s7, s30) {
   if (s30.flights && s30.cancelled) out.push(['info', `${s30.cancelled} Flugausfälle in 30 Tagen (Technik, Wetter, Streik oder Personal). Betreuung und Entschädigung sind gebucht.`]);
   return out;
 }
+/** Heute und gestern auf einer Strecke – tagesaktuell statt nur Durchschnitt. */
+function routeDayHtml(r) {
+  if (W.day < r.opened_day) return '';
+  const t = todayOps(r), last = r.hist.at(-1), y = W.day - 1;
+  const today = !t.n ? `<b>Heute kein Flug</b> – ${esc(noAcWhy(r))}.` : t.canc > 0 ? `<b>Heute ${t.all ? 'fallen alle Flüge aus' : `fallen ${n0(t.canc)} von ${t.n} Umläufen aus`}</b>: ${esc(t.why.join(', '))}. Gebuchte Gäste werden betreut und entschädigt, Erlös gibt es für diese Flüge nicht.`
+    : `<b>Heute</b> ${t.n === 1 && t.f < 1 ? 'fliegt die Strecke' : `${t.n} Umlauf${t.n > 1 ? 'e' : ''} (${t.n * 2} Flüge)`} planmäßig.`;
+  const nf = (x) => (Math.abs(x - Math.round(x)) < 0.05 ? n0(x) : n1(x));
+  const yd = !last ? 'noch keine Flüge' : last.d === y ? `gestern ${nf(last.flights)} Flüge${last.cancelled ? `, davon ${nf(last.cancelled)} ausgefallen` : ''} · ${n0(last.pax)} Passagiere · ${eur(last.rev - last.cost, { plus: true })} DB1`
+    : `zuletzt geflogen am ${dateShort(last.d)}`;
+  return `<div class="callout ${!t.n || t.canc > 0 ? 'crit' : 'info'}"><span>${today}</span><span class="small muted">${yd}</span></div>`;
+}
 function routeBody(r, s7, s30) {
   const comp = W.competitorOffers(W.playerId, r.base, r.dest);
   const c = ui.confirm === 'close:' + r.id;
@@ -1205,6 +1238,7 @@ function routeBody(r, s7, s30) {
   const ins = insights(r, s7, s30);
   const n = Math.max(s30.n, 1);
   return `<div class="rbody">
+    ${routeDayHtml(r)}
     ${ins.map(([k, t]) => `<div class="callout ${k}">${esc(t)}</div>`).join('')}
     <div class="fc">
       <div><span>Erlös pro Tag</span><b>${eur(s30.rev / n)}</b><em>Tickets, Zusatzleistungen, Fracht</em></div>
@@ -3843,7 +3877,9 @@ function boardRows() {
   return rows.sort((a, b) => a.t0 - b.t0);
 }
 function boardStatus(x, h) {
-  if (x.t0 <= h) return ['air', 'In der Luft'];
+  if (x.l.x) return ['cx', `Annulliert – ${esc(x.l.x)}`];
+  if (x.t0 <= h && x.t1 >= h) return ['air', 'In der Luft'];
+  if (x.t1 < h) return ['ok', 'Gelandet'];
   if (x.t0 - h < 0.75) return ['board2', 'Boarding'];
   const st = rstats(x.l.r, 14), otp = st.otp === null ? 0.9 : st.otp;
   const roll = (((W.day + 1) * 7919 + x.i * 104729 + x.s.ac.id.length * 31 + Math.round(x.t0 * 13)) % 1000) / 1000;
@@ -3852,10 +3888,12 @@ function boardStatus(x, h) {
 }
 VIEWS.departures = function viewDepartures() {
   const h = ui.t * 24, rows = boardRows();
-  const air = rows.filter((x) => x.t0 <= h && x.t1 >= h).sort((a, b) => (b.t1 - b.t0) - (a.t1 - a.t0));
-  const next = rows.filter((x) => x.t0 > h).slice(0, 24);
-  let html = `<h2 class="sec">Abflüge <small>${dateShort(W.day)} · ${clockText()} Uhr · ${air.length} in der Luft</small></h2>`;
-  if (!rows.length) return html + '<div class="callout info">Noch keine Flüge im Plan. Sobald ein Flugzeug geliefert ist und eine Strecke hat, erscheint hier die Abflugtafel.</div>';
+  const air = rows.filter((x) => !x.l.x && x.t0 <= h && x.t1 >= h).sort((a, b) => (b.t1 - b.t0) - (a.t1 - a.t0));
+  const next = rows.filter((x) => x.t0 > h || (x.l.x && x.t1 >= h - 2)).sort((a, b) => a.t0 - b.t0).slice(0, 24);
+  const cxN = rows.filter((x) => x.l.x).length;
+  let html = `<h2 class="sec">Abflüge <small>${dateShort(W.day)} · ${clockText()} Uhr · ${air.length} in der Luft${cxN ? ` · <span class="neg">${cxN} annulliert</span>` : ''}</small></h2>`;
+  if (!rows.length) { const rs = W.player.activeRoutes().filter((r) => r.opened_day <= W.day);
+    return html + (rs.length ? `<div class="callout warn">Heute keine Abflüge: Keine Ihrer Strecken hat ein Flugzeug (${esc([...new Set(rs.map((r) => noAcWhy(r)))].join('; '))}).</div>` : '<div class="callout info">Noch keine Flüge im Plan. Sobald ein Flugzeug geliefert ist und eine Strecke hat, erscheint hier die Abflugtafel.</div>'); }
   if (air.length) {
     const x = air[0], l = x.l, f = Math.max(0, Math.min(1, (h - x.t0) / (x.t1 - x.t0)));
     html += `<button class="flightcard" data-act="selac" data-ac="${x.s.ac.id}">
@@ -5753,6 +5791,7 @@ function stepDay(quiet = false) {
   if (quiet) return prev;
   const slow = SM.SPEEDS[ui.speedKey] && SM.SPEEDS[ui.speedKey].slow;
   if (SM.monthOf(W.day) !== SM.monthOf(prev.day) || slow) saveGame(false);
+  W.operableFreq(pl);   // Einsatzplan für den neuen Tag (Charter, Werft, Auslieferungen) – Karte und Netz zeigen den heutigen Stand
   buildSchedules();
   renderHeader(); renderTabs(); renderMapRoutes(); tickPane();
   if (pl.status === 'insolvent') { gameOver(); return prev; }
