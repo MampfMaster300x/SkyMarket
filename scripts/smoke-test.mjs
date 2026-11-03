@@ -546,7 +546,12 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const g = A(a, { type: 'dealPropose', to: 'P2', give: [{ k: 'cash', amount: 20000000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] });
   assert.ok(!g.ok && g.unfair, 'Geschenk über Handel abgelehnt: ' + g.msg);
   const mk = A(a, { type: 'dealPropose', to: SMx.MARKET, give: [{ k: 'cash', amount: 20000000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] });
-  assert.ok(!mk.ok && mk.unfair, 'auch nicht über den Marktplatz');
+  assert.equal(mk.ok, true, 'Marktgesuch geht (KI-Airlines entscheiden selbst)');
+  const ma = A(b, { type: 'marketAccept', id: mk.id }); assert.ok(!ma.ok && ma.unfair, 'Annahme durch Mitspielende wird geprüft: ' + ma.msg);
+  A(a, { type: 'dealWithdraw', id: mk.id });
+  { const f1 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 2600000 }], [{ k: 'cash', amount: 2000000 }]); assert.ok(f1.ok && f1.lim === 1e6 * w.macro.cpi || f1.ok, '0,6 Mio. Abweichung bei 4,6 Mio. Gesamtbetrag erlaubt');
+    const f2 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 12000000 }], [{ k: 'cash', amount: 10500000 }]); assert.ok(!f2.ok && Math.abs(f2.lim - 1e6 * w.macro.cpi) < 1, 'über 1 Mio. Abweichung nicht erlaubt');
+    const f3 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 450000 }], [{ k: 'cash', amount: 200000 }]); assert.ok(!f3.ok && f3.lim < 250000, 'bei kleinen Geschäften entsprechend weniger Spielraum'); }
   const f = A(a, { type: 'dealPropose', to: 'P2', give: [{ k: 'cash', amount: 20000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] });
   assert.equal(f.ok, true, 'fairer Kleinhandel geht: ' + f.msg);
   assert.equal(A(b, { type: 'dealRespond', id: f.id, choice: 'accept' }).ok, true, 'angenommen');
@@ -586,4 +591,42 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   // Preisniveau: abgelegene Märkte und Afrika teurer, große Drehkreuze unverändert
   assert.ok(SMx.fareLv('YFB') > 1.4 && SMx.fareLv('FRA') === 1 && SMx.fareLv('NBO') > 1.2, 'Preisniveau abgelegen/Afrika');
   console.log('0.20 ok: Geschenk-Handel blockiert, Prüfer: Rückzahlung, Bußgeld, Prüfvermerk, Selbstanzeige; Sperre still; Fachkräfte', p2.experts.length, 'von Spanne', SMx.expertTeam(p2).cap, ',', refused, 'Absagen'); }
+// 0.21: Airline-spezifische Schocks – Ausschüttung, Gewerkschaft, stille Gegenwehr, Monopol, Preisaufsicht, Hilfe für Kleine
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const S = SMx.P.AL_SHOCKS, keep = JSON.parse(JSON.stringify(S));
+  for (const k of Object.keys(S)) if (S[k].p !== undefined) S[k].p = 1;   // für den Test: jede Lage löst sofort aus
+  const w = SMx.newWorld({ seed: 31 }), big = SMx.addHuman(w, { id: 'B1', name: 'Gross', code: 'GR', base: 'NRT' }), small = SMx.addHuman(w, { id: 'S1', name: 'Klein', code: 'KL', base: 'HAJ' }); w.playerId = 'B1';
+  const A = (al, x) => SMx.applyAction(w, al.id, x);
+  for (let i = 0; i < 3; i++) w.step();
+  assert.equal(SMx.payoutRate(big).rate, 0, 'am Start keine Ausschüttung');
+  big.ledger.post('one_off', 3 * SMx.ownersCapital(big));
+  const pr = SMx.payoutRate(big); assert.ok(pr.mult > 3.5 && pr.rate > 0.3 && pr.rate <= 0.7, 'Ausschüttung wächst mit dem Vielfachen');
+  assert.ok(SMx.attackEligible(big) && !SMx.attackEligible(small), 'Gegenwehr droht jeder Airline mit 2,5-fachem Kapital');
+  for (let i = 0; i < 3; i++) big.ledger.months.push({ label: { y: 0, m: i }, acc: { rev_ticket: 5e9, fuel: -3e9 } });   // drei Monate mit 40 % Marge
+  w.day = 100; const c00 = big.ledger.cash; SMx.dominanceMonth(w);
+  assert.ok(big.payoutFrom > w.day && big.ledger.cash === c00, 'Gesellschafter kündigen die Ausschüttung an');
+  const negs = big.decisions.filter((x) => x.type === 'profit' && !x.resolved).length + Object.values(w.attacks).filter((a) => a.al === 'B1').length;
+  assert.equal(negs, 1, 'genau eine Belastung auf einmal');
+  assert.ok(SMx.alShock(small, 'fuelpool', w.day), 'kleine Airline bekommt die Einkaufsgemeinschaft');
+  const fSmall = w.fuelPriceFor(small, 'HAJ'); small.shocks = []; const fNo = w.fuelPriceFor(small, 'HAJ'); assert.ok(fSmall < fNo * 0.97, 'Kerosin günstiger');
+  // Stille Gegenwehr: keine Meldung
+  big.decisions = []; big.profitShare = null; big.press = { next: 0, lastUnion: w.day }; w.attacks = {};
+  const logs0 = big.events.length, news0 = w.news.length; w.day += 61; SMx.dominanceMonth(w);
+  const att = Object.values(w.attacks).filter((a) => a.al === 'B1');
+  if (att.length) assert.ok(!big.events.slice(logs0).some((e) => /wehren|Preisangriff|greif/.test(e.text || '')) && !w.news.slice(news0).some((n) => /greif|Preiskampf/.test(n.text)), 'Gegenwehr im Stillen');
+  w.day = big.payoutFrom; const c0 = big.ledger.cash; SMx.dominanceMonth(w);
+  assert.ok(c0 - big.ledger.cash >= 0.3 * 20e6 - 1, 'Ausschüttung gezahlt');
+  // Monopol: allein auf einer Strecke mit hoher Marge lockt Konkurrenz an
+  big.ledger.cashOnly(2e8, 't'); A(big, { type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'NRT' }); for (let i = 0; i < 35; i++) w.step(); A(big, { type: 'fillStaff' });
+  for (const x of ['KMQ', 'TAK', 'OIT', 'KCZ', 'MYJ', 'HKD', 'AOJ', 'ICN']) if (A(big, { type: 'openRoute', base: 'NRT', dest: x, typeId: 'A20N', freq: 1 }).ok) break;
+  for (let i = 0; i < 25; i++) w.step();
+  const mono = SMx.monopolyRoutes(w, big);
+  big.decisions = []; big.profitShare = null; big.press = { next: 0, lastUnion: w.day }; w.attacks = {}; w.fareCaps = {};
+  const ev1 = big.events.length, nw1 = w.news.length; SMx.dominanceMonth(w);
+  const att2 = Object.values(w.attacks).filter((a) => a.al === 'B1');
+  assert.ok(att2.length > 0 || (big.shocks || []).some((x) => x.k === 'entrant' || x.k === 'pricecap'), 'Gegenwehr ausgelöst');
+  assert.ok(!big.events.slice(ev1).some((e) => /wehren|Preisangriff|greif|Monopol/.test(e.text || '')) && !w.news.slice(nw1).some((n) => /greif|Preiskampf|Monopol/.test(n.text)), 'Gegenwehr im Stillen – keine Meldung');
+  const r0 = big.activeRoutes()[0], co = w.competitorOffers('B1', r0.base, r0.dest);
+  console.log('0.21 ok: Ausschüttung', Math.round(pr.rate * 100), '% bei', pr.mult.toFixed(1) + '-fachem Kapital, eine Belastung zur Zeit, Gegenwehr still auf', att2.length, 'Strecken', ', Kerosin für Kleine', ((1 - fSmall / fNo) * 100).toFixed(1), '% günstiger, Monopolstrecken', mono.length);
+  Object.assign(S, keep); }
 console.log('Alle Prüfungen bestanden.');

@@ -1076,6 +1076,15 @@ VIEWS.cockpit = function viewCockpit() {
 };
 function decisionCard(d) {
   const pl = W.player, monthly = pl.staffMonthly(cpi());
+  if (d.type === 'profit') {
+    const last = pl.ledger.months.at(-1), res = last ? Object.entries(last.acc).reduce((a, [k, v]) => a + (k.startsWith('cf_') ? 0 : v), 0) / 100 : 0, R = P.PRESSURE;
+    return `<div class="callout warn"><b>Entscheidung bis ${dateShort(d.deadline)}</b><span>${esc(d.text)}</span>
+    <div class="stack small" style="margin-top:6px">
+      <div class="row"><button class="btn small primary" data-act="decide" data-id="${d.id}" data-choice="share">Gewinnbeteiligung</button><span class="muted">${pct(R.unionShare)} vom Monatsgewinn für ${R.unionMonths} Monate (zuletzt wären das ${eur(Math.max(0, res) * R.unionShare)}), nur in Gewinnmonaten, Stimmung +8</span></div>
+      <div class="row"><button class="btn small" data-act="decide" data-id="${d.id}" data-choice="bonus">Einmalprämie</button><span class="muted">ein Monatsgehalt (${eur(monthly)}) sofort, wird mit 60 % Wahrscheinlichkeit angenommen</span></div>
+      <div class="row"><button class="btn small danger" data-act="decide" data-id="${d.id}" data-choice="reject">Ablehnen</button><span class="muted">dreitägiger Streik in sechs Tagen, Stimmung −8</span></div>
+    </div></div>`;
+  }
   return `<div class="callout crit"><b>Entscheidung bis ${dateShort(d.deadline)}</b><span>${esc(d.text)}</span>
     <div class="stack small" style="margin-top:6px">
       <div class="row"><button class="btn small primary" data-act="decide" data-id="${d.id}" data-choice="raise5">5 % mehr Gehalt</button><span class="muted">dauerhaft ${eur(monthly * 0.05)} pro Monat, Streik abgesagt, Stimmung +12</span></div>
@@ -2584,7 +2593,7 @@ new MutationObserver(() => { if (pickQueued) return; pickQueued = true; requestA
 
 // ---------- Finanzen ----------
 const PNL_ROWS = [
-  ['grp', 'Erlöse'], ['rev_ticket', 'Tickets'], ['rev_ancillary', 'Zusatzleistungen'], ['rev_cargo', 'Fracht'], ['rev_acmi', 'ACMI-Charter'],
+  ['grp', 'Erlöse'], ['rev_ticket', 'Tickets'], ['rev_ancillary', 'Zusatzleistungen'], ['rev_cargo', 'Fracht'], ['rev_acmi', 'ACMI-Charter'], ['subsidy', 'Regionalförderung'],
   ['grp', 'Flugbetrieb'], ['fuel', 'Treibstoff'], ['hedge', 'Kerosin-Absicherung'], ['crew', 'Crew-Spesen'], ['maintenance', 'Wartung'], ['navigation', 'Flugsicherung'],
   ['landing', 'Landeentgelte'], ['handling', 'Abfertigung'], ['pax_fees', 'Passagierentgelte'], ['pax_service', 'Bordservice'], ['distribution', 'Vertrieb'], ['cargo_cost', 'Frachtkosten'], ['disruption', 'Störungen'],
   ['grp', 'Personal'], ['staff_cockpit', 'Cockpit'], ['staff_cabin', 'Kabine'], ['staff_tech', 'Technik'], ['staff_extra', 'Agentur, Überstunden, Recruiting'], ['experts', 'Fachkräfte'],
@@ -2598,6 +2607,20 @@ function pnlCol(acc) {
   const ebit = PNL_ACCOUNTS_EBIT.reduce((s, k) => s + v(k), 0);
   return { v, ebit, net: ebit + v('interest') + v('invest') + v('tax'), rev: v('rev_ticket') + v('rev_ancillary') + v('rev_cargo') + v('rev_acmi') };
 }
+/** Gesellschafter, Marktführerschaft und Förderung kleiner Airlines. */
+function ownersHtml(pl) {
+  const pr = SM.payoutRate(pl), A = P.PAYOUT, SH = P.SMALL_HELP, d = W.day, sh = (k) => (pl.shocks || []).filter((x) => x.k === k && x.from <= d && x.until > d && !x.silent);
+  const n = pl.fleet.length, fuel = SH.fuel * Math.max(0, Math.min(1, (SH.fuelZero - n) / (SH.fuelZero - SH.fuelFull))), sub = Math.max(0, Math.min(1, (SH.subZero - n) / (SH.subZero - SH.subFull)));
+  const parts = [];
+  if (pl.payoutFrom && pl.payoutFrom > d) parts.push(`<b>Die Gesellschafter wollen mitverdienen:</b> ab ${dateShort(pl.payoutFrom)} werden monatlich ${pct(pr.rate)} des Gewinns ausgeschüttet – je mehr Kapital, desto mehr (höchstens ${pct(A.max)}).`);
+  else if (pl.payoutFrom && pr.rate > 0) parts.push(`<b>Ausschüttung an die Gesellschafter: ${pct(pr.rate)} vom Monatsgewinn.</b> Ihr Eigenkapital liegt beim ${NF1.format(pr.mult)}-fachen des eingebrachten Kapitals – ab dem ${A.from}-fachen ${pct(A.min)}, je weiterem Vielfachen ${pct(A.k)} mehr, höchstens ${pct(A.max)}.`);
+  if (pl.profitShare && pl.profitShare.until > d) parts.push(`<b>Gewinnbeteiligung</b> der Belegschaft: ${pct(pl.profitShare.rate)} vom Monatsgewinn bis ${dateShort(pl.profitShare.until)}.`);
+  for (const x of sh('pricecap')) parts.push(`<b>Preisaufsicht in ${esc(apName(x.apt))}</b> bis ${dateShort(x.until)}: dort höchstens das ${NF1.format(P.AL_SHOCKS.pricecap.cap)}-fache des Marktpreises.`);
+  for (const x of sh('fuelpool')) if (fuel > 0) parts.push(`<b>Einkaufsgemeinschaft Kerosin</b> bis ${dateShort(x.until)}: ${pct(fuel, 1)} günstiger (voll bis ${SH.fuelFull} Flugzeuge, ab ${SH.fuelZero} entfällt der Vorteil).`);
+  for (const x of sh('subsidy')) if (sub > 0) parts.push(`<b>Regionalförderung ${esc(apName(x.apt))}</b> bis ${dateShort(x.until)}: bis ${eur(SH.subsidy * sub * cpi())} je Abflug.`);
+  if (!parts.length) return '';
+  return `<div class="card pad stack"><h3>Gesellschafter, Aufsicht und Förderung</h3>${parts.map((x) => `<p class="small">${x}</p>`).join('')}</div>`;
+}
 VIEWS.finance = function viewFinance() {
   const pl = W.player, bs = SM.balanceSheet(pl), L = pl.ledger;
   const cur = pnlCol(L.month), prev = L.months.length ? pnlCol(L.months.at(-1).acc) : null, tot = pnlCol(L.pnl);
@@ -2605,6 +2628,7 @@ VIEWS.finance = function viewFinance() {
   const cell = (col, k) => { if (!col) return '<td class="r muted">–</td>'; const x = k === 'ebit' ? col.ebit : k === 'net' ? col.net : col.v(k); return `<td class="r ${['ebit', 'net'].includes(k) ? sgn(x) : ''}">${x === 0 ? '<span class="muted">0</span>' : eur(x)}</td>`; };
   const used = new Set(PNL_ROWS.filter(([k]) => k !== 'grp' && !['ebit', 'net'].includes(k) && (L.pnl[k] || L.month[k])).map(([k]) => k));
   let html = `<h2 class="sec">Ergebnis und Bilanz <small>EBIT-Marge seit Start ${tot.rev ? pct(tot.ebit / tot.rev, 1) : '–'}</small></h2>`;
+  html += ownersHtml(pl);
   html += `<div class="tiles">
     <div class="tile"><span>Kontostand</span><b class="${netCash(pl) < 0 ? 'neg' : ''}">${eur(netCash(pl))}</b><em>${netCash(pl) < 0 ? 'im Dispo' : 'Guthaben'} · mit Dispo verfügbar ${eur(pl.spendable(W.macro.bank ?? 1))}</em></div>
     <div class="tile"><span>Dispo genutzt</span><b class="${pl.creditUsed > 0 ? 'neg' : ''}">${pl.creditUsed > 0 ? eur(-pl.creditUsed) : eur(0)}</b><em>Rahmen ${eur(pl.creditLimit(W.macro.bank ?? 1))}, ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins</em></div>
@@ -3435,6 +3459,7 @@ function worldExtraHtml() {
     const gr = W.events.filter((e) => e.type === 'grounding' && !e.cancelled && e.start <= W.day && e.end > W.day);
     const fx = [mx > 1.001 ? `Wartung +${pct(mx - 1)}` : '', lx > 1.001 ? `neue Leasingverträge +${pct(lx - 1)}` : '', dl ? `Auslieferungen +${dl} Tage` : '', rq ? `Leasinggeber verlangen +${rq} Ansehen` : '', ...gr.map((e) => `stillgelegt: ${e.types.map((t) => tl(t)).join(', ')} (${pct(e.share)})`)].filter(Boolean);
     if (fx.length) html += `<div class="callout warn"><b>Laufende Krisen wirken auf Ihre Rechnung</b><span>${fx.join(' · ')}</span></div>`; }
+
   html += `<div class="stack"><h2 class="sec">Konjunktur nach Regionen <small>Zyklen laufen versetzt – Streuung schützt</small></h2><div class="econ">${regs.map(([rg, v]) => `<div><span>${rg}</span><div class="bar"><i class="${v < 0.95 ? 'crit' : v > 1.04 ? 'good' : ''}" style="width:${clampPct((v - 0.7) / 0.6)}%"></i><span class="tgt" style="left:50%"></span></div><b class="num">${n0(v * 100)}</b></div>`).join('')}</div></div>`;
   html += `<div class="stack"><h2 class="sec">Handelskonflikte und Zölle</h2>${tariffs.length ? `<table class="t"><tbody>${tariffs.map(([k, v]) => { const [a, b] = k.split('|'); return `<tr><td>${esc(SM.blocName(a))} ↔ ${esc(SM.blocName(b))}</td><td class="r">${pct(v)}</td></tr>`; }).join('')}</tbody></table><p class="small muted">Zölle senken Geschäftsreisen (stark), Fracht und Urlaubsreisen zwischen den Blöcken und verteuern Flugzeuge aus dem jeweils anderen Block (Airbus/ATR: EU, Boeing: USA, Embraer: Brasilien, Dash 8: Kanada).</p>` : '<p class="small muted">Freier Handel. Das kann sich schnell ändern.</p>'}</div>`;
   if (carbon.length || fees.length) html += `<div class="stack"><h2 class="sec">Abgaben und Entgelte</h2><table class="t"><tbody>${carbon.map(([b, v]) => `<tr><td>CO₂-Abgabe ${esc(SM.blocName(b))}</td><td class="r">Kerosin +${pct(v)}</td></tr>`).join('')}${fees.map(([a, v]) => `<tr><td>Entgelte ${a} · ${esc(apName(a))}</td><td class="r">+${pct(v - 1)}</td></tr>`).join('')}</tbody></table></div>`;
@@ -3604,7 +3629,7 @@ function dealComposer() {
       : `<div class="callout warn"><b>${ev.need < 0.25 * (ev.vin + ev.vout + 1) ? 'Knapp.' : 'Eher nicht.'}</b> Ihnen fehlen aus Sicht von ${esc(partner.name)} etwa ${eur(ev.need)}. Sie bekommen dann voraussichtlich ein Gegenangebot.</div>`;
   } else if (partner.isPlayer) {
     const f = (D.give.length || D.take.length) ? SM.tradeFairness(W, me, partner, D.give, D.take) : null;
-    est = `<div class="callout ${f && !f.ok ? 'crit' : 'info'}">${f ? `<b>Marktwert:</b> Sie geben rund ${eur(f.va)}, ${esc(partner.name)} rund ${eur(f.vb)}. ${f.ok ? 'Liegt in der erlaubten Spanne.' : `<b>Zu ungleich</b> – zwischen Spielenden dürfen beide Seiten höchstens ${pct(P.TRADE_FAIR.rel)} auseinanderliegen (Spielraum hier ${eur(f.lim)}). Bitte Geld oder Posten anpassen.`} ` : ''}${esc(partner.name)} entscheidet selbst. Das Angebot gilt ${SM.DEAL_DAYS} Spieltage.</div>`;
+    est = `<div class="callout ${f && !f.ok ? 'crit' : 'info'}">${f ? `<b>Marktwert:</b> Sie geben rund ${eur(f.va)}, ${esc(partner.name)} rund ${eur(f.vb)}. ${f.ok ? `Abweichung ${eur(f.diff)}, erlaubt bis ${eur(f.lim)}.` : `<b>Zu ungleich</b> – Abweichung ${eur(f.diff)}. Zwischen Spielenden sind bis zu ${pct(P.TRADE_FAIR.rel)} des Gesamtbetrags erlaubt, höchstens ${eur(P.TRADE_FAIR.max * cpi())} – hier ${eur(f.lim)}. Bitte Geld oder Posten anpassen.`} ` : ''}${esc(partner.name)} entscheidet selbst. Das Angebot gilt ${SM.DEAL_DAYS} Spieltage.</div>`;
   }
   const v = (D.give.length || D.take.length) ? myDealValue(pseudo) : null;
   return `<div class="card pad stack dealcomp"><div class="spread"><h3>${D.replyTo ? 'Gegenangebot' : 'Neues Angebot'}</h3><button class="btn small" data-act="dealcancel">Verwerfen</button></div>
@@ -5590,7 +5615,7 @@ function colorOfId(id) { const al = W && W.airlines[id]; return al ? colorOf(al)
 /** Kennzahlen einer menschlichen Airline aus den letzten 30 Tagen (Tagesreihe) und der Bilanz. */
 function humanKpis(al) {
   const h = (al.dayHist || []).slice(-30), sum = (k) => h.reduce((a, x) => a + (x[k] || 0), 0);
-  const eq = SM.balanceSheet(al).equity, start = al.ledger.equityContrib / 100;
+  const eq = SM.balanceSheet(al).equity, start = SM.ownersCapital(al);
   const rev = sum('rev'), net = sum('net'), seats = sum('seats'), fl = sum('fl'), pax = sum('pax');
   return { eq, start, growth: start > 0 ? eq / start - 1 : null, net, rev, margin: rev > 0 ? net / rev : null, lf: seats > 0 ? pax / seats : null,
     paxDay: h.length ? pax / h.length : 0, otp: fl > 0 ? Math.max(0, 1 - sum('late') / fl) : null, days: h.length, fleet: al.fleet.length, routes: al.activeRoutes().length };

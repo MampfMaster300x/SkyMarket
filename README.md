@@ -183,6 +183,47 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.3: Airline-spezifische Schocks statt Branchenthemen
+
+Ausschüttung, Gewerkschaft, Gegenwehr und Hilfe für Kleine sind jetzt Schocks wie die Weltschocks – aber je Airline, ausgelöst durch deren Lage und mit einer Wahrscheinlichkeit je Monat. Jede Airline kann sie treffen, sobald sie in die Lage kommt; Belastungen nie zwei gleichzeitig, danach mindestens 60 Tage Ruhe.
+
+| Lage der Airline | möglicher Schock (Wahrscheinlichkeit je Monat) | sichtbar? |
+|---|---|---|
+| Eigenkapital über dem 2-fachen des eingebrachten Kapitals | Gesellschafterversammlung: Ausschüttung ab 60 Tagen (35 %) | Meldung |
+| über 15 % Marge in drei Monaten | Gewerkschaft fordert Gewinnbeteiligung (30 %, höchstens einmal im Jahr) | Entscheidung |
+| Kapital über dem 2,5-fachen | Gegenwehr der Etablierten: −15 % Preis, +25 % Flüge auf den drei stärksten Strecken, 2 Monate (25 %) | **still** – nur an den Preisen der Konkurrenz zu merken |
+| allein auf einer Strecke mit über 30 % Marge (seit 90 Tagen) | Monopol lockt Konkurrenz: Eine KI-Airline steigt ein (sonst ein neuer Anbieter für 4 Monate) (30 %) | **still** – nur die normale Streckenmeldung der KI |
+| über 70 % der Abflüge an einem Flughafen ab 3 Mio. Pax und Preise über dem 1,3-fachen des Marktpreises | Preisaufsicht: dort 6 Monate höchstens das 1,2-fache (25 %) | Meldung |
+| bis 25 Flugzeuge | Einladung in die Kerosin-Einkaufsgemeinschaft für ein Jahr (10 %) | Meldung |
+| bis 30 Flugzeuge, Strecke ab einem Flughafen bis 5 Mio. Pax, den sonst niemand anfliegt | Förderzusage der Region für ein Jahr (20 %) | Meldung |
+
+Die Branchenthemen aus 0.21.1/0.21.2 entfallen.
+
+**Handel:** Der Spielraum zwischen Spielenden beträgt jetzt 35 % des Gesamtbetrags beider Seiten, mindestens 100 Tsd. €, höchstens 1 Mio. € Abweichung (Beispiele: 0,6 + 0,6 Mio. → 420 Tsd.; 2 + 2,6 Mio. → 1 Mio.; ab rund 2,9 Mio. Gesamtbetrag immer 1 Mio.). Marktgesuche werden beim Einstellen nicht mehr geprüft – KI-Airlines bewerten selbst; nimmt eine Mitspielerin oder ein Mitspieler an, greift die Prüfung.
+
+## Neu in 0.21.2: Die Themen gelten für alle
+
+- Kein Thema ist mehr auf eine Airline gemünzt. **Preisangriffe** drohen jeder Airline, die ihr eingebrachtes Kapital mehr als verzweieinhalbfacht hat – nicht nur der Nummer eins; die Ankündigung nennt keinen Namen. **Gewerkschaftsforderungen** treffen jede Airline mit mehr als 15 % Marge, **Ausschüttungen** jede, die ihr Kapital verdoppelt hat, **Einkaufsgemeinschaft und Regionalförderung** jede kleine Airline.
+- Die Themen tauchen auch dann irgendwann auf, wenn gerade niemand die Bedingung erfüllt: Gewerkschaftstag spätestens ab etwa Tag 365, Abwehr der Etablierten ab etwa Tag 450 (vorher nur, wenn eine Airline schon zwei Monate lang stark genug ist).
+
+## Neu in 0.21.1: Druck und Förderung tauchen im Spiel auf – nicht per Update
+
+Die Themen aus 0.21.0 sind nicht mehr sofort aktiv, sondern entwickeln sich mit dem Spiel. Jedes wird mit Vorlauf als Meldung angekündigt („Angekündigt: …“), es ist immer nur ein Thema gleichzeitig in der Ankündigung, und unter Welt → Konjunktur stehen sie als „Entwicklungen der Branche“:
+- **Einkaufsgemeinschaft Kerosin** (frühestens ab Tag 120, 30 Tage Vorlauf) und **Förderprogramm Regionalstrecken** (ab Tag 180, 60 Tage Vorlauf) – nur, wenn es kleine Airlines gibt.
+- **Gewerkschaftstag** (ab Tag 150, 30 Tage Vorlauf) – erst, wenn eine Airline drei Monate lang über 15 % Marge liegt.
+- **Etablierte Airlines gegen den Marktführer** (ab Tag 120, 45 Tage Vorlauf) – erst, wenn eine Airline seit zwei Monaten klar vorn liegt; je länger, desto wahrscheinlicher.
+- **Gesellschafterversammlung** je Airline: Sobald sich das Eigenkapital verdoppelt hat, kündigen die Gesellschafter die Ausschüttung an; sie beginnt 60 Tage später.
+- Laufende Spielstände: Preisangriffe aus 0.21.0 enden, wer schon Ausschüttungen hatte, behält sie; alles andere muss erst noch auftauchen.
+
+## Neu in 0.21.0: Dominanz einhegen, Kleine fördern
+
+- **Gesellschafter wollen mitverdienen (Hauptbremse):** Liegt das Eigenkapital über dem 2-fachen des eingebrachten Kapitals, wird jeden Monat ein Teil des Gewinns an die Gesellschafter ausgeschüttet: 20 % plus 20 % je weiterem Vielfachen, höchstens 70 % (2,6-fach → 32 %, 4-fach → 60 %). Das Geld verlässt das Unternehmen; „seit Start“ rechnet mit dem eingebrachten Kapital. Steht unter Finanzen → Ergebnis und Bilanz.
+- **Gewerkschaft will Gewinnbeteiligung:** Ab 15 % Marge (drei Monate) höchstens einmal im Jahr: 10 % vom Monatsgewinn für 12 Monate, eine Einmalprämie (60 % Chance) oder Ablehnen mit dreitägigem Streik.
+- **Preisangriff auf den Marktführer:** Wer unter den Mitspielenden das höchste Eigenkapital hat (mindestens 2,5-faches Kapital und 1,5-mal so viel wie die Nummer zwei), wird auf seinen drei stärksten Strecken zwei Monate lang angegriffen: Etablierte und KI-Airlines 15 % billiger, 25 % mehr Flüge.
+- **Nie alles auf einmal:** Gewerkschaft und Preisangriff wechseln sich ab, nie gleichzeitig, nicht während einer laufenden Gewinnbeteiligung, dazwischen mindestens 60 Tage Ruhe. Die Ausschüttung läuft unabhängig davon.
+- **Kerosin-Einkaufsgemeinschaft:** Airlines bis 10 Flugzeuge kaufen Kerosin 4 % günstiger, ab 25 Flugzeugen entfällt der Vorteil.
+- **Regionalförderung:** Airlines bis 15 Flugzeuge (abnehmend bis 30) bekommen bis 1.800 € je Abflug ab Flughäfen bis 5 Mio. Passagieren, die sonst niemand anfliegt (eigene Zeile in der Erfolgsrechnung).
+
 ## Neu in 0.20.1: Rückzahlungen an pleite Partner gehen an den Staat
 
 - Ist der Handelspartner zum Jahresabschluss pleite, von der Spielleitung entfernt oder unter derselben Kennung neu gegründet, zahlt der Begünstigte den Vorteil an die Staatskasse statt an ihn – auch bei Ratenzahlung und Selbstanzeige. Der Geber zahlt dann kein Bußgeld.
