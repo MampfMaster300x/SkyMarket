@@ -9971,15 +9971,22 @@ const slotAptOf = (v) => { const t = String(v || '').trim(), c = t.slice(0, 3).t
 function slotQuoteHtml(apt, n) {
   const pl = W.player; if (!apt) return '<p class="small muted">Flughafen eingeben – Code (z. B. FRA) oder Name.</p>';
   n = Math.max(1, Math.min(8, Math.round(n) || 1));
-  const free = Math.max(0, W.slotsFree(apt) - W.waitBlock(apt, pl)), q = (W.slotWait || []).filter((e) => e.apt === apt), qn = q.reduce((a, e) => a + e.n, 0);
-  const nsd = SM.nextSlotDay(W.day), total = Math.max(0, W.slotsFree(apt)) + 1;
-  const mineE = q.find((e) => e.al === pl.id && !e.plan), wants = q.map((e) => (e === mineE ? e.n + n : e.n)); if (!mineE) wants.push(n);
-  const got = rrAlloc(total, wants)[mineE ? q.indexOf(mineE) : wants.length - 1], held = pl.heldAt(apt, W.day);
-  const buyN = Math.min(n, free);
-  return `<div class="slotq"><div class="slotstats"><div><span>sofort frei</span><b class="${free ? '' : 'neg'}">${free}</b>${free ? `<em>ab ${eurB(W.slotBuyPrice(apt, 1))} je Slot</em>` : '<em>voll</em>'}</div><div><span>Ihre Reserve</span><b>${held || '–'}</b></div><div><span>Warteliste</span><b>${q.length ? `${q.length} Einträge · ${qn} Slots` : 'leer'}</b></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${total}</b><em>1 neuer + ${total - 1} freie</em></div></div>
+  const free = Math.max(0, W.slotsFree(apt) - W.waitBlock(apt, pl)), q = (W.slotWait || []).filter((e) => e.apt === apt && e.n > 0), qn = q.reduce((a, e) => a + e.n, 0);
+  const nsd = SM.nextSlotDay(W.day), total = Math.max(0, W.slotsFree(apt)) + 1, buyN = Math.min(n, free), ask = n - buyN || n, held = pl.heldAt(apt, W.day);
+  // Prognose: heutige Liste und Liste mit der neuen Anfrage (sie kommt zu Ihrem Eintrag ohne Plan, sonst ans Ende) – reihum je einer
+  const mineE = q.find((e) => e.al === pl.id && !e.plan), now = rrAlloc(total, q.map((e) => e.n));
+  const wants = q.map((e) => (e === mineE ? e.n + ask : e.n)); if (!mineE) wants.push(ask);
+  const after = rrAlloc(total, wants), mineIdx = q.map((e, i) => (e.al === pl.id ? i : -1)).filter((i) => i >= 0);
+  const myNow = mineIdx.reduce((a, i) => a + now[i], 0), myAsk = mineIdx.reduce((a, i) => a + q[i].n, 0);
+  const extra = mineIdx.reduce((a, i) => a + after[i], 0) + (mineE ? 0 : after[after.length - 1]) - myNow;
+  const list = q.length ? `<ol class="small slotq-list">${q.map((e, i) => { const a = W.airlines[e.al], me = e.al === pl.id; return `<li class="${me ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${me ? ' (Sie)' : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}${me && e.plan ? ' für einen Plan' : ''}</span><span class="${now[i] ? 'pos' : 'muted'}">→ ${now[i]} am ${dateShort(nsd.day)}</span></li>`; }).join('')}</ol>` : '';
+  const nTxt = total === 1 ? 'nur ein Slot' : `${total} Slots`;
+  const why = q.length && extra < ask ? ` Vergeben wird ${nTxt}, reihum zuerst an die Einträge davor.${myNow ? ` ${myNow === total ? (total === 1 ? 'Er geht' : 'Sie gehen alle') : `${myNow} davon gehen`} schon an Ihre bisherigen Einträge (${myNow} von ${myAsk}).` : ''}` : '';
+  return `<div class="slotq"><div class="slotstats"><div><span>sofort frei</span><b class="${free ? '' : 'neg'}">${free}</b>${free ? `<em>ab ${eurB(W.slotBuyPrice(apt, 1))} je Slot</em>` : '<em>voll</em>'}</div><div><span>Ihre Reserve</span><b>${held || '–'}</b></div><div><span>Warteliste</span><b>${q.length ? `${q.length} Eintr${q.length === 1 ? 'ag' : 'äge'} · ${qn} Slot${qn === 1 ? '' : 's'}` : 'leer'}</b></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${total}</b><em>1 neuer + ${total - 1} freie</em></div></div>
+    ${list}
     <div class="row" style="gap:6px;flex-wrap:wrap">${buyN ? `<button class="btn small primary" data-act="slotbuy" data-apt="${apt}" data-n="${buyN}">${buyN} sofort kaufen · ${eurB(W.slotBuyPrice(apt, buyN))}</button>` : ''}
-      ${n > free || !free ? `<button class="btn small${buyN ? '' : ' primary'}" data-act="slotwait" data-apt="${apt}" data-n="${n - buyN || n}">${n - buyN || n} auf die Warteliste${mineE ? ' (zu Ihrem Eintrag)' : ` · Platz ${q.length + 1}`}</button>` : ''}</div>
-    ${n > free || !free ? `<p class="small ${got >= (n - buyN || n) ? 'pos' : 'warnc'}">Prognose für ${dateLong(nsd.day)}: Sie bekämen voraussichtlich <b>${got} von ${n - buyN || n}</b> Slot${(n - buyN || n) > 1 ? 's' : ''}. Bezahlt wird erst bei der Zuteilung (Tagespreis).</p>` : '<p class="small muted">Gekaufte Slots liegen in Ihrer Reserve, bis eine Strecke sie nutzt. Ungenutzt kosten sie die übliche Slotgebühr; zurückgeben bringt den halben Buchwert.</p>'}</div>`;
+      ${n > free || !free ? `<button class="btn small${buyN ? '' : ' primary'}" data-act="slotwait" data-apt="${apt}" data-n="${ask}">${ask} auf die Warteliste${mineE ? ' (zu Ihrem Eintrag)' : ` · Platz ${q.length + 1}`}</button>` : ''}</div>
+    ${n > free || !free ? `<p class="small ${extra >= ask ? 'pos' : 'warnc'}">Prognose für ${dateLong(nsd.day)}: Mit dieser Anfrage bekämen Sie voraussichtlich <b>${extra} von ${ask}</b> ${myAsk ? 'weiteren ' : ''}Slot${ask > 1 ? 's' : ''}.${why} Bezahlt wird erst bei der Zuteilung (Tagespreis).</p>` : '<p class="small muted">Gekaufte Slots liegen in Ihrer Reserve, bis eine Strecke sie nutzt. Ungenutzt kosten sie die übliche Slotgebühr; zurückgeben bringt den halben Buchwert.</p>'}</div>`;
 }
 function slotCardHtml(c, pl, nsd) {
   const free = Math.max(0, W.slotsFree(c) - W.waitBlock(c, pl)), bought = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day).reduce((a, h) => a + h.n, 0);

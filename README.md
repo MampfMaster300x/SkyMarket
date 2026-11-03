@@ -183,6 +183,11 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.8: Warteliste mit Namen
+
+- Im Formular „Slots sichern“ steht unter den Kennzahlen jetzt die Warteliste des Flughafens: Reihenfolge, Airline, angefragte Slots (eigene Einträge für Pläne gekennzeichnet) und was jeder Eintrag beim nächsten Vergabetermin voraussichtlich bekommt.
+- Die Prognose zählt jetzt alle eigenen Einträge: Sie nennt, wie viele Slots die neue Anfrage *zusätzlich* brächte, und erklärt, warum es weniger sind – etwa weil nur ein Slot vergeben wird und der schon an Ihren eigenen früheren Eintrag geht. Vorher wurde nur der Eintrag betrachtet, zu dem die Anfrage hinzukommt, daher stand dort 0, obwohl der Slot an Sie ging.
+
 ## Neu in 0.21.7: Ereignistexte ohne Hinweis auf die Zielgruppe
 
 - Ereignismeldungen beschreiben nur noch, was passiert – nicht, wen es treffen oder wem es nützen soll. Gestrichen bzw. umformuliert:
