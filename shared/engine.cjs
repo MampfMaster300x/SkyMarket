@@ -1098,7 +1098,20 @@ const SM = (() => {
     return g.map((x) => Math.round(x));
   }
   class Ledger {
-    constructor(startCash) { this.pnl = {}; this.cash = cents(startCash); this.equityContrib = cents(startCash); this.month = {}; this.months = []; this.cashHist = []; this.today = {}; this.det = null; }
+    constructor(startCash) { this.pnl = {}; this.cash = cents(startCash); this.equityContrib = cents(startCash); this.month = {}; this.months = []; this.cashHist = []; this.today = {}; this.det = null; this.fx = null; }
+    /**
+     * Finanzbericht (nur Spielende): fx hält, was GuV und Bilanz allein nicht zeigen –
+     *  nc/tnc: nicht zahlungswirksame Buchungen je Konto (Monat / seit Beginn), cf: Geldflüsse ohne Ergebniswirkung seit Beginn,
+     *  eq/meq: Eigenkapitalbewegungen (Einlagen, Ausschüttungen …) seit Beginn / im Monat, m0: Stände zu Monatsbeginn, t0: Stände zu Beginn der Aufzeichnung.
+     */
+    startFx(day = null, startCash = null) {
+      const ni = Object.values(this.pnl).reduce((a, b) => a + b, 0);
+      const st = startCash !== null ? { start: cents(startCash) } : {};   // Gründung: Startkapital als erste Einlage und erster Geldzufluss
+      this.fx = { nc: {}, tnc: {}, cf: { ...st }, eq: { ...st }, meq: {}, m0: { cash: this.cash, ec: this.equityContrib, ni },
+        t0: { day, cash: startCash !== null ? 0 : this.cash, ec: startCash !== null ? 0 : this.equityContrib, ni } };
+    }
+    /** Eigenkapitalbewegung ohne Geldfluss (z. B. Schulden gegen Aktien). */
+    equityMove(amount, label) { const c = cents(amount); if (!c) return; this.equityContrib += c; if (this.fx) { this.fx.eq[label] = (this.fx.eq[label] || 0) + c; this.fx.meq[label] = (this.fx.meq[label] || 0) + c; } }
     /** Buchung; tag = Herkunft (Strecke, Flughafen, Flugzeug, Person, Anlass). Bei Spielenden wird sie für die aufklappbare P&L mitgeschrieben. */
     post(acc, amount, cash = true, tag = null) {
       const c = cents(amount);
@@ -1107,14 +1120,18 @@ const SM = (() => {
       this.month[acc] = (this.month[acc] || 0) + c;
       this.today[acc] = (this.today[acc] || 0) + c;
       if (cash) this.cash += c;
+      else if (this.fx) { this.fx.nc[acc] = (this.fx.nc[acc] || 0) + c; this.fx.tnc[acc] = (this.fx.tnc[acc] || 0) + c; }
       if (this.det) {
         const t = tag || 'ohne Zuordnung', m = this.det.m[acc] || (this.det.m[acc] = {}), q = this.det.p[acc] || (this.det.p[acc] = {});
         m[t] = (m[t] || 0) + c; q[t] = (q[t] || 0) + c;
       }
     }
-    cashOnly(amount, label) { const c = cents(amount); if (!c) return; this.cash += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c; }
+    cashOnly(amount, label) { const c = cents(amount); if (!c) return; this.cash += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c; if (this.fx) this.fx.cf[label] = (this.fx.cf[label] || 0) + c; }
     /** Eigenkapital rein (Kapitalerhöhung) oder raus (Dividende, Aktienrückkauf): Kasse und Einlagen ändern sich, das Ergebnis nicht. */
-    equityFlow(amount, label) { const c = cents(amount); if (!c) return; this.cash += c; this.equityContrib += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c; }
+    equityFlow(amount, label) {
+      const c = cents(amount); if (!c) return; this.cash += c; this.equityContrib += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c;
+      if (this.fx) { this.fx.cf[label] = (this.fx.cf[label] || 0) + c; this.fx.eq[label] = (this.fx.eq[label] || 0) + c; this.fx.meq[label] = (this.fx.meq[label] || 0) + c; }
+    }
     closeDay() {
       let r = 0; for (const k in this.today) if (!k.startsWith('cf_')) r += this.today[k];
       this.lastDay = r / 100;
@@ -1122,6 +1139,11 @@ const SM = (() => {
     }
     closeMonth(label) {
       const e = { label, acc: this.month }; if (this.det) { e.det = this.det.m; this.det.m = {}; }
+      if (this.fx) {   // Monatsabschluss für Kapitalfluss und Eigenkapitalspiegel: Stände am Anfang und Ende, nicht zahlungswirksame Posten, EK-Bewegungen
+        const F = this.fx, ni = Object.values(this.pnl).reduce((a, b) => a + b, 0);
+        e.fx = { m0: F.m0, m1: { cash: this.cash, ec: this.equityContrib, ni }, nc: F.nc, eq: F.meq };
+        F.m0 = { cash: this.cash, ec: this.equityContrib, ni }; F.nc = {}; F.meq = {};
+      }
       this.months.push(e); if (this.months.length > 36) this.months.shift(); this.month = {};
       for (let i = 0; i < this.months.length - P.PNL_DETAIL_MONTHS; i++) delete this.months[i].det;   // Einzelposten nur für die letzten Monate
     }
@@ -1156,7 +1178,7 @@ const SM = (() => {
         hedge: null, experts: [], studies: {}, stations: {}, hangars: [], decisions: [], milestones: {}, slotHold: {},
         staff: archetype ? null : { pil: zeroGroups(), cab: 0, tech: 0, pipeline: [], pay: 1.0, morale: 0.65, agency: true, cov: null } });
       this.ledger = new Ledger(equity);
-      if (!archetype) this.ledger.det = { m: {}, p: {} };   // Spielende: Einzelposten für die aufklappbare P&L
+      if (!archetype) { this.ledger.det = { m: {}, p: {} }; this.ledger.startFx(null, equity); }   // Spielende: Einzelposten und Finanzbericht
       this.rngForecast = new Rng(hashStr(id));
     }
     get isPlayer() { return !this.archetype; }
@@ -2973,7 +2995,7 @@ const SM = (() => {
         if (al.distressDays === P.RESTRUCTURING_AFTER_DAYS && al.archetype && !al.rescued) {
           // Letzte Rettung für KI-Airlines: Investor oder Staatsfonds, einmalig
           const amt = Math.round((20e6 + al.fleet.length * 1.5e6) * this.macro.cpi / 1e5) * 1e5;
-          L.cash += Math.round(amt * 100); L.equityContrib += Math.round(amt * 100); al.rescued = true; al.distressDays = 0;
+          L.equityFlow(amt, 'rescue'); al.rescued = true; al.distressDays = 0;
           this.pushNews(this.day, `${al.name} wird mit ${Math.round(amt / 1e6)} Mio. EUR frischem Kapital gerettet und muss schrumpfen`, 'warn', al.id);
           this.restructure(al);
         } else if (al.distressDays === P.RESTRUCTURING_AFTER_DAYS) {
@@ -4782,7 +4804,7 @@ const SM = (() => {
     const al = w.airlines[id], amt = Math.round(clamp(Number(amount) || 0, -999e6, 999e6) / 1e4) * 1e4;
     if (!al || !al.isPlayer || al.removed) return { ok: false, msg: 'Unbekannte Airline.' };
     if (!amt) return { ok: false, msg: 'Bitte einen Betrag angeben.' };
-    al.ledger.cash += Math.round(amt * 100); al.ledger.equityContrib = (al.ledger.equityContrib || 0) + Math.round(amt * 100);
+    al.ledger.equityFlow(amt, 'admin');
     if (typeof capState(al).mc === 'number') capShift(w, al, amt);
     al.log(w.day, `${by}: Kapitalkorrektur ${amt > 0 ? '+' : '−'}${Math.round(Math.abs(amt) / 1e4) / 100} Mio. EUR`, amt > 0 ? 'info' : 'warn');
     return { ok: true };
@@ -4922,7 +4944,7 @@ const SM = (() => {
     const val = Math.max(1e6, mktCap(w, al) * P.RESTRUCT.swap.disc);
     let amt = al.creditUsed, q = amt / (val + amt);
     const qMax = room / (1 - c.ext); if (q > qMax) { q = qMax; amt = q * val / (1 - q); }
-    al.creditUsed -= amt; al.ledger.equityContrib += cents(amt);
+    al.creditUsed -= amt; al.ledger.equityMove(amt, 'debt_swap');
     for (const h of holdersOf(w, al)) h.al.stakes[al.id].f *= 1 - q;
     c.ext = c.ext * (1 - q) + q;
     al.log(w.day, `Schulden gegen Aktien: Die Bank wandelt ${Math.round(amt / 1e5) / 10} Mio. EUR Kreditlinie in ${Math.round(q * 1000) / 10} % Ihrer Aktien. Außerhalb Ihrer Hand jetzt ${Math.round(c.ext * 100)} %.`, 'warn');
@@ -6412,7 +6434,7 @@ const SM = (() => {
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
         experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
-        ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined,
+        ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
       })),
     };
@@ -6436,6 +6458,8 @@ const SM = (() => {
       al.rngForecast.s = rngF;
       Object.assign(al.ledger, ledger);
       if (al.isPlayer && !al.ledger.det) al.ledger.det = { m: {}, p: {} };   // 0.21.11: Einzelposten ab jetzt
+      if (al.isPlayer && !(ledger && ledger.fx)) al.ledger.startFx(s.day);   // 0.21.14: Finanzbericht ab jetzt (Stände von heute als Anfang)
+      if (!al.isPlayer) al.ledger.fx = null;
       al._day = s.day;
       if (!al.poachLog) delete al.poachLog;
       if (!al.grudge) delete al.grudge;

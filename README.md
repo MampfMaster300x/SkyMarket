@@ -183,6 +183,20 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.14: Finanzbericht – alles nachvollziehbar
+
+Unter Finanzen steht jetzt ein vollständiger Finanzbericht. Jede Summe lässt sich bis zur einzelnen Buchung aufklappen, und jede Abstimmung zeigt „✓ stimmt“ (oder die Abweichung):
+
+- **Abstimmung auf einen Blick:** GuV = Summe aller Herkünfte · Kasse = Anfang + Kapitalfluss · Bilanz: Vermögen − Schulden = Einlagen + Ergebnisse.
+- **Gewinn- und Verlustrechnung (top-down):** Gruppen mit Summen (Erlöse, Flugbetrieb, Personal, Flugzeuge/Standorte/Verwaltung, Finanzergebnis, Steuern) und Zwischenergebnissen (Deckungsbeitrag I, EBIT, Jahresüberschuss) → Konten → Einzelposten. Spalten: laufender Monat, Vormonat, seit Start.
+- **Ergebnis nach Herkunft (bottom-up):** Jede Buchung gehört zu genau einer Strecke, einem Flugzeug, einem Flughafen, einer Fachkraft, der Belegschaft oder dem Unternehmen. Je Objekt Erlöse, Kosten, Ergebnis und alle Einzelbuchungen; die Summe ergibt exakt den Jahresüberschuss.
+- **Kapitalflussrechnung:** Kasse zu Beginn + Cashflow aus dem Betrieb (Jahresüberschuss, Abschreibungen und andere Buchungen ohne Geldfluss) + Investitionen (Flugzeugkäufe/-verkäufe, Kautionen, Slots, Aktien) + Finanzierung (Startkapital, Kredite, Dispo, Anleihen, Kapitalerhöhung, Dividenden, Zuschüsse) = Kasse am Ende, abgeglichen mit dem Konto.
+- **Bilanz** zum Stichtag mit Einzelposten: Flugzeuge (Anschaffung − Abschreibung = Buchwert), Kautionen, Slots je Flughafen, Beteiligungen; Flugzeugkredite je Flugzeug, Bankkredite, Dispo, Anleihen, gestundete Raten; Eigenkapital = Einlagen (Startkapital, Kapitalerhöhungen, Ausschüttungen …) + alle Ergebnisse.
+- **Eigenkapitalspiegel:** Eigenkapital zu Beginn + Jahresüberschuss ± Einlagen/Ausschüttungen = Eigenkapital am Ende = Bilanz.
+- Zeitraum wählbar: laufender Monat, die abgeschlossenen Monate, seit Gründung.
+- Technisch: Die Buchhaltung erfasst jetzt auch Buchungen ohne Geldfluss, alle Geldflüsse ohne Ergebniswirkung, alle Eigenkapitalbewegungen und die Stände zu Monatsbeginn. Drei Stellen, die Kasse oder Einlagen direkt verändert haben (Zuschuss der Spielleitung, Rettungskapital, Schulden gegen Aktien), laufen jetzt über die Buchhaltung. Laufende Spielstände beginnen die Aufzeichnung beim ersten Laden; davor Gebuchtes steht als eigener Posten.
+- Neue Tests prüfen die Abstimmungen je Monat und seit Gründung auf den Cent, auch nach Speichern und Laden.
+
 ## Neu in 0.21.13: Filter im Einsatzplan
 
 - Die Filter im Einsatzplan (Flugzeugtyp, Basis) taten nichts: Der zentrale Klickverteiler gab nur Aktionen mit „asg…“ an die Einsatzplanung weiter, die Filterknöpfe heißen aber „fptype“/„fpbase“. Behoben.

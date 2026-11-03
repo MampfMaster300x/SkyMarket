@@ -753,4 +753,32 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   }
   assert.deepEqual(broken, [], 'Knöpfe ohne erreichbaren Empfänger: ' + broken.join(', '));
   console.log('0.21.13 ok:', names.size, 'Knopf-Aktionen haben einen erreichbaren Empfänger'); }
+// 0.21.14: Finanzbericht – Kasse, Einlagen und Ergebnis stimmen je Monat und seit Gründung auf den Cent; alte Stände beginnen die Aufzeichnung beim Laden
+{ const SMx = (await import('../shared/engine.cjs')).default, sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+  const w0 = SMx.newGame({ seed: 9, base: 'HAM' }), A = (w, a) => SMx.applyAction(w, w.player.id, a);
+  let w = w0; w.player.cash = Math.max(w.player.cash, 3e8);
+  A(w, { type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); A(w, { type: 'acquire', typeId: 'E295', mode: 'buy', base: 'HAM' }); A(w, { type: 'fillStaff' }); for (let i = 0; i < 20; i++) w.step();
+  for (const d of ['PMI', 'VIE']) A(w, { type: 'openRoute', base: 'HAM', dest: d, typeId: d === 'VIE' ? 'E295' : 'A20N', freq: 1 });
+  A(w, { type: 'buySlots', apt: 'HAM', n: 1 }); for (let i = 0; i < 45; i++) w.step();
+  SMx.adminGrant(w, w.player.id, 4e6, 'Test'); A(w, { type: 'sellSlots', apt: 'HAM', n: 1 });
+  w = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); for (let i = 0; i < 40; i++) w.step();
+  const L = w.player.ledger, F = L.fx, ni = sum(L.pnl);
+  assert.equal(F.t0.cash + (ni - F.t0.ni) - sum(F.tnc) + sum(F.cf), L.cash, 'Kasse seit Gründung = Startkapital + Kapitalfluss');
+  assert.equal(F.t0.ec + sum(F.eq), L.equityContrib, 'Einlagen seit Gründung = Startkapital + Bewegungen');
+  assert.ok(F.eq.start > 0 && F.eq.admin === 4e8 && F.tnc.depreciation < 0, 'Startkapital, Zuschuss und Abschreibung erfasst');
+  const ms = L.months.filter((m) => m.fx); assert.ok(ms.length >= 3, 'Monatsabschlüsse mit Kapitalfluss');
+  for (const m of ms) {
+    const net = Object.entries(m.acc).reduce((a, [k, v]) => a + (k.startsWith('cf_') ? 0 : v), 0), cf = Object.entries(m.acc).reduce((a, [k, v]) => a + (k.startsWith('cf_') ? v : 0), 0);
+    assert.equal(m.fx.m0.cash + net - sum(m.fx.nc) + cf, m.fx.m1.cash, 'Monat: Kasse Anfang + Kapitalfluss = Kasse Ende');
+    assert.equal(m.fx.m0.ec + sum(m.fx.eq), m.fx.m1.ec, 'Monat: Einlagen'); assert.equal(m.fx.m0.ni + net, m.fx.m1.ni, 'Monat: Ergebnis');
+    for (const [k, v] of Object.entries(m.acc)) if (!k.startsWith('cf_')) assert.equal(sum(m.det[k]), v, 'Monat: Einzelposten = Konto ' + k);
+  }
+  assert.ok(Math.abs(SMx.balanceSheet(w.player).check) < 0.01, 'Bilanz: Vermögen − Schulden = Einlagen + Ergebnisse');
+  // Alter Spielstand ohne Aufzeichnung: beginnt beim Laden mit den heutigen Ständen
+  const sv = JSON.parse(JSON.stringify(SMx.serialize(w))); delete sv.airlines.find((a) => a.id === w.player.id).ledger.fx;
+  const wo = SMx.deserialize(sv), Lo = wo.player.ledger; assert.ok(Lo.fx && Lo.fx.t0.day === wo.day && Lo.fx.t0.cash === Lo.cash, 'alter Stand: Aufzeichnung ab heute');
+  for (let i = 0; i < 35; i++) wo.step(); const Fo = Lo.fx;
+  assert.equal(Fo.t0.cash + (sum(Lo.pnl) - Fo.t0.ni) - sum(Fo.tnc) + sum(Fo.cf), Lo.cash, 'alter Stand: Kasse seit Aufzeichnung stimmt');
+  assert.ok(!wo.list.some((a) => a.archetype && a.ledger.fx), 'KI-Airlines ohne Finanzbericht');
+  console.log('0.21.14 ok: Kasse, Einlagen, Ergebnis und Einzelposten stimmen in', ms.length, 'Monaten und seit Gründung auf den Cent'); }
 console.log('Alle Prüfungen bestanden.');

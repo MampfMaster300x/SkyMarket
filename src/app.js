@@ -2661,6 +2661,183 @@ function pnlCol(acc) {
   const ebit = PNL_ACCOUNTS_EBIT.reduce((s, k) => s + v(k), 0);
   return { v, ebit, net: ebit + v('interest') + v('invest') + v('tax'), rev: v('rev_ticket') + v('rev_ancillary') + v('rev_cargo') + v('rev_acmi') };
 }
+// ---------------------------------------------------------------------------
+// Finanzbericht: GuV (top-down), Ergebnis nach Herkunft (bottom-up), Kapitalfluss, Bilanz, Eigenkapitalspiegel – jede Summe mit Abstimmung
+// ---------------------------------------------------------------------------
+const PNL_GROUPS = [
+  { k: 'rev', l: 'Erlöse', acc: ['rev_ticket', 'rev_ancillary', 'rev_cargo', 'rev_acmi', 'subsidy'] },
+  { k: 'ops', l: 'Flugbetrieb (direkte Kosten)', acc: ['fuel', 'hedge', 'crew', 'maintenance', 'navigation', 'landing', 'handling', 'pax_fees', 'pax_service', 'distribution', 'cargo_cost', 'disruption'] },
+  { sub: 'db1', l: 'Deckungsbeitrag I', hint: 'Erlöse minus Flugbetrieb', of: ['rev', 'ops'] },
+  { k: 'staff', l: 'Personal', acc: ['staff_cockpit', 'staff_cabin', 'staff_tech', 'staff_extra', 'experts'] },
+  { k: 'fix', l: 'Flugzeuge, Standorte, Vertrieb, Verwaltung', acc: ['lease', 'depreciation', 'insurance', 'stations', 'slots', 'marketing', 'loyalty', 'overhead', 'one_off', 'trade'] },
+  { sub: 'ebit', l: 'Betriebsergebnis (EBIT)', of: ['rev', 'ops', 'staff', 'fix'] },
+  { k: 'fin', l: 'Finanzergebnis', acc: ['interest', 'invest'] },
+  { k: 'tax', l: 'Steuern', acc: ['tax'] },
+  { sub: 'net', l: 'Jahresüberschuss', hint: 'Ergebnis nach Steuern', of: ['rev', 'ops', 'staff', 'fix', 'fin', 'tax'] },
+];
+const ACC_LABEL = Object.fromEntries(PNL_ROWS.filter(([k]) => k !== 'grp').map(([k, l]) => [k, l]));
+const accGroup = (k) => { const g = PNL_GROUPS.find((x) => x.acc && x.acc.includes(k)); return g ? g.k : 'fix'; };
+const CF_LABEL = { start: 'Startkapital (Gründung)', capex: 'Flugzeugkäufe', asset_sale: 'Flugzeugverkäufe (Erlös)', deposit: 'Leasing-Kautionen gezahlt', deposit_back: 'Leasing-Kautionen zurück', slots: 'Slotkäufe', slots_sale: 'Slotverkäufe (Erlös)',
+  stake_buy: 'Aktienkäufe (Beteiligungen)', stake_sell: 'Aktienverkäufe', ma: 'Übernahme: Kaufpreis', ma_cash: 'Übernahme: übernommene Kasse', loan_draw: 'Kredite aufgenommen', loan_repay: 'Kredite getilgt', credit_draw: 'Dispo in Anspruch genommen',
+  credit_repay: 'Dispo zurückgeführt', bond: 'Anleihe ausgegeben', bond_repay: 'Anleihe zurückgezahlt', equity_issue: 'Kapitalerhöhung', buyback: 'Aktienrückkauf', dividend: 'Dividenden und Ausschüttungen', admin: 'Zuschuss oder Korrektur der Spielleitung',
+  rescue: 'Rettungskapital', lease_deferred: 'Nachzahlung gestundeter Leasingraten', debt_swap: 'Schulden gegen Aktien (ohne Geldfluss)' };
+const CF_INV = ['capex', 'asset_sale', 'deposit', 'deposit_back', 'slots', 'slots_sale', 'stake_buy', 'stake_sell', 'ma', 'ma_cash'];
+const CF_FIN = ['start', 'loan_draw', 'loan_repay', 'credit_draw', 'credit_repay', 'bond', 'bond_repay', 'equity_issue', 'buyback', 'dividend', 'admin', 'rescue'];
+const sumO = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+const ec = (c) => eur((c || 0) / 100);   // Cent → Anzeige
+const okMark = (diff) => (Math.abs(diff) < 100 ? '<span class="pos" title="stimmt auf den Euro">✓ stimmt</span>' : `<span class="neg">Abweichung ${ec(diff)}</span>`);
+/** Zeiträume des Berichts: laufender Monat, abgeschlossene Monate mit Aufschlüsselung, seit Gründung bzw. Beginn der Aufzeichnung. */
+function finPeriods(pl) {
+  const L = pl.ledger, F = L.fx, D = L.det, now = { cash: L.cash, ec: L.equityContrib, ni: sumO(L.pnl) };
+  const split = (acc) => { const pnl = {}, cf = {}; for (const [k, v] of Object.entries(acc || {})) { if (k.startsWith('cf_')) cf[k.slice(3)] = v; else pnl[k] = v; } return { pnl, cf }; };
+  const out = [{ k: 'cur', label: `${MONTHS[dateParts(W.day).m]} (lfd.)`, ...split(L.month), det: D ? D.m : null, fx: F ? { m0: F.m0, m1: now, nc: F.nc, eq: F.meq } : null }];
+  for (let i = L.months.length - 1; i >= 0; i--) { const m = L.months[i]; if (!m.det && !m.fx) continue; out.push({ k: 'm' + i, label: `${MONTHS[m.label.m]} ${2027 + (m.label.y || 0)}`, ...split(m.acc), det: m.det || null, fx: m.fx || null }); }
+  const since = F && F.t0.day !== null && F.t0.day !== undefined ? `seit ${dateShortY(F.t0.day)}` : 'seit Gründung';
+  out.push({ k: 'all', label: since, pnl: L.pnl, cf: F ? F.cf : {}, det: D ? D.p : null, fx: F ? { m0: F.t0, m1: now, nc: F.tnc, eq: F.eq, all: true } : null });
+  return out;
+}
+function finPeriod(pl) { const ps = finPeriods(pl); return ps.find((p) => p.k === ui.finP) || ps[0]; }
+function finPeriodBar(pl) {
+  const ps = finPeriods(pl), cur = finPeriod(pl).k;
+  return `<div class="row fin-per" style="gap:6px;flex-wrap:wrap;align-items:center"><span class="small muted">Zeitraum für Herkunft, Kapitalfluss und Eigenkapital:</span><div class="seg wrap">${ps.map((p) => `<button data-act="finp" data-v="${p.k}" aria-pressed="${p.k === cur}">${esc(p.label)}</button>`).join('')}</div></div>`;
+}
+const finOpen = (k, def = false) => { const o = ui.finOpen || (ui.finOpen = {}); return o[k] === undefined ? def : o[k]; };
+const finRow = (k, def, label, cells, cls = '') => `<tr class="fin-x${finOpen(k, def) ? ' open' : ''} ${cls}" data-act="finx" data-k="${esc(k)}" data-d="${def ? 1 : 0}" role="button" tabindex="0" aria-expanded="${finOpen(k, def)}"><td><i class="pnl-car">${finOpen(k, def) ? '▾' : '▸'}</i>${label}</td>${cells}</tr>`;
+
+/** GuV top-down: Gruppen mit Summen → Konten → Einzelposten. Spalten: lfd. Monat, Vormonat, seit Start. */
+function finPnlHtml(pl) {
+  const L = pl.ledger, last = L.months.at(-1), cols = [L.month, last ? last.acc : null, L.pnl], pm = dateParts(W.day).m;
+  const gsum = (acc, gk) => (acc ? (PNL_GROUPS.find((g) => g.k === gk).acc).reduce((a, k) => a + (acc[k] || 0), 0) : null);
+  const vsum = (acc, of) => (acc ? of.reduce((a, gk) => a + gsum(acc, gk), 0) : null);
+  const td = (c, bold = false) => (c === null ? '<td class="r muted">–</td>' : `<td class="r${bold ? ' ' + sgn(c) : ''}">${c === 0 ? '<span class="muted">0</span>' : ec(c)}</td>`);
+  const used = (k) => cols.some((a) => a && a[k]);
+  let rows = '';
+  for (const g of PNL_GROUPS) {
+    if (g.sub) { rows += `<tr class="sum fin-sub"><td>${g.l}${g.hint ? ` <span class="small muted">${g.hint}</span>` : ''}</td>${cols.map((a) => td(vsum(a, g.of), true)).join('')}</tr>`; continue; }
+    const accs = g.acc.filter(used); if (!accs.length && g.k !== 'tax') continue;
+    rows += finRow('g:' + g.k, true, `<b>${g.l}</b>`, cols.map((a) => td(gsum(a, g.k))).join(''), 'fin-grp');
+    if (!finOpen('g:' + g.k, true)) continue;
+    const op = ui.pnlOpen || (ui.pnlOpen = {});
+    for (const k of accs) rows += `<tr class="pnl-x${op[k] ? ' open' : ''}" data-act="pnlx" data-k="${k}" role="button" tabindex="0" aria-expanded="${!!op[k]}"><td style="padding-left:22px"><i class="pnl-car">${op[k] ? '▾' : '▸'}</i>${ACC_LABEL[k] || k}</td>${cols.map((a) => td(a ? a[k] || 0 : null)).join('')}</tr>${op[k] ? pnlDetailRows(pl, k) : ''}`;
+  }
+  // Konten, die keiner Gruppe zugeordnet sind (sollte nicht vorkommen) – sichtbar statt verschluckt
+  const known = new Set(PNL_GROUPS.flatMap((g) => g.acc || [])), extra = [...new Set(cols.flatMap((a) => Object.keys(a || {})))].filter((k) => !k.startsWith('cf_') && !known.has(k));
+  for (const k of extra) rows += `<tr><td>${esc(k)}</td>${cols.map((a) => td(a ? a[k] || 0 : null)).join('')}</tr>`;
+  return `<div class="stack"><h2 class="sec">Gewinn- und Verlustrechnung <small>von oben nach unten: Gruppe → Konto → Einzelposten · Zeile anklicken</small></h2><div class="tw"><table class="t pnl fin"><thead><tr><th></th><th class="r">${MONTHS[pm]} (lfd.)</th><th class="r">Vormonat</th><th class="r">seit Start</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="small muted">Jede Zeile ist die Summe der Zeilen darunter; die Einzelposten ergeben exakt das Konto. Ergebnis ist nicht Kontostand – wie aus dem Ergebnis Geld wird, zeigt die Kapitalflussrechnung.</p></div>`;
+}
+
+/** Herkunft einer Buchung: Strecke, Flugzeug, Flughafen, Fachkraft, Belegschaft oder Unternehmen. */
+const EXPERT_ROLE_LABELS = new Set(Object.values(P.EXPERT_ROLES).map((r) => r.label));
+function originOf(acc, tag) {
+  const t = String(tag || '');
+  if (t === 'ohne Zuordnung') return { d: 'firm', o: 'ohne Zuordnung', sub: '' };
+  let m = /^([A-Z]{3}–[A-Z]{3})(?: › (.*))?$/.exec(t); if (m) return { d: 'route', o: m[1], sub: m[2] || '' };
+  m = /^(?:(.*) › )?([A-Za-z0-9]+-\d+ · [^›]+)$/.exec(t); if (m) return { d: 'ac', o: m[2], sub: m[1] || '' };
+  m = /^(?:(.*) › )?(.+ \(([^()]+)\))$/.exec(t);
+  if (m && EXPERT_ROLE_LABELS.has(m[3])) return { d: 'person', o: m[2], sub: m[1] || '' };
+  if (m && /^[A-Z]{3}$/.test(m[3])) return { d: 'apt', o: m[2], sub: m[1] || '' };
+  if (acc.startsWith('staff_')) return { d: 'staff', o: t.split(' › ')[0], sub: t.split(' › ').slice(1).join(' › ') };
+  const i = t.indexOf(' › '); return { d: 'firm', o: i < 0 ? t : t.slice(0, i), sub: i < 0 ? '' : t.slice(i + 3) };
+}
+const ORIGIN_DIMS = [['route', 'Strecken', 'Erlöse und direkte Flugkosten je Strecke'], ['ac', 'Flugzeuge', 'Leasing, Abschreibung, Versicherung, Finanzierung, Charter je Flugzeug'], ['apt', 'Flughäfen und Basen', 'Slots, Stationen, Basen, Hangars, Lizenzen je Flughafen'],
+  ['staff', 'Belegschaft', 'Gehälter je Gruppe, Einstellungen, Boni'], ['person', 'Fachkräfte', 'je Person'], ['firm', 'Unternehmen', 'Zentrale, Marketing, Zinsen, Steuern, Absicherung, Einmaliges'], ['old', 'vor Beginn der Aufschlüsselung', 'ältere Buchungen ohne Herkunft']];
+function finOriginHtml(pl, per) {
+  if (!per.det) return `<div class="stack"><h2 class="sec">Ergebnis nach Herkunft</h2><p class="small muted">Für ${esc(per.label)} gibt es keine Einzelposten.</p></div>`;
+  const objs = {}, put = (d, o, acc, sub, v) => { const key = d + '|' + o, x = objs[key] || (objs[key] = { d, o, rev: 0, cost: 0, items: {} }); if (accGroup(acc) === 'rev') x.rev += v; else x.cost += v; const ik = acc + '|' + sub; x.items[ik] = (x.items[ik] || 0) + v; };
+  for (const [acc, tags] of Object.entries(per.det)) for (const [tag, v] of Object.entries(tags)) { if (!v) continue; const g = originOf(acc, tag); put(g.d, g.o, acc, g.sub, v); }
+  for (const [acc, v] of Object.entries(per.pnl)) { const rest = v - sumO(per.det[acc]); if (Math.abs(rest) >= 1) put('old', 'vor Beginn der Aufschlüsselung', acc, '', rest); }
+  const net = sumO(per.pnl), all = Object.values(objs), tot = all.reduce((a, x) => a + x.rev + x.cost, 0);
+  const td = (c, b = false) => `<td class="r${b ? ' ' + sgn(c) : ''}">${c ? ec(c) : '<span class="muted">0</span>'}</td>`;
+  let rows = '';
+  for (const [d, l, hint] of ORIGIN_DIMS) {
+    const xs = all.filter((x) => x.d === d).sort((a, b) => (d === 'route' ? (b.rev + b.cost) - (a.rev + a.cost) : Math.abs(b.rev + b.cost) - Math.abs(a.rev + a.cost)));
+    if (!xs.length) continue;
+    const s = (f) => xs.reduce((a, x) => a + f(x), 0), gk = `o:${per.k}:${d}`;
+    rows += finRow(gk, d !== 'old', `<b>${l}</b> <span class="small muted">${xs.length} · ${hint}</span>`, td(s((x) => x.rev)) + td(s((x) => x.cost)) + td(s((x) => x.rev + x.cost), true), 'fin-grp');
+    if (!finOpen(gk, d !== 'old')) continue;
+    const MAX = finOpen(gk + ':all') ? 999 : 20;
+    for (const x of xs.slice(0, MAX)) {
+      const ok = `o:${per.k}:${d}:${x.o}`;
+      rows += finRow(ok, false, `<span style="padding-left:14px">${esc(x.o)}</span>`, td(x.rev) + td(x.cost) + td(x.rev + x.cost, true));
+      if (finOpen(ok)) rows += Object.entries(x.items).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([ik, v]) => { const [acc, sub] = ik.split('|'); return `<tr class="pnl-d"><td style="padding-left:40px"><span class="muted">${esc(ACC_LABEL[acc] || acc)}${sub ? ' ›' : ''}</span> ${sub ? `<b>${esc(sub)}</b>` : ''}</td>${accGroup(acc) === 'rev' ? td(v) + '<td></td>' : '<td></td>' + td(v)}${td(v, true)}</tr>`; }).join('');
+    }
+    if (xs.length > MAX) rows += `<tr class="pnl-d more" data-act="finx" data-k="${esc(gk + ':all')}" data-d="0" role="button" tabindex="0"><td colspan="4"><span class="link">… ${xs.length - MAX} weitere anzeigen</span></td></tr>`;
+  }
+  rows += `<tr class="sum fin-sub"><td>Summe aller Herkünfte</td>${td(all.reduce((a, x) => a + x.rev, 0))}${td(all.reduce((a, x) => a + x.cost, 0))}${td(tot, true)}</tr>
+    <tr class="fin-chk"><td colspan="3">= Jahresüberschuss laut GuV (${esc(per.label)}): ${ec(net)}</td><td class="r">${okMark(tot - net)}</td></tr>`;
+  return `<div class="stack"><h2 class="sec">Ergebnis nach Herkunft <small>von unten nach oben: jede Buchung gehört zu genau einer Strecke, einem Flugzeug, Flughafen … · ${esc(per.label)}</small></h2>
+    <div class="tw"><table class="t pnl fin"><thead><tr><th></th><th class="r">Erlöse</th><th class="r">Kosten</th><th class="r">Ergebnis</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="small muted">Strecken tragen nur ihre direkten Kosten; was ein Flugzeug kostet (Leasing, Abschreibung, Versicherung), steht beim Flugzeug, Slots und Stationen beim Flughafen. Zusammen ergibt alles exakt den Jahresüberschuss.</p></div>`;
+}
+
+/** Kapitalflussrechnung: Kasse am Anfang + Ergebnis − nicht zahlungswirksame Posten ± Investitionen ± Finanzierung = Kasse am Ende. */
+function finCashHtml(pl, per) {
+  const X = per.fx;
+  if (!X) return `<div class="stack"><h2 class="sec">Kapitalflussrechnung</h2><p class="small muted">Für ${esc(per.label)} liegen die Geldflüsse noch nicht aufgeschlüsselt vor – sie werden ab dem Update aufgezeichnet.</p></div>`;
+  const ni = X.m1.ni - X.m0.ni, nc = X.nc || {}, cf = per.cf || {}, td = (c, b = false) => `<td class="r${b ? ' ' + sgn(c) : ''}">${c ? ec(c) : '<span class="muted">0</span>'}</td>`;
+  const lab = (k) => CF_LABEL[k] || k, sec = (keys) => Object.entries(cf).filter(([k, v]) => keys(k) && v);
+  const op = sec((k) => !CF_INV.includes(k) && !CF_FIN.includes(k)), inv = sec((k) => CF_INV.includes(k)), fin = sec((k) => CF_FIN.includes(k));
+  const sOp = ni - sumO(nc) + op.reduce((a, [, v]) => a + v, 0), sInv = inv.reduce((a, [, v]) => a + v, 0), sFin = fin.reduce((a, [, v]) => a + v, 0), end = X.m0.cash + sOp + sInv + sFin;
+  const k0 = `c:${per.k}`;
+  let rows = `<tr><td><b>Kasse zu Beginn</b> <span class="small muted">${X.all ? (per.label === 'seit Gründung' ? 'bei Gründung' : 'bei Beginn der Aufzeichnung') : 'am Monatsanfang'}</span></td>${td(X.m0.cash)}</tr>`;
+  rows += finRow(k0 + ':op', true, '<b>Cashflow aus dem Betrieb</b>', td(sOp, true), 'fin-grp');
+  if (finOpen(k0 + ':op', true)) {
+    rows += `<tr class="pnl-d"><td style="padding-left:26px">Jahresüberschuss des Zeitraums</td>${td(ni)}</tr>`;
+    for (const [k, v] of Object.entries(nc).filter(([, v]) => v)) rows += `<tr class="pnl-d"><td style="padding-left:26px"><span class="muted">ohne Geldfluss gebucht ›</span> <b>${esc(ACC_LABEL[k] || k)}</b> ${k === 'depreciation' ? '<span class="small muted">(Wertverlust, kein Geld)</span>' : k === 'one_off' ? '<span class="small muted">(Buchgewinne/-verluste)</span>' : ''}</td>${td(-v)}</tr>`;
+    for (const [k, v] of op) rows += `<tr class="pnl-d"><td style="padding-left:26px">${esc(lab(k))}</td>${td(v)}</tr>`;
+  }
+  rows += finRow(k0 + ':inv', true, '<b>Cashflow aus Investitionen</b>', td(sInv, true), 'fin-grp');
+  if (finOpen(k0 + ':inv', true)) rows += inv.map(([k, v]) => `<tr class="pnl-d"><td style="padding-left:26px">${esc(lab(k))}</td>${td(v)}</tr>`).join('') || '<tr class="pnl-d"><td class="muted" style="padding-left:26px">keine</td><td></td></tr>';
+  rows += finRow(k0 + ':fin', true, '<b>Cashflow aus Finanzierung</b>', td(sFin, true), 'fin-grp');
+  if (finOpen(k0 + ':fin', true)) rows += fin.map(([k, v]) => `<tr class="pnl-d"><td style="padding-left:26px">${esc(lab(k))}</td>${td(v)}</tr>`).join('') || '<tr class="pnl-d"><td class="muted" style="padding-left:26px">keine</td><td></td></tr>';
+  rows += `<tr class="sum fin-sub"><td>Kasse am Ende (berechnet)</td>${td(end)}</tr><tr class="fin-chk"><td>= Bankguthaben laut Konto: ${ec(X.m1.cash)}${X.all || per.k === 'cur' ? ` · nach Dispo ${eur(netCash(pl))}` : ''}</td><td class="r">${okMark(end - X.m1.cash)}</td></tr>`;
+  return `<div class="stack"><h2 class="sec">Kapitalflussrechnung <small>wie aus dem Ergebnis Geld wird · ${esc(per.label)}</small></h2><div class="tw"><table class="t pnl fin"><tbody>${rows}</tbody></table></div>
+    <p class="small muted">Abschreibungen mindern das Ergebnis, kosten aber kein Geld. Flugzeugkäufe, Kautionen, Slots und Tilgungen kosten Geld, mindern aber nicht das Ergebnis. Der Dispo ist hier Finanzierung: Was er ausgleicht, steht als „Dispo in Anspruch genommen“.</p></div>`;
+}
+
+/** Bilanz zum Stichtag mit Einzelposten je Flugzeug, Flughafen, Kredit, Beteiligung und Eigenkapital-Abstimmung. */
+function finBalanceHtml(pl) {
+  const bs = SM.balanceSheet(pl), L = pl.ledger, F = L.fx, d = W.day, td = (x) => `<td class="r">${x ? eur(x) : '<span class="muted">0</span>'}</td>`;
+  const own = pl.fleet.filter((a) => a.owned), leased = pl.fleet.filter((a) => !a.owned && a.deposit > 0);
+  const det = (k, label, val, items, note = '') => finRow('b:' + k, false, label + (note ? ` <span class="small muted">${note}</span>` : ''), td(val)) + (finOpen('b:' + k) ? (items.length ? items.map(([l, v, n]) => `<tr class="pnl-d"><td style="padding-left:26px">${l}${n ? ` <span class="small muted">${n}</span>` : ''}</td>${td(v)}</tr>`).join('') : '<tr class="pnl-d"><td class="muted" style="padding-left:26px">keine</td><td></td></tr>') : '');
+  const stakes = Object.entries(pl.stakes || {}).filter(([, s]) => s.f > 1e-6), slots = Object.entries(pl.slotBook || {});
+  let A = `<tr class="grp"><td colspan="2">Aktiva – was der Airline gehört</td></tr>`;
+  A += `<tr><td>Bankguthaben</td>${td(bs.cash)}</tr>`;
+  A += det('nbv', 'Flugzeuge im Eigentum', bs.nbv, own.map((a) => { const v0 = a.value0 || P.AIRCRAFT_TYPES[a.type_id].value_eur; return [`<b class="mono">${acName(a.id)}</b> ${tl(a.type_id)}`, a.nbv, `Anschaffung ${eur(v0)} − Abschreibung ${eur(v0 - a.nbv)}`]; }), `${own.length} Stück, Buchwert`);
+  A += det('dep', 'Leasing-Kautionen', bs.deposits, leased.map((a) => [`<b class="mono">${acName(a.id)}</b> ${tl(a.type_id)}`, a.deposit, 'kommt bei Rückgabe zurück']));
+  A += det('slots', 'Slots', bs.slots, slots.map(([apt, x]) => [`${apt} · ${esc(apName(apt))}`, x.v, `${x.n} Slot${x.n === 1 ? '' : 's'}, Kaufpreis`]), 'Buchwert = bezahlter Preis');
+  A += det('stakes', 'Beteiligungen', bs.stakes, stakes.map(([id, s]) => [esc((W.airlines[id] || {}).name || id), s.book, `${pct(s.f, 1)} der Aktien · Buchwert`]));
+  A += `<tr class="sum fin-sub"><td>Summe Aktiva</td>${td(bs.assets)}</tr>`;
+  let Pa = `<tr class="grp"><td colspan="2">Passiva – wem die Airline das schuldet</td></tr>`;
+  Pa += det('loans', 'Flugzeugkredite', bs.loans, own.filter((a) => a.loan > 0).map((a) => [`<b class="mono">${acName(a.id)}</b>`, a.loan, `${pct(a.loanRate || 0.06, 1)} Zins`]));
+  Pa += det('bank', 'Bankkredite', bs.bank, pl.loans.map((l) => [`Kredit ${esc(l.id)}${l.rescue ? ' (Sanierung)' : ''}`, l.balance, `${pct(l.rate, 1)} Zins, ${l.years} Jahre, Rate ${eur(l.annuity || 0)}/Monat`]));
+  Pa += `<tr><td>Dispo (Kreditlinie) <span class="small muted">Rahmen ${eur(pl.creditLimit(W.macro.bank ?? 1))}</span></td>${td(bs.credit)}</tr>`;
+  Pa += det('bonds', 'Anleihen', bs.bonds, (pl.bonds || []).map((b) => [`Anleihe ${esc(b.id)}`, b.amount, `${pct(b.rate, 1)} Zins, fällig ${dateShort(b.until)}`]));
+  const deferred = pl.defer ? pl.defer.owed || 0 : 0; if (deferred) Pa += `<tr><td>Gestundete Leasingraten</td>${td(deferred)}</tr>`;
+  Pa += `<tr class="sum fin-sub"><td>Summe Fremdkapital</td>${td(bs.liabilities)}</tr>`;
+  // Eigenkapital: Einlagen (Startkapital, Kapitalerhöhungen, Ausschüttungen …) + alle Ergebnisse seit Gründung
+  const ni = L.netIncome(), eqItems = F ? Object.entries(F.eq).filter(([, v]) => v).map(([k, v]) => [esc(CF_LABEL[k] || k), v / 100, '']) : [];
+  if (F && Math.abs(F.t0.ec) >= 100) eqItems.unshift(['Einlagen vor Beginn der Aufzeichnung', F.t0.ec / 100, 'Startkapital und frühere Bewegungen']);
+  Pa += det('eq', 'Eigenkapital', bs.equity, [...eqItems, ['Alle Ergebnisse seit Gründung (Gewinne und Verluste)', ni, 'Summe aller Jahresüberschüsse']], 'Einlagen + Ergebnisse');
+  Pa += `<tr class="sum fin-sub"><td>Summe Passiva</td>${td(bs.liabilities + bs.equity)}</tr>`;
+  const chk = bs.assets - bs.liabilities - (L.equityContrib / 100 + ni);
+  Pa += `<tr class="fin-chk"><td>Aktiva − Fremdkapital = Einlagen ${eur(L.equityContrib / 100)} + Ergebnisse ${eur(ni)}</td><td class="r">${okMark(chk * 100)}</td></tr>`;
+  return `<div class="stack"><h2 class="sec">Bilanz <small>Stichtag ${dateShortY(d)} · Zeile anklicken für die Einzelposten</small></h2><div class="tw"><table class="t pnl fin"><tbody>${A}${Pa}</tbody></table></div>
+    <p class="small muted">Außerhalb der Bilanz: Leasingverpflichtungen von rund ${eur(bs.leaseLiab)} (24 Monatsraten). Slots stehen mit dem bezahlten Preis in der Bilanz, Flugzeuge mit Anschaffung minus Abschreibung. Steuern: ${pct(P.TAX_RATE)} auf Monatsgewinne mit Verlustvortrag.</p></div>`;
+}
+
+/** Eigenkapitalspiegel: EK zu Beginn + Ergebnis + Einlagen − Ausschüttungen = EK am Ende. */
+function finEquityHtml(pl, per) {
+  const X = per.fx; if (!X) return '';
+  const td = (c, b = false) => `<td class="r${b ? ' ' + sgn(c) : ''}">${c ? ec(c) : '<span class="muted">0</span>'}</td>`;
+  const e0 = X.m0.ec + X.m0.ni, e1 = X.m1.ec + X.m1.ni, ni = X.m1.ni - X.m0.ni, moves = Object.entries(X.eq || {}).filter(([, v]) => v), calc = e0 + ni + moves.reduce((a, [, v]) => a + v, 0);
+  let rows = `<tr><td><b>Eigenkapital zu Beginn</b></td>${td(e0)}</tr><tr><td>+ Jahresüberschuss des Zeitraums</td>${td(ni, true)}</tr>`;
+  rows += moves.map(([k, v]) => `<tr><td>${v >= 0 ? '+' : '−'} ${esc(CF_LABEL[k] || k)}</td>${td(v)}</tr>`).join('');
+  rows += `<tr class="sum fin-sub"><td>Eigenkapital am Ende</td>${td(calc)}</tr><tr class="fin-chk"><td>= Bilanz-Eigenkapital ${per.k === 'cur' || X.all ? 'heute' : 'am Monatsende'}: ${ec(e1)}</td><td class="r">${okMark(calc - e1)}</td></tr>`;
+  return `<div class="stack"><h2 class="sec">Eigenkapitalspiegel <small>${esc(per.label)}</small></h2><div class="tw"><table class="t pnl fin"><tbody>${rows}</tbody></table></div></div>`;
+}
+
 /** Einzelposten eines P&L-Kontos: laufender Monat, Vormonat, seit Start (seit Beginn der Aufschlüsselung). */
 function pnlDetailRows(pl, k) {
   const L = pl.ledger, D = L.det; if (!D) return '<tr class="pnl-d"><td colspan="4" class="small muted">Für diesen Spielstand gibt es noch keine Einzelposten.</td></tr>';
@@ -2709,20 +2886,13 @@ VIEWS.finance = function viewFinance() {
     <div class="tile tlink" data-act="tab" data-tab="history" role="button" tabindex="0" title="Verlauf Tag für Tag"><span>Ergebnis gestern <i class="tl-go">↗</i></span><b class="${sgn(L.lastDay || 0)}">${eur(L.lastDay || 0, { plus: true })}</b><em>${MONTHS[pm]} bisher <span class="${sgn(cur.net)}">${eur(cur.net, { plus: true })}</span></em></div>
   </div>
   <div class="stack"><h2 class="sec">Kontostand <small>letzte ${Math.min(netHistOf(pl).length, 365)} Tage</small></h2>${sparkline(netHistOf(pl).slice(-365))}</div>`;
-  const op = ui.pnlOpen || (ui.pnlOpen = {}), canOpen = (k) => !['ebit', 'net'].includes(k) && (L.pnl[k] || L.month[k]);
-  html += `<div class="stack"><h2 class="sec">Gewinn- und Verlustrechnung <small>Ergebnis ist nicht Kontostand · Zeile anklicken für die Einzelposten</small></h2><div class="tw"><table class="t pnl"><thead><tr><th></th><th class="r">${MONTHS[pm]} (lfd.)</th><th class="r">Vormonat</th><th class="r">seit Start</th></tr></thead><tbody>
-    ${PNL_ROWS.filter(([k]) => k === 'grp' || ['ebit', 'net', 'interest', 'tax'].includes(k) || used.has(k)).map(([k, l]) => k === 'grp' ? `<tr class="grp"><td colspan="4">${l}</td></tr>`
-      : `<tr class="${['ebit', 'net'].includes(k) ? 'sum' : ''}${canOpen(k) ? ' pnl-x' : ''}${op[k] ? ' open' : ''}"${canOpen(k) ? ` data-act="pnlx" data-k="${k}" role="button" tabindex="0" aria-expanded="${!!op[k]}"` : ''}><td>${canOpen(k) ? `<i class="pnl-car">${op[k] ? '▾' : '▸'}</i>` : ''}${l}</td>${cell(cur, k)}${cell(prev, k)}${cell(tot, k)}</tr>${op[k] ? pnlDetailRows(pl, k) : ''}`).join('')}
-  </tbody></table></div>${L.det ? '' : ''}</div>`;
-  html += `<div class="stack"><h2 class="sec">Bilanz <small>vereinfacht</small></h2><table class="t"><tbody>
-    <tr><td>Bank</td><td class="r">${eur(bs.cash)}</td><td>Flugzeugkredite</td><td class="r">${eur(bs.loans)}</td></tr>
-    <tr><td>Flugzeuge (Buchwert)</td><td class="r">${eur(bs.nbv)}</td><td>Bankkredite</td><td class="r">${eur(bs.bank)}</td></tr>
-    <tr><td>Leasing-Kautionen</td><td class="r">${eur(bs.deposits)}</td><td>Kreditlinie (Dispo)</td><td class="r">${eur(bs.credit)}</td></tr>
-    <tr><td>Slots (Buchwert)</td><td class="r">${eur(bs.slots)}</td><td>Anleihen</td><td class="r">${eur(bs.bonds)}</td></tr>
-    <tr><td>Beteiligungen (Buchwert)</td><td class="r">${eur(bs.stakes)}</td><td>Gestundete Raten</td><td class="r">${eur(bs.assets - bs.equity - bs.loans - bs.bank - bs.credit - bs.bonds)}</td></tr>
-    <tr class="sum"><td></td><td></td><td>Eigenkapital</td><td class="r ${sgn(bs.equity)}">${eur(bs.equity)}</td></tr>
-    <tr class="sum"><td>Summe</td><td class="r">${eur(bs.assets)}</td><td>Summe</td><td class="r">${eur(bs.liabilities + bs.equity)}</td></tr>
-  </tbody></table><p class="small muted">Außerhalb der Bilanz: Leasingverpflichtungen von rund ${eur(bs.leaseLiab)} (24 Monatsraten). Kauf, Kaution und Tilgung bewegen Geld, aber nicht das Ergebnis. Abschreibung mindert das Ergebnis, aber kein Geld. Steuern: 25 % auf Monatsgewinne mit Verlustvortrag.</p></div>`;
+  // Abstimmung auf einen Blick: GuV = Summe der Herkünfte, Kasse = Kapitalfluss, Bilanz = Einlagen + Ergebnisse
+  { const pc = finPeriods(pl)[0], net = sumO(pc.pnl), orig = pc.det ? Object.values(pc.det).reduce((a, o) => a + sumO(o), 0) + Object.entries(pc.pnl).reduce((a, [k, v]) => a + v - sumO(pc.det[k]), 0) : net;
+    const X = pc.fx, cash = X ? X.m0.cash + (X.m1.ni - X.m0.ni) - sumO(X.nc) + sumO(pc.cf) - X.m1.cash : 0, bal = (bs.assets - bs.liabilities - (L.equityContrib / 100 + L.netIncome())) * 100;
+    html += `<div class="fin-recon small"><span>${okMark(orig - net)} GuV = Summe aller Strecken, Flugzeuge, Flughäfen …</span><span>${X ? okMark(cash) : '<span class="muted">–</span>'} Kasse = Anfang + Kapitalfluss</span><span>${okMark(bal)} Bilanz: Vermögen − Schulden = Einlagen + Ergebnisse</span></div>`; }
+  html += finPnlHtml(pl);
+  html += finPeriodBar(pl);
+  { const per = finPeriod(pl); html += finOriginHtml(pl, per) + finCashHtml(pl, per) + finBalanceHtml(pl) + finEquityHtml(pl, per); }
   return html;
 };
 function miniLine(vals, f) {
@@ -4294,6 +4464,8 @@ function onPaneClick(e) {
   if (act === 'tour') { startTour(); return; }
   if (act === 'restartvol') { showRestart(true); return; }
   if (act === 'plsort') { ui.plSort = b.dataset.v; renderPane(true); return; }
+  if (act === 'finx') { const o = ui.finOpen || (ui.finOpen = {}), k = b.dataset.k, def = b.dataset.d === '1'; o[k] = !(o[k] === undefined ? def : o[k]); renderPane(true); return; }
+  if (act === 'finp') { ui.finP = b.dataset.v; renderPane(true); return; }
   if (act === 'pnlx') { const o = ui.pnlOpen || (ui.pnlOpen = {}); o[b.dataset.k] = !o[b.dataset.k]; renderPane(true); return; }
   if (act === 'pnlall') { const o = ui.pnlAll || (ui.pnlAll = {}); o[b.dataset.k] = true; renderPane(true); return; }
   if (act === 'plall') { ui.plAll = true; renderPane(); return; }
