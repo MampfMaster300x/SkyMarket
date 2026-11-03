@@ -183,6 +183,13 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.9: Slotvergabe zum 1. Oktober repariert
+
+- **Fehler:** Die Winter-Slotvergabe lief erst am Ende des Oktobers (also zum 1. November), angezeigt und angekündigt war der 1. Oktober. Ab dem 1. Oktober zeigte die Slot-Seite schon den 1. April als nächsten Termin, die Wartenden gingen leer aus. Die Sommer-Vergabe zum 1. April war korrekt.
+- Jetzt findet die Vergabe am letzten Tag des Vormonats statt (31. März bzw. 30. September) und gilt ab dem 1. April bzw. 1. Oktober. Der letzte Vergabetermin wird gespeichert (`slotRoundDay`); fällt ein Termin aus, holt das Spiel ihn am nächsten Tag nach.
+- **Laufende Spielstände:** Steht ein Spiel beim Update im Oktober, wird die ausgefallene Oktober-Vergabe am nächsten Spieltag nachgeholt. Wer schon im November ist, hat sie über den alten Termin bekommen – es gibt keine doppelte Vergabe.
+- **Zusage gilt immer:** Wo jemand wartet, ist zum Termin mindestens der neue Slot frei – auch wenn der Flughafen vorher überbucht war (sonst wäre der neue Slot nur das Minus ausgeglichen worden).
+
 ## Neu in 0.21.8: Warteliste mit Namen
 
 - Im Formular „Slots sichern“ steht unter den Kennzahlen jetzt die Warteliste des Flughafens: Reihenfolge, Airline, angefragte Slots (eigene Einträge für Pläne gekennzeichnet) und was jeder Eintrag beim nächsten Vergabetermin voraussichtlich bekommt.

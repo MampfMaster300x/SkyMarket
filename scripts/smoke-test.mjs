@@ -652,4 +652,20 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     assert.ok(t[0].endsWith('Monate niedrig.') && t[1] === 'Preisaufsicht in Hamburg: Die Behörde begrenzt Ihre Tarife dort für 6 Monate auf höchstens das 1,2-fache des Marktpreises.', 'alte Meldungen umformuliert: ' + t.join(' | ')); }
   console.log('0.21 ok: Ausschüttung', Math.round(pr.rate * 100), '% bei', pr.mult.toFixed(1) + '-fachem Kapital, eine Belastung zur Zeit, Gegenwehr still auf', att2.length, 'Strecken', ', Kerosin für Kleine', ((1 - fSmall / fNo) * 100).toFixed(1), '% günstiger, Monopolstrecken', mono.length);
   Object.assign(S, keep); }
+// 0.21.9: Winter-Slotvergabe zum 1. Oktober (nicht erst 1. November), Zusage auch bei überbuchtem Flughafen, Nachholung
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const w0 = SMx.newGame({ seed: 61, base: 'HAM' }); for (let i = 0; i < 3; i++) w0.step();
+  const mk = (day, round) => { const sv = JSON.parse(JSON.stringify(SMx.serialize(w0))); sv.day = day; if (round === undefined) delete sv.slotRoundDay; else sv.slotRoundDay = round; const w = SMx.deserialize(sv), pl = w.player;
+    pl.cash = Math.max(pl.cash, 5e8); const f = w.slotsFree('LHR'); w.slotCap.LHR -= f + 2;   // überbucht: 2 Slots zu viel belegt
+    assert.equal(SMx.applyAction(w, pl.id, { type: 'slotWait', apt: 'LHR', n: 1 }).ok, true, 'Warteliste LHR'); return { w, pl }; };
+  assert.equal(SMx.nextSlotDay(250).day, 273, 'nächster Termin 1. Oktober');
+  { const { w, pl } = mk(268, 90); while (w.day < 272) w.step();
+    assert.equal(pl.heldAt('LHR', w.day), 0, 'vor dem 1. Oktober nichts');
+    w.step(); assert.equal(w.day, 273); assert.equal(pl.heldAt('LHR', w.day), 1, 'am 1. Oktober zugeteilt – auch bei überbuchtem Flughafen');
+    assert.ok(w.news.some((n) => n.day === 273 && /Winterflugplan/.test(n.msg)), 'Meldung zum 1. Oktober');
+    const cap = w.slotCap.LHR; for (let i = 0; i < 40; i++) w.step(); assert.equal(w.slotCap.LHR, cap, 'keine zweite Vergabe am 1. November'); }
+  { const { w, pl } = mk(285); assert.equal(w.slotRoundDay, 90, 'alter Stand im Oktober: Vergabe steht noch aus'); w.step();
+    assert.equal(pl.heldAt('LHR', w.day), 1, 'verpasste Oktober-Vergabe wird nachgeholt'); assert.equal(w.slotRoundDay, 273); }
+  { const { w, pl } = mk(310); assert.equal(w.slotRoundDay, 273, 'alter Stand im November: schon vergeben'); w.step(); assert.equal(pl.heldAt('LHR', w.day), 0, 'keine doppelte Vergabe'); }
+  console.log('0.21.9 ok: Winter-Slotvergabe am 1. Oktober, Zusage bei Überbuchung, Nachholung im Oktober'); }
 console.log('Alle Prüfungen bestanden.');

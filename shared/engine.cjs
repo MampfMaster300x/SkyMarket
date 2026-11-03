@@ -1843,6 +1843,8 @@ const SM = (() => {
   }
   const MEGA_CLIENT = { okt: 'Reiseveranstalter mit Oktoberfest-Paketen', rio: 'Karnevals-Reiseveranstalter', hajj: 'Pilgerreise-Veranstalter (Hadsch)', cny: 'Reisebüro für Familienreisen zum Neujahrsfest', f1mc: 'Rennstall und VIP-Gäste zum Grand Prix', expo30: 'Expo-Delegationen' };
   /** Nächste feste Slotvergabe (1. April oder 1. Oktober) nach dem Spieltag. */
+  /** Letzter Slotvergabetag (1. April oder 1. Oktober) am oder vor diesem Tag. */
+  function lastSlotDue(day) { const y = Math.floor(day / 365), doy = day - 365 * y; return doy >= MONTH_STARTS[9] ? 365 * y + MONTH_STARTS[9] : doy >= MONTH_STARTS[3] ? 365 * y + MONTH_STARTS[3] : 365 * (y - 1) + MONTH_STARTS[9]; }
   function nextSlotDay(day) { const y = 2027 + Math.floor(day / 365); for (const yy of [y, y + 1]) for (const m of [4, 10]) { const d = (yy - 2027) * 365 + MONTH_STARTS[m - 1]; if (d > day) return { day: d, summer: m === 4 }; } return { day: day + 182, summer: true }; }
   const calDay = (y, m, d) => (y - 2027) * 365 + MONTH_STARTS[m - 1] + d - 1;
   /** Startage eines Großereignisses in einem Spieljahr (oder null). */
@@ -2277,6 +2279,21 @@ const SM = (() => {
       }
       this.slotWait = this.slotWait.filter((e) => e.n > 0);
     }
+    /** Slotvergabe zum 1. April bzw. 1. Oktober (due = Vergabetag): ein Slot mehr an jedem koordinierten Flughafen, Ausbau gewachsener Flughäfen, dann die Warteliste reihum. */
+    slotRound(due) {
+      const summer = (((due % 365) + 365) % 365) === MONTH_STARTS[3];
+      for (const c in this.slotCap) this.slotCap[c] += 1;
+      // Gewachsene Flughäfen bauen aus: zusätzliche Slots nach Verkehrswachstum
+      for (const [c, v] of Object.entries(this.aptObs || {})) { const base = Math.max(0.3, ap(c).pax || 0); if (v > base * 1.15 && this.slotCap[c] !== undefined && apx(c).slots !== null) this.slotCap[c] += Math.min(12, Math.round(2 + 3 * Math.log2(v / base))); }
+      for (const al of this.list) al.cleanHolds(Math.max(this.day, due));
+      // Zusage: Wo jemand wartet, ist mindestens der neue Slot frei – auch wenn der Flughafen vorher überbucht war
+      for (const apt of new Set((this.slotWait || []).filter((e) => e.n > 0).map((e) => e.apt))) { if (apx(apt).slots === null || this.slotCap[apt] === undefined) continue; const f = this.slotsFree(apt); if (f < 1) this.slotCap[apt] += 1 - f; }
+      const before = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
+      this.allocateWaitlist();
+      const after = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
+      this.slotRoundDay = due;
+      this.pushNews(Math.max(this.day, due), `Slotvergabe zum ${summer ? 'Sommer' : 'Winter'}flugplan: An jedem koordinierten Flughafen gibt es einen Slot mehr${before ? `, ${before - after} von ${before} Slots auf den Wartelisten wurden zugeteilt` : ''}. Nächster Termin: 1. ${summer ? 'Oktober' : 'April'}.`, 'info', null);
+    }
     /** Geplante Strecken: fehlende Slots pro Flughafen. */
     planMissing(al, pl) {
       const r = pl.route ? al.routes.find((x) => x.id === pl.route && !x.closed) : null, n = r ? Math.max(0, pl.freq - r.freq) : pl.freq, out = {};
@@ -2552,7 +2569,8 @@ const SM = (() => {
     step() {
       setFuelX(this);
       { const cr = shockX(this, 'req'); for (const al of this.list) { al._day = this.day; al._crunch = cr; } }
-      // Warteliste: Vergabe nur zu festen Terminen (1. April, 1. Oktober) – siehe monthEnd. Pläne mit vollständigen Slots werden umgesetzt.
+      // Warteliste: Vergabe nur zu festen Terminen (1. April, 1. Oktober) – siehe monthEnd; ein verpasster Termin wird hier nachgeholt. Pläne mit vollständigen Slots werden umgesetzt.
+      { const due = lastSlotDue(this.day); if (this.slotRoundDay === undefined) this.slotRoundDay = due; else if (this.slotRoundDay < due) this.slotRound(due); }
       for (const al of this.humans) if (al.status !== 'insolvent' && al.plans && al.plans.length) this.checkPlans(al);
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.completeDaily(al);
       expireDeals(this);
@@ -3066,17 +3084,8 @@ const SM = (() => {
       if (m === 11) auditYear(this);
       this.monthlyMacro();
       this.generateMonthlyEvents();
-      if (m === 2 || m === 9) {
-        // Slotvergabe zum Sommer- (1. April) bzw. Winterflugplan (1. Oktober): neue Slots an jedem Flughafen, dann die Warteliste der Reihe nach
-        for (const c in this.slotCap) this.slotCap[c] += 1;
-        // Gewachsene Flughäfen bauen aus: zusätzliche Slots nach Verkehrswachstum
-        for (const [c, v] of Object.entries(this.aptObs || {})) { const base = Math.max(0.3, ap(c).pax || 0); if (v > base * 1.15 && this.slotCap[c] !== undefined && apx(c).slots !== null) this.slotCap[c] += Math.min(12, Math.round(2 + 3 * Math.log2(v / base))); }
-        for (const al of this.list) al.cleanHolds(this.day + 1);
-        const before = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
-        this.allocateWaitlist();
-        const after = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
-        this.pushNews(this.day + 1, `Slotvergabe zum ${m === 2 ? 'Sommer' : 'Winter'}flugplan: An jedem koordinierten Flughafen gibt es einen Slot mehr${before ? `, ${before - after} von ${before} Slots auf den Wartelisten wurden zugeteilt` : ''}. Nächster Termin: 1. ${m === 2 ? 'Oktober' : 'April'}.`, 'info', null);
-      }
+      // Slotvergabe zum Sommer- (1. April) bzw. Winterflugplan (1. Oktober): am letzten Tag des Vormonats (März bzw. September)
+      if (m === 2 || m === 8) this.slotRound(this.day + 1);
       // Drehkreuze wachsen: Umsteiger erhöhen das Aufkommen am Flughafen, je 200.000 Umsteiger im Jahr kommt ein Slot dazu
       for (const al of this.humans) {
         if (al.status === 'insolvent' || !al.hubs) continue;
@@ -4633,7 +4642,7 @@ const SM = (() => {
     w.macro.cycle = { phase: w.rng.range(0, 6.283), period: w.rng.int(40, 70), amp: diff.cycle };
     for (const [id, setup] of Object.entries(AI_SETUP)) bootstrapAi(w, id, setup, RIVALS[w.rivals].sigma);
     w.initSlots();
-    w.glutPlanned = true;
+    w.glutPlanned = true; w.slotRoundDay = lastSlotDue(w.day);
     anchorAis(w);
     w.refreshOffers();
     setFuelX(w);
@@ -6313,7 +6322,7 @@ const SM = (() => {
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      aptObs: w.aptObs || {}, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      aptObs: w.aptObs || {}, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
@@ -6340,7 +6349,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      aptObs: s.aptObs || {}, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -6403,6 +6412,8 @@ const SM = (() => {
       if (n.msg && /^[^:]{1,60} annulliert: /.test(n.msg)) n.msg = 'Entwarnung: ' + n.msg.replace(/^[^:]{1,60} annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
     }
     for (const al of w.list) if (al.isPlayer) for (const ev of al.events || []) if (ev.msg && /hat ein Ereignis annulliert: /.test(ev.msg)) ev.msg = 'Entwarnung: ' + ev.msg.replace(/^.*hat ein Ereignis annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
+    // 0.21.9: Die Winter-Slotvergabe lief bisher erst zum 1. November. Steht ein Spielstand im Oktober, wird sie am nächsten Tag nachgeholt.
+    if (w.slotRoundDay === undefined) { const due = lastSlotDue(w.day); w.slotRoundDay = (due - MONTH_STARTS[9]) % 365 === 0 && w.day < due + 31 ? due - (MONTH_STARTS[9] - MONTH_STARTS[3]) : due; }
     // 0.21.7: Ereignistexte nennen nicht mehr, wen sie treffen sollen
     neutralTexts(w);
     // 0.19: Ankeraktionäre bei großen KI-Airlines, Konzern-Ausschüttung höchstens 50 %
