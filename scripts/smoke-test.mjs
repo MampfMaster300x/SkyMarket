@@ -579,7 +579,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     assert.ok(cy - y.ledger.cash > 15e6 || (y.audit.debt && y.audit.debt.to === null), 'Begünstigter zahlt an die Staatskasse');
   }
   // Admin-Entfernung ist nicht öffentlich
-  const k = SMx.kickHuman(w, 'P2'); assert.ok(k.ok && !w.news.some((n) => /aus dem Spiel genommen/.test(n.text)), 'keine öffentliche Sperrmeldung');
+  const k = SMx.kickHuman(w, 'P2'); assert.ok(k.ok && !w.news.some((n) => /aus dem Spiel genommen/.test(n.msg)) && w.news.some((n) => /zieht sich vom Markt zurück/.test(n.msg)), 'keine öffentliche Sperrmeldung');
   // Führungsspanne für Fachkräfte
   const w2 = SMx.newGame({ seed: 4, base: 'HAM' }), p2 = w2.player; p2.ledger.cashOnly(5e7, 't');
   const tm = SMx.expertTeam(p2); assert.equal(tm.cap, 3, 'Startspanne 3');
@@ -613,7 +613,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   big.decisions = []; big.profitShare = null; big.press = { next: 0, lastUnion: w.day }; w.attacks = {};
   const logs0 = big.events.length, news0 = w.news.length; w.day += 61; SMx.dominanceMonth(w);
   const att = Object.values(w.attacks).filter((a) => a.al === 'B1');
-  if (att.length) assert.ok(!big.events.slice(logs0).some((e) => /wehren|Preisangriff|greif/.test(e.text || '')) && !w.news.slice(news0).some((n) => /greif|Preiskampf/.test(n.text)), 'Gegenwehr im Stillen');
+  if (att.length) assert.ok(!big.events.slice(logs0).some((e) => /wehren|Preisangriff|greif/.test(e.msg || '')) && !w.news.slice(news0).some((n) => /greif|Preiskampf/.test(n.msg)), 'Gegenwehr im Stillen');
   w.day = big.payoutFrom; const c0 = big.ledger.cash; SMx.dominanceMonth(w);
   assert.ok(c0 - big.ledger.cash >= 0.3 * 20e6 - 1, 'Ausschüttung gezahlt');
   // Monopol: allein auf einer Strecke mit hoher Marge lockt Konkurrenz an
@@ -625,8 +625,12 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const ev1 = big.events.length, nw1 = w.news.length; SMx.dominanceMonth(w);
   const att2 = Object.values(w.attacks).filter((a) => a.al === 'B1');
   assert.ok(att2.length > 0 || (big.shocks || []).some((x) => x.k === 'entrant' || x.k === 'pricecap'), 'Gegenwehr ausgelöst');
-  assert.ok(!big.events.slice(ev1).some((e) => /wehren|Preisangriff|greif|Monopol/.test(e.text || '')) && !w.news.slice(nw1).some((n) => /greif|Preiskampf|Monopol/.test(n.text)), 'Gegenwehr im Stillen – keine Meldung');
+  assert.ok(!big.events.slice(ev1).some((e) => /wehren|Preisangriff|greif|Monopol/.test(e.msg || '')) && !w.news.slice(nw1).some((n) => /greif|Preiskampf|Monopol/.test(n.msg)), 'Gegenwehr im Stillen – keine Meldung');
   const r0 = big.activeRoutes()[0], co = w.competitorOffers('B1', r0.base, r0.dest);
+  { const e = w.addEvent({ type: 'fuel_spike', fuelF: 1.5, scope: 'all', end: w.day + 90, text: 'Ölpreisschock: Kerosin +50 %', severity: 'crit' }); w.macro.fuelUsd *= 1.5; w.day++;
+    assert.equal(w.cancelEvent(e.id, 'Tim').ok, true, 'Annullieren');
+    const m = w.news.at(-1).msg; assert.ok(/Ölmarkt/.test(m) && !/annulliert|Tim/.test(m), 'Annullierung erscheint als Gegenereignis: ' + m);
+    assert.ok(big.events.at(-1).msg === m, 'auch im Logbuch der Spielenden'); }
   console.log('0.21 ok: Ausschüttung', Math.round(pr.rate * 100), '% bei', pr.mult.toFixed(1) + '-fachem Kapital, eine Belastung zur Zeit, Gegenwehr still auf', att2.length, 'Strecken', ', Kerosin für Kleine', ((1 - fSmall / fNo) * 100).toFixed(1), '% günstiger, Monopolstrecken', mono.length);
   Object.assign(S, keep); }
 console.log('Alle Prüfungen bestanden.');

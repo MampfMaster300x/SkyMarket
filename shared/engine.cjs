@@ -1490,6 +1490,41 @@ const SM = (() => {
     // 0.19: weitere Schocks mit echten Folgen für die Rechnung
     credit_crunch: { p: 0.018 }, grounding: { p: 0.022 }, supply_chain: { p: 0.02 }, tourism: { p: 0.045 }, labor_crisis: { p: 0.025 }, disaster: { p: 0.015 }, regulation: { p: 0.02 },
   };
+  /** Meldung, wenn ein Ereignis annulliert wird: als Gegenereignis im Spiel formuliert (Ursache und Wirkung). */
+  function counterEventText(e, started) {
+    const cn = (cs) => (cs && cs.length ? (cs.length > 4 ? 'mehreren Ländern' : cs.map((c) => COUNTRY_NAMES[c] || c).join(' und ')) : 'der Region');
+    const an = (as) => (as && as.length ? (as.length > 3 ? `${as.slice(0, 3).map((c) => ap(c).name).join(', ')} und weiteren Flughäfen` : as.map((c) => ap(c).name).join(', ')) : 'den Flughäfen');
+    const pre = started ? '' : 'Doch nicht: ';
+    switch (e.type) {
+      case 'fuel_spike': return { sev: 'good', text: started ? 'Entspannung am Ölmarkt: Die Förderländer drehen die Hähne wieder auf, Kerosin fällt zurück auf das alte Niveau.' : 'Doch nicht: Die Förderländer einigen sich, der Ölpreisschock bleibt aus.' };
+      case 'fuel_drop': return { sev: 'warn', text: 'Ölpreis zieht wieder an: Die Förderländer kürzen die Produktion, der Preisrutsch bei Kerosin ist vorbei.' };
+      case 'recession': return e.fxF ? { sev: 'good', text: 'Die Notenbank stützt den Euro mit einem Rettungspaket: Der Kurs erholt sich, Kerosin und Dollarkredite werden wieder günstiger.' } : { sev: 'good', text: `${pre}Überraschende Erholung in ${cn(e.countries)}: Die Konjunktur fängt sich schneller als erwartet, Geschäftsreisen ziehen wieder an.` };
+      case 'boom': return { sev: 'warn', text: `Der Aufschwung in ${cn(e.countries)} verpufft: Die Nachfrage geht auf das alte Niveau zurück.` };
+      case 'trade_war': return { sev: 'good', text: `Durchbruch bei den Handelsgesprächen: ${blocName(e.blocs[0])} und ${blocName(e.blocs[1])} verzichten auf Zölle.` };
+      case 'trade_deal': return { sev: 'warn', text: 'Handelsabkommen geplatzt: Die Zölle bleiben bestehen.' };
+      case 'airspace': return { sev: 'good', text: `${pre}Waffenruhe vereinbart: Der Luftraum über ${cn(e.countries)} ist wieder offen.` };
+      case 'carbon': return { sev: 'good', text: `Gericht kippt die CO₂-Abgabe in ${blocName(e.bloc)}: Kerosin wird dort wieder günstiger.` };
+      case 'fee_hike': return { sev: 'good', text: `${an(e.airports)} nimmt die Entgelterhöhung nach Protesten der Airlines zurück.` };
+      case 'atc_strike': return { sev: 'good', text: `Einigung in letzter Minute: Der Fluglotsenstreik in ${cn(e.countries)} ist abgesagt.` };
+      case 'airport_strike': return { sev: 'good', text: `Tarifeinigung: Der Warnstreik in ${an(e.airports)} ist abgesagt.` };
+      case 'volcano': return { sev: 'good', text: `Der Wind dreht: Die Aschewolke zieht ab, der Luftraum über ${an(e.airports)} ist wieder frei.` };
+      case 'storm': case 'disaster': return { sev: 'good', text: `Entwarnung: Über ${an(e.airports)} läuft der Flugbetrieb wieder normal.` };
+      case 'tax_change': return { sev: (e.taxDelta || 0) > 0 ? 'good' : 'warn', text: `Ticketsteuer in ${cn(e.countries)}: Das Parlament stoppt die Änderung, es bleibt beim bisherigen Satz.` };
+      case 'rate_change': return { sev: (e.rateD || 0) > 0 ? 'good' : 'warn', text: 'Die Zentralbank korrigiert ihre Zinsentscheidung: Der Leitzins geht auf den alten Stand zurück.' };
+      case 'health': return { sev: 'good', text: `${pre}Entwarnung der Gesundheitsbehörden: Die Reisewarnungen sind aufgehoben, die Nachfrage normalisiert sich.` };
+      case 'pilot_shortage': return { sev: 'good', text: 'Pilotenmangel entschärft: Ein großer Jahrgang der Flugschulen kommt auf den Markt, Einstellungen gehen wieder schneller.' };
+      case 'fx_shock': return { sev: (e.fxF || 1) < 1 ? 'good' : 'warn', text: 'Der Wechselkurs normalisiert sich: Der Euro kehrt zum alten Kurs zurück.' };
+      case 'credit_crunch': return { sev: 'good', text: 'Die Zentralbank stützt die Banken: Kreditlinien und Leasinggeber sind wieder offen, der Leitzins sinkt.' };
+      case 'grounding': return { sev: 'good', text: `Freigabe: Die Behörden heben die Stilllegung der ${(e.types || []).map((t) => P.AIRCRAFT_TYPES[t] ? P.AIRCRAFT_TYPES[t].label : t).join(', ')} auf – die Flugzeuge dürfen wieder fliegen.` };
+      case 'supply_chain': return { sev: 'good', text: 'Die Lieferketten entspannen sich: Ersatzteile sind wieder da, Wartung, Leasing und Auslieferungen normalisieren sich.' };
+      case 'tourism': return (e.demand && e.demand.leisure > 1) ? { sev: 'warn', text: `Der Hype um ${an(e.airports)} flaut ab: Urlaubsreisen dorthin gehen auf das alte Niveau zurück.` } : { sev: 'good', text: `Reisewarnung aufgehoben: Urlaubsreisen nach ${an(e.airports)} ziehen wieder an.` };
+      case 'labor_crisis': return { sev: 'good', text: 'Tarifeinigung auf breiter Front: Die Lohnforderungen sind vom Tisch, der Arbeitsmarkt entspannt sich.' };
+      case 'big_event': case 'mega': return { sev: 'warn', text: `Abgesagt: Die Großveranstaltung ${e.airports && e.airports.length ? 'in ' + an(e.airports) : ''} findet nicht statt.` };
+      case 'own_strike': return { sev: 'good', text: 'Streik abgesagt: Einigung mit der Gewerkschaft in letzter Minute.' };
+      case 'sickness': return { sev: 'good', text: 'Die Grippewelle ebbt ab: Die Crews sind wieder an Bord.' };
+      default: return { sev: 'good', text: `Entwarnung: ${String(e.text || '').replace(/^Angekündigt: /, '').split(':')[0]} – die Lage hat sich beruhigt.` };
+    }
+  }
   /** Motoren- und Musterprobleme, die zu Stilllegungen führen können. */
   const GROUNDING_SETS = [
     { types: ['A20N', 'A21N', 'A21X', 'BCS3'], what: 'Getriebefan-Triebwerke (Pulverschmiede-Rückruf)' },
@@ -1928,8 +1963,11 @@ const SM = (() => {
       for (const al of this.humans) if (al.decisions) al.decisions = al.decisions.filter((d) => d.eventId !== e.id);
       e.cancelled = true; e.recovery = 0; e.end = Math.min(e.end, day); if (!started) e.start = day;
       this.recalcTariffs();
-      this.pushNews(day, `${by} annulliert: ${e.text}`, 'info', e.airline || null);
-      for (const h of this.humans) h.log(day, `${by} hat ein Ereignis annulliert: ${e.text}`, 'info');
+      // Im Spiel erscheint die Annullierung als eigenes Ereignis, das die Wirkung erklärt – nicht als Eingriff der Spielleitung
+      const ct = counterEventText(e, started);
+      this.pushNews(day, ct.text, ct.sev, e.airline || null);
+      if (e.airline) { const A = this.airlines[e.airline]; if (A) A.log(day, ct.text, ct.sev === 'good' ? 'good' : 'info'); }
+      else for (const h of this.humans) h.log(day, ct.text, ct.sev === 'good' ? 'good' : 'info');
       return { ok: true };
     }
     generateMonthlyEvents() {
@@ -6324,7 +6362,11 @@ const SM = (() => {
     if (!w.themes) { w.themes = {}; w.attacks = {}; for (const al of w.list) if (al.isPlayer && al.divOut) al.payoutFrom = w.day; }
     // 0.20: Handelsbilanz für die Wirtschaftsprüfung, Admin-Entfernungen nicht mehr öffentlich
     auditMigrate(w);
-    for (const n of w.news || []) if (n.text && / wurde von der .* aus dem Spiel genommen$/.test(n.text)) n.text = n.text.replace(/ wurde von der .* aus dem Spiel genommen$/, ' zieht sich vom Markt zurück');
+    for (const n of w.news || []) {
+      if (n.msg && / wurde von der .* aus dem Spiel genommen$/.test(n.msg)) n.msg = n.msg.replace(/ wurde von der .* aus dem Spiel genommen$/, ' zieht sich vom Markt zurück');
+      if (n.msg && /^[^:]{1,60} annulliert: /.test(n.msg)) n.msg = 'Entwarnung: ' + n.msg.replace(/^[^:]{1,60} annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
+    }
+    for (const al of w.list) if (al.isPlayer) for (const ev of al.events || []) if (ev.msg && /hat ein Ereignis annulliert: /.test(ev.msg)) ev.msg = 'Entwarnung: ' + ev.msg.replace(/^.*hat ein Ereignis annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
     // 0.19: Ankeraktionäre bei großen KI-Airlines, Konzern-Ausschüttung höchstens 50 %
     if (!w.list.some((a) => a.archetype && a.cap && a.cap.anchor)) anchorAis(w);
     for (const T of w.list) if (T.cap && T.archetype && T.cap.div > 0.5) T.cap.div = 0.5;

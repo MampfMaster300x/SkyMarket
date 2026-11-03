@@ -183,6 +183,11 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.4: Annullierte Ereignisse erscheinen als Gegenereignis
+
+- Annulliert die Spielleitung oder der Admin ein Ereignis, steht in Meldungen und Logbuch nicht mehr „annulliert“, sondern ein Ereignis im Spiel, das die Wirkung erklärt – z. B. Ölpreisschock → „Entspannung am Ölmarkt: Die Förderländer drehen die Hähne wieder auf, Kerosin fällt zurück auf das alte Niveau“, Luftraumsperrung → „Waffenruhe vereinbart: Der Luftraum über … ist wieder offen“, Rezession → „Überraschende Erholung in …“, Stilllegung → „Freigabe: Die Behörden heben die Stilllegung … auf“. Noch nicht begonnene Ereignisse: „Doch nicht: …“. Für alle Ereignisarten gibt es passende Texte; die Wirkung wird wie bisher zurückgenommen.
+- Ältere „… annulliert: …“-Meldungen werden beim Laden umformuliert („Entwarnung: … – die Lage hat sich beruhigt“). Ebenso korrigiert: die Umformulierung alter Sperrmeldungen aus 0.20 griff nicht.
+
 ## Neu in 0.21.3: Airline-spezifische Schocks statt Branchenthemen
 
 Ausschüttung, Gewerkschaft, Gegenwehr und Hilfe für Kleine sind jetzt Schocks wie die Weltschocks – aber je Airline, ausgelöst durch deren Lage und mit einer Wahrscheinlichkeit je Monat. Jede Airline kann sie treffen, sobald sie in die Lage kommt; Belastungen nie zwei gleichzeitig, danach mindestens 60 Tage Ruhe.
