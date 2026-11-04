@@ -208,8 +208,9 @@ nav.tabs .dot { position: absolute; top: 1px; right: 1px; width: 7px; height: 7p
   .only-narrow { display: grid; }
 }
 @media (max-width: 900px) {
-  body { overflow: auto; }
-  #app { height: auto; min-height: 100%; }
+  /* Die Seite selbst scrollt nicht, nur #app: So bleibt das Fenster für den Browser still, und iOS-Safari verschiebt die feste Leiste unten beim Scrollen nicht mehr */
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  #app { display: block; height: 100%; height: 100dvh; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
   header.top { flex-wrap: wrap; padding-top: 8px; }
   .logo { padding-right: 10px; }
   .logo .wm span { display: none; }
@@ -1665,10 +1666,15 @@ const SM = (() => {
     },
     START_EQUITY_EUR: 20e6, OVERHEAD_PER_AIRCRAFT_DAY: 650.0, STATION_COST_DAY_AI: 600.0,
     // Verwaltungskosten (EUR/Tag) für Spielende: wächst mit der Flotte, kleine Gründungen bleiben bezahlbar
+    // Größe kostet: Ab 25 Flugzeugen wächst die Abstimmung (Systeme, Gremien, Schnittstellen) schneller als die Flotte – je weiterem Flugzeug teurer
+    HQ_SIZE: { from: 25, k: 5000, exp: 1.3 },
+    BRAKES_FROM: 365,   // Größenzuschlag und Margendruck gelten ab dem 1. Januar 2028 (Spieltag 365)
+    // Hohe Streckenmargen locken Konkurrenz: andere Airlines senken dort Preise und legen Sitze nach, wo niemand fliegt, steigt jemand ein
+    MARGIN_PRESSURE: { margin: 0.25, minDays: 60, p: 0.4, max: 6, days: 120, x: 0.8, cap: 1.25, sizeRef: 25 },
     HQ_CURVE: [[0, 800], [5, 3000], [15, 10000], [30, 26000], [100, 80000], [200, 200000], [400, 520000]],   // ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte (Konzernstrukturen)
     ANTITRUST: { share: 0.6, minDeps: 25, minPax: 8, grace: 90, fine: 0.005 },
     // 0.20: Handel zwischen Spielenden nur in realistischer Spanne; Wirtschaftsprüfer prüfen zum Jahresende
-    TRADE_FAIR: { rel: 0.35, min: 100000, max: 1000000 },   // Spielraum: 35 % vom Gesamtbetrag beider Seiten, mindestens 100 Tsd., höchstens 1 Mio. €
+    TRADE_FAIR: { free: 1000000 },   // Spielraum: Abweichung bis 1 Mio. € (Preisindex) ist frei – unabhängig von der Größe des Geschäfts
     // 0.21: Dominanz einhegen – Gesellschafter verlangen Ausschüttung, Druck auf Marktführer (nie zwei Dinge gleichzeitig), Hilfe für Kleine
     PAYOUT: { from: 2, k: 0.2, min: 0.2, max: 0.7,
       // Hauptversammlung (0.21.12): Abstimmung nach Anteilen. Die Minderheit stimmt für den Antrag, Sie mit Ihrem eigenen Anteil.
@@ -2482,6 +2488,8 @@ const SM = (() => {
     oldAcFactor(age) { return this.oldAcExpert() && age >= P.OLD_AC_AGE ? 0.9 : 1; }
     stage() { const n = this.fleet.length; let s = P.STAGES[0]; for (const st of P.STAGES) if (n >= st.min) s = st; return s; }
     /** Verwaltung pro Tag: KI nach Stufe, Spielende entlang P.HQ_CURVE (linear zwischen den Stützpunkten). */
+    /** Größenzuschlag der Verwaltung pro Tag (nur Spielende, ohne Preisindex). */
+    hqSizeDay(day = this._day ?? 0) { const S = P.HQ_SIZE, n = this.fleet.length; return this.isPlayer && n > S.from && day >= P.BRAKES_FROM ? S.k * (n - S.from) ** S.exp : 0; }
     hqDay() {
       if (!this.isPlayer) return this.stage().hq;
       const n = this.fleet.length, C = P.HQ_CURVE;
@@ -4197,6 +4205,7 @@ const SM = (() => {
         L.post('overhead', -P.STATION_COST_DAY_AI * stations.size * cpi);
       }
       L.post('overhead', -al.hqDay() * cpi, true, 'Zentrale (Hauptverwaltung)');
+      if (al.isPlayer && al.hqSizeDay() > 0) L.post('overhead', -al.hqSizeDay() * cpi, true, `Zentrale: Größenzuschlag ab ${P.HQ_SIZE.from} Flugzeugen`);
       if (al.isPlayer) { const sx = softX(al, 'baseDay'); for (const b of al.bases) L.post('overhead', -baseDayCost(b) * sx * cpi, true, `Basis › ${aTag(b)}`); }
       else L.post('overhead', -P.BASE_FIXED_DAY * (al.bases.length - 1) * cpi);
       L.post('overhead', -P.TYPE_COMPLEXITY_DAY * Math.max(new Set(al.fleet.map((a) => P.AIRCRAFT_TYPES[a.type_id].group)).size - 1, 0) * cpi, true, 'Mehrere Flugzeugfamilien (Schulung, Ersatzteile)');
@@ -6782,11 +6791,11 @@ const SM = (() => {
   /** Prüft, ob beide Seiten eines Handels in einer realistischen Spanne liegen. */
   function tradeFairness(w, A, B, give, take) {
     const T = P.TRADE_FAIR, va = give.reduce((x, it) => x + tradeItemValue(w, A, B, it), 0), vb = take.reduce((x, it) => x + tradeItemValue(w, B, A, it), 0);
-    const lim = clamp(T.rel * (va + vb), T.min * w.macro.cpi, T.max * w.macro.cpi), diff = Math.abs(va - vb);
+    const lim = T.free * w.macro.cpi, diff = Math.abs(va - vb);
     return { va: Math.round(va), vb: Math.round(vb), diff: Math.round(diff), lim: Math.round(lim), ok: diff <= lim };
   }
   function fairMsg(w, f, A, B) {
-    return `Unrealistischer Handel: ${A.name} gibt Werte von rund ${mioTxt(f.va)}, ${B.name} von rund ${mioTxt(f.vb)} – Abweichung ${mioTxt(f.diff)}. Zwischen Airlines von Spielenden sind bis zu ${Math.round(P.TRADE_FAIR.rel * 100)} % des Gesamtbetrags erlaubt (mindestens ${Math.round(P.TRADE_FAIR.min * w.macro.cpi / 1000)} Tsd., höchstens ${mioTxt(P.TRADE_FAIR.max * w.macro.cpi)}), hier also ${mioTxt(f.lim)} – größere Geschenke würden die Wirtschaftsprüfer beanstanden.`;
+    return `Unrealistischer Handel: ${A.name} gibt Werte von rund ${mioTxt(f.va)}, ${B.name} von rund ${mioTxt(f.vb)} – Abweichung ${mioTxt(f.diff)}. Zwischen Airlines von Spielenden dürfen beide Seiten höchstens ${mioTxt(f.lim)} auseinanderliegen.`;
   }
   /** Bilanz der Handelsgeschäfte zwischen Spielenden seit dem letzten Jahresabschluss (je Partner). */
   function auditPreview(w, al) {
@@ -6970,6 +6979,35 @@ const SM = (() => {
     if (total > 0) { al.ledger.post('subsidy', total, true, `Regionalförderung › ${apts.map((x) => aTag(x)).join(', ')}`); al.log(w.day, `Regionalförderung: ${mioTxt(total)} für Flüge ab ${apts.map((x) => ap(x).name).join(', ')}`, 'good'); }
     return total;
   }
+  /**
+   * Margendruck (monatlich, still): Strecken mit sehr hoher Marge (DB2 ≥ 25 % vom Umsatz, 30 Tage) ziehen Konkurrenz an. Wer dort schon fliegt,
+   * senkt die Preise und legt Sitze nach; fliegt niemand, steigt eine Airline mit Basis an einem Ende ein. Größere Airlines fallen eher auf.
+   */
+  function marginPressure(w, al) {
+    if (w.day + 1 < P.BRAKES_FROM) return;   // erst ab dem Stichtag (Monatsabschluss am 31.12. zählt schon, wirkt ab 1.1.)
+    const M = P.MARGIN_PRESSURE, r0 = w.rng, size = clamp(al.fleet.length / M.sizeRef, 0.3, 1.2), cands = [];
+    for (const r of al.activeRoutes()) {
+      if (w.day - r.opened_day < M.minDays || r.hist.length < 20) continue;
+      const k = pairKey(r.base, r.dest); if (w.attacks[k]) continue;
+      const rev = r.hist.slice(-30).reduce((a, x) => a + (x.rev || 0), 0); if (!(rev > 0)) continue;
+      const m = routeDb(r, 30, al) / rev; if (m >= M.margin) cands.push({ r, k, m });
+    }
+    cands.sort((a, b) => b.m - a.m);
+    let n = 0;
+    for (const c of cands) {
+      if (n >= M.max) break;
+      if (r0.random() >= M.p * Math.min(1.5, c.m / M.margin) * size) continue;
+      n++;
+      const flown = w.list.some((x) => x !== al && x.status !== 'insolvent' && x.activeRoutes().some((q) => pairKey(q.base, q.dest) === c.k));
+      if (!flown) {   // Niemand sonst auf der Strecke: Einstieg einer Airline mit Basis an einem Ende
+        const q = c.r, ai = w.list.filter((x) => x.archetype && x.status === 'active' && (x.bases.includes(q.base) || x.bases.includes(q.dest)) && x.fleet.length < (x.maxFleet || 99)).sort(() => r0.random() - 0.5)[0];
+        if (ai) { const base = ai.bases.includes(q.base) ? q.base : q.dest, dest = base === q.base ? q.dest : q.base, t = (ai.cfg.pref_types || []).find((x) => rangeOk(base, dest, x));
+          if (t && w.slotsOkFor(ai, base, dest, 1)) aiOpen(w, ai, aiSpec(w, ai, base, dest, t, 1).spec, null); }
+      }
+      w.attacks[c.k] = { al: al.id, x: M.x, cap: M.cap, until: w.day + M.days, why: 'margin' };
+    }
+    if (n) setFuelX(w);
+  }
   /** Monatlich je Airline: Lage prüfen, mit Wahrscheinlichkeit einen passenden Schock auslösen – Belastungen nie gleichzeitig. */
   function dominanceMonth(w) {
     const R = P.PRESSURE, S = P.AL_SHOCKS, day = w.day, r = w.rng;
@@ -6988,9 +7026,10 @@ const SM = (() => {
         const cands = [...new Set(al.activeRoutes().flatMap((q) => [q.base, q.dest]))].filter((c) => (ap(c).pax || 0) <= P.SMALL_HELP.subPax && !alShock(al, 'subsidy', day, (x) => x.apt === c) && !w.list.some((x) => x !== al && x.status !== 'insolvent' && x.activeRoutes().some((q) => q.base === c || q.dest === c)));
         if (cands.length) { const c = r.pick(cands); addShock(w, al, { k: 'subsidy', apt: c, from: day, until: day + S.subsidy.days }, `Förderzusage: Die Region um ${ap(c).name} fördert ein Jahr lang jeden Ihrer Abflüge von dort (bis ${Math.round(P.SMALL_HELP.subsidy)} € je Abflug).`, 'good'); }
       }
+      marginPressure(w, al);
       // Belastungen: nur eine gleichzeitig, danach Atempause
       const pr = al.press || (al.press = { next: 0 });
-      const busy = Object.values(w.attacks).some((a) => a.al === al.id) || Object.values(w.fareCaps).some((a) => a.al === al.id) || al.decisions.some((d) => d.type === 'profit' && !d.resolved) || (al.profitShare && al.profitShare.until > day) || alShock(al, 'entrant', day);
+      const busy = Object.values(w.attacks).some((a) => a.al === al.id && a.why !== 'margin') || Object.values(w.fareCaps).some((a) => a.al === al.id) || al.decisions.some((d) => d.type === 'profit' && !d.resolved) || (al.profitShare && al.profitShare.until > day) || alShock(al, 'entrant', day);
       if (busy) { pr.next = Math.max(pr.next, day + R.cool); continue; }
       if (day < pr.next) continue;
       const ms = al.ledger.months.slice(-3), rev = ms.reduce((a, m) => a + monthRev(m), 0), res = ms.reduce((a, m) => a + monthRes(m), 0), margin = rev > 0 ? res / rev : 0;
@@ -7790,6 +7829,10 @@ const SM = (() => {
       if (n.msg && /^[^:]{1,60} annulliert: /.test(n.msg)) n.msg = 'Entwarnung: ' + n.msg.replace(/^[^:]{1,60} annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
     }
     for (const al of w.list) if (al.isPlayer) for (const ev of al.events || []) if (ev.msg && /hat ein Ereignis annulliert: /.test(ev.msg)) ev.msg = 'Entwarnung: ' + ev.msg.replace(/^.*hat ein Ereignis annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
+    // 0.21.16: laufender Margendruck gleich mit der neuen Stärke (−20 % statt −12 %)
+    for (const a of Object.values(w.attacks || {})) if (a.why === 'margin') { a.x = Math.min(a.x, P.MARGIN_PRESSURE.x); a.cap = Math.max(a.cap, P.MARGIN_PRESSURE.cap); }
+    // 0.21.18: Margendruck erst ab dem Stichtag – vorher schon gestartete Angriffe enden
+    if (w.day < P.BRAKES_FROM && w.attacks) for (const [k, a] of Object.entries(w.attacks)) if (a.why === 'margin') delete w.attacks[k];
     // 0.21.12: Gesellschafter-Ausschüttung wird zur Hauptversammlung mit Abstimmung nach Anteilen
     if (!w.agmV) { w.agmV = 1;
       for (const al of w.list) {
@@ -8539,14 +8582,19 @@ function setTab(t) {
   $('#pane').scrollTop = 0;
   if (isPhone() && !ui.tour && !ui.mapNav && prevTab && prevTab !== t) phoneScroll(sectionOf(t).key, sectionOf(prevTab).key !== sectionOf(t).key);
 }
+// Wer scrollt die Seite? Auf schmalen Bildschirmen der App-Bereich (#app, damit iOS die feste Leiste unten nicht verschiebt), sonst das Fenster.
+function pageScroller() { const a = document.getElementById('app'); return a && getComputedStyle(a).overflowY === 'auto' ? a : null; }
+const pageY = () => { const sc = pageScroller(); return sc ? sc.scrollTop : window.scrollY; };
+const pageMax = () => { const sc = pageScroller(); return sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - innerHeight; };
+const pageTo = (y) => { const sc = pageScroller(); if (sc) sc.scrollTop = y; else window.scrollTo(0, y); };
 // Handy: nach einem Wechsel den Inhalt zeigen (Karte oben, sonst Kopf des Bereichs)
 function phoneScroll(sec, newSection) {
   const side = $('#side'); if (!side) return;
   const hh = $('header.top') ? $('header.top').offsetHeight : 0;
-  if (newSection && sec === 'karte') { window.scrollTo({ top: 0 }); return; }
-  const y = Math.max(0, side.getBoundingClientRect().top + window.scrollY - hh - 4);
+  if (newSection && sec === 'karte') { pageTo(0); return; }
+  const y = Math.max(0, side.getBoundingClientRect().top + pageY() - hh - 4);
   // neuer Bereich: Kopf des Bereichs zeigen; Unterreiter: nur zurück nach oben, wenn man tiefer war
-  if (newSection ? Math.abs(window.scrollY - y) > 4 : window.scrollY > y + 4) window.scrollTo({ top: y });
+  if (newSection ? Math.abs(pageY() - y) > 4 : pageY() > y + 4) pageTo(y);
 }
 function editing() { if (ui.picker) return true; const a = document.activeElement; return a && $('#pane').contains(a) && /INPUT|SELECT/.test(a.tagName); }
 const VIEWS = {};
@@ -8570,7 +8618,7 @@ document.addEventListener('focusout', (e) => { if (ui.paneStale && e.target && $
 function renderPane(force = false) {
   if (!force && (editing() || performance.now() - userScrollAt < 800)) { deferPane(); return; }
   ui.paneStale = false;
-  const pane = $('#pane'), st = pane.scrollTop, wy = window.scrollY;
+  const pane = $('#pane'), st = pane.scrollTop, wy = pageY();
   const inner = [...pane.querySelectorAll(KEEP_SCROLL)].map((e) => [e.scrollTop, e.scrollLeft]);
   pane.style.minHeight = pane.offsetHeight + 'px';   // Seite nicht kurz zusammenfallen lassen (sonst springt das Handy nach oben)
   pane.innerHTML = VIEWS[ui.tab]();
@@ -8579,10 +8627,10 @@ function renderPane(force = false) {
   pane.scrollTop = st;
   const els = pane.querySelectorAll(KEEP_SCROLL); for (let i = 0; i < els.length && i < inner.length; i++) { if (inner[i][0]) els[i].scrollTop = inner[i][0]; if (inner[i][1]) els[i].scrollLeft = inner[i][1]; }
   pane.style.minHeight = '';
-  if (Math.abs(window.scrollY - wy) > 2) window.scrollTo(0, wy);
+  if (Math.abs(pageY() - wy) > 2) pageTo(wy);
   ui.lastPaneRender = performance.now();
   // Nachzügler (Bilder, Schriften): Position im nächsten Frame noch einmal setzen
-  if (st > 0 || wy > 0) requestAnimationFrame(() => { if (performance.now() - userScrollAt < 300) return; if (Math.abs(pane.scrollTop - st) > 2 && pane.scrollHeight - pane.clientHeight >= st) pane.scrollTop = st; if (Math.abs(window.scrollY - wy) > 2 && document.documentElement.scrollHeight - innerHeight >= wy) window.scrollTo(0, wy); });
+  if (st > 0 || wy > 0) requestAnimationFrame(() => { if (performance.now() - userScrollAt < 300) return; if (Math.abs(pane.scrollTop - st) > 2 && pane.scrollHeight - pane.clientHeight >= st) pane.scrollTop = st; if (Math.abs(pageY() - wy) > 2 && pageMax() >= wy) pageTo(wy); });
 }
 /** Ansichten mit laufenden Zahlen – nur diese werden bei laufender Zeit neu gezeichnet. */
 const LIVE_TABS = new Set(['cockpit', 'dashboard', 'routes', 'fleetOwn', 'fleetPlan', 'finance', 'credit', 'rescue', 'cfo', 'news', 'history', 'players', 'staff', 'exchange', 'departures', 'milestones', 'world']);

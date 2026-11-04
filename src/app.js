@@ -705,14 +705,19 @@ function setTab(t) {
   $('#pane').scrollTop = 0;
   if (isPhone() && !ui.tour && !ui.mapNav && prevTab && prevTab !== t) phoneScroll(sectionOf(t).key, sectionOf(prevTab).key !== sectionOf(t).key);
 }
+// Wer scrollt die Seite? Auf schmalen Bildschirmen der App-Bereich (#app, damit iOS die feste Leiste unten nicht verschiebt), sonst das Fenster.
+function pageScroller() { const a = document.getElementById('app'); return a && getComputedStyle(a).overflowY === 'auto' ? a : null; }
+const pageY = () => { const sc = pageScroller(); return sc ? sc.scrollTop : window.scrollY; };
+const pageMax = () => { const sc = pageScroller(); return sc ? sc.scrollHeight - sc.clientHeight : document.documentElement.scrollHeight - innerHeight; };
+const pageTo = (y) => { const sc = pageScroller(); if (sc) sc.scrollTop = y; else window.scrollTo(0, y); };
 // Handy: nach einem Wechsel den Inhalt zeigen (Karte oben, sonst Kopf des Bereichs)
 function phoneScroll(sec, newSection) {
   const side = $('#side'); if (!side) return;
   const hh = $('header.top') ? $('header.top').offsetHeight : 0;
-  if (newSection && sec === 'karte') { window.scrollTo({ top: 0 }); return; }
-  const y = Math.max(0, side.getBoundingClientRect().top + window.scrollY - hh - 4);
+  if (newSection && sec === 'karte') { pageTo(0); return; }
+  const y = Math.max(0, side.getBoundingClientRect().top + pageY() - hh - 4);
   // neuer Bereich: Kopf des Bereichs zeigen; Unterreiter: nur zurück nach oben, wenn man tiefer war
-  if (newSection ? Math.abs(window.scrollY - y) > 4 : window.scrollY > y + 4) window.scrollTo({ top: y });
+  if (newSection ? Math.abs(pageY() - y) > 4 : pageY() > y + 4) pageTo(y);
 }
 function editing() { if (ui.picker) return true; const a = document.activeElement; return a && $('#pane').contains(a) && /INPUT|SELECT/.test(a.tagName); }
 const VIEWS = {};
@@ -736,7 +741,7 @@ document.addEventListener('focusout', (e) => { if (ui.paneStale && e.target && $
 function renderPane(force = false) {
   if (!force && (editing() || performance.now() - userScrollAt < 800)) { deferPane(); return; }
   ui.paneStale = false;
-  const pane = $('#pane'), st = pane.scrollTop, wy = window.scrollY;
+  const pane = $('#pane'), st = pane.scrollTop, wy = pageY();
   const inner = [...pane.querySelectorAll(KEEP_SCROLL)].map((e) => [e.scrollTop, e.scrollLeft]);
   pane.style.minHeight = pane.offsetHeight + 'px';   // Seite nicht kurz zusammenfallen lassen (sonst springt das Handy nach oben)
   pane.innerHTML = VIEWS[ui.tab]();
@@ -745,10 +750,10 @@ function renderPane(force = false) {
   pane.scrollTop = st;
   const els = pane.querySelectorAll(KEEP_SCROLL); for (let i = 0; i < els.length && i < inner.length; i++) { if (inner[i][0]) els[i].scrollTop = inner[i][0]; if (inner[i][1]) els[i].scrollLeft = inner[i][1]; }
   pane.style.minHeight = '';
-  if (Math.abs(window.scrollY - wy) > 2) window.scrollTo(0, wy);
+  if (Math.abs(pageY() - wy) > 2) pageTo(wy);
   ui.lastPaneRender = performance.now();
   // Nachzügler (Bilder, Schriften): Position im nächsten Frame noch einmal setzen
-  if (st > 0 || wy > 0) requestAnimationFrame(() => { if (performance.now() - userScrollAt < 300) return; if (Math.abs(pane.scrollTop - st) > 2 && pane.scrollHeight - pane.clientHeight >= st) pane.scrollTop = st; if (Math.abs(window.scrollY - wy) > 2 && document.documentElement.scrollHeight - innerHeight >= wy) window.scrollTo(0, wy); });
+  if (st > 0 || wy > 0) requestAnimationFrame(() => { if (performance.now() - userScrollAt < 300) return; if (Math.abs(pane.scrollTop - st) > 2 && pane.scrollHeight - pane.clientHeight >= st) pane.scrollTop = st; if (Math.abs(pageY() - wy) > 2 && pageMax() >= wy) pageTo(wy); });
 }
 /** Ansichten mit laufenden Zahlen – nur diese werden bei laufender Zeit neu gezeichnet. */
 const LIVE_TABS = new Set(['cockpit', 'dashboard', 'routes', 'fleetOwn', 'fleetPlan', 'finance', 'credit', 'rescue', 'cfo', 'news', 'history', 'players', 'staff', 'exchange', 'departures', 'milestones', 'world']);

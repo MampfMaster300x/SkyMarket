@@ -386,10 +386,15 @@ const SM = (() => {
     },
     START_EQUITY_EUR: 20e6, OVERHEAD_PER_AIRCRAFT_DAY: 650.0, STATION_COST_DAY_AI: 600.0,
     // Verwaltungskosten (EUR/Tag) für Spielende: wächst mit der Flotte, kleine Gründungen bleiben bezahlbar
+    // Größe kostet: Ab 25 Flugzeugen wächst die Abstimmung (Systeme, Gremien, Schnittstellen) schneller als die Flotte – je weiterem Flugzeug teurer
+    HQ_SIZE: { from: 25, k: 5000, exp: 1.3 },
+    BRAKES_FROM: 365,   // Größenzuschlag und Margendruck gelten ab dem 1. Januar 2028 (Spieltag 365)
+    // Hohe Streckenmargen locken Konkurrenz: andere Airlines senken dort Preise und legen Sitze nach, wo niemand fliegt, steigt jemand ein
+    MARGIN_PRESSURE: { margin: 0.25, minDays: 60, p: 0.4, max: 6, days: 120, x: 0.8, cap: 1.25, sizeRef: 25 },
     HQ_CURVE: [[0, 800], [5, 3000], [15, 10000], [30, 26000], [100, 80000], [200, 200000], [400, 520000]],   // ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte (Konzernstrukturen)
     ANTITRUST: { share: 0.6, minDeps: 25, minPax: 8, grace: 90, fine: 0.005 },
     // 0.20: Handel zwischen Spielenden nur in realistischer Spanne; Wirtschaftsprüfer prüfen zum Jahresende
-    TRADE_FAIR: { rel: 0.35, min: 100000, max: 1000000 },   // Spielraum: 35 % vom Gesamtbetrag beider Seiten, mindestens 100 Tsd., höchstens 1 Mio. €
+    TRADE_FAIR: { free: 1000000 },   // Spielraum: Abweichung bis 1 Mio. € (Preisindex) ist frei – unabhängig von der Größe des Geschäfts
     // 0.21: Dominanz einhegen – Gesellschafter verlangen Ausschüttung, Druck auf Marktführer (nie zwei Dinge gleichzeitig), Hilfe für Kleine
     PAYOUT: { from: 2, k: 0.2, min: 0.2, max: 0.7,
       // Hauptversammlung (0.21.12): Abstimmung nach Anteilen. Die Minderheit stimmt für den Antrag, Sie mit Ihrem eigenen Anteil.
@@ -1203,6 +1208,8 @@ const SM = (() => {
     oldAcFactor(age) { return this.oldAcExpert() && age >= P.OLD_AC_AGE ? 0.9 : 1; }
     stage() { const n = this.fleet.length; let s = P.STAGES[0]; for (const st of P.STAGES) if (n >= st.min) s = st; return s; }
     /** Verwaltung pro Tag: KI nach Stufe, Spielende entlang P.HQ_CURVE (linear zwischen den Stützpunkten). */
+    /** Größenzuschlag der Verwaltung pro Tag (nur Spielende, ohne Preisindex). */
+    hqSizeDay(day = this._day ?? 0) { const S = P.HQ_SIZE, n = this.fleet.length; return this.isPlayer && n > S.from && day >= P.BRAKES_FROM ? S.k * (n - S.from) ** S.exp : 0; }
     hqDay() {
       if (!this.isPlayer) return this.stage().hq;
       const n = this.fleet.length, C = P.HQ_CURVE;
@@ -2918,6 +2925,7 @@ const SM = (() => {
         L.post('overhead', -P.STATION_COST_DAY_AI * stations.size * cpi);
       }
       L.post('overhead', -al.hqDay() * cpi, true, 'Zentrale (Hauptverwaltung)');
+      if (al.isPlayer && al.hqSizeDay() > 0) L.post('overhead', -al.hqSizeDay() * cpi, true, `Zentrale: Größenzuschlag ab ${P.HQ_SIZE.from} Flugzeugen`);
       if (al.isPlayer) { const sx = softX(al, 'baseDay'); for (const b of al.bases) L.post('overhead', -baseDayCost(b) * sx * cpi, true, `Basis › ${aTag(b)}`); }
       else L.post('overhead', -P.BASE_FIXED_DAY * (al.bases.length - 1) * cpi);
       L.post('overhead', -P.TYPE_COMPLEXITY_DAY * Math.max(new Set(al.fleet.map((a) => P.AIRCRAFT_TYPES[a.type_id].group)).size - 1, 0) * cpi, true, 'Mehrere Flugzeugfamilien (Schulung, Ersatzteile)');
@@ -5503,11 +5511,11 @@ const SM = (() => {
   /** Prüft, ob beide Seiten eines Handels in einer realistischen Spanne liegen. */
   function tradeFairness(w, A, B, give, take) {
     const T = P.TRADE_FAIR, va = give.reduce((x, it) => x + tradeItemValue(w, A, B, it), 0), vb = take.reduce((x, it) => x + tradeItemValue(w, B, A, it), 0);
-    const lim = clamp(T.rel * (va + vb), T.min * w.macro.cpi, T.max * w.macro.cpi), diff = Math.abs(va - vb);
+    const lim = T.free * w.macro.cpi, diff = Math.abs(va - vb);
     return { va: Math.round(va), vb: Math.round(vb), diff: Math.round(diff), lim: Math.round(lim), ok: diff <= lim };
   }
   function fairMsg(w, f, A, B) {
-    return `Unrealistischer Handel: ${A.name} gibt Werte von rund ${mioTxt(f.va)}, ${B.name} von rund ${mioTxt(f.vb)} – Abweichung ${mioTxt(f.diff)}. Zwischen Airlines von Spielenden sind bis zu ${Math.round(P.TRADE_FAIR.rel * 100)} % des Gesamtbetrags erlaubt (mindestens ${Math.round(P.TRADE_FAIR.min * w.macro.cpi / 1000)} Tsd., höchstens ${mioTxt(P.TRADE_FAIR.max * w.macro.cpi)}), hier also ${mioTxt(f.lim)} – größere Geschenke würden die Wirtschaftsprüfer beanstanden.`;
+    return `Unrealistischer Handel: ${A.name} gibt Werte von rund ${mioTxt(f.va)}, ${B.name} von rund ${mioTxt(f.vb)} – Abweichung ${mioTxt(f.diff)}. Zwischen Airlines von Spielenden dürfen beide Seiten höchstens ${mioTxt(f.lim)} auseinanderliegen.`;
   }
   /** Bilanz der Handelsgeschäfte zwischen Spielenden seit dem letzten Jahresabschluss (je Partner). */
   function auditPreview(w, al) {
@@ -5691,6 +5699,35 @@ const SM = (() => {
     if (total > 0) { al.ledger.post('subsidy', total, true, `Regionalförderung › ${apts.map((x) => aTag(x)).join(', ')}`); al.log(w.day, `Regionalförderung: ${mioTxt(total)} für Flüge ab ${apts.map((x) => ap(x).name).join(', ')}`, 'good'); }
     return total;
   }
+  /**
+   * Margendruck (monatlich, still): Strecken mit sehr hoher Marge (DB2 ≥ 25 % vom Umsatz, 30 Tage) ziehen Konkurrenz an. Wer dort schon fliegt,
+   * senkt die Preise und legt Sitze nach; fliegt niemand, steigt eine Airline mit Basis an einem Ende ein. Größere Airlines fallen eher auf.
+   */
+  function marginPressure(w, al) {
+    if (w.day + 1 < P.BRAKES_FROM) return;   // erst ab dem Stichtag (Monatsabschluss am 31.12. zählt schon, wirkt ab 1.1.)
+    const M = P.MARGIN_PRESSURE, r0 = w.rng, size = clamp(al.fleet.length / M.sizeRef, 0.3, 1.2), cands = [];
+    for (const r of al.activeRoutes()) {
+      if (w.day - r.opened_day < M.minDays || r.hist.length < 20) continue;
+      const k = pairKey(r.base, r.dest); if (w.attacks[k]) continue;
+      const rev = r.hist.slice(-30).reduce((a, x) => a + (x.rev || 0), 0); if (!(rev > 0)) continue;
+      const m = routeDb(r, 30, al) / rev; if (m >= M.margin) cands.push({ r, k, m });
+    }
+    cands.sort((a, b) => b.m - a.m);
+    let n = 0;
+    for (const c of cands) {
+      if (n >= M.max) break;
+      if (r0.random() >= M.p * Math.min(1.5, c.m / M.margin) * size) continue;
+      n++;
+      const flown = w.list.some((x) => x !== al && x.status !== 'insolvent' && x.activeRoutes().some((q) => pairKey(q.base, q.dest) === c.k));
+      if (!flown) {   // Niemand sonst auf der Strecke: Einstieg einer Airline mit Basis an einem Ende
+        const q = c.r, ai = w.list.filter((x) => x.archetype && x.status === 'active' && (x.bases.includes(q.base) || x.bases.includes(q.dest)) && x.fleet.length < (x.maxFleet || 99)).sort(() => r0.random() - 0.5)[0];
+        if (ai) { const base = ai.bases.includes(q.base) ? q.base : q.dest, dest = base === q.base ? q.dest : q.base, t = (ai.cfg.pref_types || []).find((x) => rangeOk(base, dest, x));
+          if (t && w.slotsOkFor(ai, base, dest, 1)) aiOpen(w, ai, aiSpec(w, ai, base, dest, t, 1).spec, null); }
+      }
+      w.attacks[c.k] = { al: al.id, x: M.x, cap: M.cap, until: w.day + M.days, why: 'margin' };
+    }
+    if (n) setFuelX(w);
+  }
   /** Monatlich je Airline: Lage prüfen, mit Wahrscheinlichkeit einen passenden Schock auslösen – Belastungen nie gleichzeitig. */
   function dominanceMonth(w) {
     const R = P.PRESSURE, S = P.AL_SHOCKS, day = w.day, r = w.rng;
@@ -5709,9 +5746,10 @@ const SM = (() => {
         const cands = [...new Set(al.activeRoutes().flatMap((q) => [q.base, q.dest]))].filter((c) => (ap(c).pax || 0) <= P.SMALL_HELP.subPax && !alShock(al, 'subsidy', day, (x) => x.apt === c) && !w.list.some((x) => x !== al && x.status !== 'insolvent' && x.activeRoutes().some((q) => q.base === c || q.dest === c)));
         if (cands.length) { const c = r.pick(cands); addShock(w, al, { k: 'subsidy', apt: c, from: day, until: day + S.subsidy.days }, `Förderzusage: Die Region um ${ap(c).name} fördert ein Jahr lang jeden Ihrer Abflüge von dort (bis ${Math.round(P.SMALL_HELP.subsidy)} € je Abflug).`, 'good'); }
       }
+      marginPressure(w, al);
       // Belastungen: nur eine gleichzeitig, danach Atempause
       const pr = al.press || (al.press = { next: 0 });
-      const busy = Object.values(w.attacks).some((a) => a.al === al.id) || Object.values(w.fareCaps).some((a) => a.al === al.id) || al.decisions.some((d) => d.type === 'profit' && !d.resolved) || (al.profitShare && al.profitShare.until > day) || alShock(al, 'entrant', day);
+      const busy = Object.values(w.attacks).some((a) => a.al === al.id && a.why !== 'margin') || Object.values(w.fareCaps).some((a) => a.al === al.id) || al.decisions.some((d) => d.type === 'profit' && !d.resolved) || (al.profitShare && al.profitShare.until > day) || alShock(al, 'entrant', day);
       if (busy) { pr.next = Math.max(pr.next, day + R.cool); continue; }
       if (day < pr.next) continue;
       const ms = al.ledger.months.slice(-3), rev = ms.reduce((a, m) => a + monthRev(m), 0), res = ms.reduce((a, m) => a + monthRes(m), 0), margin = rev > 0 ? res / rev : 0;
@@ -6511,6 +6549,10 @@ const SM = (() => {
       if (n.msg && /^[^:]{1,60} annulliert: /.test(n.msg)) n.msg = 'Entwarnung: ' + n.msg.replace(/^[^:]{1,60} annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
     }
     for (const al of w.list) if (al.isPlayer) for (const ev of al.events || []) if (ev.msg && /hat ein Ereignis annulliert: /.test(ev.msg)) ev.msg = 'Entwarnung: ' + ev.msg.replace(/^.*hat ein Ereignis annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
+    // 0.21.16: laufender Margendruck gleich mit der neuen Stärke (−20 % statt −12 %)
+    for (const a of Object.values(w.attacks || {})) if (a.why === 'margin') { a.x = Math.min(a.x, P.MARGIN_PRESSURE.x); a.cap = Math.max(a.cap, P.MARGIN_PRESSURE.cap); }
+    // 0.21.18: Margendruck erst ab dem Stichtag – vorher schon gestartete Angriffe enden
+    if (w.day < P.BRAKES_FROM && w.attacks) for (const [k, a] of Object.entries(w.attacks)) if (a.why === 'margin') delete w.attacks[k];
     // 0.21.12: Gesellschafter-Ausschüttung wird zur Hauptversammlung mit Abstimmung nach Anteilen
     if (!w.agmV) { w.agmV = 1;
       for (const al of w.list) {

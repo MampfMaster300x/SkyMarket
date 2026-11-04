@@ -183,6 +183,26 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.18: Wachstumsbremsen ab 1. Januar 2028
+
+- Größenzuschlag der Verwaltung und Margendruck (bis 6 Strecken je Monat, −20 %) gelten erst ab dem **1. Januar 2028 im Spiel** (Spieltag 365, `P.BRAKES_FROM`). Margendruck, der vorher schon ausgelöst wurde, endet beim Laden; der erste Durchgang läuft beim Monatsabschluss am 31. Dezember 2027 und wirkt ab dem 1. Januar.
+- Die Handelsregel (bis 1 Mio. € Abweichung frei) gilt weiterhin sofort.
+
+## Neu in 0.21.17: Handel – bis 1 Mio. € Abweichung frei
+
+- Zwischen Airlines von Spielenden gilt nicht mehr „35 % vom Gesamtbetrag“: Eine Abweichung bis **1 Mio. €** (mit dem Preisindex) ist bei jedem Geschäft frei, egal wie klein es ist. Darüber wird der Handel abgelehnt. Die Wirtschaftsprüfung zum Jahresende prüft weiterhin, wer sich über mehrere Geschäfte Werte zuschiebt.
+
+## Neu in 0.21.16: Stärkerer Margendruck
+
+- Der Markt greift jetzt bis zu **6 Strecken pro Monat** mit hoher Marge an (bisher 3), und die Konkurrenz senkt dort die Preise um **20 %** (bisher 12 %) bei bis zu 25 % mehr Sitzen, jeweils für 120 Tage.
+- Bereits laufender Margendruck in bestehenden Spielständen bekommt beim Laden sofort die neue Stärke.
+
+## Neu in 0.21.15: Wachstumsbremsen, feste Leiste auf dem Handy
+
+- **Größe kostet Verwaltung:** Ab 25 Flugzeugen kommt zur Zentrale ein Größenzuschlag (Abstimmung, Systeme, Gremien), der schneller wächst als die Flotte: rund 87.000 €/Tag bei 34 Flugzeugen, 330.000 € bei 50, 915.000 € bei 80. In der GuV als „Zentrale: Größenzuschlag“.
+- **Konkurrenz greift hohe Margen an:** Jeden Monat prüft der Markt alle Strecken; wer auf einer Strecke 30 Tage lang mehr als 25 % Streckenbeitrag (DB2) vom Umsatz verdient, zieht Konkurrenz an (bis zu 3 Strecken je Monat, große Airlines fallen eher auf). Die anderen Anbieter senken dort für 120 Tage die Preise um 12 % und bieten mehr Sitze an; fliegt niemand sonst, steigt eine Airline mit Basis an einem Ende ein. Das passiert still, wie die übrige Gegenwehr, und blockiert die anderen Belastungen nicht.
+- **Handy:** Die untere Leiste rutschte beim Scrollen (vor allem in Safari auf dem iPhone) in die Bildmitte. Auf schmalen Bildschirmen scrollt jetzt nicht mehr die ganze Seite, sondern nur der App-Bereich – Kopfzeile, Reiter und Leiste bleiben fest.
+
 ## Neu in 0.21.14: Finanzbericht – alles nachvollziehbar
 
 Unter Finanzen steht jetzt ein vollständiger Finanzbericht. Jede Summe lässt sich bis zur einzelnen Buchung aufklappen, und jede Abstimmung zeigt „✓ stimmt“ (oder die Abweichung):

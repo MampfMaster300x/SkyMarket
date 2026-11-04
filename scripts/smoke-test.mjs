@@ -567,7 +567,8 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   A(a, { type: 'dealWithdraw', id: mk.id });
   { const f1 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 2600000 }], [{ k: 'cash', amount: 2000000 }]); assert.ok(f1.ok && f1.lim === 1e6 * w.macro.cpi || f1.ok, '0,6 Mio. Abweichung bei 4,6 Mio. Gesamtbetrag erlaubt');
     const f2 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 12000000 }], [{ k: 'cash', amount: 10500000 }]); assert.ok(!f2.ok && Math.abs(f2.lim - 1e6 * w.macro.cpi) < 1, 'über 1 Mio. Abweichung nicht erlaubt');
-    const f3 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 450000 }], [{ k: 'cash', amount: 200000 }]); assert.ok(!f3.ok && f3.lim < 250000, 'bei kleinen Geschäften entsprechend weniger Spielraum'); }
+    const f3 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 950000 }], [{ k: 'cash', amount: 0 }]); assert.ok(f3.ok, 'bis 1 Mio. Abweichung frei, auch bei kleinen Geschäften');
+    const f4 = SMx.tradeFairness(w, a, b, [{ k: 'cash', amount: 1200000 * w.macro.cpi }], []); assert.ok(!f4.ok, 'mehr als 1 Mio. Abweichung nicht erlaubt'); }
   const f = A(a, { type: 'dealPropose', to: 'P2', give: [{ k: 'cash', amount: 20000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] });
   assert.equal(f.ok, true, 'fairer Kleinhandel geht: ' + f.msg);
   assert.equal(A(b, { type: 'dealRespond', id: f.id, choice: 'accept' }).ok, true, 'angenommen');
@@ -781,4 +782,21 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.equal(Fo.t0.cash + (sum(Lo.pnl) - Fo.t0.ni) - sum(Fo.tnc) + sum(Fo.cf), Lo.cash, 'alter Stand: Kasse seit Aufzeichnung stimmt');
   assert.ok(!wo.list.some((a) => a.archetype && a.ledger.fx), 'KI-Airlines ohne Finanzbericht');
   console.log('0.21.14 ok: Kasse, Einlagen, Ergebnis und Einzelposten stimmen in', ms.length, 'Monaten und seit Gründung auf den Cent'); }
+// 0.21.15: Wachstumsbremsen – Größenzuschlag der Verwaltung ab 25 Flugzeugen, Konkurrenz greift Strecken mit hoher Marge an
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const w = SMx.newGame({ seed: 12, base: 'HAM' }), pl = w.player, A = (a) => SMx.applyAction(w, pl.id, a);
+  const fl = pl.fleet; const fake = (n) => { fl.length = 0; for (let i = 0; i < n; i++) fl.push({ type_id: 'A20N' }); };
+  fake(34); assert.equal(pl.hqSizeDay(100), 0, 'vor dem 1. Januar 2028 kein Zuschlag');
+  fake(25); assert.equal(pl.hqSizeDay(400), 0, 'bis 25 Flugzeuge kein Zuschlag'); fake(34); const z34 = pl.hqSizeDay(400); fake(50); const z50 = pl.hqSizeDay(400);
+  assert.ok(z34 > 50000 && z34 < 150000 && z50 / 50 > z34 / 34 * 1.5, `Zuschlag wächst schneller als die Flotte (${Math.round(z34)} / ${Math.round(z50)} €/Tag)`); fake(0);
+  pl.cash = Math.max(pl.cash, 3e8); A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); A({ type: 'fillStaff' }); for (let i = 0; i < 20; i++) w.step();
+  assert.equal(A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 1 }).ok, true, 'Strecke');
+  const r = pl.routes.find((x) => x.dest === 'PMI'); for (let i = 0; i < 70; i++) w.step();
+  // sehr hohe Marge vortäuschen und Margendruck auslösen
+  for (const h of r.hist) { h.rev = 200000; h.cost = 20000; }
+  const M = SMx.P.MARGIN_PRESSURE, p0 = M.p; M.p = 10; w.attacks = {}; SMx.dominanceMonth(w);
+  assert.ok(!Object.values(w.attacks).some((a) => a.why === 'margin'), 'vor dem Stichtag kein Margendruck');
+  const bf = SMx.P.BRAKES_FROM; SMx.P.BRAKES_FROM = 0; w.attacks = {}; SMx.dominanceMonth(w); M.p = p0; SMx.P.BRAKES_FROM = bf;
+  const at = w.attacks[SMx.pairKey('HAM', 'PMI')]; assert.ok(at && at.why === 'margin' && at.al === pl.id && at.x < 1, 'Konkurrenz greift die Strecke mit hoher Marge an');
+  console.log('0.21.15 ok: Größenzuschlag', Math.round(z34), '€/Tag bei 34 Flugzeugen, Margendruck auf HAM–PMI'); }
 console.log('Alle Prüfungen bestanden.');

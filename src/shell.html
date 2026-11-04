@@ -199,8 +199,9 @@ nav.tabs .dot { position: absolute; top: 1px; right: 1px; width: 7px; height: 7p
   .only-narrow { display: grid; }
 }
 @media (max-width: 900px) {
-  body { overflow: auto; }
-  #app { height: auto; min-height: 100%; }
+  /* Die Seite selbst scrollt nicht, nur #app: So bleibt das Fenster für den Browser still, und iOS-Safari verschiebt die feste Leiste unten beim Scrollen nicht mehr */
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  #app { display: block; height: 100%; height: 100dvh; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
   header.top { flex-wrap: wrap; padding-top: 8px; }
   .logo { padding-right: 10px; }
   .logo .wm span { display: none; }
