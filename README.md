@@ -183,6 +183,19 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.20: Harte Zeiten
+
+- **Branchenkrise im Zyklus:** Ab dem zweiten Spieljahr kann eine weltweite Branchenkrise kommen – je länger es gut lief, desto wahrscheinlicher (3 % im ersten Monat, dann +1,5 Punkte je Monat bis 20 %; danach mindestens 18 Monate Pause). Angekündigt 30–60 Tage vorher, Dauer 9–14 Monate plus 5 Monate Erholung: Geschäftsreisen −18 bis −28 %, Urlaub −10 bis −18 %, Besuchsreisen −5 bis −10 %, Ticketpreise im ganzen Markt −6 bis −10 %, Banken kürzen Kreditlinien (−25 %), Leasinggeber verlangen +6 Ansehen. In einer Testwelt drehte die KI-Branche von zusammen +73 auf −39 Mio. € Ergebnis im Monat.
+- **Leasing-Indexierung:** Leasingraten von Spielenden steigen je Vertragsjahr um 3 % (Meldung im Logbuch).
+- **Sicherheitsnachforderung:** Fällt das Rating auf B oder CCC, verlangen die Leasinggeber sofort eine Monatsrate je Leasingflugzeug als zusätzliche Kaution – genau dann, wenn das Geld knapp ist. Zurück gibt es sie, wenn das Rating mindestens 60 Tage später wieder BB oder besser ist. Im Kapitalfluss als „Leasing-Kautionen gezahlt/zurück“, in der Bilanz bei den Kautionen.
+- Spielleitung: Die Branchenkrise lässt sich wie jedes Ereignis annullieren („Konjunkturprogramme greifen …“).
+
+## Neu in 0.21.19: Spielzeit-Dashboard für Admins
+
+- Der Server erfasst jetzt die **Spielzeit je Konto**: Zeit mit sichtbarem Spielfenster in einem Online-Spiel (Lebenszeichen alle 15 Sekunden). Fenster im Hintergrund, gesperrtes Handy oder Lücken über 90 Sekunden zählen nicht und beginnen eine neue Sitzung. Gespeichert je Konto unter `play/<name>`: gesamt, je Spiel, je Tag (Berliner Zeit, 400 Tage), Sitzungen, erste und letzte Aktivität.
+- **Dashboard** (Lobby → Verwaltung → „Spielzeit der Spieler“ oder Menü oben rechts): Konten, Spielzeit gesamt/heute/7 Tage, wer gerade online ist, Spielzeit aller Spieler je Tag (30 Tage) und eine sortierbare Tabelle je Spieler (gesamt, heute, 7 Tage, Ø je Spieltag, Spieltage, Sitzungen, 30-Tage-Verlauf, zuletzt); Zeile anklicken zeigt die Zeit je Spiel.
+- Erfasst wird ab diesem Update – frühere Spielzeit hat der Server nicht gespeichert.
+
 ## Neu in 0.21.18: Wachstumsbremsen ab 1. Januar 2028
 
 - Größenzuschlag der Verwaltung und Margendruck (bis 6 Strecken je Monat, −20 %) gelten erst ab dem **1. Januar 2028 im Spiel** (Spieltag 365, `P.BRAKES_FROM`). Margendruck, der vorher schon ausgelöst wurde, endet beim Laden; der erste Durchgang läuft beim Monatsabschluss am 31. Dezember 2027 und wirkt ab dem 1. Januar.

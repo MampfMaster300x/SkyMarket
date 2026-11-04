@@ -157,6 +157,14 @@ assert.equal(r.ok, true);
 // Admin Tim: sieht alle Spiele, tritt ohne Passwort bei, darf fremde Spiele löschen
 const tim = ok(await call('tim', 'POST', '/login', { username: 'Tim', password: 'admin1234' }), 'Anmeldung Tim');
 assert.equal(tim.admin, true, 'Tim ist Admin');
+// 0.21.19: Spielzeit – sichtbares Spielfenster zählt, Admin-Übersicht
+{ await call('anna', 'GET', `/games/${g.id}/state?ping=1&vis=1`); await new Promise((r) => setTimeout(r, 40)); await call('anna', 'GET', `/games/${g.id}/state?ping=1&vis=1`);
+  await call('ben', 'GET', `/games/${g.id}/state?ping=1&vis=0`);
+  assert.equal((await call('anna', 'GET', '/admin/playtime')).status, 403, 'Spielzeit nur für Admins');
+  const pt = ok(await call('tim', 'GET', '/admin/playtime'), 'Spielzeit'); const ra = pt.rows.find((r) => r.key === 'anna'), rb = pt.rows.find((r) => r.key === 'ben');
+  assert.ok(ra && ra.total >= 30 && ra.sessions === 1 && ra.games.length === 1 && ra.days[pt.today] === ra.total, 'Anna: Spielzeit erfasst ' + JSON.stringify(ra && { t: ra.total, s: ra.sessions }));
+  assert.ok(rb && rb.total === 0 && !rb.sessions, 'Ben: Fenster im Hintergrund zählt nicht');
+  console.log('0.21.19 ok: Spielzeit', ra.total, 'ms für Anna,', pt.rows.length, 'Konten in der Übersicht'); }
 assert.equal((await call('ben', 'GET', '/admin/games')).status, 403, 'Verwaltung nur für Admins');
 const g2 = ok(await call('ben', 'POST', '/games', { name: 'Geheimrunde', password: 'zuzu', difficulty: 'hard', speed: 'p', airline: { name: 'Isar Zwei', code: 'IZ', base: 'MUC' } }), 'zweites Spiel');
 const adm = ok(await call('tim', 'GET', '/admin/games'), 'Admin-Liste');
@@ -799,4 +807,24 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const bf = SMx.P.BRAKES_FROM; SMx.P.BRAKES_FROM = 0; w.attacks = {}; SMx.dominanceMonth(w); M.p = p0; SMx.P.BRAKES_FROM = bf;
   const at = w.attacks[SMx.pairKey('HAM', 'PMI')]; assert.ok(at && at.why === 'margin' && at.al === pl.id && at.x < 1, 'Konkurrenz greift die Strecke mit hoher Marge an');
   console.log('0.21.15 ok: Größenzuschlag', Math.round(z34), '€/Tag bei 34 Flugzeugen, Margendruck auf HAM–PMI'); }
+// 0.21.20: Harte Zeiten – Branchenkrise, Leasing-Indexierung, Sicherheitsnachforderung bei schwachem Rating
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const w = SMx.newGame({ seed: 14, base: 'HAM' }), pl = w.player, A = (a) => SMx.applyAction(w, pl.id, a);
+  pl.ledger.equityFlow(3e8, 'admin'); A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); A({ type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); for (let i = 0; i < 20; i++) w.step();
+  // Branchenkrise
+  SMx.setFuelX(w); const ref0 = SMx.refPrice('HAM', 'JFK', w.macro.cpi), dm0 = w.demandMult('HAM', 'JFK', 'business');
+  const ev = w.startDownturn(10, 200); assert.ok(w.news.some((n) => /Branchenkrise/.test(n.msg)), 'Branchenkrise angekündigt');
+  for (let i = 0; i < 12; i++) w.step(); SMx.setFuelX(w);
+  const dm1 = w.demandMult('HAM', 'JFK', 'business'), ref1 = SMx.refPrice('HAM', 'JFK', w.macro.cpi);
+  assert.ok(dm1 < dm0 * 0.85 && Math.abs(dm1 / dm0 - ev.demand.business) < 0.02, `Geschäftsreisen brechen ein (${dm1.toFixed(2)})`);
+  assert.ok(ref1 < ref0 * 0.96, 'Ticketpreise unter Druck'); w.monthlyMacro(); assert.ok(w.macro.bank < 0.8, 'Banken kürzen Kreditlinien');
+  // Leasing-Indexierung
+  const ac = pl.fleet[0], u0 = ac.leaseUsd; ac.delivery_day = w.day - 365; w.step(); assert.ok(Math.abs(ac.leaseUsd / u0 - 1.03) < 1e-9, 'Leasingrate +3 % nach einem Vertragsjahr');
+  // Sicherheitsnachforderung
+  const c0 = pl.ledger.cash, d0 = pl.fleet.reduce((x, a) => x + (a.deposit || 0), 0); pl.rating = 'B'; SMx.leaseSecurity(w, pl);
+  const tot = pl.secDep && pl.secDep.amt; assert.ok(tot > 0 && pl.ledger.cash === c0 - tot * 100 && pl.fleet.reduce((x, a) => x + (a.deposit || 0), 0) - d0 === tot, 'Rating B: zusätzliche Kaution, Kasse sinkt');
+  SMx.leaseSecurity(w, pl); assert.equal(pl.secDep.amt, tot, 'nur einmal je Schwächephase');
+  pl.rating = 'BB'; w.day += 61; SMx.leaseSecurity(w, pl); assert.ok(!pl.secDep && pl.ledger.cash === c0, 'Rating erholt: Kaution zurück');
+  assert.ok(Math.abs(SMx.balanceSheet(pl).check) < 0.01, 'Bilanz stimmt weiter');
+  console.log('0.21.20 ok: Branchenkrise (Geschäftsreisen', Math.round((1 - ev.demand.business) * 100) + ' %, Preise', Math.round((1 - ev.fareX) * 100) + ' %), Leasing +3 %/Jahr, Sicherheit', Math.round(tot / 1000), 'Tsd. €'); }
 console.log('Alle Prüfungen bestanden.');

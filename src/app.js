@@ -926,7 +926,7 @@ function renderUserMenu() {
   const dark = document.documentElement.dataset.theme !== 'light';
   void dark;
   items.push(['sep'], ['tour', 'Kurzer Rundgang'], ['guide', 'Anleitung'], ['assistant', 'Assistenz einstellen'], ['profile', 'Logo gestalten'], ['theme', `Design: ${THEME_LABEL[themePref()]} (wechseln)`]);
-  if (ONLINE && mpState.user) items.push(['sep'], ['password', 'Passwort ändern'], ['logout', `Abmelden (${mpState.user.name})`]);
+  if (ONLINE && mpState.user) items.push(['sep'], ...(mpState.user.admin ? [['playtime', 'Spielzeit der Spieler']] : []), ['password', 'Passwort ändern'], ['logout', `Abmelden (${mpState.user.name})`]);
   m.innerHTML = items.map(([k, l]) => (k === 'sep' ? '<div class="sep"></div>' : `<button data-um="${k}">${esc(l)}</button>`)).join('');
 }
 function onUserMenu(k) {
@@ -941,6 +941,7 @@ function onUserMenu(k) {
   else if (k === 'theme') cycleTheme();
   else if (k === 'profile') setTab('profile');
   else if (k === 'password') showPwChange({});
+  else if (k === 'playtime') showPlaytime(() => { $('#modal').hidden = true; });
   else if (k === 'logout') { api('/logout', { body: {} }).catch(() => {}).finally(() => { mpState.user = null; stopOnline(); showAuth(); }); }
 }
 
@@ -5518,6 +5519,41 @@ function showAuth(mode = 'login') {
   setTimeout(() => $('#auUser') && $('#auUser').focus(), 50);
 }
 
+// ---------- Admin: Spielzeit der Spieler ----------
+const fmtDur = (ms) => { const m = Math.round((ms || 0) / 60000); if (m < 60) return `${m} Min.`; const h = Math.floor(m / 60); return h < 100 ? `${h}:${String(m % 60).padStart(2, '0')} Std.` : `${n0(h)} Std.`; };
+const berlinKey = (t) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date(t));
+const agoTxt = (t, now) => { if (!t) return '–'; const m = Math.round((now - t) / 60000); if (m < 2) return 'gerade eben'; if (m < 60) return `vor ${m} Min.`; const h = Math.round(m / 60); if (h < 36) return `vor ${h} Std.`; return new Date(t).toLocaleDateString('de-DE'); };
+async function showPlaytime(onBack) {
+  const m = modal('<h1>Spielzeit</h1><p class="small muted">Lade …</p>');
+  let d; try { d = await api('/admin/playtime'); } catch (e) { toast(e.message); onBack(); return; }
+  const st = ui.playSort || 'total', now = d.now;
+  const last = (n) => { const out = []; for (let i = n - 1; i >= 0; i--) out.push(berlinKey(now - i * 864e5)); return out; };
+  const k7 = last(7), k30 = last(30), sumK = (r, ks) => ks.reduce((a, k) => a + ((r.days || {})[k] || 0), 0);
+  const rows = d.rows.map((r) => { const act = Object.values(r.days || {}).filter((v) => v > 0).length; return { ...r, today: (r.days || {})[d.today] || 0, w7: sumK(r, k7), avg: act ? r.total / act : 0, act }; });
+  const sorters = { total: (a, b) => b.total - a.total, w7: (a, b) => b.w7 - a.w7, today: (a, b) => b.today - a.today, last: (a, b) => (b.last || 0) - (a.last || 0), name: (a, b) => a.name.localeCompare(b.name, 'de') };
+  rows.sort(sorters[st] || sorters.total);
+  const tot = rows.reduce((a, r) => a + r.total, 0), max = Math.max(1, ...rows.map((r) => r.total)), daily = k30.map((k) => rows.reduce((a, r) => a + ((r.days || {})[k] || 0), 0)), dmax = Math.max(1, ...daily);
+  const tiles = [['Konten', n0(rows.length), `${rows.filter((r) => r.total > 0).length} mit Spielzeit`], ['Spielzeit gesamt', fmtDur(tot), d.since ? `seit ${new Date(d.since).toLocaleDateString('de-DE')}` : 'noch nichts erfasst'],
+    ['Heute', fmtDur(rows.reduce((a, r) => a + r.today, 0)), `${rows.filter((r) => r.today > 0).length} Spieler aktiv`], ['Letzte 7 Tage', fmtDur(rows.reduce((a, r) => a + r.w7, 0)), `${rows.filter((r) => r.w7 > 0).length} Spieler aktiv`], ['Gerade online', n0(rows.filter((r) => r.online).length), 'in einem Spiel']];
+  const bars = `<div class="pt-days" role="img" aria-label="Spielzeit aller Spieler je Tag, letzte 30 Tage">${daily.map((v, i) => `<i style="height:${Math.max(v ? 3 : 0, v / dmax * 100).toFixed(1)}%" title="${new Date(now - (29 - i) * 864e5).toLocaleDateString('de-DE')}: ${fmtDur(v)}"></i>`).join('')}</div><div class="spread small muted"><span>vor 30 Tagen</span><span>heute</span></div>`;
+  const spark = (r) => { const v = k30.map((k) => (r.days || {})[k] || 0), mx = Math.max(1, ...v); return `<span class="pt-spark">${v.map((x) => `<i style="height:${Math.max(x ? 8 : 0, x / mx * 100).toFixed(0)}%"></i>`).join('')}</span>`; };
+  const th = (k, l, cls = 'r') => `<th class="${cls}"><button class="linkbtn${st === k ? ' on' : ''}" data-pt="${k}">${l}${st === k ? ' ▾' : ''}</button></th>`;
+  const open = ui.playOpen || (ui.playOpen = {});
+  const body = rows.map((r, i) => `<tr class="${r.total ? '' : 'muted'}" data-pto="${esc(r.key)}" style="cursor:pointer"><td class="r muted">${i + 1}</td><td><i class="pc-dot ${r.online ? 'on' : ''}"></i> <b>${esc(r.name)}</b>${r.admin ? ' <span class="chip">Admin</span>' : ''}</td>
+      <td class="r"><b>${r.total ? fmtDur(r.total) : '–'}</b><div class="pt-bar"><i style="width:${(r.total / max * 100).toFixed(1)}%"></i></div></td><td class="r">${r.today ? fmtDur(r.today) : '–'}</td><td class="r">${r.w7 ? fmtDur(r.w7) : '–'}</td>
+      <td class="r">${r.act ? fmtDur(r.avg) : '–'}</td><td class="r">${r.act || '–'}</td><td class="r">${r.sessions || '–'}</td><td>${spark(r)}</td><td class="r small">${r.online ? '<span class="pos">online</span>' : agoTxt(r.last, now)}</td></tr>
+    ${open[r.key] ? `<tr class="pnl-d"><td></td><td colspan="9" class="small">${r.games.length ? r.games.map((g) => `${esc(g.name)}: <b>${fmtDur(g.ms)}</b>`).join(' · ') : 'noch keine erfasste Spielzeit'}${r.created ? ` · Konto seit ${new Date(r.created).toLocaleDateString('de-DE')}` : ''}${r.first ? ` · erste erfasste Sitzung ${new Date(r.first).toLocaleDateString('de-DE')}` : ''}</td></tr>` : ''}`).join('');
+  m.innerHTML = `<div class="dialog wide pt" role="dialog" aria-modal="true"><div class="spread"><h1>Spielzeit der Spieler</h1><button class="btn small" data-pt="close">Schließen</button></div>
+    <p class="small muted">Gezählt wird die Zeit mit sichtbarem Spielfenster in einem Online-Spiel (Lebenszeichen alle 15 Sekunden). Fenster im Hintergrund, gesperrtes Handy oder Pausen über 90 Sekunden zählen nicht. Erfasst wird seit dem Update ${d.since ? `(erste Sitzung ${new Date(d.since).toLocaleDateString('de-DE')})` : ''} – frühere Spielzeit ist nicht gespeichert.</p>
+    <div class="tiles">${tiles.map(([a, b, c]) => `<div class="tile"><span>${a}</span><b>${b}</b><em>${c}</em></div>`).join('')}</div>
+    <div class="stack"><h3>Alle Spieler je Tag</h3>${bars}</div>
+    <div class="tw"><table class="t pt-t"><thead><tr><th class="r">#</th>${th('name', 'Spieler', '')}${th('total', 'Gesamt')}${th('today', 'Heute')}${th('w7', '7 Tage')}<th class="r">Ø je Spieltag</th><th class="r">Tage</th><th class="r">Sitzungen</th><th>30 Tage</th>${th('last', 'Zuletzt')}</tr></thead><tbody>${body}</tbody></table></div>
+    <p class="small muted">Zeile anklicken: Spielzeit je Spiel. „Ø je Spieltag“: Spielzeit geteilt durch die Tage, an denen gespielt wurde.</p></div>`;
+  m.onclick = (e) => {
+    const b = e.target.closest('[data-pt]'); if (b) { const v = b.dataset.pt; if (v === 'close') { m.onclick = null; onBack(); return; } ui.playSort = v; showPlaytime(onBack); return; }
+    const r = e.target.closest('[data-pto]'); if (r) { open[r.dataset.pto] = !open[r.dataset.pto]; showPlaytime(onBack); }
+  };
+}
 /** Passwort ändern – freiwillig oder Pflicht nach einem Zurücksetzen durch die Spielleitung. */
 function showPwChange({ forced = false, current = '', then = null } = {}) {
   const back = then || (() => { $('#modal').hidden = true; });
@@ -5554,7 +5590,7 @@ async function showLobby(tab = null) {
     <section class="mainworld" id="lbMain"><p class="small muted">Lade die Hauptwelt …</p></section>
     <div class="lobby">
       <section class="stack"><div class="spread"><h3>Meine Spiele</h3><button class="btn small primary" id="lbNew">Neues Spiel</button></div><div id="lbMine" class="glist"><p class="small muted">Lade …</p></div></section>
-      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3><span class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</span></div><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
+      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3><button class="btn small" id="lbPlay">Spielzeit der Spieler</button></div><p class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</p><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
       <section class="stack"><h3>Spiel beitreten</h3>
         <form id="lbCodeForm" class="row"><input type="text" id="lbCode" maxlength="6" placeholder="Code, z. B. K7QF2M" style="text-transform:uppercase;flex:1;min-width:140px"><button class="btn" type="submit">Suchen</button></form>
         <form id="lbSearchForm" class="row"><input type="text" id="lbQ" maxlength="40" placeholder="Spielname suchen" style="flex:1;min-width:140px"><button class="btn" type="submit">Finden</button></form>
@@ -5565,6 +5601,7 @@ async function showLobby(tab = null) {
     <div class="row small"><button class="btn small" id="lbGuide">Anleitung</button><button class="btn small" id="lbSolo">Allein und offline spielen</button><span class="muted">Ein Offline-Spiel bleibt in diesem Browser.</span></div>`);
   $('#lbLogout').addEventListener('click', async () => { try { await api('/logout', { body: {} }); } catch (e) { /* egal */ } mpState.user = null; showAuth(); });
   $('#lbPw').addEventListener('click', () => showPwChange({ then: () => showLobby() }));
+  if ($('#lbPlay')) $('#lbPlay').addEventListener('click', () => showPlaytime(() => showLobby()));
   $('#lbNew').addEventListener('click', showCreate);
   $('#lbSolo').addEventListener('click', () => showStart(false));
   $('#lbGuide').addEventListener('click', () => showGuide(() => showLobby()));
@@ -5644,7 +5681,7 @@ function dtLocal(t) { if (!t) return ''; const d = new Date(t), z = (n) => Strin
 function nextFriNoon() { const d = new Date(); d.setHours(12, 0, 0, 0); let add = (5 - d.getDay() + 7) % 7; if (add === 0 && d.getTime() <= Date.now()) add = 7; d.setDate(d.getDate() + add); return d.getTime(); }
 const dateShortY = (day) => { const p = dateParts(day); return `${p.d}. ${MONTHS[p.m]} ${p.y}`; };
 // ---------- Verwaltung eines Spiels (Admins überall, Spielleitung im eigenen Spiel) ----------
-const EV_TYPE = { mega: 'Großereignis (Kalender)', storm: 'Unwetter', volcano: 'Vulkanasche', airspace: 'Luftraum', atc_strike: 'Lotsenstreik', airport_strike: 'Flughafenstreik', big_event: 'Großereignis', recession: 'Rezession', boom: 'Aufschwung', trade_war: 'Handelskrieg', trade_deal: 'Handelsabkommen', carbon: 'CO₂-Abgabe', fee_hike: 'Entgelte', tax_change: 'Ticketsteuer', rate_change: 'Leitzins', health: 'Gesundheitskrise', pilot_shortage: 'Pilotenmangel', fx_shock: 'Wechselkurs', fuel_spike: 'Kerosin', fuel_drop: 'Kerosin', own_strike: 'Streik (Airline)', strike: 'Streik (Airline)', sickness: 'Krankheitswelle', it_outage: 'IT-Ausfall' };
+const EV_TYPE = { downturn: 'Branchenkrise', oil_glut: 'Ölschwemme', mega: 'Großereignis (Kalender)', storm: 'Unwetter', volcano: 'Vulkanasche', airspace: 'Luftraum', atc_strike: 'Lotsenstreik', airport_strike: 'Flughafenstreik', big_event: 'Großereignis', recession: 'Rezession', boom: 'Aufschwung', trade_war: 'Handelskrieg', trade_deal: 'Handelsabkommen', carbon: 'CO₂-Abgabe', fee_hike: 'Entgelte', tax_change: 'Ticketsteuer', rate_change: 'Leitzins', health: 'Gesundheitskrise', pilot_shortage: 'Pilotenmangel', fx_shock: 'Wechselkurs', fuel_spike: 'Kerosin', fuel_drop: 'Kerosin', own_strike: 'Streik (Airline)', strike: 'Streik (Airline)', sickness: 'Krankheitswelle', it_outage: 'IT-Ausfall' };
 async function showAdmin(id, onBack) {
   const m = modal('<h1>Verwaltung</h1><p class="small muted">Lade …</p>');
   let d;
@@ -5848,7 +5885,7 @@ async function mpPoll(first) {
   const id = ui.mp.id;
   try {
     const ping = Date.now() - mpState.lastPing > 15000;
-    const r = await api(`/games/${id}/state?v=${encodeURIComponent(mpState.ver)}${ping ? '&ping=1' : ''}`, { raw: true });
+    const r = await api(`/games/${id}/state?v=${encodeURIComponent(mpState.ver)}${ping ? `&ping=1&vis=${document.visibilityState === 'visible' ? 1 : 0}` : ''}`, { raw: true });
     if (r.status === 401) { stopOnline(); showAuth(); return; }
     if (r.status === 403 || r.status === 404) { stopOnline(); toast('Kein Zugriff mehr auf dieses Spiel – es wurde gelöscht oder die Spielleitung hat Ihre Airline entfernt.'); showLobby(); return; }
     if (!r.ok && r.status !== 204) throw new Error(`Server antwortet mit ${r.status}`);

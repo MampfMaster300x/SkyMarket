@@ -92,7 +92,7 @@ const isAdmin = (user) => !!user && ADMINS.has(user.key);
 
 const K = {
   user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, presence: (id) => `games/${id}/presence`, chat: (id) => `games/${id}/chat`,
-  code: (c) => `codes/${c}`, index: 'index/games',
+  code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`,
 };
 async function updateJson(store, key, fn, init = null, tries = 6) {
   for (let i = 0; i < tries; i++) {
@@ -163,6 +163,24 @@ async function mutateState(store, id, fn = null) {
   throw Object.assign(new Error('Gerade viel Betrieb, bitte noch einmal versuchen.'), { status: 409 });
 }
 async function loadMeta(store, id) { return store.get(K.meta(id), { type: 'json' }); }
+
+// ---------------------------------------------------------------------------
+// Spielzeit: Bei jedem Lebenszeichen eines sichtbaren Spielfensters (alle ~15 s) wächst die Zeit seit dem letzten Lebenszeichen.
+// Lücken über 90 s (Fenster zu, im Hintergrund, Handy gesperrt) zählen nicht und beginnen eine neue Sitzung.
+// ---------------------------------------------------------------------------
+const PLAY_GAP = 90000, PLAY_DAYS = 400;
+const berlinDay = (t) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date(t));
+async function recordPlay(store, user, gameId, now = Date.now()) {
+  await updateJson(store, K.play(user.key), (p) => {
+    p = p || { key: user.key, name: user.name, total: 0, sessions: 0, first: now, last: 0, games: {}, days: {} };
+    const dt = p.last && now - p.last <= PLAY_GAP ? Math.max(0, now - p.last) : 0;
+    if (!dt) p.sessions = (p.sessions || 0) + 1;
+    p.total += dt; p.games[gameId] = (p.games[gameId] || 0) + dt;
+    const d = berlinDay(now); p.days[d] = (p.days[d] || 0) + dt;
+    const keys = Object.keys(p.days); if (keys.length > PLAY_DAYS) for (const k of keys.sort().slice(0, keys.length - PLAY_DAYS)) delete p.days[k];
+    p.last = now; p.name = user.name; return p;
+  }, null, 2);
+}
 function memberOf(meta, user) { return meta && meta.players.find((p) => p.u === user.key); }
 function clockHeader(md) { const key = SM.speedKey(md.speed), sp = SM.SPEEDS[key], now = Date.now(); return JSON.stringify({ speed: key, ms: sp.ms, lastTick: md.lastTick || now, carry: md.carry || 0, now, day: md.day || 0, startAt: md.startAt && md.startAt > now ? md.startAt : null }); }
 const waiting = (md, now = Date.now()) => !!(md && md.startAt && md.startAt > now);
@@ -319,6 +337,22 @@ export async function handle(req, { store }) {
       return json({ games: hits });
     }
     // ---- Verwaltung (nur Admins) ----
+    // ---- Admin: Spielzeit aller Konten (seit Beginn der Erfassung) ----
+    if (path === '/admin/playtime' && method === 'GET') {
+      if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+      const [plays, users] = await Promise.all([store.list({ prefix: 'play/' }), store.list({ prefix: 'users/' })]);
+      const P = (await Promise.all(plays.blobs.map((b) => store.get(b.key, { type: 'json' })))).filter(Boolean);
+      const byKey = Object.fromEntries(P.map((p) => [p.key, p]));
+      const U = (await Promise.all(users.blobs.map((b) => store.get(b.key, { type: 'json' })))).filter(Boolean);
+      const gameIds = [...new Set(P.flatMap((p) => Object.keys(p.games || {})))], names = {};
+      for (const g of gameIds) { const m = await loadMeta(store, g); names[g] = m ? (m.main ? 'Hauptwelt' : m.name) : 'gelöschtes Spiel'; }
+      const now = Date.now();
+      const rows = U.map((u) => { const p = byKey[u.key] || null;
+        return { key: u.key, name: u.name, created: u.created || null, admin: ADMINS.has(u.key), total: p ? p.total : 0, sessions: p ? p.sessions : 0, first: p ? p.first : null, last: p ? p.last : null,
+          online: !!(p && now - p.last < 60000), days: p ? p.days : {}, games: p ? Object.entries(p.games).map(([g, ms]) => ({ id: g, name: names[g], ms })).sort((a, b) => b.ms - a.ms) : [] }; });
+      const since = P.length ? Math.min(...P.map((p) => p.first || now)) : null;
+      return json({ now, since, today: berlinDay(now), rows: rows.sort((a, b) => b.total - a.total) });
+    }
     if (path === '/admin/games' && method === 'GET') {
       if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
       const list = ((await store.get(K.index, { type: 'json' })) || []).slice(0, 500);
@@ -499,6 +533,7 @@ export async function handle(req, { store }) {
       if (op === 'state' && method === 'GET') {
         if (url.searchParams.get('ping')) {
           try { await updateJson(store, K.presence(id), (p) => ({ ...(p || {}), [user.key]: Date.now() }), {}, 2); } catch (e) { /* Anwesenheit ist nicht kritisch */ }
+          if (url.searchParams.get('vis') === '1' && me.airlineId) { try { await recordPlay(store, user, id); } catch (e) { /* Spielzeit ist nicht kritisch */ } }
         }
         const r = await mutateState(store, id, null);
         const md = r.md, v = url.searchParams.get('v') || '';
