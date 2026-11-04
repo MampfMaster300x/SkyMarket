@@ -3,6 +3,7 @@
 import { scryptSync, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import SM from '../shared/engine.cjs';
+import { APP_VERSION } from './version.mjs';
 
 const MAX_PLAYERS = 4;
 // Hauptwelt: eine dauerhafte Welt für alle Angemeldeten, 1 Spieltag = 20 Minuten, Tempo nur durch Admins
@@ -445,7 +446,7 @@ export async function handle(req, { store }) {
           players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
             return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
               status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null }; }),
-          banned: meta.banned || [], events: SM.adminEvents(w) });
+          banned: meta.banned || [], events: SM.adminEvents(w), audit: SM.adminAudit(w) });
       }
       if (op === 'admin' && method === 'POST') {
         if (!canManage(meta, user)) return fail(403, 'Nur für Admins und die Spielleitung.');
@@ -472,6 +473,13 @@ export async function handle(req, { store }) {
         if (cmd === 'unban') {
           await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.banned = (m.banned || []).filter((b) => b.u !== body.u); return m; });
           return json({ ok: true, msg: 'Sperre aufgehoben.' });
+        }
+        if (cmd === 'auditOrder') {
+          const r = await mutateState(store, id, (w) => SM.auditOrder(w, { b: String(body.b || ''), a: String(body.a || ''), amount: Number(body.amount), state: !!body.state, by: 'Spielleitung' }));
+          const res = r.result || { ok: false };
+          if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
+          console.log(`${user.key} hat in ${id} eine Nachprüfung angeordnet: ${res.msg}`);
+          return json({ ok: true, msg: 'Nachprüfung angeordnet – ' + res.msg, ver: r.etag });
         }
         if (cmd === 'cancelEvent' || cmd === 'grant') {
           const r = await mutateState(store, id, (w) => (cmd === 'grant' ? SM.adminGrant(w, String(body.airlineId || ''), Number(body.amount), by) : w.cancelEvent(String(body.eventId || ''), by)));
@@ -533,11 +541,12 @@ export async function handle(req, { store }) {
       if (op === 'state' && method === 'GET') {
         if (url.searchParams.get('ping')) {
           try { await updateJson(store, K.presence(id), (p) => ({ ...(p || {}), [user.key]: Date.now() }), {}, 2); } catch (e) { /* Anwesenheit ist nicht kritisch */ }
-          if (url.searchParams.get('vis') === '1' && me.airlineId) { try { await recordPlay(store, user, id); } catch (e) { /* Spielzeit ist nicht kritisch */ } }
+          // Spielzeit: sichtbares Fenster (vis=1); ältere Fenster ohne vis-Angabe zählen auch – sie bekommen den Hinweis zum Neuladen
+          if (url.searchParams.get('vis') !== '0' && me.airlineId) { try { await recordPlay(store, user, id); } catch (e) { /* Spielzeit ist nicht kritisch */ } }
         }
         const r = await mutateState(store, id, null);
         const md = r.md, v = url.searchParams.get('v') || '';
-        const headers = { 'x-ver': r.etag || String(md.ver), 'x-clock': clockHeader(md), 'x-chat': String(meta.chatSeq || 0), 'cache-control': 'no-store', 'access-control-expose-headers': 'x-ver, x-clock, x-chat' };
+        const headers = { 'x-ver': r.etag || String(md.ver), 'x-clock': clockHeader(md), 'x-chat': String(meta.chatSeq || 0), 'cache-control': 'no-store', 'x-app': APP_VERSION, 'access-control-expose-headers': 'x-ver, x-clock, x-chat, x-app' };
         if (v && v === headers['x-ver']) return new Response(null, { status: 204, headers });
         return new Response(r.buf, { status: 200, headers: { ...headers, 'content-type': 'application/octet-stream' } });
       }

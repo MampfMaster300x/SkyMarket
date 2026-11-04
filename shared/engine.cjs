@@ -310,7 +310,8 @@ const SM = (() => {
       pilotH: 3, cabinH: 3, techPerAc: 3.5, techMaintShare: 0.12,
       recruit: { pilot: 9000, cabin: 1500, tech: 3500 }, lead: { pilot: 14, cabin: 6, tech: 9 }, leadMaxFactor: 1.5,
       // Arbeitsmarkt je Monat: Obergrenze je Airline und gemeinsamer Bestand (Grundstock plus je menschlicher Airline)
-      maxHire: { pilot: 120, cabin: 400, tech: 120 }, marketPool: { pilot: 400, cabin: 1500, tech: 500 }, marketPerAirline: { pilot: 60, cabin: 220, tech: 70 },
+      // 0.21.22: deutlich knapper – mehr gibt es nur in Krisen und wenn Airlines Personal abbauen oder pleitegehen
+      maxHire: { pilot: 50, cabin: 160, tech: 50 }, marketPool: { pilot: 150, cabin: 600, tech: 200 }, marketPerAirline: { pilot: 25, cabin: 90, tech: 30 },
       // Gründungsphase: In den ersten Tagen liegen Bewerbungen schon vor – Einstellungen starten schnell
       foundingDays: 60, foundingLead: 5, trainDays: 45, trainCost: 28000,
       agency: 1.6, overtime: 1.5, overtimeMax: 0.10, perDiem: 9, severanceMonths: 3, attrition: 0.01,
@@ -390,6 +391,14 @@ const SM = (() => {
     HQ_SIZE: { from: 25, k: 5000, exp: 1.3 },
     BRAKES_FROM: 365,
     // Harte Zeiten (0.21.20): weltweite Branchenkrise im Zyklus, Leasing-Indexierung, Sicherheitsnachforderung bei schwachem Rating
+    // 0.21.22: Freigesetztes Personal (Entlassungen, Abbau, Insolvenzen) kommt auf den Markt; in Krisen gibt es mehr Bewerbungen
+    LABOR_FREE: { share: 0.6, decay: 0.7, crisisX: 1.5, crew: { regional: [8, 6, 3], narrow: [11, 20, 3.5], wide: [18, 40, 5] } },
+    // Eigener Nachwuchs (Akademie-Absolventen): kennt Unternehmen und Abläufe – bessere Stimmung, seltener Kündigungen, pünktlicher, weniger technische Ausfälle
+    HOME: { morale: 0.12, leave: 0.5, otp: 0.04, fail: 0.3 },
+    // Leasingflugzeug übernehmen: nach Vertragsende zum Restwert mit Abschlag, vorher Marktwert plus Ablöse
+    LEASE_BUY: { endDisc: 0.95 },
+    // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
+    BASE_MAX: 4,
     DOWNTURN: { minDay: 365, gap: 540, base: 0.03, slope: 0.015, max: 0.2, lead: [30, 60], days: [270, 420], recovery: 150,
       business: [0.72, 0.82], leisure: [0.82, 0.9], vfr: [0.9, 0.95], fare: [0.9, 0.94], bank: 0.25, req: 6 },
     LEASE_INDEX: 0.03,   // Leasingraten steigen jedes Vertragsjahr um 3 % (Spielende)
@@ -1634,10 +1643,36 @@ const SM = (() => {
     return P.LEASE_DELIVERY_DAYS + Math.min(70, 7 * Math.floor(q / 4)) + sd;
   }
   const ACADEMY = {
-    pilot: { label: 'Flugschule', ramp: 120, cost: [0, 60000, 120000, 220000], out: [0, 2, 4, 7] },
-    cabin: { label: 'Kabinenakademie', ramp: 60, cost: [0, 25000, 50000, 90000], out: [0, 4, 8, 14] },
-    tech: { label: 'Technikschule', ramp: 90, cost: [0, 20000, 40000, 75000], out: [0, 1, 2, 4] },
+    pilot: { label: 'Flugschule', ramp: 120, cost: [0, 60000, 120000, 220000, 380000, 600000], out: [0, 2, 4, 7, 12, 19] },
+    cabin: { label: 'Kabinenakademie', ramp: 60, cost: [0, 25000, 50000, 90000, 150000, 240000], out: [0, 4, 8, 14, 24, 38] },
+    tech: { label: 'Technikschule', ramp: 90, cost: [0, 20000, 40000, 75000, 125000, 200000], out: [0, 1, 2, 4, 7, 11] },
   };
+  /** Höchste Akademiestufe je Wachstumsphase: Gründung 1, Regional 2, Netzwerk 3, Interkontinental 4, Global Player 5. */
+  const ACADEMY_MAX = [1, 2, 3, 4, 5];
+  function academyMax(al) { const lv = al && al.prog ? clamp(al.prog.lv | 0, 0, ACADEMY_MAX.length - 1) : ACADEMY_MAX.length - 1; return ACADEMY_MAX[lv]; }
+  /** Eigener Nachwuchs: Zahl der Akademie-Absolventen je Bereich (nie mehr als Beschäftigte) und Anteile. */
+  function homeOf(st) { return st.home || (st.home = { pil: 0, cab: 0, tech: 0 }); }
+  function homeShares(al) {
+    const st = al && al.staff; if (!st) return { crew: 0, tech: 0, all: 0, pil: 0, cab: 0, n: 0 };
+    const h = homeOf(st), pil = STAFF_GROUPS.reduce((x, g) => x + (st.pil[g] || 0), 0);
+    h.pil = Math.max(0, Math.min(h.pil, pil)); h.cab = Math.max(0, Math.min(h.cab, st.cab)); h.tech = Math.max(0, Math.min(h.tech, st.tech));
+    const sh = (a, b) => (b > 0 ? a / b : 0), all = pil + st.cab + st.tech;
+    return st.homeX = { pil: sh(h.pil, pil), cab: sh(h.cab, st.cab), crew: sh(h.pil + h.cab, pil + st.cab), tech: sh(h.tech, st.tech), all: sh(h.pil + h.cab + h.tech, all), n: h.pil + h.cab + h.tech };
+  }
+  const homeX = (al) => (al && al.isPlayer && al.staff && al.staff.homeX) || { crew: 0, tech: 0, all: 0, pil: 0, cab: 0, n: 0 };
+  /** Freigesetztes Personal (Entlassungen, Flottenabbau, Insolvenz) kommt zum Teil auf den Arbeitsmarkt. */
+  function releaseStaff(w, n) {
+    const F = w.laborFree || (w.laborFree = { pilot: 0, cabin: 0, tech: 0 }), k = P.LABOR_FREE.share;
+    for (const r of ['pilot', 'cabin', 'tech']) if (n[r] > 0) F[r] = Math.round((F[r] || 0) + n[r] * k);
+  }
+  /** Geschätzte Besatzung je Flugzeug (für KI-Airlines ohne Personalliste). */
+  function crewEstimate(typeId) {
+    const t = P.AIRCRAFT_TYPES[typeId], C = P.LABOR_FREE.crew, seats = typeof t.seats === 'object' ? t.seats.standard : t.seats || 150, k = t.ill && t.ill.kind === 'wide' ? C.wide : seats < 100 ? C.regional : C.narrow;
+    return { pilot: k[0], cabin: k[1], tech: k[2] };
+  }
+  function releaseFleet(w, acs) { const n = { pilot: 0, cabin: 0, tech: 0 }; for (const a of acs) { const c = crewEstimate(a.type_id); n.pilot += c.pilot; n.cabin += c.cabin; n.tech += c.tech; } releaseStaff(w, n); }
+  /** Krise: Airlines stellen weltweit kaum ein und bauen ab – es gibt mehr Bewerbungen. */
+  function laborCrisis(w) { const d = w.day; return w.events.some((e) => !e.cancelled && e.start <= d && e.end > d && (e.type === 'downturn' || e.type === 'health' || (e.type === 'recession' && (e.countries || []).length > 10))); }
   function milestoneCtx(w, al) {
     const routes = al.activeRoutes(), regions = new Set(), cs = new Set();
     for (const r of routes) for (const x of [r.base, r.dest]) { regions.add(ap(x).region); cs.add(ap(x).country); }
@@ -1837,11 +1872,14 @@ const SM = (() => {
     return w.day - (al.joinedDay || 0) < S.foundingDays ? Math.min(S.foundingLead, l) : l;
   }
   /** Gemeinsamer Arbeitsmarkt je Monat: Wie viele Einstellungen es für alle Mitspielenden zusammen gibt. */
+  function laborBase(w, role) {
+    const tight = role === 'pilot' ? w.macro.laborTight : 1 + (w.macro.laborTight - 1) * 0.4, S = P.STAFF, crisis = laborCrisis(w);
+    return { base: Math.floor((S.marketPool[role] + S.marketPerAirline[role] * Math.max(1, w.humans.length)) * (crisis ? P.LABOR_FREE.crisisX : 1) / tight), crisis };
+  }
   function laborPool(w, role) {
-    const tight = role === 'pilot' ? w.macro.laborTight : 1 + (w.macro.laborTight - 1) * 0.4, month = Math.floor(w.day / 30);
-    const used = w.labor && w.labor.m === month ? w.labor[role] || 0 : 0;
-    const S = P.STAFF;
-    return { pool: Math.floor((S.marketPool[role] + S.marketPerAirline[role] * Math.max(1, w.humans.length)) / tight), used };
+    const month = Math.floor(w.day / 30), used = w.labor && w.labor.m === month ? w.labor[role] || 0 : 0;
+    const { base, crisis } = laborBase(w, role), free = Math.floor((w.laborFree && w.laborFree[role]) || 0);
+    return { pool: base + free, used, base, free, crisis };
   }
   /** Einmalige Kosten fürs Einstellen (Anwerbung, ohne Gehalt) – dieselbe Formel wie beim Einstellen selbst. */
   function hireQuote(w, role, count) {
@@ -1932,7 +1970,7 @@ const SM = (() => {
       this.seed = seed >>> 0; this._trend = {}; this._trendDay = -1;
       this.slotCap = {}; this.candidates = []; this.acMarket = []; this.acmiOffers = []; this.offerCounter = 0; this.eventMult = 1;
       this.deals = []; this.dealCounter = 0; this.agreements = []; this.coops = []; this.auctions = [];
-      this.lessorQueue = {}; this.labor = { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 }; this.lessorStock = {};
+      this.lessorQueue = {}; this.labor = { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 }; this.laborFree = { pilot: 0, cabin: 0, tech: 0 }; this.lessorStock = {};
       Object.assign(this.macro, { tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } });
     }
     get fuelPrice() { return this.macro.fuelUsd / this.macro.eurusd; }
@@ -1990,7 +2028,7 @@ const SM = (() => {
       const sE = oO.softE && (!oD.softE || oO.softE.ops.cancel >= oD.softE.ops.cancel) ? [oO.softE, r.base] : oD.softE ? [oD.softE, r.dest] : null;
       const strike = this.events.some((e) => e.type === 'own_strike' && e.airline === al.id && e.start <= day && e.end > day && !e.averted) ? 0.7 : 0;
       let staff = 0; if (al.isPlayer && al.staff && al.staff.cov) { const c = al.staff.cov.cancel; staff = 1 - (1 - (c[ty.group] || 0)) * (1 - (c.cab || 0)); }
-      let fail = (1 - ty.dispatch_rel) * (1 + P.AGE.fail * this.ageOf(al, r)) * (1 - lv3([0, 0.2, 0.35, 0.5], al.skill('tech')));
+      let fail = (1 - ty.dispatch_rel) * (1 + P.AGE.fail * this.ageOf(al, r)) * (1 - lv3([0, 0.2, 0.35, 0.5], al.skill('tech'))) * (1 - P.HOME.fail * homeX(al).tech);
       if (al.isPlayer && al.staff && al.staff.cov && al.staff.cov.tech < 1) fail *= 1 + 2 * (1 - al.staff.cov.tech);
       const it = this.events.some((e) => e.type === 'it_outage' && e.airline === al.id && e.start <= day && e.end > day) ? 0.1 : 0;
       return { hard, weather, weatherWhy: sE ? lbl(sE[0], sE[1]) : null, strike, staff, fail, it, delay: oO.delay + oD.delay };
@@ -2314,6 +2352,8 @@ const SM = (() => {
       // Akademien entlasten den Arbeitsmarkt
       const acad = this.humans.reduce((s, h) => s + (h.academy ? Object.values(h.academy).reduce((t, x) => t + (x.lv || 0), 0) : 0), 0);
       M.laborTight = Math.max(1, M.laborTight - 0.01 * acad);
+      { const F = this.laborFree || (this.laborFree = { pilot: 0, cabin: 0, tech: 0 });
+        for (const r of ['pilot', 'cabin', 'tech']) { const took = Math.max(0, (L[r] || 0) - laborBase(this, r).base); F[r] = Math.floor(Math.max(0, (F[r] || 0) - took) * P.LABOR_FREE.decay); } }
       this.labor = { m: Math.floor(day / 30) + 1, pilot: 0, cabin: 0, tech: 0, aiAc: 0 };
       for (const k of Object.keys(this.lessorQueue || {})) { this.lessorQueue[k] *= 0.6; if (this.lessorQueue[k] < 0.5) delete this.lessorQueue[k]; }
     }
@@ -2776,6 +2816,7 @@ const SM = (() => {
       this.closeAuctions();
       this.fuelHist.push(this.fuelPrice); if (this.fuelHist.length > 400) this.fuelHist.shift();
       { const M = this.macro, x = M.fuelUsd / P.FUEL_USD_KG; M.fuelIdx = M.fuelIdx === undefined ? x : M.fuelIdx + (x - M.fuelIdx) / P.FUEL_PASS.ema; }
+      if (this.xfers && this.xfers.some((x) => x.late === true)) auditYear(this, { late: true });   // Nachprüfung (nacherfasste Geschäfte aus dem schon geprüften Jahr)
       if (MONTH_STARTS.includes((day + 1) % 365)) this.monthEnd();
       this.day += 1;
     }
@@ -2825,7 +2866,7 @@ const SM = (() => {
         }
         const yf = ty.yieldF || 1;
         const c = this.costsFor(al, r, o, d, perFlight, perFlight * shareLocal * l.fare * yf);
-        const otpBase = bp.otp + lv3([0, 0.03, 0.05, 0.08], opsLv) - risk.delay / 120 - (itOut ? 0.4 : 0);
+        const otpBase = bp.otp + lv3([0, 0.03, 0.05, 0.08], opsLv) + P.HOME.otp * homeX(al).crew - risk.delay / 120 - (itOut ? 0.4 : 0);
         const onTime = rr.random() < clamp(otpBase, 0.05, 0.98);
         const meanLate = Math.max(bp.mean_delay_min / (1 - bp.otp) - 15, 1) * (1 - lv3([0, 0.15, 0.25, 0.35], opsLv)) + risk.delay;
         const delay = onTime ? 0 : 15 + rr.expo(1 / meanLate);
@@ -3062,7 +3103,7 @@ const SM = (() => {
       const perf = al.activeRoutes().sort((a, b) => routeDb(a, 30, al) - routeDb(b, 30, al));
       for (const r of perf.slice(0, Math.max(1, Math.floor(perf.length / 3)))) al.closeRoute(this.day, r, 'Restrukturierung');
       this.operableFreq(al);
-      for (const a of al.fleet.slice().sort((x, y) => x.used_hours - y.used_hours)) if (a.used_hours <= 0 && !a.acmi && a.status === 'ok') al.dispose(this.day, a, 'Restrukturierung');
+      for (const a of al.fleet.slice().sort((x, y) => x.used_hours - y.used_hours)) if (a.used_hours <= 0 && !a.acmi && a.status === 'ok') { if (!al.staff) releaseFleet(this, [a]); al.dispose(this.day, a, 'Restrukturierung'); }
     }
     competitorFares(aid, o, d) {
       const out = [], par = parentOf(this, this.airlines[aid]);
@@ -3298,7 +3339,7 @@ const SM = (() => {
     }
     /** Akademien: monatliche Förderung, nach Anlaufzeit kommen eigene Absolventen (exklusiv, schwerer abzuwerben). */
     academyMonthly(al) {
-      const A = al.academy; if (!A) return;
+      const A = al.academy; if (!A) { if (al.staff) homeShares(al); return; }
       const cpi = this.macro.cpi;
       for (const [role, x] of Object.entries(A)) {
         if (!x.lv) continue;
@@ -3307,8 +3348,10 @@ const SM = (() => {
         if (this.day - x.since < def.ramp) continue;
         const n = def.out[x.lv];
         if (role === 'pilot') al.staff.pil[x.group] += n; else if (role === 'cabin') al.staff.cab += n; else al.staff.tech += n;
+        homeOf(al.staff)[role === 'pilot' ? 'pil' : role === 'cabin' ? 'cab' : 'tech'] += n;
         al.log(this.day, `${n} Absolventinnen und Absolventen der ${def.label} beginnen bei Ihnen${role === 'pilot' ? ` (${P.TYPE_GROUPS[x.group]})` : ''}`, 'staff');
       }
+      homeShares(al);
     }
     /** Karriere: Aufstieg in die nächste Phase, sobald alle Bedingungen erfüllt sind. */
     checkCareer(al) {
@@ -3335,15 +3378,24 @@ const SM = (() => {
       }
     }
     playerMonthly(al) {
+      for (const a of al.fleet) {
+        if (a.owned || a.flex || a.endNote || a.delivery_day > this.day || this.day < leaseEnd(a)) continue;
+        a.endNote = this.day; const q = leaseBuyQuote(this, al, a);
+        al.log(this.day, `Leasingvertrag ${a.id} (${P.AIRCRAFT_TYPES[a.type_id].label}) hat die Mindestlaufzeit erreicht: Übernahme jetzt für ${mioTxt(q.price)} möglich (Restwert mit ${Math.round((1 - P.LEASE_BUY.endDisc) * 100)} % Abschlag) – sonst läuft er monatlich weiter, Rückgabe ohne Ablöse.`, 'fleet');
+      }
       this.academyMonthly(al);
       this.analystScan(al);
       this.checkMilestones(al);
       const st = al.staff, S = P.STAFF, r = this.rng;
+      const hx = homeShares(al), H = P.HOME, hm = homeOf(st);
       const leaveRate = S.attrition + Math.max(0, 0.5 - st.morale) * 0.04;
-      const leave = (n) => { let k = 0; for (let i = 0; i < n; i++) if (r.random() < leaveRate) k++; return k; };
-      let left = 0;
-      for (const g of STAFF_GROUPS) { const k = leave(st.pil[g]); st.pil[g] -= k; left += k; }
-      const kc = leave(st.cab), kt = leave(st.tech); st.cab -= kc; st.tech -= kt; left += kc + kt;
+      // Eigener Nachwuchs kündigt seltener: Anteil der Absolventen senkt die Kündigungsquote
+      const leave = (n, sh) => { let k = 0; const q = leaveRate * (1 - H.leave * sh); for (let i = 0; i < n; i++) if (r.random() < q) k++; return k; };
+      let left = 0, lp = 0;
+      for (const g of STAFF_GROUPS) { const k = leave(st.pil[g], hx.pil); st.pil[g] -= k; left += k; lp += k; }
+      const kc = leave(st.cab, hx.cab), kt = leave(st.tech, hx.tech); st.cab -= kc; st.tech -= kt; left += kc + kt;
+      hm.pil -= Math.round(lp * hx.pil * (1 - H.leave)); hm.cab -= Math.round(kc * hx.cab * (1 - H.leave)); hm.tech -= Math.round(kt * hx.tech * (1 - H.leave));
+      homeShares(al);
       if (left > 0) al.log(this.day, `${left} Beschäftigte haben gekündigt (Stimmung ${Math.round(st.morale * 100)} %)`, left > 3 ? 'warn' : 'info');
       const cov = st.cov;
       let overload = 0;
@@ -3351,7 +3403,7 @@ const SM = (() => {
         for (const g of STAFF_GROUPS) if (cov.need.pil[g] > 0 && st.pil[g] > 0) overload = Math.max(overload, cov.need.pil[g] / st.pil[g] - 1);
         if (cov.need.cab > 0 && st.cab > 0) overload = Math.max(overload, cov.need.cab / st.cab - 1);
       }
-      const target = clamp(0.62 + 1.6 * (st.pay - (this.macro.wage || 1)) - 1.2 * Math.max(0, Math.min(overload, 0.3)) + lv3([0, 0.05, 0.1, 0.15], al.skill('hr')) + lv3([0, 0.03, 0.06, 0.09], al.skill('inflight')) + (al.perk('gourmet') ? 0.03 : 0), 0.05, 0.97);
+      const target = clamp(0.62 + 1.6 * (st.pay - (this.macro.wage || 1)) - 1.2 * Math.max(0, Math.min(overload, 0.3)) + lv3([0, 0.05, 0.1, 0.15], al.skill('hr')) + lv3([0, 0.03, 0.06, 0.09], al.skill('inflight')) + (al.perk('gourmet') ? 0.03 : 0) + P.HOME.morale * (st.homeX ? st.homeX.all : 0), 0.05, 0.97);
       st.morale = clamp(st.morale + 0.35 * (target - st.morale), 0, 1);
     }
     completeDaily(al) {
@@ -3622,6 +3674,7 @@ const SM = (() => {
       al.ledger.post('staff_extra', -cost, true, `Abfindungen › ${roleLabel(role, group)}`);
       if (role === 'pilot') st.pil[group] -= count; else if (role === 'cabin') st.cab -= count; else st.tech -= count;
       st.morale = clamp(st.morale - 0.02 * Math.min(5, count), 0, 1);
+      releaseStaff(this, { [role]: count }); homeShares(al);
       al.log(this.day, `${count} ${roleLabel(role, group)} entlassen, Abfindung ${Math.round(cost / 1000)} Tsd. EUR`, 'staff');
       return { ok: true, cost };
     }
@@ -3969,6 +4022,7 @@ const SM = (() => {
     }
     openBase(al, apt) {
       if (al.bases.includes(apt)) return { ok: false, msg: 'Dort sind Sie schon.' };
+      if (al.isPlayer && al.bases.length >= P.BASE_MAX) return { ok: false, msg: `Mehr als ${P.BASE_MAX} Basen sind nicht möglich. Schließen Sie eine Basis, um eine neue zu eröffnen.` };
       const appr = baseApproval(al, apt); if (!appr.ok) return { ok: false, msg: appr.msg, rejected: true };
       const lic = Math.max(0, licenceFee(this, apt) * appr.x - (al.stations[apt] ? stationFee(this, apt) : 0)), bx = softX(al, 'base');   // wer dort schon eine Station hat, zahlt nur die Differenz
       const setup = baseSetupCost(this, apt) * bx, sl = al.isPlayer ? baseSlotCost(this, apt, al) : 0;
@@ -4647,7 +4701,7 @@ const SM = (() => {
       }
     }
     w.operableFreq(al);
-    for (const a of al.fleet.slice()) if (a.idle_days >= 45 && a.delivery_day < day && a.status === 'ok') al.dispose(day, a, 'dauerhaft ungenutzt');
+    for (const a of al.fleet.slice()) if (a.idle_days >= 45 && a.delivery_day < day && a.status === 'ok') { releaseFleet(w, [a]); al.dispose(day, a, 'dauerhaft ungenutzt'); }
     if (al.fleet.length >= al.maxFleet) return;
     if (aiAttack(w, al)) return;
     if (monthOf(day) % 3 === 0 && aiBaseExpansion(w, al)) return;
@@ -4945,6 +4999,31 @@ const SM = (() => {
     al.log(w.day, `Sale-and-Lease-back ${a.id}: verkauft für ${Math.round(value / 1e5) / 10} Mio. EUR (Kredit ${Math.round(a.loan / 1e5) / 10} Mio. abgelöst), Miete ${Math.round(lease / 1000)} Tsd. EUR im Monat`, 'fleet');
     return { ok: true, value, lease };
   }
+  /** Ende der Mindestlaufzeit eines Leasingvertrags (danach läuft er monatlich weiter). */
+  const leaseEnd = (a) => (a.lease_start || 0) + Math.round(P.LEASE_MIN_TERM_MONTHS * 30.4);
+  /** Übernahme eines Leasingflugzeugs: nach Vertragsende Restwert mit Abschlag, vorher Marktwert plus Ablöse (wie bei vorzeitiger Rückgabe). */
+  function leaseBuyQuote(w, al, a) {
+    if (!a || a.owned) return { ok: false, msg: 'Das Flugzeug gehört Ihnen schon.' };
+    if (a.delivery_day > w.day) return { ok: false, msg: 'Erst nach der Auslieferung.' };
+    if (a.acmi && a.acmi.start <= w.day && a.acmi.end > w.day) return { ok: false, msg: 'Erst nach dem Charter.' };
+    const end = leaseEnd(a), ended = a.flex || w.day >= end, fair = acFairValue(w, a);
+    const price = Math.round(fair * (ended ? P.LEASE_BUY.endDisc : 1) / 1e4) * 1e4, fee = ended ? 0 : Math.round(P.LEASE_EARLY_RETURN_MONTHS * (a.leaseMonth || 0) / 1e3) * 1e3;
+    const rk = riskTerms(al, a.type_id), down = Math.round(price * rk.down / 1e3) * 1e3, loan = price - down, dep = a.deposit || 0;
+    return { ok: true, price, fee, end, ended, down, loan, dep, cash: down + fee - dep, rate: w.macro.rate + 0.025, saves: a.leaseMonth || 0 };
+  }
+  function leaseBuy(w, al, acId) {
+    const a = al.fleet.find((x) => x.id === acId), q = leaseBuyQuote(w, al, a);
+    if (!q.ok) return q;
+    if (q.cash > 0 && al.spendable(w.macro.bank ?? 1) < q.cash) return { ok: false, msg: `Für den Eigenanteil fehlen ${mioTxt(q.cash - al.spendable(w.macro.bank ?? 1))} – auch mit Dispo.` };
+    const L = al.ledger, tag = acTag(al, a);
+    if (q.dep) L.cashOnly(q.dep, 'deposit_back');
+    if (q.fee) L.post('one_off', -q.fee, true, `Ablöse Leasingvertrag › ${tag}`);
+    L.cashOnly(-q.price, 'capex'); L.cashOnly(q.loan, 'loan_draw');
+    Object.assign(a, { owned: true, nbv: q.price, value0: q.price, loan: q.loan, loanRate: q.rate, deposit: 0, flex: false, slb: false, leaseMonth: 0, leaseUsd: 0 });
+    delete a.riskPrem; delete a.endNote;
+    al.log(w.day, `${P.AIRCRAFT_TYPES[a.type_id].label} ${a.id} vom Leasinggeber übernommen: ${mioTxt(q.price)}${q.fee ? ` plus ${mioTxt(q.fee)} Ablöse` : ''}, Eigenanteil ${mioTxt(q.down)}, Kredit ${mioTxt(q.loan)}${q.dep ? `, Kaution ${mioTxt(q.dep)} verrechnet` : ''} – keine Leasingrate mehr`, 'fleet');
+    return { ok: true, ...q };
+  }
   /** Leasingraten stunden: 90 Tage keine Zahlung, danach über 180 Tage nachzahlen (+5 %). Einmal im Jahr, nur in der Krise. */
   function leaseDefer(w, al) {
     const D = P.RESTRUCT.defer;
@@ -5010,6 +5089,7 @@ const SM = (() => {
     if (al.liquidated) return al.liq;
     const R = P.RESTRUCT.liq, day = w.day, liq = { own: 0, lease: 0, slots: 0, staff: 0, experts: 0, gates: 0, apts: [] };
     const eq0 = balanceSheet(al).equity;
+    if (!al.staff) releaseFleet(w, al.fleet.filter((a) => a.delivery_day <= day));   // KI-Airline: Besatzungen kommen auf den Markt
     for (const a of al.fleet) {
       if (a.delivery_day > day) { if (!a.owned) { w.lessorStock = w.lessorStock || {}; if (w.lessorStock[a.type_id] !== undefined) w.lessorStock[a.type_id]++; } continue; }
       const t = P.AIRCRAFT_TYPES[a.type_id], age = Math.round(al.acAge(a, day)), base = { id: 'A' + (++w.offerCounter), type: a.type_id, age, cond: a.cond || 1, delivery: 10, fhSinceC: Math.round(a.fh || 0), expires: day + R.days, from: al.name };
@@ -5024,7 +5104,7 @@ const SM = (() => {
     if (al.staff) {
       const S = al.staff, pil = STAFF_GROUPS.reduce((x, g) => x + (S.pil[g] || 0), 0);
       liq.staff = pil + S.cab + S.tech;
-      if (w.labor) { const m = Math.floor(day / 30); if (w.labor.m === m) { w.labor.pilot = Math.max(0, (w.labor.pilot || 0) - pil); w.labor.cabin = Math.max(0, (w.labor.cabin || 0) - S.cab); w.labor.tech = Math.max(0, (w.labor.tech || 0) - S.tech); } }
+      releaseStaff(w, { pilot: pil, cabin: S.cab, tech: S.tech }); S.home = { pil: 0, cab: 0, tech: 0 };
       for (const g of STAFF_GROUPS) S.pil[g] = 0; S.cab = 0; S.tech = 0; S.pipeline = [];
     } else liq.staff = 0;
     for (const e of al.experts || []) { if (P.EXPERT_ROLES[e.role] && P.EXPERT_ROLES[e.role].unique) continue; w.candidates.push({ id: 'C' + (++w.offerCounter), name: e.name, role: e.role, level: e.level, years: e.years, region: e.region, salary: Math.round(e.salary * 0.95 / 100) * 100, trait: e.trait, prev: `zuletzt bei ${al.name}`, expires: day + 40, refs: e.refs }); liq.experts++; }
@@ -5571,18 +5651,23 @@ const SM = (() => {
     return `Unrealistischer Handel: ${A.name} gibt Werte von rund ${mioTxt(f.va)}, ${B.name} von rund ${mioTxt(f.vb)} – Abweichung ${mioTxt(f.diff)}. Zwischen Airlines von Spielenden dürfen beide Seiten höchstens ${mioTxt(f.lim)} auseinanderliegen.`;
   }
   /** Bilanz der Handelsgeschäfte zwischen Spielenden seit dem letzten Jahresabschluss (je Partner). */
-  function auditPreview(w, al) {
-    const A = P.AUDIT, from = w.auditFrom || 0, by = {};
+  function auditPreview(w, al, { late = false } = {}) {
+    const A = P.AUDIT, from = w.auditFrom || 0, by = {}, since = al.joinedDay || 0;
     for (const x of w.xfers || []) {
-      if (x.day < from || (x.a !== al.id && x.b !== al.id)) continue;
-      const other = x.a === al.id ? x.b : x.a, got = x.a === al.id ? x.vb : x.va, gave = x.a === al.id ? x.va : x.vb;
-      const e = by[other] || (by[other] = { partner: other, got: 0, gave: 0, n: 0, first: x.day }); e.got += got; e.gave += gave; e.n++; e.first = Math.min(e.first, x.day);
+      if (x.a !== al.id && x.b !== al.id) continue;
+      if (late ? x.late !== true : (x.late === true || x.day < from)) continue;
+      if (x.day < since) continue;   // Geschäfte einer früheren (abgewickelten) Gesellschaft unter derselben Kennung
+      const other = x.a === al.id ? x.b : x.a;
+      const e = by[other] || (by[other] = { partner: other, got: 0, gave: 0, adv: 0, n: 0, first: x.day, state: false, manual: false }); e.n++; e.first = Math.min(e.first, x.day);
+      if (x.adv) { if (x.b === al.id) { e.adv += x.adv; e.manual = true; if (x.state) e.state = true; } continue; }   // Anordnung der Spielleitung: festgestellter Vorteil
+      e.got += x.a === al.id ? x.vb : x.va; e.gave += x.a === al.id ? x.va : x.vb;
     }
     return Object.values(by).map((e) => {
-      const net = e.got - e.gave, vol = (e.got + e.gave) / 2, excess = Math.max(0, net - A.tol * vol);
-      const flagged = excess >= A.minGain * w.macro.cpi && vol > 0 && net / vol >= A.share;
+      const net = e.got - e.gave, vol = (e.got + e.gave) / 2, ex0 = Math.max(0, net - A.tol * vol);
+      const hit = ex0 >= A.minGain * w.macro.cpi && vol > 0 && net / vol >= A.share, excess = (hit ? ex0 : 0) + e.adv;
+      const flagged = hit || e.adv > 0;
       const P0 = w.airlines[e.partner];
-      return { ...e, name: P0 ? P0.name : e.partner, net: Math.round(net), vol: Math.round(vol), excess: Math.round(excess), flagged };
+      return { ...e, name: P0 ? P0.name : e.partner, net: Math.round(net + e.adv), vol: Math.round(vol), excess: Math.round(flagged ? excess : ex0), flagged };
     }).sort((a, b) => b.excess - a.excess);
   }
   const auditActive = (x) => x && x.status !== 'insolvent' && !x.removed;
@@ -5601,33 +5686,84 @@ const SM = (() => {
     return { ok: true, amount: e.excess, state: !B };
   }
   /** Jahresabschluss: Wirtschaftsprüfer beanstanden einseitige Vermögensverschiebungen zwischen Spielenden. */
-  function auditYear(w) {
-    const A = P.AUDIT, day = w.day, done = new Set();
+  function auditYear(w, { late = false, by = null } = {}) {
+    const A = P.AUDIT, day = w.day, done = new Set(), from = w.auditFrom || 0;
+    const pool = (w.xfers || []).filter((x) => (late ? x.late === true : x.late !== true && x.day >= from));
+    const rep = { day, late, by, n: pool.filter((x) => !x.adv).length, pairs: new Set(pool.map((x) => [x.a, x.b].sort().join('|'))).size, findings: [] };
+    const head = late ? (by ? `Nachprüfung auf Anordnung der ${by}` : 'Nachprüfung des letzten Jahresabschlusses') : 'Wirtschaftsprüfung zum Jahresabschluss';
     for (const G of w.humans) {
-      if (G.audit && G.audit.strikes && day > (G.audit.until || 0) + A.cleanYears * 365) G.audit.strikes = 0;   // nach zwei sauberen Jahren gelöscht
+      if (!late && G.audit && G.audit.strikes && day > (G.audit.until || 0) + A.cleanYears * 365) G.audit.strikes = 0;   // nach zwei sauberen Jahren gelöscht
       if (!auditActive(G)) continue;
-      for (const e of auditPreview(w, G)) {
+      for (const e of auditPreview(w, G, { late })) {
         if (!e.flagged) continue;
         const key = [G.id, e.partner].sort().join('|'); if (done.has(key)) continue; done.add(key);
         const L = w.airlines[e.partner], au = G.audit || (G.audit = { strikes: 0, findings: [] });
         au.strikes = (au.strikes || 0) + 1;
         const k = Math.min(au.strikes, A.fine.length) - 1, fine = Math.round(e.excess * A.fine[k] / 1e4) * 1e4, claw = e.excess, due = claw + fine;
         au.malus = A.malus[k]; au.until = day + 365; au.findings = [...(au.findings || []), { day, partner: e.partner, name: e.name, claw, fine }].slice(-6);
-        const payee = auditPayee(w, e.partner, e.first), to = payee ? payee.id : null, cash = G.spendable(w.macro.bank ?? 1);
+        const payee = e.state ? null : auditPayee(w, e.partner, e.first), to = payee ? payee.id : null, cash = G.spendable(w.macro.bank ?? 1);
         let now = cash >= due ? due : Math.max(0, Math.min(due, Math.round(cash * 0.5 / 1e4) * 1e4));
         G.ledger.post('one_off', -now, true, 'Wirtschaftsprüfung: Rückzahlung und Bußgeld');
         const toPartner = Math.min(claw, now); if (to && toPartner > 0) L.ledger.post('one_off', toPartner, true, `Wirtschaftsprüfung: Rückzahlung erhalten › ${G.name}`);
         if (due - now > 0) au.debt = { left: due - now, monthly: Math.ceil((due - now) / A.months / 1e3) * 1e3, to, since: e.first, clawLeft: to ? Math.max(0, claw - toPartner) : 0 };
-        G.log(day, `Wirtschaftsprüfung zum Jahresabschluss: Die Geschäfte mit ${e.name} haben Ihnen einen ungerechtfertigten Vorteil von ${mioTxt(claw)} gebracht. Rückzahlung ${mioTxt(claw)} ${to ? `an ${e.name}` : `an die Staatskasse (${e.name} gibt es nicht mehr)`}, Bußgeld ${mioTxt(fine)} (${Math.round(A.fine[k] * 100)} %${au.strikes > 1 ? `, ${au.strikes}. Beanstandung` : ''}), Prüfvermerk: Ansehen −${au.malus} für ein Jahr.${due - now > 0 ? ` Sofort bezahlt ${mioTxt(now)}, der Rest von ${mioTxt(due - now)} in ${A.months} Monatsraten.` : ''}`, 'crit');
+        G.log(day, `${head}: Die Geschäfte mit ${e.name} haben Ihnen einen ungerechtfertigten Vorteil von ${mioTxt(claw)} gebracht. Rückzahlung ${mioTxt(claw)} ${to ? `an ${e.name}` : `an die Staatskasse (${e.state ? 'auf Anordnung' : `${e.name} gibt es nicht mehr`})`}, Bußgeld ${mioTxt(fine)} (${Math.round(A.fine[k] * 100)} %${au.strikes > 1 ? `, ${au.strikes}. Beanstandung` : ''}), Prüfvermerk: Ansehen −${au.malus} für ein Jahr.${due - now > 0 ? ` Sofort bezahlt ${mioTxt(now)}, der Rest von ${mioTxt(due - now)} in ${A.months} Monatsraten.` : ''}`, 'crit');
         if (payee) {
           const gf = Math.round(e.excess * A.giverFine / 1e4) * 1e4;
           if (gf > 0) { payee.ledger.post('one_off', -gf, true, 'Wirtschaftsprüfung: Bußgeld (Geber)'); payee.log(day, `Wirtschaftsprüfung: Sie haben ${G.name} Werte weit unter Marktpreis überlassen. ${to ? `${G.name} zahlt Ihnen ${mioTxt(claw)} zurück${due - now > 0 ? ' (teilweise in Raten)' : ''}; ` : ''}Bußgeld für Sie ${mioTxt(gf)}.`, 'warn'); }
         }
-        w.pushNews(day, `Jahresabschluss: Wirtschaftsprüfer beanstanden Handelsgeschäfte von ${G.name} – Rückzahlung und Bußgeld angeordnet`, 'warn', G.id);
+        w.pushNews(day, `${late ? 'Nachprüfung' : 'Jahresabschluss'}: Wirtschaftsprüfer beanstanden Handelsgeschäfte von ${G.name} – Rückzahlung und Bußgeld angeordnet`, 'warn', G.id);
+        rep.findings.push({ b: G.id, bName: G.name, a: e.partner, aName: e.name, claw, fine, now, state: !to, strike: au.strikes });
       }
     }
-    w.auditFrom = day + 1;
-    w.xfers = (w.xfers || []).filter((x) => x.day > day - 400);
+    if (late) { for (const x of w.xfers || []) if (x.late === true) x.late = 'done'; }   // erledigt – bleibt zur Nachverfolgung erfasst
+    else {
+      w.auditFrom = day + 1;
+      w.xfers = (w.xfers || []).filter((x) => x.day > day - 400);
+      if (rep.n && !rep.findings.length) w.pushNews(day, `Jahresabschluss: Die Wirtschaftsprüfer haben ${rep.n} Handelsgeschäft${rep.n === 1 ? '' : 'e'} zwischen Airlines von Mitspielenden geprüft – keine Beanstandung`, 'info', null);
+    }
+    (w.auditLog = w.auditLog || []).push(rep); w.auditLog = w.auditLog.slice(-12);
+    return rep;
+  }
+  /**
+   * Nacherfassung: angenommene Geschäfte zwischen Spielenden aus dem laufenden und dem letzten geprüften Jahr, die in der Handelsbilanz fehlen
+   * (z. B. weil sie vor der Einführung der Prüfung aus der Historie gefallen waren). Fehlt eines aus dem schon geprüften Jahr, folgt eine Nachprüfung.
+   */
+  function auditCatchUp(w) {
+    if (!w.xfers) return 0;
+    const from = (w.auditFrom || 0) - 365, have = new Set(w.xfers.filter((x) => x.deal).map((x) => x.deal)); let n = 0;
+    for (const d of w.deals || []) {
+      const dd = d.resolvedDay ?? d.day;
+      if (d.status !== 'accepted' || dd < from || have.has(d.id)) continue;
+      const A = w.airlines[d.from], B = w.airlines[d.to]; if (!A || !B || !A.isPlayer || !B.isPlayer) continue;
+      const val = (items, G, R) => items.reduce((x, it) => x + (it.k === 'ac' ? 0 : tradeItemValue(w, G, R, it)), 0);   // Flugzeuge sind nicht mehr eindeutig zuzuordnen
+      const x = { day: dd, a: A.id, b: B.id, va: Math.round(val(d.give, A, B)), vb: Math.round(val(d.take, B, A)), deal: d.id, old: true };
+      if (dd < (w.auditFrom || 0)) x.late = true;
+      w.xfers.push(x); have.add(d.id); n++;
+    }
+    return n;
+  }
+  /** Spielleitung: Nachprüfung anordnen – festgestellter Vorteil wird wie eine Beanstandung behandelt (Rückzahlung, Bußgeld, Prüfvermerk). */
+  function auditOrder(w, { b, a, amount, state = false, by = 'Spielleitung' } = {}) {
+    const G = w.airlines[b], L = w.airlines[a], amt = Math.round(clamp(Number(amount) || 0, 0, 999e6) / 1e4) * 1e4;
+    if (!G || !G.isPlayer || !auditActive(G)) return { ok: false, msg: 'Begünstigte Airline nicht gefunden oder nicht aktiv.' };
+    if (!L || !L.isPlayer || L.id === G.id) return { ok: false, msg: 'Bitte eine andere Airline als Partner wählen.' };
+    if (amt < 1e5) return { ok: false, msg: 'Bitte einen Vorteil von mindestens 0,1 Mio. € angeben.' };
+    (w.xfers = w.xfers || []).push({ day: w.day, a: L.id, b: G.id, va: 0, vb: 0, adv: amt, late: true, manual: true, state: !!state });
+    const rep = auditYear(w, { late: true, by });
+    const f = rep.findings.find((x) => x.b === G.id);
+    return f ? { ok: true, msg: `${G.name}: Rückzahlung ${mioTxt(f.claw)} ${f.state ? 'an die Staatskasse' : `an ${L.name}`}, Bußgeld ${mioTxt(f.fine)}${f.claw + f.fine - f.now > 0 ? ` – ${mioTxt(f.claw + f.fine - f.now)} in Raten` : ''}.`, finding: f } : { ok: false, msg: 'Keine Beanstandung möglich.' };
+  }
+  /** Überblick für die Spielleitung: erfasste Geschäfte je Paar und Jahr, Vorschau, letzte Prüfberichte. */
+  function adminAudit(w) {
+    const nm = (id) => (w.airlines[id] ? w.airlines[id].name : id), from = w.auditFrom || 0, pairs = {};
+    for (const x of w.xfers || []) {
+      const k = [x.a, x.b].sort().join('|'), yr = Math.floor(x.day / 365), e = pairs[k + '|' + yr] || (pairs[k + '|' + yr] = { a: x.a < x.b ? x.a : x.b, b: x.a < x.b ? x.b : x.a, year: yr, n: 0, aTo: 0, bTo: 0, adv: 0, late: 0 });
+      e.n++; if (x.late) e.late++;
+      if (x.adv) { e.adv += x.adv; continue; }
+      if (x.a === e.a) { e.aTo += x.va; e.bTo += x.vb; } else { e.bTo += x.va; e.aTo += x.vb; }
+    }
+    const humans = w.humans.filter(auditActive).map((h) => ({ id: h.id, name: h.name, joined: h.joinedDay || 0, audit: h.audit || null, preview: auditPreview(w, h).filter((e) => e.net > 0) }));
+    return { day: w.day, from, humans, pairs: Object.values(pairs).map((e) => ({ ...e, aName: nm(e.a), bName: nm(e.b) })).sort((x, y) => y.year - x.year || Math.abs(y.aTo - y.bTo) - Math.abs(x.aTo - x.bTo)), log: (w.auditLog || []).slice().reverse(), tol: P.AUDIT.tol, minGain: P.AUDIT.minGain * w.macro.cpi };
   }
   /** Monatsrate aus einem Prüfungsbescheid. */
   function auditInstallment(w, G) {
@@ -5839,6 +5975,13 @@ const SM = (() => {
       pr.next = day + R.cool;
     }
     setFuelX(w);
+  }
+  /** Gespeicherte Angebote: offene und die letzten 120 – angenommene Geschäfte zwischen Spielenden bleiben 400 Tage (für die Wirtschaftsprüfung). */
+  function keepDeals(w) {
+    const pl = (id) => !!(w.airlines[id] && w.airlines[id].isPlayer);
+    const pp = (d) => d.status === 'accepted' && pl(d.from) && pl(d.to);
+    const recent = w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400), rest = new Set(recent.filter((d) => !pp(d)).slice(-120));
+    return recent.filter((d) => pp(d) || rest.has(d));
   }
   /** Bestand: Handelsgeschäfte zwischen Spielenden aus dem laufenden Jahr nachträglich bewerten (für die erste Prüfung). */
   function auditMigrate(w) {
@@ -6423,6 +6566,7 @@ const SM = (() => {
       case 'bid': return w.bid(al, String(a.lot || ''), num(a.amount));
       case 'takeover': return takeover(w, al, String(a.target || ''));
       case 'buyStake': return buyStake(w, al, String(a.target || ''), num(a.q));
+      case 'leaseBuy': return leaseBuy(w, al, String(a.acId || ''));
       case 'saleLeaseback': { const r = saleLeaseback(w, al, String(a.acId || '')); if (r.ok) w.operableFreq(al); return r; }
       case 'leaseDefer': return leaseDefer(w, al);
       case 'rescueLoan': return rescueLoan(w, al);
@@ -6436,9 +6580,10 @@ const SM = (() => {
       case 'poachCorp': return w.poachCorp(al, String(a.target || ''), String(a.apt || ''), num(a.budget));
       case 'academy': {
         if (!ACADEMY[a.role]) return { ok: false, msg: 'Unbekannte Akademie.' };
-        const lv = clamp(Math.round(num(a.level)), 0, 3);
+        const lv = clamp(Math.round(num(a.level)), 0, ACADEMY_MAX[ACADEMY_MAX.length - 1]);
         al.academy = al.academy || {};
         const cur = al.academy[a.role] || { lv: 0, since: day };
+        if (lv > academyMax(al) && lv > (cur.lv || 0)) { const need = ACADEMY_MAX.findIndex((x) => x >= lv); return { ok: false, msg: `Stufe ${lv} gibt es ab der Phase „${CAREER.levels[need].label}“ – mit dem Wachstum wird die ${ACADEMY[a.role].label} größer.` }; }
         if (a.role === 'pilot') { if (a.group && !STAFF_GROUPS.includes(a.group)) return { ok: false, msg: 'Ungültige Musterberechtigung.' }; cur.group = a.group || cur.group || STAFF_GROUPS.find((g) => al.fleet.some((x) => P.AIRCRAFT_TYPES[x.type_id].group === g)) || 'A32F'; }
         if (!cur.lv && lv) cur.since = day;
         cur.lv = lv; al.academy[a.role] = cur;
@@ -6508,8 +6653,8 @@ const SM = (() => {
       playerId: w.playerId, order: w.order, news: w.news.slice(-120), events: w.events.filter((e) => e.end + (e.recovery || 0) > w.day - 30), eventCounter: w.eventCounter,
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
-      deals: w.deals.filter((d) => d.status === 'open' || d.day > w.day - 400).slice(-120), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      aptObs: w.aptObs || {}, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      deals: keepDeals(w), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
+      aptObs: w.aptObs || {}, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, auditLog: w.auditLog || [], laborFree: w.laborFree || null, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
@@ -6536,7 +6681,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      aptObs: s.aptObs || {}, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, auditLog: s.auditLog || [], laborFree: s.laborFree || null, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -6597,6 +6742,9 @@ const SM = (() => {
     if (!w.themes) { w.themes = {}; w.attacks = {}; }
     // 0.20: Handelsbilanz für die Wirtschaftsprüfung, Admin-Entfernungen nicht mehr öffentlich
     auditMigrate(w);
+    auditCatchUp(w);   // 0.21.21: fehlende Geschäfte nacherfassen
+    // 0.21.22: knapper Arbeitsmarkt
+    if (!w.laborFree) { w.laborFree = { pilot: 0, cabin: 0, tech: 0 }; if (w.day > 0 && w.humans.length) w.pushNews(w.day, 'Arbeitsmarkt: Piloten, Kabinen- und Technikpersonal werden knapp – Bewerbungen gibt es vor allem, wenn Airlines Personal abbauen oder pleitegehen. Eigene Akademien gewinnen an Bedeutung.', 'warn', null); }
     for (const n of w.news || []) {
       if (n.msg && / wurde von der .* aus dem Spiel genommen$/.test(n.msg)) n.msg = n.msg.replace(/ wurde von der .* aus dem Spiel genommen$/, ' zieht sich vom Markt zurück');
       if (n.msg && /^[^:]{1,60} annulliert: /.test(n.msg)) n.msg = 'Entwarnung: ' + n.msg.replace(/^[^:]{1,60} annulliert: /, '').split(':')[0] + ' – die Lage hat sich beruhigt.';
@@ -6638,7 +6786,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, auditPreview, auditYear, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;

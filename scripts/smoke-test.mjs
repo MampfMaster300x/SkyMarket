@@ -3,6 +3,7 @@ import { handle, tickMain } from '../server/api.mjs';
 import { memStore } from '../server/memstore.mjs';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 const store = memStore();
 const jar = {};
@@ -164,6 +165,11 @@ assert.equal(tim.admin, true, 'Tim ist Admin');
   const pt = ok(await call('tim', 'GET', '/admin/playtime'), 'Spielzeit'); const ra = pt.rows.find((r) => r.key === 'anna'), rb = pt.rows.find((r) => r.key === 'ben');
   assert.ok(ra && ra.total >= 30 && ra.sessions === 1 && ra.games.length === 1 && ra.days[pt.today] === ra.total, 'Anna: Spielzeit erfasst ' + JSON.stringify(ra && { t: ra.total, s: ra.sessions }));
   assert.ok(rb && rb.total === 0 && !rb.sessions, 'Ben: Fenster im Hintergrund zählt nicht');
+  // 0.21.22: ältere Fenster ohne vis-Angabe zählen ebenfalls; Server meldet die App-Version
+  await call('ben', 'GET', `/games/${g.id}/state?ping=1`); await new Promise((r) => setTimeout(r, 40)); await call('ben', 'GET', `/games/${g.id}/state?ping=1`);
+  const pt2 = ok(await call('tim', 'GET', '/admin/playtime'), 'Spielzeit 2'); assert.ok(pt2.rows.find((r) => r.key === 'ben').total >= 30, 'altes Fenster ohne vis zählt');
+  { const { APP_VERSION } = await import('../server/version.mjs'); const r = await handle(new Request(`http://localhost/api/games/${g.id}/state`, { headers: { cookie: jar.ben } }), { store });
+    assert.equal(r.headers.get('x-app'), APP_VERSION, 'Server meldet die App-Version'); assert.equal(APP_VERSION, JSON.parse(fs.readFileSync('package.json', 'utf8')).version, 'version.mjs passt zu package.json (npm run build)'); }
   console.log('0.21.19 ok: Spielzeit', ra.total, 'ms für Anna,', pt.rows.length, 'Konten in der Übersicht'); }
 assert.equal((await call('ben', 'GET', '/admin/games')).status, 403, 'Verwaltung nur für Admins');
 const g2 = ok(await call('ben', 'POST', '/games', { name: 'Geheimrunde', password: 'zuzu', difficulty: 'hard', speed: 'p', airline: { name: 'Isar Zwei', code: 'IZ', base: 'MUC' } }), 'zweites Spiel');
@@ -258,6 +264,11 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.equal((await call('anna', 'POST', '/games/main/admin', { cmd: 'unban', u: 'x' })).status, 403, 'Verwaltung POST nur für Admins');
   const ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung laden');
   const benP = ad.players.find((p) => p.u === 'ben'); assert.ok(benP, 'Ben in der Liste');
+  { assert.ok(ad.audit && Array.isArray(ad.audit.pairs) && ad.audit.humans.length >= 2, 'Prüfübersicht in der Verwaltung');
+    const [h1, h2] = ad.audit.humans;
+    assert.equal((await call('anna', 'POST', '/games/main/admin', { cmd: 'auditOrder', b: h1.id, a: h2.id, amount: 2e6 })).status, 403, 'Nachprüfung nur für die Verwaltung');
+    const ao = ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'auditOrder', b: h1.id, a: h2.id, amount: 2e6, state: true }), 'Nachprüfung anordnen'); assert.ok(/Staatskasse/.test(ao.msg), ao.msg);
+    const ad2 = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung neu laden'); assert.ok(ad2.audit.log.some((r) => r.by && r.findings.length === 1 && r.findings[0].b === h1.id), 'Prüfbericht gespeichert'); }
   ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'kick', airlineId: benP.airlineId, ban: true }), 'Ben entfernen und sperren');
   assert.equal((await call('ben', 'GET', '/games/main/state')).status, 403, 'Ben hat keinen Zugriff mehr');
   assert.equal((await call('ben', 'POST', '/games/main/join', { airline: { name: 'Neu Ben', code: 'NB', base: 'MUC' } })).status, 403, 'gesperrt');
@@ -827,4 +838,92 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   pl.rating = 'BB'; w.day += 61; SMx.leaseSecurity(w, pl); assert.ok(!pl.secDep && pl.ledger.cash === c0, 'Rating erholt: Kaution zurück');
   assert.ok(Math.abs(SMx.balanceSheet(pl).check) < 0.01, 'Bilanz stimmt weiter');
   console.log('0.21.20 ok: Branchenkrise (Geschäftsreisen', Math.round((1 - ev.demand.business) * 100) + ' %, Preise', Math.round((1 - ev.fareX) * 100) + ' %), Leasing +3 %/Jahr, Sicherheit', Math.round(tot / 1000), 'Tsd. €'); }
+// 0.21.21: Wirtschaftsprüfung durchgängig – Handel → Erfassung → Jahresabschluss, Nacherfassung fehlender Geschäfte, Nachprüfung, Neugründung, Prüfbericht
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const mk = (seed) => { const w = SMx.newWorld({ seed }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }), b = SMx.addHuman(w, { id: 'P2', name: 'Beta', code: 'BB', base: 'MUC' }); w.playerId = 'P1';
+    for (let i = 0; i < 3; i++) w.step(); a.ledger.equityFlow(4e7, 't'); b.ledger.equityFlow(4e7, 't'); return { w, a, b }; };
+  const gift = (w, f, t, amount) => { const p = SMx.applyAction(w, f.id, { type: 'dealPropose', to: t.id, give: [{ k: 'cash', amount }], take: [] }); assert.ok(p.ok, 'Angebot: ' + p.msg); assert.ok(SMx.applyAction(w, t.id, { type: 'dealRespond', id: p.id, choice: 'accept' }).ok, 'angenommen'); };
+  const rt = (w) => SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w))));
+  // a) Viele kleine Geschenke (je unter 1 Mio., also erlaubt) summieren sich – der Jahresabschluss greift
+  { const { w, a, b } = mk(31); for (let i = 0; i < 4; i++) gift(w, a, b, 950000);
+    const pv = SMx.auditPreview(w, b)[0]; assert.ok(pv.flagged && pv.n === 4, 'Vorschau: beanstandet');
+    w.day = 364; const ca = a.ledger.cash, cb = b.ledger.cash; const rep = SMx.auditYear(w);
+    assert.ok(rep.findings.length === 1 && rep.n === 4 && b.audit.strikes === 1, 'Beanstandung im Prüfbericht');
+    const f = rep.findings[0]; assert.equal(Math.round(cb - b.ledger.cash), Math.round((f.claw + f.fine) * 100), 'Begünstigter zahlt Vorteil + Bußgeld');
+    assert.ok(a.ledger.cash - ca > 0 && w.auditLog.length === 1 && w.auditFrom === 365, 'Geber bekommt zurück, Bericht gespeichert, neues Prüfjahr'); }
+  // b) Fairer Handel: Bericht ohne Beanstandung, für alle sichtbar
+  { const { w, a, b } = mk(32); b.staff.cab += 2; const p = SMx.applyAction(w, a.id, { type: 'dealPropose', to: 'P2', give: [{ k: 'cash', amount: 20000 }], take: [{ k: 'staff', role: 'cabin', n: 1 }] }); SMx.applyAction(w, b.id, { type: 'dealRespond', id: p.id, choice: 'accept' });
+    w.day = 364; const rep = SMx.auditYear(w); assert.ok(!rep.findings.length && rep.n === 1, 'keine Beanstandung');
+    assert.ok(w.news.some((n) => /keine Beanstandung/.test(n.msg)), 'Meldung: geprüft, keine Beanstandung'); }
+  // c) Altgeschäft fehlt in der Handelsbilanz (z. B. 20 Mio. für eine Flugbegleiterin) – Nacherfassung und Nachprüfung, nur einmal
+  { const { w, a, b } = mk(33);
+    w.deals.push({ id: 'DX', from: 'P1', to: 'P2', day: 1, resolvedDay: 1, expires: 15, status: 'accepted', give: [{ k: 'cash', amount: 20e6 }], take: [{ k: 'staff', role: 'cabin', group: null, n: 1 }], note: '' });
+    w.auditFrom = 2;   // das Jahr mit dem Geschäft ist schon geprüft
+    for (let i = 0; i < 150; i++) w.deals.push({ id: 'DA' + i, from: 'P1', to: 'AI1', day: 2, status: 'rejected', give: [], take: [], note: '' });
+    let w2 = rt(w); assert.ok(w2.deals.some((d) => d.id === 'DX'), 'Geschäft zwischen Spielenden bleibt gespeichert, auch bei vielen anderen Angeboten');
+    assert.ok(w2.xfers.some((x) => x.deal === 'DX' && x.late === true), 'nacherfasst für die Nachprüfung');
+    const B2 = w2.airlines.P2, cb = B2.ledger.cash; w2.step();
+    assert.ok(B2.audit && B2.audit.strikes === 1 && cb - B2.ledger.cash > 15e8, 'Nachprüfung: Rückzahlung und Bußgeld');
+    assert.ok(w2.auditLog.at(-1).late && w2.news.some((n) => /^Nachprüfung: /.test(n.msg)), 'Nachprüfung im Bericht und in den Meldungen');
+    const w3 = rt(w2); w3.step(); assert.equal(w3.airlines.P2.audit.strikes, 1, 'nicht doppelt bestraft');
+    assert.ok(!w3.xfers.some((x) => x.late === true) && w3.xfers.some((x) => x.deal === 'DX'), 'bleibt als erledigt erfasst'); }
+  // d) Neugründung: Geschäfte der abgewickelten Vorgängerin zählen nicht für die neue Gesellschaft
+  { const { w, a, b } = mk(34); gift(w, a, b, 950000); gift(w, a, b, 950000); w.step(); w.step();
+    SMx.restartHuman(w, 'P2', { name: 'Beta Neu', code: 'BN', base: 'FRA' });
+    assert.equal(SMx.auditPreview(w, w.airlines.P2).length, 0, 'neue Gesellschaft haftet nicht für die alte'); }
+  // e) Anordnung der Spielleitung: genau der festgestellte Vorteil, Rückzahlung an die Staatskasse, Übersicht
+  { const { w, a, b } = mk(35); const ca = a.ledger.cash, cb = b.ledger.cash;
+    const r = SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 20e6, state: true }); assert.ok(r.ok, r.msg);
+    assert.equal(r.finding.claw, 20e6); assert.equal(r.finding.fine, 2e6); assert.ok(r.finding.state, 'an die Staatskasse');
+    assert.equal(Math.round((cb - b.ledger.cash) / 100), 22e6, '22 Mio. abgebucht'); assert.equal(a.ledger.cash, ca, 'Partner bekommt nichts und zahlt kein Bußgeld');
+    assert.ok(!SMx.auditOrder(w, { b: 'P2', a: 'P2', amount: 5e6 }).ok && !SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 0 }).ok, 'Eingaben geprüft');
+    const ov = SMx.adminAudit(w); assert.ok(ov.log.length === 1 && ov.pairs.length === 1 && ov.pairs[0].adv === 20e6, 'Übersicht für die Verwaltung');
+    assert.ok(Math.abs(SMx.balanceSheet(b).check) < 0.01, 'Bilanz stimmt'); }
+  console.log('0.21.21 ok: kleine Geschenke summiert und beanstandet, Bericht ohne Beanstandung, Altgeschäft nacherfasst und nachgeprüft (einmal), Neugründung ausgenommen, Anordnung 20 Mio. + 2 Mio. Bußgeld an die Staatskasse');
+}
+// 0.21.22: Leasingflugzeug übernehmen, Akademien wachsen mit, knapper Arbeitsmarkt, eigener Nachwuchs
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+// a) Leasingübernahme
+{ const w = SMx.newWorld({ seed: 41 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1';
+  a.ledger.equityFlow(6e7, 't');
+  const r = SMx.applyAction(w, 'P1', { type: 'acquire', typeId: 'DH8D', base: 'HAM', mode: 'lease' }); assert.ok(r.ok, r.msg);
+  const ac = a.fleet[0]; while (w.day <= ac.delivery_day) w.step();
+  const q0 = SMx.leaseBuyQuote(w, a, ac); assert.ok(q0.ok && !q0.ended && q0.fee > 0, 'vor Vertragsende: Ablöse');
+  // Vertragsende simulieren
+  ac.lease_start -= 1200; ac.bornDay -= 1200; w.step(); for (let i=0;i<40;i++) w.step();
+  assert.ok(ac.endNote, 'Hinweis bei Vertragsende'); assert.ok(a.events.some((e) => /Mindestlaufzeit/.test(e.msg)), 'Logbuch');
+  const q = SMx.leaseBuyQuote(w, a, ac); assert.ok(q.ended && q.fee === 0, 'nach Vertragsende keine Ablöse');
+  const c0 = a.ledger.cash; const b = SMx.applyAction(w, 'P1', { type: 'leaseBuy', acId: ac.id }); assert.ok(b.ok, b.msg);
+  assert.ok(ac.owned && ac.nbv === q.price && ac.loan === q.loan && !ac.deposit, 'gehört jetzt der Airline');
+  assert.equal(Math.round((c0 - a.ledger.cash) / 100), Math.round(q.down - q.dep), 'Kasse: Eigenanteil minus Kaution');
+  assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt');
+  const ls0 = a.ledger.month.lease || 0; w.step(); assert.equal(a.ledger.month.lease || 0, ls0, 'keine Leasingrate mehr');
+    const rt = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(rt.airlines.P1.fleet[0].owned, 'gespeichert');
+}
+// b) Akademie nach Phase
+{ const w = SMx.newWorld({ seed: 42 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1';
+  a.ledger.equityFlow(6e7, 't');
+  assert.equal(SMx.academyMax(a), 1);
+  const x = SMx.applyAction(w, 'P1', { type: 'academy', role: 'pilot', level: 3, group: 'DH8' }); assert.ok(!x.ok && /Phase/.test(x.msg), x.msg);
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'academy', role: 'cabin', level: 1 }).ok);
+  a.prog.lv = 4; assert.equal(SMx.academyMax(a), 5); assert.ok(SMx.applyAction(w, 'P1', { type: 'academy', role: 'cabin', level: 5 }).ok, 'Stufe 5 als Global Player');
+  a.academy.cabin.since = w.day - 100; const c0 = a.staff.cab; w.academyMonthly(a); assert.equal(a.staff.cab - c0, 38); assert.equal(a.staff.home.cab, 38);
+  const hx = SMx.homeShares(a); assert.equal(hx.cab, 1);
+  // Kündigungen: Eigene bleiben eher
+  a.staff.cab = 400; a.staff.home.cab = 200; a.staff.morale = 0.3; SMx.homeShares(a);
+  const cab0 = a.staff.cab + 38, h0 = a.staff.home.cab + 38; w.playerMonthly(a); assert.ok(a.staff.home.cab <= a.staff.cab && h0 - a.staff.home.cab <= cab0 - a.staff.cab, 'Eigene kündigen seltener');
+}
+// c) Arbeitsmarkt knapp, Freisetzung und Krise
+{ const w = SMx.newWorld({ seed: 43 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1';
+  const p0 = SMx.laborPool(w, 'pilot'); assert.equal(p0.base, 175, 'Grundstock Piloten 150 + 25');
+  SMx.releaseStaff(w, { pilot: 100 }); assert.equal(SMx.laborPool(w, 'pilot').free, 60, '60 % kommen auf den Markt');
+  a.staff.pil.DH8 = 20; const f = w.fire(a, 'pilot', 'DH8', 10); assert.ok(f.ok); assert.equal(SMx.laborPool(w, 'pilot').free, 66);
+  w.events.push({ id: 'X', type: 'downturn', start: w.day, end: w.day + 100, countries: [] }); assert.ok(SMx.laborCrisis(w)); assert.equal(SMx.laborPool(w, 'pilot').base, Math.floor(175 * 1.5 / w.macro.laborTight));
+}
+
+  // d) höchstens vier Basen
+  { const w = SMx.newWorld({ seed: 44 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1'; a.ledger.equityFlow(5e8, 't');
+    a.bases.push('BRE', 'HAJ', 'LEJ'); const r = w.openBase(a, 'DRS'); assert.ok(!r.ok && /4 Basen/.test(r.msg), 'fünfte Basis abgelehnt: ' + r.msg); }
+  console.log('0.21.22 ok: Übernahme nach Vertragsende ohne Ablöse (vorher mit), Akademie-Stufen nach Phase bis 5, Absolventen als eigener Nachwuchs, Arbeitsmarkt 150+25 Piloten, Freisetzung 60 %, Krise ×1,5');
+}
 console.log('Alle Prüfungen bestanden.');

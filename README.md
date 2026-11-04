@@ -183,6 +183,28 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.23: Spielzeit für alle, Hinweis auf neue Version
+
+- **Spielzeit:** Fenster, die vor 0.21.19 geöffnet und seitdem nicht neu geladen wurden, schickten keine Sichtbarkeitsangabe mit und wurden deshalb nie gezählt. Der Server zählt solche Lebenszeichen jetzt mit (nur ausdrücklich unsichtbare Fenster zählen nicht).
+- **Neue Version:** Der Server meldet seine Version (`x-app`). Läuft im Browser eine ältere, erscheint unten „Neue Version … – Jetzt neu laden“; ist das Fenster gerade im Hintergrund, lädt es sich sofort neu. `npm run build` schreibt die Version aus package.json nach `server/version.mjs`.
+
+## Neu in 0.21.22: Personal knapp, eigener Nachwuchs, Leasingflugzeuge übernehmen
+
+- **Knapper Arbeitsmarkt:** Monatlich gibt es nur noch rund 40 % der bisherigen Bewerbungen (Piloten 150 + 25 je Mitspielendem statt 400 + 60; Kabine 600 + 90; Technik 200 + 30; je Airline höchstens 50/160/50). Mehr gibt es, wenn Airlines entlassen, Flugzeuge abgeben oder pleitegehen (60 % davon kommen auf den Markt, jeden Monat 30 % weniger) und in Krisen (Branchenkrise, große Rezession, Pandemie: ×1,5).
+- **Akademien wachsen mit:** Stufen 4 und 5 neu; freigeschaltet je Wachstumsphase (Gründung 1, Regional 2, Netzwerk 3, Interkontinental 4, Global Player 5). Bestehende Stufen bleiben.
+- **Eigener Nachwuchs:** Absolventen werden als eigene Leute geführt. Ihr Anteil hebt die Stimmung (bis +12), halbiert ihre Kündigungen, verbessert die Pünktlichkeit der Crews (bis +4 Punkte) und senkt technische Ausfälle (bis −30 %). Abwerbung und Entlassung treffen zuerst die übrigen.
+- **Leasingflugzeug übernehmen:** Flotte → „Übernehmen“. Nach der Mindestlaufzeit (36 Monate) zum Restwert mit 5 % Abschlag, vorher zum Marktwert plus Ablöse (4 Monatsraten). Finanziert wie ein Kauf (Eigenanteil nach Ansehen, Rest als Kredit), die Kaution wird verrechnet. Bei Vertragsende kommt ein Hinweis im Logbuch.
+- **Netz sortieren:** Strecken nach Eröffnung, Ziel, DB2, Umsatz, Auslastung, Passagieren, Frequenz oder Entfernung – auf- und absteigend.
+- **Höchstens vier Basen** je Airline (bestehende bleiben; eine neue gibt es erst nach dem Schließen einer anderen).
+
+## Neu in 0.21.21: Wirtschaftsprüfung nachvollziehbar und lückenlos
+
+- **Lücke geschlossen:** Gespeichert wurden nur die letzten 120 Angebote – im Mehrspielerbetrieb fielen alte Geschäfte zwischen Spielenden heraus, bevor die Prüfung sie erfassen konnte. Angenommene Geschäfte zwischen Spielenden bleiben jetzt 400 Tage gespeichert.
+- **Nacherfassung und Nachprüfung:** Beim Laden werden angenommene Geschäfte zwischen Spielenden, die in der Handelsbilanz fehlen, nachgetragen. Gehören sie zum schon geprüften Jahr, folgt am nächsten Spieltag eine Nachprüfung (gleiche Regeln, gleiche Folgen, nur einmal).
+- **Neugründung:** Geschäfte einer abgewickelten Airline zählen nicht mehr für die Nachfolgerin unter derselben Kennung.
+- **Prüfbericht:** Jeder Jahresabschluss wird gespeichert; ohne Beanstandung gibt es eine Meldung („… Handelsgeschäfte geprüft – keine Beanstandung“).
+- **Verwaltung → Wirtschaftsprüfung:** Prüfberichte, alle erfassten Geschäfte je Paar und Jahr mit Saldo, Vorschau zum nächsten Jahresabschluss – und „Nachprüfung anordnen“: festgestellter Vorteil wird wie eine Beanstandung behandelt (Rückzahlung an den Partner oder die Staatskasse, Bußgeld, Prüfvermerk, notfalls Raten).
+
 ## Neu in 0.21.20: Harte Zeiten
 
 - **Branchenkrise im Zyklus:** Ab dem zweiten Spieljahr kann eine weltweite Branchenkrise kommen – je länger es gut lief, desto wahrscheinlicher (3 % im ersten Monat, dann +1,5 Punkte je Monat bis 20 %; danach mindestens 18 Monate Pause). Angekündigt 30–60 Tage vorher, Dauer 9–14 Monate plus 5 Monate Erholung: Geschäftsreisen −18 bis −28 %, Urlaub −10 bis −18 %, Besuchsreisen −5 bis −10 %, Ticketpreise im ganzen Markt −6 bis −10 %, Banken kürzen Kreditlinien (−25 %), Leasinggeber verlangen +6 Ansehen. In einer Testwelt drehte die KI-Branche von zusammen +73 auf −39 Mio. € Ergebnis im Monat.
