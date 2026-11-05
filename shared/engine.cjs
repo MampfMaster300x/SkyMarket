@@ -399,6 +399,8 @@ const SM = (() => {
     LEASE_BUY: { endDisc: 0.95 },
     // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
     BASE_MAX: 4,
+    // 0.21.32: Ungenutzte Slots (Reserve) gehen nach 6 Monaten an den Flughafen zurück – Erstattung wie bei „Reserve zurückgeben“ (Slotpreis × 0,5); Warnung 30 Tage vorher
+    SLOT_IDLE: { days: 183, warn: 30 },
     // 0.21.28: Warteliste – ab der Vergabe am 1. April 2028 (Tag 455) höchstens 3 Einträge je Airline; Vorrang nach Slot-Rating
     // (Flotte, Slots im Besitz, Eigenkapital, Ergebnis seit der letzten Vergabe – je ein Viertel, gemessen am Größten im Spiel)
     WAIT: { from: 455, max: 3, maxOld: 12, w: { fleet: 0.25, slots: 0.25, equity: 0.25, profit: 0.25 } },
@@ -1390,11 +1392,11 @@ const SM = (() => {
     }
     // Slot-Reserve: freigewordene Slots an koordinierten Flughäfen bleiben eine Zeit lang bei der Airline (handelbar, wiederverwendbar)
     heldAt(apt, day) { return (this.slotHold[apt] || []).reduce((s, h) => s + (h.until > day ? h.n : 0), 0); }
-    hold(apt, n, until, buy = false) { if (!(n > 0) || !P.AIRPORTS[apt] || apx(apt).slots === null) return; (this.slotHold[apt] = this.slotHold[apt] || []).push(buy ? { n, until: 1e9, buy: true } : { n, until }); }
+    hold(apt, n, until, buy = false) { if (!(n > 0) || !P.AIRPORTS[apt] || apx(apt).slots === null) return; (this.slotHold[apt] = this.slotHold[apt] || []).push(buy ? { n, until: 1e9, buy: true, since: this._day } : { n, until }); }   // ohne Tagesangabe setzt slotIdleCheck den heutigen Tag
     /** Frei gewordene Slots: Spielende haben sie bezahlt und behalten sie (Reserve, Slotgebühr läuft weiter, Rückgabe zum halben Preis). */
     release(apt, n, day) { if (this.isPlayer) this.hold(apt, n, 0, true); else this.hold(apt, n, day + SLOT_HOLD_DAYS); }
     useHeld(apt, n, day) {
-      let left = n; const lst = (this.slotHold[apt] || []).filter((h) => h.until > day).sort((a, b) => a.until - b.until);
+      let left = n; const lst = (this.slotHold[apt] || []).filter((h) => h.until > day).sort((a, b) => a.until - b.until || (a.since ?? 0) - (b.since ?? 0));   // älteste Reserve zuerst
       for (const h of lst) { const k = Math.min(h.n, left); h.n -= k; left -= k; if (!left) break; }
       this.slotHold[apt] = lst.filter((h) => h.n > 0); if (!this.slotHold[apt].length) delete this.slotHold[apt];
       return n - left;
@@ -1664,6 +1666,15 @@ const SM = (() => {
   };
   /** Höchste Akademiestufe je Wachstumsphase: Gründung 1, Regional 2, Netzwerk 3, Interkontinental 4, Global Player 5. */
   const ACADEMY_MAX = [1, 2, 3, 4, 5];
+  /** Schulen je Bereich (0.21.32: mehrere Schulen/Klassen; ältere Stände: ein Objekt je Bereich). */
+  function acadList(al, role) {
+    const A = al && al.academy; if (!A || !A[role]) return [];
+    if (!Array.isArray(A[role])) { const x = A[role]; A[role] = x.lv ? [{ id: role[0].toUpperCase() + '1', ...x }] : []; }
+    return A[role];
+  }
+  const acadAll = (al) => Object.keys(ACADEMY).flatMap((r) => acadList(al, r));
+  /** Höchste Förderstufe eines Bereichs (für den Abwerbeschutz). */
+  const acadLv = (al, role) => acadList(al, role).reduce((m, x) => Math.max(m, x.lv || 0), 0);
   function academyMax(al) { const lv = al && al.prog ? clamp(al.prog.lv | 0, 0, ACADEMY_MAX.length - 1) : ACADEMY_MAX.length - 1; return ACADEMY_MAX[lv]; }
   /** Eigener Nachwuchs: Zahl der Akademie-Absolventen je Bereich (nie mehr als Beschäftigte) und Anteile. */
   function homeOf(st) { return st.home || (st.home = { pil: 0, cab: 0, tech: 0 }); }
@@ -1718,7 +1729,7 @@ const SM = (() => {
     { id: 'equity2', label: 'Wert verdoppelt', desc: 'Eigenkapital doppelt so hoch wie zum Start.', pts: 70, brand: 0.02, test: (c) => c.bs.equity >= 2 * c.al.ledger.equityContrib / 100 },
     { id: 'alliance', label: 'Partner gefunden', desc: 'Codeshare oder Allianz geschlossen.', pts: 15, brand: 0.01, test: (c) => c.w.coopsOf(c.al.id).length > 0 },
     { id: 'auction', label: 'Erstkunde', desc: 'Eine Auktion um Lieferpositionen gewonnen.', pts: 20, brand: 0.01, test: (c) => (c.w.auctions || []).some((a) => a.winners && a.winners.includes(c.al.id)) },
-    { id: 'academy', label: 'Eigener Nachwuchs', desc: 'Eine Akademie gefördert.', pts: 15, test: (c) => c.al.academy && Object.values(c.al.academy).some((x) => x.lv > 0) },
+    { id: 'academy', label: 'Eigener Nachwuchs', desc: 'Eine Akademie gefördert.', pts: 15, test: (c) => acadAll(c.al).some((x) => x.lv > 0) },
     { id: 'pax50m', label: '50 Millionen Passagiere', desc: 'Eine der Großen.', pts: 90, brand: 0.03, test: (c) => c.pax >= 5e7 },
     { id: 'fleet100', label: 'Hundert Flugzeuge', desc: '100 Flugzeuge – ab hier wird die Verwaltung zum eigenen Gegner.', pts: 80, brand: 0.02, test: (c) => c.al.fleet.length >= 100 },
     { id: 'fleet250', label: 'Weltkonzern', desc: '250 Flugzeuge.', pts: 120, brand: 0.03, test: (c) => c.al.fleet.length >= 250 },
@@ -2370,7 +2381,7 @@ const SM = (() => {
       // Leasinggeber füllen ihren Bestand nur langsam auf
       for (const [k, t] of Object.entries(P.AIRCRAFT_TYPES)) { if (t.launch && day < t.launch + 365) continue; const cap = capOf(this, k); this.lessorStock[k] = Math.min(cap, (this.lessorStock[k] ?? cap) + Math.ceil(cap * 0.4)); }
       // Akademien entlasten den Arbeitsmarkt
-      const acad = this.humans.reduce((s, h) => s + (h.academy ? Object.values(h.academy).reduce((t, x) => t + (x.lv || 0), 0) : 0), 0);
+      const acad = this.humans.reduce((s, h) => s + acadAll(h).reduce((t, x) => t + (x.lv || 0), 0), 0);
       M.laborTight = Math.max(1, M.laborTight - 0.01 * acad);
       { const F = this.laborFree || (this.laborFree = { pilot: 0, cabin: 0, tech: 0 });
         for (const r of ['pilot', 'cabin', 'tech']) { const took = Math.max(0, (L[r] || 0) - laborBase(this, r).base); F[r] = Math.floor(Math.max(0, (F[r] || 0) - took) * P.LABOR_FREE.decay); } }
@@ -2796,7 +2807,7 @@ const SM = (() => {
       // Warteliste: Vergabe nur zu festen Terminen (1. April, 1. Oktober) – siehe monthEnd; ein verpasster Termin wird hier nachgeholt. Pläne mit vollständigen Slots werden umgesetzt.
       { const due = lastSlotDue(this.day); if (this.slotRoundDay === undefined) this.slotRoundDay = due; else if (this.slotRoundDay < due) this.slotRound(due); }
       for (const al of this.humans) if (al.status !== 'insolvent' && al.plans && al.plans.length) this.checkPlans(al);
-      for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.completeDaily(al);
+      for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') { this.completeDaily(al); this.slotIdleCheck(al); }
       expireDeals(this);
       const day = this.day, month = monthOf(day), dow = day % 7, cpi = this.macro.cpi;
       this.dailyEvents();
@@ -3423,10 +3434,10 @@ const SM = (() => {
     academyMonthly(al) {
       const A = al.academy; if (!A) { if (al.staff) homeShares(al); return; }
       const cpi = this.macro.cpi;
-      for (const [role, x] of Object.entries(A)) {
+      for (const [role, x] of Object.keys(ACADEMY).flatMap((r) => acadList(al, r).map((y) => [r, y]))) {
         if (!x.lv) continue;
         const def = ACADEMY[role];
-        al.ledger.post('staff_extra', -def.cost[x.lv] * cpi, true, `Akademie › ${def.label || role}`);
+        al.ledger.post('staff_extra', -def.cost[x.lv] * cpi, true, `Akademie › ${def.label || role}${role === 'pilot' && x.group ? ` (${P.TYPE_GROUPS[x.group]})` : ''}`);
         if (this.day - x.since < def.ramp) continue;
         const n = def.out[x.lv];
         if (role === 'pilot') al.staff.pil[x.group] += n; else if (role === 'cabin') al.staff.cab += n; else al.staff.tech += n;
@@ -3629,7 +3640,7 @@ const SM = (() => {
       if (have <= 0) return { ok: false, msg: `${T.name} hat keine ${roleLabel(role, group)}.` };
       const sal = (role === 'pilot' ? S.pilotSalary[group] : role === 'cabin' ? S.cabinSalary : S.techSalary) * (this.macro.wage || 1) * this.macro.cpi;
       const theirPay = T.staff ? T.staff.pay : 1 + ({ premium: 0.06, lcc: -0.04 }[T.archetype] || 0), theirMorale = T.staff ? T.staff.morale : 0.62;
-      const acLv = T.academy && T.academy[role] ? T.academy[role].lv || 0 : 0;
+      const acLv = acadLv(T, role);
       const p = clamp((0.12 + 0.9 * (al.staff.pay - theirPay) + 0.35 * Math.min(1, bonus / (sal * 3)) + 0.8 * Math.max(0, 0.65 - theirMorale)) * (1 - 0.12 * acLv), 0.03, 0.85);
       let taken = 0; for (let i = 0; i < Math.min(n, have); i++) if (r.random() < p) taken++;
       const cost = taken * bonus + n * S.recruit[role] * 0.4 * this.macro.cpi;
@@ -4185,10 +4196,31 @@ const SM = (() => {
       const price = this.slotBuyPrice(apt, n);
       if (al.spendable(this.macro.bank ?? 1) < price) return { ok: false, msg: `${n} Slots kosten ${Math.round(price / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
       al.slotInvest(apt, price, n);
-      (al.slotHold[apt] = al.slotHold[apt] || []).push({ n, until: 1e9, buy: true });
+      (al.slotHold[apt] = al.slotHold[apt] || []).push({ n, until: 1e9, buy: true, since: this.day });
       al.log(this.day, `${n} Slot${n === 1 ? '' : 's'} in ${ap(apt).name} gekauft (${Math.round(price / 1000)} Tsd. EUR)${this.slotsFree(apt) <= 0 ? ' – der Flughafen ist jetzt voll, ohne Sie kommt dort niemand mehr dazu' : ''}`, 'route');
       if (w_isMulti(this) || this.slotsFree(apt) <= 0) this.pushNews(this.day, `${al.name} kauft ${n} Slots in ${ap(apt).name}${this.slotsFree(apt) <= 0 ? ' – keine freien Slots mehr' : ''}`, 'ai', al.id);
       return { ok: true, n, price };
+    }
+    /** Täglich: Reserve-Slots, die 6 Monate ungenutzt sind, gehen an den Flughafen zurück (Erstattung wie bei der freiwilligen Rückgabe an den Flughafen). */
+    slotIdleCheck(al) {
+      const day = this.day, S = P.SLOT_IDLE;
+      for (const [apt, hs] of Object.entries(al.slotHold || {})) {
+        let n = 0, warn = 0, wDay = 0;
+        for (const h of hs) {
+          if (!h.buy || !(h.n > 0) || h.until <= day) continue;
+          if (h.since === undefined) h.since = day;   // ältere Stände: Frist läuft ab heute
+          const age = day - h.since;
+          if (age >= S.days) { n += h.n; h.n = 0; }
+          else if (age >= S.days - S.warn && !h.warned) { h.warned = true; warn += h.n; wDay = h.since + S.days; }
+        }
+        if (warn) al.log(day, `Slots ${ap(apt).name}: ${warn} Slot${warn > 1 ? 's' : ''} der Reserve ${warn > 1 ? 'sind' : 'ist'} seit fast 6 Monaten ungenutzt – ohne Strecke ${warn > 1 ? 'gehen sie' : 'geht er'} am ${dayDE(wDay)} an den Flughafen zurück.`, 'warn');
+        if (n) {
+          const back = Math.round(this.slotPrice(apt) * n * P.RESTRUCT.slotPool), book = al.slotDivest(apt, n);
+          al.ledger.post('one_off', back - book, false, `Slots zurückgegeben (6 Monate ungenutzt) › ${aTag(apt)}`); al.ledger.cashOnly(back, 'slots_sale');
+          al.log(day, `Slots ${ap(apt).name}: ${n} ungenutzte${n > 1 ? '' : 'r'} Slot${n > 1 ? 's' : ''} nach 6 Monaten an den Flughafen zurückgegeben – Erstattung ${mioTxt(back)}.`, 'warn');
+        }
+        al.slotHold[apt] = hs.filter((h) => h.n > 0); if (!al.slotHold[apt].length) delete al.slotHold[apt];
+      }
     }
     sellSlots(al, apt, n) {
       const have = (al.slotHold[apt] || []).filter((h) => h.buy && h.until > this.day).reduce((s, h) => s + h.n, 0);
@@ -4648,7 +4680,7 @@ const SM = (() => {
     for (const h of w.humans) {
       if (h.status === 'insolvent' || !h.staff) continue;
       const st = h.staff, grudge = w.list.reduce((s, a) => s + ((a.grudge && a.grudge[h.id]) || 0), 0);
-      const acLv = h.academy && h.academy.pilot ? h.academy.pilot.lv || 0 : 0;
+      const acLv = acadLv(h, 'pilot');
       const p = (1 - 0.12 * acLv) * (0.05 + 1.4 * Math.max(0, (M.wage || 1) - st.pay) + 0.9 * Math.max(0, 0.6 - st.morale) + Math.min(0.3, grudge * 0.03)) * aggr * clamp(threatOf(w, h), 0.2, 1.4);
       if (r.random() < p) {
         const g = STAFF_GROUPS.slice().sort((a, b) => st.pil[b] - st.pil[a])[0];
@@ -6709,16 +6741,26 @@ const SM = (() => {
       case 'repayBond': return repayBond(w, al, String(a.id || ''));
       case 'poachCorp': return w.poachCorp(al, String(a.target || ''), String(a.apt || ''), num(a.budget));
       case 'academy': {
+        // mehrere Schulen je Bereich: id = vorhandene Schule, 'new' = neue Schule; ohne id (ältere Oberfläche): erste Schule
         if (!ACADEMY[a.role]) return { ok: false, msg: 'Unbekannte Akademie.' };
-        const lv = clamp(Math.round(num(a.level)), 0, ACADEMY_MAX[ACADEMY_MAX.length - 1]);
-        al.academy = al.academy || {};
-        const cur = al.academy[a.role] || { lv: 0, since: day };
-        if (lv > academyMax(al) && lv > (cur.lv || 0)) { const need = ACADEMY_MAX.findIndex((x) => x >= lv); return { ok: false, msg: `Stufe ${lv} gibt es ab der Phase „${CAREER.levels[need].label}“ – mit dem Wachstum wird die ${ACADEMY[a.role].label} größer.` }; }
+        const lv = clamp(Math.round(num(a.level)), 0, ACADEMY_MAX[ACADEMY_MAX.length - 1]), def = ACADEMY[a.role];
+        al.academy = al.academy || {}; const list = acadList(al, a.role); al.academy[a.role] = list;
+        let cur = a.id && a.id !== 'new' ? list.find((x) => x.id === a.id) : !a.id ? list[0] : null;
+        if (a.id && a.id !== 'new' && !cur) return { ok: false, msg: 'Diese Schule gibt es nicht (mehr).' };
+        if (lv > academyMax(al) && lv > ((cur && cur.lv) || 0)) { const need = ACADEMY_MAX.findIndex((x) => x >= lv); return { ok: false, msg: `Stufe ${lv} gibt es ab der Phase „${CAREER.levels[need].label}“ – mit dem Wachstum wird die ${def.label} größer.` }; }
+        if (!cur) {
+          if (!lv) return { ok: true };
+          if (list.length >= academyMax(al)) { const need = ACADEMY_MAX.findIndex((x) => x > list.length); return { ok: false, msg: `Mehr als ${list.length} ${list.length === 1 ? 'Schule' : 'Schulen'} dieser Art gibt es ${need >= 0 ? `ab der Phase „${CAREER.levels[need].label}“` : 'nicht'} – mit jeder Phase kommt eine dazu.` }; }
+          cur = { id: a.role[0].toUpperCase() + (1 + list.reduce((m, x) => Math.max(m, Number(String(x.id).slice(1)) || 0), 0)), lv: 0, since: day };
+          list.push(cur);
+        }
         if (a.role === 'pilot') { if (a.group && !STAFF_GROUPS.includes(a.group)) return { ok: false, msg: 'Ungültige Musterberechtigung.' }; cur.group = a.group || cur.group || STAFF_GROUPS.find((g) => al.fleet.some((x) => P.AIRCRAFT_TYPES[x.type_id].group === g)) || 'A32F'; }
         if (!cur.lv && lv) cur.since = day;
-        cur.lv = lv; al.academy[a.role] = cur;
-        al.log(day, lv ? `${ACADEMY[a.role].label}: Förderstufe ${lv} (${Math.round(ACADEMY[a.role].cost[lv] / 1000)} Tsd. EUR im Monat)` : `${ACADEMY[a.role].label}: Förderung beendet`, 'staff');
-        return { ok: true };
+        const name = `${def.label}${list.length > 1 || a.role === 'pilot' ? ` ${a.role === 'pilot' ? `(${P.TYPE_GROUPS[cur.group]})` : cur.id.slice(1)}` : ''}`;
+        if (!lv) { al.academy[a.role] = list.filter((x) => x !== cur); al.log(day, `${name}: Förderung beendet, Schule geschlossen`, 'staff'); return { ok: true, closed: true }; }
+        cur.lv = lv;
+        al.log(day, `${name}: Förderstufe ${lv} (${Math.round(def.cost[lv] / 1000)} Tsd. EUR im Monat)`, 'staff');
+        return { ok: true, id: cur.id };
       }
       case 'poach': return w.poach(al, a.target, a.role, a.group || null, num(a.n, 1), num(a.bonus));
       case 'poachExpert': return w.poachExpert(al, a.target, a.id, num(a.factor, 1.2));
@@ -6953,7 +6995,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;

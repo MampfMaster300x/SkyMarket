@@ -136,7 +136,7 @@ console.log('Chat ok:', ca.messages.map((m) => `${m.airline}${m.to ? ' (privat)'
 r = ok(await call('anna', 'POST', `/games/${g.id}/action`, { action: { type: 'academy', role: 'cabin', level: 1 } }), 'Akademie');
 assert.equal(r.ok, true, JSON.stringify(r));
 ws = JSON.parse(gunzipSync(Buffer.from((await call('anna', 'GET', `/games/${g.id}/state?v=a1`)).data)).toString());
-assert.equal(ws.airlines.find((a) => a.name === 'Hanse Air').academy.cabin.lv, 1);
+{ const ac = ws.airlines.find((a) => a.name === 'Hanse Air').academy.cabin; assert.equal(Array.isArray(ac) ? ac[0].lv : ac.lv, 1); }
 const lot = (ws.auctions || []).find((a) => !a.done);
 if (lot) {
   r = ok(await call('ben', 'POST', `/games/${g.id}/action`, { action: { type: 'bid', lot: lot.id, amount: lot.min * 1.2 } }), 'Gebot');
@@ -932,7 +932,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const x = SMx.applyAction(w, 'P1', { type: 'academy', role: 'pilot', level: 3, group: 'DH8' }); assert.ok(!x.ok && /Phase/.test(x.msg), x.msg);
   assert.ok(SMx.applyAction(w, 'P1', { type: 'academy', role: 'cabin', level: 1 }).ok);
   a.prog.lv = 4; assert.equal(SMx.academyMax(a), 5); assert.ok(SMx.applyAction(w, 'P1', { type: 'academy', role: 'cabin', level: 5 }).ok, 'Stufe 5 als Global Player');
-  a.academy.cabin.since = w.day - 100; const c0 = a.staff.cab; w.academyMonthly(a); assert.equal(a.staff.cab - c0, 38); assert.equal(a.staff.home.cab, 38);
+  a.academy.cabin[0].since = w.day - 100; const c0 = a.staff.cab; w.academyMonthly(a); assert.equal(a.staff.cab - c0, 38); assert.equal(a.staff.home.cab, 38);
   const hx = SMx.homeShares(a); assert.equal(hx.cab, 1);
   // Kündigungen: Eigene bleiben eher
   a.staff.cab = 400; a.staff.home.cab = 200; a.staff.morale = 0.3; SMx.homeShares(a);
@@ -1123,5 +1123,39 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const mine = w.slotWait.find((e) => e.al === 'P1'); assert.ok(SMx.applyAction(w, 'P1', { type: 'slotWaitLeave', id: mine.id }).ok, 'austragen'); assert.ok(!w.slotWait.some((e) => e.al === 'P1'), 'Eintrag weg');
   assert.ok(!SMx.applyAction(w, 'P1', { type: 'slotWaitLeave', id: w.slotWait[0].id }).ok, 'fremde Einträge nicht');
   console.log('0.21.31 ok: Warteliste austragen, kein Vorrang nach Zuteilung in der letzten Vergabe');
+}
+// 0.21.32: Ungenutzte Slots gehen nach 6 Monaten zurück (Warnung 30 Tage vorher, Erstattung wie bei der Rückgabe an den Flughafen)
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 99 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1'; a.ledger.equityFlow(2e8, 't');
+  for (let i = 0; i < 2; i++) w.step();
+  const apt = SMx.AP_CODES.find((c) => SMx.apx(c).slots !== null && w.slotsFree(c) >= 3 && c !== 'HAM');
+  const r = w.buySlots(a, apt, 2); assert.ok(r.ok, r.msg); const h0 = a.heldAt(apt, w.day); assert.equal(h0, 2);
+  const free0 = w.slotsFree(apt), hs = a.slotHold[apt].filter((h) => h.buy); assert.ok(hs.every((h) => h.since !== undefined), 'Reserve mit Datum');
+  for (const h of hs) h.since = w.day - (SMx.P.SLOT_IDLE.days - SMx.P.SLOT_IDLE.warn); w.slotIdleCheck(a);
+  assert.ok(a.events.some((e) => /seit fast 6 Monaten ungenutzt/.test(e.msg)) && a.heldAt(apt, w.day) === 2, 'Warnung 30 Tage vorher, Slots noch da');
+  for (const h of a.slotHold[apt]) if (h.buy) h.since = w.day - SMx.P.SLOT_IDLE.days; const c0 = a.ledger.cash; w.slotIdleCheck(a);
+  assert.equal(a.heldAt(apt, w.day), 0, 'nach 6 Monaten zurückgegeben'); assert.ok(a.ledger.cash > c0, 'mit Erstattung'); assert.equal(w.slotsFree(apt), free0 + 2, 'Slots wieder frei am Flughafen');
+  assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt');
+  // Strecke verbraucht die älteste Reserve zuerst
+  a.hold(apt, 1, 0, true); a.slotHold[apt][0].since = 5; a.hold(apt, 1, 0, true); a.slotHold[apt][1].since = 50; a.useHeld(apt, 1, w.day); assert.equal(a.slotHold[apt][0].since, 50, 'älteste Reserve zuerst verbraucht');
+  // ältere Stände ohne Datum: Frist beginnt mit dem Update
+  delete a.slotHold[apt][0].since; w.slotIdleCheck(a); assert.equal(a.slotHold[apt][0].since, w.day);
+  console.log('0.21.32 ok: ungenutzte Slots nach 6 Monaten zurück (Warnung 30 Tage vorher, Erstattung), älteste Reserve zuerst genutzt');
+}
+// 0.21.32: mehrere Schulen je Bereich (z. B. Flugschulen für verschiedene Musterberechtigungen)
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 103 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1'; a.ledger.equityFlow(2e8, 't');
+  const A = (x) => SMx.applyAction(w, 'P1', { type: 'academy', ...x });
+  assert.ok(A({ role: 'pilot', id: 'new', level: 1, group: 'DH8' }).ok, 'erste Flugschule');
+  const no = A({ role: 'pilot', id: 'new', level: 1, group: 'A32F' }); assert.ok(!no.ok && /Phase/.test(no.msg), 'Gründung: nur eine Schule je Bereich: ' + no.msg);
+  a.prog.lv = 2; assert.ok(A({ role: 'pilot', id: 'new', level: 2, group: 'A32F' }).ok && A({ role: 'pilot', id: 'new', level: 1, group: 'ATR' }).ok, 'Netzwerk: drei Flugschulen');
+  assert.ok(!A({ role: 'pilot', id: 'new', level: 1, group: 'EJET' }).ok, 'nicht mehr als drei');
+  const L = SMx.acadList(a, 'pilot'); assert.deepEqual(L.map((x) => x.group), ['DH8', 'A32F', 'ATR']); assert.equal(SMx.acadLv(a, 'pilot'), 2);
+  for (const x of L) x.since = w.day - 200; const p0 = { ...a.staff.pil }; w.academyMonthly(a);
+  assert.ok(a.staff.pil.DH8 - p0.DH8 === 2 && a.staff.pil.A32F - p0.A32F === 4 && a.staff.pil.ATR - p0.ATR === 2, 'jede Schule bildet für ihre Familie aus');
+  assert.ok(A({ role: 'pilot', id: L[2].id, level: 0 }).ok && SMx.acadList(a, 'pilot').length === 2, 'Schule schließen');
+  // ältere Stände (ein Objekt je Bereich) werden zur Liste
+  a.academy.cabin = { lv: 2, since: 5 }; const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); const c2 = SMx.acadList(w2.airlines.P1, 'cabin'); assert.ok(c2.length === 1 && c2[0].lv === 2 && c2[0].id, 'alter Stand übernommen');
+  console.log('0.21.32 ok: mehrere Schulen je Bereich (Netzwerk: 3), je Schule eigene Musterberechtigung, schließen, alte Stände übernommen');
 }
 console.log('Alle Prüfungen bestanden.');

@@ -6,7 +6,7 @@
 <meta name="description" content="SKYMARKET – Airline-Wirtschaftssimulation: Hauptwelt für alle und private Runden">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b400'/%3E%3Cpath d='M26 16 L20 14.5 L13 6 L10.5 6 L14 14.5 L8 14.5 L6 11.5 L4.5 11.5 L5.5 16 L4.5 20.5 L6 20.5 L8 17.5 L14 17.5 L10.5 26 L13 26 L20 17.5 L26 16Z' fill='%231a1400'/%3E%3C/svg%3E">
 <style>[hidden]{display:none!important}</style>
-<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.31";</script>
+<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.32";</script>
 <title>Skymarket</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -269,7 +269,7 @@ nav.tabs .dot { position: absolute; top: 1px; right: 1px; width: 7px; height: 7p
 .plane circle { fill: transparent; }
 .plane.me circle { fill: color-mix(in srgb, var(--plane) 16%, transparent); stroke: var(--plane); stroke-width: .8; stroke-opacity: .75; vector-effect: non-scaling-stroke; }
 .map-legend { position: absolute; left: 12px; bottom: 12px; background: var(--panel-glass); backdrop-filter: blur(8px);
-  border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 11.5px; color: var(--ink-2); max-width: calc(100% - 210px); }
+  border: 1px solid var(--line); border-radius: 16px; padding: 7px 14px; font-size: 11.5px; color: var(--ink-2); max-width: calc(100% - 210px); }
 .map-legend .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .map-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
 .map-legend i.ring { background: none; border: 2px dashed; }
@@ -352,15 +352,17 @@ p { margin: 0; }
 .tile b { font: 500 15px/1.25 var(--f-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .tile em { font-style: normal; font-size: 11px; color: var(--ink-3); }
 .pos, .tile .pos { color: var(--good); } .neg, .tile .neg { color: var(--crit); } .warnc { color: var(--warn); }
-.btn { border: 1px solid var(--line-2); background: transparent; border-radius: 999px; padding: 7px 14px; font-weight: 500; font-size: 12.5px; }
+.btn { border: 1px solid var(--line-2); background: transparent; border-radius: 18px; padding: 7px 14px; font-weight: 500; font-size: 12.5px; line-height: 1.35; text-wrap-style: balance; }
 .btn:hover { border-color: var(--ink-3); background: var(--panel-2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
 .btn.danger { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, var(--line-2)); }
-.btn.small { padding: 4px 11px; font-size: 12px; }
+.btn.small { padding: 4px 11px; font-size: 12px; border-radius: 14px; }
+.btn .btn-sub { display: block; font-size: 10.5px; font-weight: 500; opacity: .8; font-family: var(--f-body); white-space: nowrap; }
+.btn:has(.btn-sub) { line-height: 1.25; padding-top: 4px; padding-bottom: 4px; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
-.seg { display: inline-flex; background: var(--panel-2); border-radius: 999px; padding: 3px; gap: 2px; flex-wrap: wrap; }
-.seg button { border: 0; background: transparent; padding: 5px 11px; font-size: 12px; color: var(--ink-2); border-radius: 999px; }
+.seg { display: inline-flex; background: var(--panel-2); border-radius: 16px; padding: 3px; gap: 2px; flex-wrap: wrap; max-width: 100%; }
+.seg button { border: 0; background: transparent; padding: 5px 11px; font-size: 12px; line-height: 1.35; color: var(--ink-2); border-radius: 13px; text-wrap-style: balance; }
 .seg button:hover { color: var(--ink); }
 .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); font-weight: 600; }
 .seg.wrap { flex-wrap: wrap; }
@@ -385,6 +387,9 @@ input[type="number"] { font-family: var(--f-mono); }
 input[type="checkbox"] { accent-color: var(--accent); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+/* Formularzeilen mit Auswahlfeldern: lieber umbrechen als den gewählten Text abschneiden */
+.grid2:has(> label.f > select) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.grid3:has(> label.f > select) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
 .card { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
 .card.pad { padding: 14px; }
 .callout { border-radius: var(--r); padding: 10px 12px; font-size: 12.5px; display: grid; gap: 4px; background: var(--panel-2); }
@@ -392,8 +397,8 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .callout.crit { background: var(--crit-soft); box-shadow: inset 3px 0 0 var(--crit); }
 .callout.good { background: var(--good-soft); box-shadow: inset 3px 0 0 var(--good); }
 .callout.info { box-shadow: inset 3px 0 0 var(--ink-3); }
-.chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 99px; padding: 2px 8px; font-size: 11px; font-weight: 500; background: var(--panel-2); color: var(--ink-2); white-space: nowrap; }
-.chip-t { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 6px 12px; font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: transparent; color: var(--ink-3); cursor: pointer; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink-3) 60%, transparent); }
+.chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 500; background: var(--panel-2); color: var(--ink-2); white-space: nowrap; }
+.chip-t { display: inline-flex; align-items: center; gap: 6px; border-radius: 16px; padding: 6px 12px; font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: transparent; color: var(--ink-3); cursor: pointer; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink-3) 60%, transparent); }
 .chip-t[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); text-decoration: none; }
 .chip-t[aria-pressed="true"]::before { content: '✓'; font-weight: 700; color: var(--accent-ink); }
 details.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -409,6 +414,9 @@ table.t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 table.t th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 11px; padding: 5px 6px; border-bottom: 1px solid var(--line); }
 table.t td { padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 table.t td.r, table.t th.r { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.t th.r { white-space: normal; font-family: var(--f-body); } table.t td.r.wrap { white-space: normal; } table.t td.r.wrap .btn { white-space: nowrap; }
+table.t td.chips { min-width: 48px; } table.t.pnl td:first-child b { white-space: normal; } table.t.usedmkt td:first-child b, table.t.usedmkt td:first-child .acl { white-space: normal; } table.t td .chip { white-space: normal; }
+.kbar { white-space: nowrap; } td.r .kbar { display: flex; justify-content: flex-end; margin: 3px 0 0; } table.t td.chips .chip { margin: 1px 0; }
 table.t tr.sum td { font-weight: 600; border-top: 1px solid var(--line-2); }
 table.t tr.grp td { color: var(--ink-3); font-size: 11px; font-weight: 600; padding-top: 12px; border-bottom: 0; }
 table.t.pnl tr.pnl-x { cursor: pointer; }
@@ -438,13 +446,24 @@ table.t td b { white-space: nowrap; }
 .kbar i { width: 6px; height: 10px; border-radius: 2px; background: var(--panel-2); border: 1px solid var(--line-2); }
 .kbar i.on { background: var(--accent); border-color: var(--accent); }
 .callout.know { display: block; }
+.phwrap { container-type: inline-size; display: grid; gap: 6px; }
 .phases { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.ph-cap { display: none; color: var(--ink-2); }
+@container (max-width: 450px) { .phases .ph span { display: none; } .ph-cap { display: block; } }
 .phases .ph { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--ink-3); text-align: center; }
 .phases .ph i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line-2); font-weight: 700; color: var(--ink-2); }
 .phases .ph.done i { background: var(--good); border-color: var(--good); color: #fff; }
 .phases .ph.cur i { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .phases .ph.cur span { color: var(--ink); font-weight: 600; }
-.pchecks { display: grid; gap: 6px; align-content: start; }
+.acad-school { display: grid; gap: 8px; padding: 10px 0 4px; border-top: 1px solid var(--line); }
+.lvgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 6px; }
+.lvgrid button { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: var(--r); padding: 7px 10px; text-align: left; display: grid; gap: 1px; font-size: 12px; min-width: 0; line-height: 1.3; }
+.lvgrid button b { font-size: 12.5px; } .lvgrid button span { color: var(--ink-2); font-variant-numeric: tabular-nums; } .lvgrid button em { font-style: normal; font-size: 11px; color: var(--ink-3); }
+.lvgrid button:not(:disabled):hover { border-color: var(--ink-3); }
+.lvgrid button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.lvgrid button:disabled { opacity: .5; cursor: not-allowed; }
+.acad-foot { display: flex; gap: 6px 10px; flex-wrap: wrap; align-items: center; padding-top: 8px; border-top: 1px solid var(--line); }
+.pchecks { display: grid; gap: 6px; align-content: start; container-type: inline-size; min-width: 0; }
 .career .card { align-content: start; }
 .grid2 > .card.stack { align-content: start; }
   .rsbtns { flex-wrap: wrap; } .rsbtns .btn { height: auto; min-height: 32px; white-space: normal; text-align: left; line-height: 1.3; padding-top: 6px; padding-bottom: 6px; }
@@ -458,6 +477,7 @@ table.t td b { white-space: nowrap; }
 @media (max-width: 640px) { .stk-row { grid-template-columns: minmax(0, 1fr) auto; } .stk-act { grid-column: 1 / -1; justify-content: flex-start; } .stk-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .pchecks .pc { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 8px; align-items: center; font-size: 12px; }
 .pchecks .pc b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+@container (max-width: 380px) { .pchecks .pc { grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; } .pchecks .pc b { white-space: normal; text-align: right; } .pchecks .pc .bar { grid-column: 1 / -1; order: 3; } }
 .pchecks .pc.ok span { color: var(--good); }
 @media (max-width: 520px) { .pchecks .pc { grid-template-columns: 1fr auto; } .pchecks .pc .bar { grid-column: 1 / -1; order: 3; } .phases .ph span { font-size: 9.5px; } }
 .cand { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 4px; }
@@ -593,7 +613,7 @@ table.t td b { white-space: nowrap; }
 /* Durchsuchbare Auswahl */
 select.picked { display: none !important; }
 .pick-btn { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; text-align: left; color: var(--ink); cursor: pointer; }
-.pick-btn > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-btn > span { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
 .pick-btn svg { width: 16px; height: 16px; flex: none; stroke: var(--ink-3); fill: none; stroke-width: 2; }
 .pick-btn:hover { border-color: var(--ink-3); } .pick-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pick-btn:disabled { opacity: .55; cursor: default; }
@@ -863,7 +883,7 @@ input[type="password"] { border: 1px solid var(--line-2); background: var(--pane
 .basepick button span { font-size: 11px; color: var(--ink-3); }
 .basepick button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--panel);
-  padding: 9px 16px; border-radius: 999px; font-size: 12.5px; z-index: 60; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+  padding: 9px 16px; border-radius: 18px; font-size: 12.5px; z-index: 60; box-shadow: var(--shadow); max-width: calc(100% - 32px); text-wrap-style: balance; text-align: center; }
 .spark { width: 100%; height: 70px; display: block; }
 @media (max-width: 900px) { .plane-card { width: auto; right: 12px; top: auto; bottom: 12px; } .map-legend { max-width: calc(100% - 24px); } }
 @media (max-width: 600px) { .map-legend { display: none; } .plane-card .acv { display: none; } }
@@ -1189,6 +1209,8 @@ nav.main .lbs { display: none; }
   .thumb { width: 76px; }
 
   .btn { min-height: 36px; } .btn.small { min-height: 32px; padding-left: 12px; padding-right: 12px; }
+  table.t.usedmkt thead { display: none; } table.t.usedmkt tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 10px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+  table.t.usedmkt td { border-bottom: 0; padding: 2px 0; } table.t.usedmkt td:first-child { grid-column: 1 / -1; } table.t.usedmkt td:nth-child(2) { text-align: left !important; }
   .pane input:not([type=checkbox]):not([type=radio]):not([type=range]), .pane select, .pane textarea, .dialog input, .dialog select, .dialog textarea { font-size: 16px; }
 
   .modal { place-items: end stretch; padding: 0; }
@@ -1687,6 +1709,8 @@ const SM = (() => {
     LEASE_BUY: { endDisc: 0.95 },
     // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
     BASE_MAX: 4,
+    // 0.21.32: Ungenutzte Slots (Reserve) gehen nach 6 Monaten an den Flughafen zurück – Erstattung wie bei „Reserve zurückgeben“ (Slotpreis × 0,5); Warnung 30 Tage vorher
+    SLOT_IDLE: { days: 183, warn: 30 },
     // 0.21.28: Warteliste – ab der Vergabe am 1. April 2028 (Tag 455) höchstens 3 Einträge je Airline; Vorrang nach Slot-Rating
     // (Flotte, Slots im Besitz, Eigenkapital, Ergebnis seit der letzten Vergabe – je ein Viertel, gemessen am Größten im Spiel)
     WAIT: { from: 455, max: 3, maxOld: 12, w: { fleet: 0.25, slots: 0.25, equity: 0.25, profit: 0.25 } },
@@ -2678,11 +2702,11 @@ const SM = (() => {
     }
     // Slot-Reserve: freigewordene Slots an koordinierten Flughäfen bleiben eine Zeit lang bei der Airline (handelbar, wiederverwendbar)
     heldAt(apt, day) { return (this.slotHold[apt] || []).reduce((s, h) => s + (h.until > day ? h.n : 0), 0); }
-    hold(apt, n, until, buy = false) { if (!(n > 0) || !P.AIRPORTS[apt] || apx(apt).slots === null) return; (this.slotHold[apt] = this.slotHold[apt] || []).push(buy ? { n, until: 1e9, buy: true } : { n, until }); }
+    hold(apt, n, until, buy = false) { if (!(n > 0) || !P.AIRPORTS[apt] || apx(apt).slots === null) return; (this.slotHold[apt] = this.slotHold[apt] || []).push(buy ? { n, until: 1e9, buy: true, since: this._day } : { n, until }); }   // ohne Tagesangabe setzt slotIdleCheck den heutigen Tag
     /** Frei gewordene Slots: Spielende haben sie bezahlt und behalten sie (Reserve, Slotgebühr läuft weiter, Rückgabe zum halben Preis). */
     release(apt, n, day) { if (this.isPlayer) this.hold(apt, n, 0, true); else this.hold(apt, n, day + SLOT_HOLD_DAYS); }
     useHeld(apt, n, day) {
-      let left = n; const lst = (this.slotHold[apt] || []).filter((h) => h.until > day).sort((a, b) => a.until - b.until);
+      let left = n; const lst = (this.slotHold[apt] || []).filter((h) => h.until > day).sort((a, b) => a.until - b.until || (a.since ?? 0) - (b.since ?? 0));   // älteste Reserve zuerst
       for (const h of lst) { const k = Math.min(h.n, left); h.n -= k; left -= k; if (!left) break; }
       this.slotHold[apt] = lst.filter((h) => h.n > 0); if (!this.slotHold[apt].length) delete this.slotHold[apt];
       return n - left;
@@ -2952,6 +2976,15 @@ const SM = (() => {
   };
   /** Höchste Akademiestufe je Wachstumsphase: Gründung 1, Regional 2, Netzwerk 3, Interkontinental 4, Global Player 5. */
   const ACADEMY_MAX = [1, 2, 3, 4, 5];
+  /** Schulen je Bereich (0.21.32: mehrere Schulen/Klassen; ältere Stände: ein Objekt je Bereich). */
+  function acadList(al, role) {
+    const A = al && al.academy; if (!A || !A[role]) return [];
+    if (!Array.isArray(A[role])) { const x = A[role]; A[role] = x.lv ? [{ id: role[0].toUpperCase() + '1', ...x }] : []; }
+    return A[role];
+  }
+  const acadAll = (al) => Object.keys(ACADEMY).flatMap((r) => acadList(al, r));
+  /** Höchste Förderstufe eines Bereichs (für den Abwerbeschutz). */
+  const acadLv = (al, role) => acadList(al, role).reduce((m, x) => Math.max(m, x.lv || 0), 0);
   function academyMax(al) { const lv = al && al.prog ? clamp(al.prog.lv | 0, 0, ACADEMY_MAX.length - 1) : ACADEMY_MAX.length - 1; return ACADEMY_MAX[lv]; }
   /** Eigener Nachwuchs: Zahl der Akademie-Absolventen je Bereich (nie mehr als Beschäftigte) und Anteile. */
   function homeOf(st) { return st.home || (st.home = { pil: 0, cab: 0, tech: 0 }); }
@@ -3006,7 +3039,7 @@ const SM = (() => {
     { id: 'equity2', label: 'Wert verdoppelt', desc: 'Eigenkapital doppelt so hoch wie zum Start.', pts: 70, brand: 0.02, test: (c) => c.bs.equity >= 2 * c.al.ledger.equityContrib / 100 },
     { id: 'alliance', label: 'Partner gefunden', desc: 'Codeshare oder Allianz geschlossen.', pts: 15, brand: 0.01, test: (c) => c.w.coopsOf(c.al.id).length > 0 },
     { id: 'auction', label: 'Erstkunde', desc: 'Eine Auktion um Lieferpositionen gewonnen.', pts: 20, brand: 0.01, test: (c) => (c.w.auctions || []).some((a) => a.winners && a.winners.includes(c.al.id)) },
-    { id: 'academy', label: 'Eigener Nachwuchs', desc: 'Eine Akademie gefördert.', pts: 15, test: (c) => c.al.academy && Object.values(c.al.academy).some((x) => x.lv > 0) },
+    { id: 'academy', label: 'Eigener Nachwuchs', desc: 'Eine Akademie gefördert.', pts: 15, test: (c) => acadAll(c.al).some((x) => x.lv > 0) },
     { id: 'pax50m', label: '50 Millionen Passagiere', desc: 'Eine der Großen.', pts: 90, brand: 0.03, test: (c) => c.pax >= 5e7 },
     { id: 'fleet100', label: 'Hundert Flugzeuge', desc: '100 Flugzeuge – ab hier wird die Verwaltung zum eigenen Gegner.', pts: 80, brand: 0.02, test: (c) => c.al.fleet.length >= 100 },
     { id: 'fleet250', label: 'Weltkonzern', desc: '250 Flugzeuge.', pts: 120, brand: 0.03, test: (c) => c.al.fleet.length >= 250 },
@@ -3658,7 +3691,7 @@ const SM = (() => {
       // Leasinggeber füllen ihren Bestand nur langsam auf
       for (const [k, t] of Object.entries(P.AIRCRAFT_TYPES)) { if (t.launch && day < t.launch + 365) continue; const cap = capOf(this, k); this.lessorStock[k] = Math.min(cap, (this.lessorStock[k] ?? cap) + Math.ceil(cap * 0.4)); }
       // Akademien entlasten den Arbeitsmarkt
-      const acad = this.humans.reduce((s, h) => s + (h.academy ? Object.values(h.academy).reduce((t, x) => t + (x.lv || 0), 0) : 0), 0);
+      const acad = this.humans.reduce((s, h) => s + acadAll(h).reduce((t, x) => t + (x.lv || 0), 0), 0);
       M.laborTight = Math.max(1, M.laborTight - 0.01 * acad);
       { const F = this.laborFree || (this.laborFree = { pilot: 0, cabin: 0, tech: 0 });
         for (const r of ['pilot', 'cabin', 'tech']) { const took = Math.max(0, (L[r] || 0) - laborBase(this, r).base); F[r] = Math.floor(Math.max(0, (F[r] || 0) - took) * P.LABOR_FREE.decay); } }
@@ -4084,7 +4117,7 @@ const SM = (() => {
       // Warteliste: Vergabe nur zu festen Terminen (1. April, 1. Oktober) – siehe monthEnd; ein verpasster Termin wird hier nachgeholt. Pläne mit vollständigen Slots werden umgesetzt.
       { const due = lastSlotDue(this.day); if (this.slotRoundDay === undefined) this.slotRoundDay = due; else if (this.slotRoundDay < due) this.slotRound(due); }
       for (const al of this.humans) if (al.status !== 'insolvent' && al.plans && al.plans.length) this.checkPlans(al);
-      for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.completeDaily(al);
+      for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') { this.completeDaily(al); this.slotIdleCheck(al); }
       expireDeals(this);
       const day = this.day, month = monthOf(day), dow = day % 7, cpi = this.macro.cpi;
       this.dailyEvents();
@@ -4711,10 +4744,10 @@ const SM = (() => {
     academyMonthly(al) {
       const A = al.academy; if (!A) { if (al.staff) homeShares(al); return; }
       const cpi = this.macro.cpi;
-      for (const [role, x] of Object.entries(A)) {
+      for (const [role, x] of Object.keys(ACADEMY).flatMap((r) => acadList(al, r).map((y) => [r, y]))) {
         if (!x.lv) continue;
         const def = ACADEMY[role];
-        al.ledger.post('staff_extra', -def.cost[x.lv] * cpi, true, `Akademie › ${def.label || role}`);
+        al.ledger.post('staff_extra', -def.cost[x.lv] * cpi, true, `Akademie › ${def.label || role}${role === 'pilot' && x.group ? ` (${P.TYPE_GROUPS[x.group]})` : ''}`);
         if (this.day - x.since < def.ramp) continue;
         const n = def.out[x.lv];
         if (role === 'pilot') al.staff.pil[x.group] += n; else if (role === 'cabin') al.staff.cab += n; else al.staff.tech += n;
@@ -4917,7 +4950,7 @@ const SM = (() => {
       if (have <= 0) return { ok: false, msg: `${T.name} hat keine ${roleLabel(role, group)}.` };
       const sal = (role === 'pilot' ? S.pilotSalary[group] : role === 'cabin' ? S.cabinSalary : S.techSalary) * (this.macro.wage || 1) * this.macro.cpi;
       const theirPay = T.staff ? T.staff.pay : 1 + ({ premium: 0.06, lcc: -0.04 }[T.archetype] || 0), theirMorale = T.staff ? T.staff.morale : 0.62;
-      const acLv = T.academy && T.academy[role] ? T.academy[role].lv || 0 : 0;
+      const acLv = acadLv(T, role);
       const p = clamp((0.12 + 0.9 * (al.staff.pay - theirPay) + 0.35 * Math.min(1, bonus / (sal * 3)) + 0.8 * Math.max(0, 0.65 - theirMorale)) * (1 - 0.12 * acLv), 0.03, 0.85);
       let taken = 0; for (let i = 0; i < Math.min(n, have); i++) if (r.random() < p) taken++;
       const cost = taken * bonus + n * S.recruit[role] * 0.4 * this.macro.cpi;
@@ -5473,10 +5506,31 @@ const SM = (() => {
       const price = this.slotBuyPrice(apt, n);
       if (al.spendable(this.macro.bank ?? 1) < price) return { ok: false, msg: `${n} Slots kosten ${Math.round(price / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
       al.slotInvest(apt, price, n);
-      (al.slotHold[apt] = al.slotHold[apt] || []).push({ n, until: 1e9, buy: true });
+      (al.slotHold[apt] = al.slotHold[apt] || []).push({ n, until: 1e9, buy: true, since: this.day });
       al.log(this.day, `${n} Slot${n === 1 ? '' : 's'} in ${ap(apt).name} gekauft (${Math.round(price / 1000)} Tsd. EUR)${this.slotsFree(apt) <= 0 ? ' – der Flughafen ist jetzt voll, ohne Sie kommt dort niemand mehr dazu' : ''}`, 'route');
       if (w_isMulti(this) || this.slotsFree(apt) <= 0) this.pushNews(this.day, `${al.name} kauft ${n} Slots in ${ap(apt).name}${this.slotsFree(apt) <= 0 ? ' – keine freien Slots mehr' : ''}`, 'ai', al.id);
       return { ok: true, n, price };
+    }
+    /** Täglich: Reserve-Slots, die 6 Monate ungenutzt sind, gehen an den Flughafen zurück (Erstattung wie bei der freiwilligen Rückgabe an den Flughafen). */
+    slotIdleCheck(al) {
+      const day = this.day, S = P.SLOT_IDLE;
+      for (const [apt, hs] of Object.entries(al.slotHold || {})) {
+        let n = 0, warn = 0, wDay = 0;
+        for (const h of hs) {
+          if (!h.buy || !(h.n > 0) || h.until <= day) continue;
+          if (h.since === undefined) h.since = day;   // ältere Stände: Frist läuft ab heute
+          const age = day - h.since;
+          if (age >= S.days) { n += h.n; h.n = 0; }
+          else if (age >= S.days - S.warn && !h.warned) { h.warned = true; warn += h.n; wDay = h.since + S.days; }
+        }
+        if (warn) al.log(day, `Slots ${ap(apt).name}: ${warn} Slot${warn > 1 ? 's' : ''} der Reserve ${warn > 1 ? 'sind' : 'ist'} seit fast 6 Monaten ungenutzt – ohne Strecke ${warn > 1 ? 'gehen sie' : 'geht er'} am ${dayDE(wDay)} an den Flughafen zurück.`, 'warn');
+        if (n) {
+          const back = Math.round(this.slotPrice(apt) * n * P.RESTRUCT.slotPool), book = al.slotDivest(apt, n);
+          al.ledger.post('one_off', back - book, false, `Slots zurückgegeben (6 Monate ungenutzt) › ${aTag(apt)}`); al.ledger.cashOnly(back, 'slots_sale');
+          al.log(day, `Slots ${ap(apt).name}: ${n} ungenutzte${n > 1 ? '' : 'r'} Slot${n > 1 ? 's' : ''} nach 6 Monaten an den Flughafen zurückgegeben – Erstattung ${mioTxt(back)}.`, 'warn');
+        }
+        al.slotHold[apt] = hs.filter((h) => h.n > 0); if (!al.slotHold[apt].length) delete al.slotHold[apt];
+      }
     }
     sellSlots(al, apt, n) {
       const have = (al.slotHold[apt] || []).filter((h) => h.buy && h.until > this.day).reduce((s, h) => s + h.n, 0);
@@ -5936,7 +5990,7 @@ const SM = (() => {
     for (const h of w.humans) {
       if (h.status === 'insolvent' || !h.staff) continue;
       const st = h.staff, grudge = w.list.reduce((s, a) => s + ((a.grudge && a.grudge[h.id]) || 0), 0);
-      const acLv = h.academy && h.academy.pilot ? h.academy.pilot.lv || 0 : 0;
+      const acLv = acadLv(h, 'pilot');
       const p = (1 - 0.12 * acLv) * (0.05 + 1.4 * Math.max(0, (M.wage || 1) - st.pay) + 0.9 * Math.max(0, 0.6 - st.morale) + Math.min(0.3, grudge * 0.03)) * aggr * clamp(threatOf(w, h), 0.2, 1.4);
       if (r.random() < p) {
         const g = STAFF_GROUPS.slice().sort((a, b) => st.pil[b] - st.pil[a])[0];
@@ -7997,16 +8051,26 @@ const SM = (() => {
       case 'repayBond': return repayBond(w, al, String(a.id || ''));
       case 'poachCorp': return w.poachCorp(al, String(a.target || ''), String(a.apt || ''), num(a.budget));
       case 'academy': {
+        // mehrere Schulen je Bereich: id = vorhandene Schule, 'new' = neue Schule; ohne id (ältere Oberfläche): erste Schule
         if (!ACADEMY[a.role]) return { ok: false, msg: 'Unbekannte Akademie.' };
-        const lv = clamp(Math.round(num(a.level)), 0, ACADEMY_MAX[ACADEMY_MAX.length - 1]);
-        al.academy = al.academy || {};
-        const cur = al.academy[a.role] || { lv: 0, since: day };
-        if (lv > academyMax(al) && lv > (cur.lv || 0)) { const need = ACADEMY_MAX.findIndex((x) => x >= lv); return { ok: false, msg: `Stufe ${lv} gibt es ab der Phase „${CAREER.levels[need].label}“ – mit dem Wachstum wird die ${ACADEMY[a.role].label} größer.` }; }
+        const lv = clamp(Math.round(num(a.level)), 0, ACADEMY_MAX[ACADEMY_MAX.length - 1]), def = ACADEMY[a.role];
+        al.academy = al.academy || {}; const list = acadList(al, a.role); al.academy[a.role] = list;
+        let cur = a.id && a.id !== 'new' ? list.find((x) => x.id === a.id) : !a.id ? list[0] : null;
+        if (a.id && a.id !== 'new' && !cur) return { ok: false, msg: 'Diese Schule gibt es nicht (mehr).' };
+        if (lv > academyMax(al) && lv > ((cur && cur.lv) || 0)) { const need = ACADEMY_MAX.findIndex((x) => x >= lv); return { ok: false, msg: `Stufe ${lv} gibt es ab der Phase „${CAREER.levels[need].label}“ – mit dem Wachstum wird die ${def.label} größer.` }; }
+        if (!cur) {
+          if (!lv) return { ok: true };
+          if (list.length >= academyMax(al)) { const need = ACADEMY_MAX.findIndex((x) => x > list.length); return { ok: false, msg: `Mehr als ${list.length} ${list.length === 1 ? 'Schule' : 'Schulen'} dieser Art gibt es ${need >= 0 ? `ab der Phase „${CAREER.levels[need].label}“` : 'nicht'} – mit jeder Phase kommt eine dazu.` }; }
+          cur = { id: a.role[0].toUpperCase() + (1 + list.reduce((m, x) => Math.max(m, Number(String(x.id).slice(1)) || 0), 0)), lv: 0, since: day };
+          list.push(cur);
+        }
         if (a.role === 'pilot') { if (a.group && !STAFF_GROUPS.includes(a.group)) return { ok: false, msg: 'Ungültige Musterberechtigung.' }; cur.group = a.group || cur.group || STAFF_GROUPS.find((g) => al.fleet.some((x) => P.AIRCRAFT_TYPES[x.type_id].group === g)) || 'A32F'; }
         if (!cur.lv && lv) cur.since = day;
-        cur.lv = lv; al.academy[a.role] = cur;
-        al.log(day, lv ? `${ACADEMY[a.role].label}: Förderstufe ${lv} (${Math.round(ACADEMY[a.role].cost[lv] / 1000)} Tsd. EUR im Monat)` : `${ACADEMY[a.role].label}: Förderung beendet`, 'staff');
-        return { ok: true };
+        const name = `${def.label}${list.length > 1 || a.role === 'pilot' ? ` ${a.role === 'pilot' ? `(${P.TYPE_GROUPS[cur.group]})` : cur.id.slice(1)}` : ''}`;
+        if (!lv) { al.academy[a.role] = list.filter((x) => x !== cur); al.log(day, `${name}: Förderung beendet, Schule geschlossen`, 'staff'); return { ok: true, closed: true }; }
+        cur.lv = lv;
+        al.log(day, `${name}: Förderstufe ${lv} (${Math.round(def.cost[lv] / 1000)} Tsd. EUR im Monat)`, 'staff');
+        return { ok: true, id: cur.id };
       }
       case 'poach': return w.poach(al, a.target, a.role, a.group || null, num(a.n, 1), num(a.bonus));
       case 'poachExpert': return w.poachExpert(al, a.target, a.id, num(a.factor, 1.2));
@@ -8241,7 +8305,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 
@@ -10118,9 +10182,9 @@ VIEWS.fleetBuy = function viewFleetBuy() {
   html += auctionsHtml();
   const cash = pl.spendable(W.macro.bank ?? 1);
   if (pl.bases.length > 1) html += `<label class="f"><span>Stationieren in</span><select id="acq-base">${pl.bases.map((b) => `<option ${b === base ? 'selected' : ''}>${b}</option>`).join('')}</select></label>`;
-  const btn = (id, mode, label, offer = null, primary = false) => { const need = acquireCost(id, mode, offer); const ok = cash >= need; return `<button class="btn small${primary ? ' primary' : ''}" data-act="acquire" data-type="${id}" data-mode="${mode}"${offer ? ` data-offer="${offer.id}"` : ''} ${ok ? '' : 'disabled'} title="${ok ? `sofort ${eur(need)}${need > pl.ledger.cash / 100 ? ' – geht in den Dispo' : ''}` : 'Auch mit Dispo fehlen ' + eur(need - cash)}">${label} · ${need > 0 ? `sofort ${eurB(need)}` : 'ohne Anzahlung'}</button>`; };
-  html += `<div class="stack"><h2 class="sec">Gebrauchtmarkt <small>wechselt monatlich</small></h2><div class="tw"><table class="t"><thead><tr><th>Typ</th><th class="r">Alter · Zustand</th><th class="r">Konditionen</th><th></th></tr></thead><tbody>
-    ${W.acMarket.slice().sort((a, b) => a.type.localeCompare(b.type) || a.age - b.age).map((o) => `<tr><td><b>${tlx(o.type)}</b>${o.from ? ` <span class="chip warn" title="Aus einer Insolvenz – deutlich unter Marktpreis">aus der Insolvenz von ${esc(o.from)}</span>` : ''}<div class="small muted">Angebot bis ${dateShort(o.expires)} · Lieferung ${o.delivery} T.</div></td><td style="text-align:right"><span class="mono">${o.age} J.</span><div>${condInfo(o)}</div></td>
+  const btn = (id, mode, label, offer = null, primary = false) => { const need = acquireCost(id, mode, offer); const ok = cash >= need; return `<button class="btn small${primary ? ' primary' : ''}" data-act="acquire" data-type="${id}" data-mode="${mode}"${offer ? ` data-offer="${offer.id}"` : ''} ${ok ? '' : 'disabled'} title="${ok ? `sofort ${eur(need)}${need > pl.ledger.cash / 100 ? ' – geht in den Dispo' : ''}` : 'Auch mit Dispo fehlen ' + eur(need - cash)}">${label}<span class="btn-sub">${need > 0 ? `sofort ${eurB(need)}` : 'ohne Anzahlung'}</span></button>`; };
+  html += `<div class="stack"><h2 class="sec">Gebrauchtmarkt <small>wechselt monatlich</small></h2><div class="tw"><table class="t usedmkt"><thead><tr><th>Typ · Alter · Zustand</th><th class="r">Konditionen</th><th></th></tr></thead><tbody>
+    ${W.acMarket.slice().sort((a, b) => a.type.localeCompare(b.type) || a.age - b.age).map((o) => `<tr><td><b>${tlx(o.type)}</b>${o.from ? ` <span class="chip warn" title="Aus einer Insolvenz – deutlich unter Marktpreis">aus der Insolvenz von ${esc(o.from)}</span>` : ''}<div class="small"><span class="mono">${o.age} J.</span> · ${condInfo(o)}</div><div class="small muted">Angebot bis ${dateShort(o.expires)} · Lieferung ${o.delivery} T.</div></td>
       <td style="text-align:right">${(() => { const f = pl.oldAcFactor(o.age), v = o.kind === 'lease' ? o.lease_month : o.price; return `<b class="mono">${eur(v * f)}${o.kind === 'lease' ? '/Mon.' : ''}</b><div class="small muted">${o.kind === 'lease' ? 'Leasing 36 M.' : 'Kauf'}${f < 1 ? ` · <span class="pos" title="statt ${eur(v)}">Luis −10 %</span>` : ''}</div>`; })()}</td>
       <td class="r">${btn(o.type, o.kind === 'lease' ? 'lease' : 'buy', o.kind === 'lease' ? 'Leasen' : 'Kaufen', o)}</td></tr>`).join('')}
   </tbody></table></div><p class="small muted">Leasingraten sind in US-Dollar vereinbart: Fällt der Euro, wird das Leasing teurer. Der Zustand gebrauchter Flugzeuge ist verborgen: Verbrauchte Maschinen verhalten sich wie deutlich ältere. ${pl.oldAcExpert() ? 'Luis Perez begutachtet jedes Angebot ab 8 Jahren.' : 'Ein Gutachter wie Luis Perez (Unternehmen → Personal) sieht ihn genau, Ihre Technik ab Senior grob.'}</p></div>`;
@@ -10589,11 +10653,10 @@ VIEWS.strategy = function viewStrategy() {
     let tr = 0, dem = 0, n = 0; for (const r of rs) { const h = r.hist.slice(-30); tr += h.reduce((a, x) => a + (x.tr_out || 0) + (x.tr_in || 0), 0); dem += h.reduce((a, x) => a + (x.trd || 0), 0); n = Math.max(n, h.length); }
     const trd = n ? tr / n / 2 : 0, want = n ? Math.max(tr, dem) / n / 2 : 0;
     const TR = P.TRANSFER, nLong = rs.filter((r) => r.role !== 'local' && SM.gcDistanceKm(r.base, r.dest) > 4000).length, attr = Math.min(TR.attrMax, TR.attrPerLong * nLong), conn = Math.max(0.6, TR.connH - TR.connHPerLv * hl);
-    return `<tr><td><b class="mono">${B}</b> <span class="small muted">${esc(apName(B))}</span><div class="small muted" title="Viele Langstreckenziele machen ein Drehkreuz für Umsteiger attraktiver; jede Ausbaustufe verkürzt die Umsteigezeit.">Attraktivität +${pct(attr)} (${nLong} Langstrecke${nLong === 1 ? '' : 'n'}) · Umsteigen ${NF1.format(conn)} h${rs.some((r) => r.role === 'feeder') ? ` · ${rs.filter((r) => r.role === 'feeder').length} Zubringer` : ''}</div></td><td class="r">${rs.length}</td><td class="r">${n0(trd)}${want > trd * 1.15 ? ` <span class="small muted" title="So viele wollten umsteigen">/ ${n0(want)}</span>` : ''}</td><td><span class="chip ${hl ? 'good' : ''}">${P.HUB[hl].label}</span></td>
-      <td>${nx ? `<button class="btn small ${rs.length >= nx.minRoutes ? 'primary' : ''}" data-act="hubup" data-apt="${B}" data-v="${hl + 1}" ${rs.length >= nx.minRoutes ? '' : 'disabled'} title="${esc(nx.desc)}">${nx.label}: ${eur(((nx.setup - (hl ? P.HUB[hl].setup : 0)) * SM.apx(B).cost) * cpi() * SM.softX(pl, 'hub', hl + 1))}${SM.softX(pl, 'hub', hl + 1) > 1 ? ' (mit Aufschlag)' : ''}</button>${rs.length < nx.minRoutes ? ` <span class="small muted">ab ${nx.minRoutes} Strecken</span>` : ''}` : '<span class="small muted">höchste Stufe</span>'}
+    return `<tr><td><b class="mono">${B}</b> <span class="small muted">${esc(apName(B))}</span><div class="small muted" title="Viele Langstreckenziele machen ein Drehkreuz für Umsteiger attraktiver; jede Ausbaustufe verkürzt die Umsteigezeit.">Attraktivität +${pct(attr)} (${nLong} Langstrecke${nLong === 1 ? '' : 'n'}) · Umsteigen ${NF1.format(conn)} h${rs.some((r) => r.role === 'feeder') ? ` · ${rs.filter((r) => r.role === 'feeder').length} Zubringer` : ''}</div></td><td class="r">${rs.length}</td><td class="r">${n0(trd)}${want > trd * 1.15 ? ` <span class="small muted" title="So viele wollten umsteigen">/ ${n0(want)}</span>` : ''}</td><td><div style="margin-bottom:4px"><span class="chip ${hl ? 'good' : ''}">${P.HUB[hl].label}</span></div>${nx ? `<button class="btn small ${rs.length >= nx.minRoutes ? 'primary' : ''}" data-act="hubup" data-apt="${B}" data-v="${hl + 1}" ${rs.length >= nx.minRoutes ? '' : 'disabled'} title="${esc(nx.desc)}">${nx.label}<span class="btn-sub">${eur(((nx.setup - (hl ? P.HUB[hl].setup : 0)) * SM.apx(B).cost) * cpi() * SM.softX(pl, 'hub', hl + 1))}${SM.softX(pl, 'hub', hl + 1) > 1 ? ' mit Aufschlag' : ''}</span></button>${rs.length < nx.minRoutes ? ` <span class="small muted">ab ${nx.minRoutes} Strecken</span>` : ''}` : '<span class="small muted">höchste Stufe</span>'}
       ${hl ? ` <button class="btn small" data-act="hubup" data-apt="${B}" data-v="${hl - 1}">zurückstufen</button>` : ''}</td></tr>`;
   }).join('');
-  html += `<div class="stack"><h2 class="sec sm">Drehkreuze <small>Umsteiger über Ihre Basen</small></h2><div class="tw"><table class="t"><thead><tr><th>Basis</th><th class="r">Strecken</th><th class="r" title="Reisende pro Tag, die über die Basis umsteigen (je Reise einmal gezählt) / so viele wollten">Umsteiger/Tag</th><th>Stufe</th><th>Ausbau</th></tr></thead><tbody>${hubRows}</tbody></table></div>
+  html += `<div class="stack"><h2 class="sec sm">Drehkreuze <small>Umsteiger über Ihre Basen</small></h2><div class="tw"><table class="t"><thead><tr><th>Basis</th><th class="r">Strecken</th><th class="r" title="Reisende pro Tag, die über die Basis umsteigen (je Reise einmal gezählt) / so viele wollten">Umsteiger/Tag</th><th>Stufe · Ausbau</th></tr></thead><tbody>${hubRows}</tbody></table></div>
     <div class="hub-lv">${P.HUB.slice(1).map((x, i) => `<div><b>${i + 1}. ${x.label}</b><span>${x.desc}</span><em>ab ${x.minRoutes} Strecken · ${eur(x.monthly * cpi())}/Monat</em></div>`).join('')}</div>
     <p class="small muted">Jede Stufe macht Umsteigen bequemer (kürzere Umsteigezeit, abgestimmte Wellen, mehr sinnvolle Verbindungen) und bringt Geschäftsreisenden am Drehkreuz einen Heimvorteil. So wird auch ein kleinerer Flughafen zum Drehkreuz – Sie sind nicht auf London oder Frankfurt angewiesen. Umsteiger füllen freie Plätze: Am meisten bringt der Ausbau, wenn Ihre Flüge nicht schon voll sind.</p></div>`;
   // Marktkontrolle (Slots haben einen eigenen Reiter unter Strecken)
@@ -10602,7 +10665,7 @@ VIEWS.strategy = function viewStrategy() {
     const own = pl.gateLock && pl.gateLock[c], other = W.lockOwner(c), price = W.gateLockPrice(c);
     return `<tr><td><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))} · ${NF1.format(SM.paxEff(c))} Mio. Pax/Jahr${W.aptObs && W.aptObs[c] ? ` <span title="Im Spiel gewachsen – ursprünglich ${NF1.format(P.AIRPORTS[c].pax || 0)} Mio.">↑</span>` : ''}</span></td>
       <td>${own ? `<span class="chip good">alle Gates bei Ihnen</span><div class="small muted">bis ${dateY(own.until || W.day)} · kein Kartellverfahren · Kündigung: ${eur(W.gateLockRefund(own))} zurück</div>` : other && other !== pl ? `<span class="chip crit">${esc(other.name)}</span>${other.gateLock[c].until ? `<div class="small muted">bis ${dateY(other.gateLock[c].until)}</div>` : ''}` : `${eur(price)} + ${eur(price * P.GATE_LOCK.monthlyRate)}/Monat<div class="small muted">${P.GATE_LOCK.years} Jahre</div>`}</td>
-      <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !other ? `<button class="btn small ${netCash(pl) >= price ? 'primary' : ''}" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag · ${eurB(price)}</button>` : ''}</td></tr>`;
+      <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !other ? `<button class="btn small ${netCash(pl) >= price ? 'primary' : ''}" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag<span class="btn-sub">${eurB(price)}</span></button>` : ''}</td></tr>`;
   }).join('');
   html += `<div class="stack"><h2 class="sec sm">Slots und Marktkontrolle</h2>
     <div class="callout info row" style="gap:8px;align-items:center"><span><b>Slots kaufen, Wartelisten und Vergabetermine</b> finden Sie jetzt unter Strecken → Slots. Nächste Vergabe: ${slotDateTxt()}.</span><button class="btn small" data-act="tab" data-tab="slots" style="margin-left:auto">Zu den Slots</button></div>
@@ -10616,6 +10679,23 @@ VIEWS.strategy = function viewStrategy() {
 /** Reihum-Vergabe simulieren: total Slots auf die Einträge (Liste von Wünschen) verteilen. */
 function rrAlloc(total, wants) { const got = wants.map(() => 0); let left = total, guard = 0; while (left > 0 && got.some((g, i) => g < wants[i]) && guard++ < 80) for (let i = 0; i < wants.length && left > 0; i++) if (got[i] < wants[i]) { got[i]++; left--; } return got; }
 const slotAptOf = (v) => { const t = String(v || '').trim(), c = t.slice(0, 3).toUpperCase(); if (P.AIRPORTS[c] && (t.length === 3 || /^[A-Za-z]{3}\b/.test(t))) return c; const l = t.toLowerCase(); if (l.length < 3) return null; return SM.AP_CODES.find((x) => apName(x).toLowerCase() === l) || SM.AP_CODES.find((x) => apName(x).toLowerCase().startsWith(l)) || null; };
+/** Alle Wartelisten im Spiel: filtern nach Airline und Flughafen – wer fragt wo wie viele Slots an. */
+function allWaitHtml(pl) {
+  const all = (W.slotWait || []).filter((e) => e.n > 0); if (!all.length) return '';
+  const F = fltState('wl'), q = pickNorm(F.q || ''), als = [...new Set(all.map((e) => e.al))].map((id) => W.airlines[id]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const apts = [...new Set(all.map((e) => e.apt))].sort();
+  const rows = [];
+  for (const apt of apts) {
+    const qu = W.waitQueue(apt).filter((e) => e.n > 0), fc = W.waitForecast(apt);
+    qu.forEach((e, i) => { const a = W.airlines[e.al]; if (F.st && e.al !== F.st) return; if (q && !pickNorm(`${apt} ${apName(apt)} ${a ? a.name : ''}`).includes(q)) return; rows.push({ apt, e, a, pos: i + 1, of: qu.length, g: fc.byId[e.id] || 0 }); });
+  }
+  const sumN = rows.reduce((x, r) => x + r.e.n, 0);
+  return `<div class="card pad stack"><h3>Alle Wartelisten <small class="muted">${all.length} Einträge an ${apts.length} Flughäfen</small></h3>
+    <div class="fltbar row"><select id="flt-st" data-flt="wl" aria-label="Airline"><option value="">Alle Airlines</option>${als.map((a) => `<option value="${a.id}" ${F.st === a.id ? 'selected' : ''}>${esc(a.name)}${a.id === pl.id ? ' (Sie)' : ''}</option>`).join('')}</select>
+      <input type="search" id="flt-q" data-flt="wl" placeholder="Flughafen oder Airline suchen" value="${esc(F.q || '')}" aria-label="Suchen">${F.st || F.q ? '<button class="btn small ghost" data-act="fltclear" data-k="wl">Filter zurücksetzen</button>' : ''}</div>
+    ${rows.length ? `<div class="tw"><table class="t"><thead><tr><th>Flughafen</th><th>Airline</th><th class="r">Slots</th><th class="r">Platz</th><th class="r">Prognose</th></tr></thead><tbody>${rows.map((r) => `<tr class="${r.e.al === pl.id ? 'me' : ''}"><td><b class="mono">${r.apt}</b> <span class="small muted">${esc(apName(r.apt))}</span></td><td>${r.a ? esc(r.a.name) : r.e.al}${r.e.al === pl.id ? ' (Sie)' : ''}<div class="small muted">${r.a ? `Rating ${n0(W.slotRating(r.a).score)}` : ''}${W.waitFirst(r.e) ? ' · Vorrang' : W.gotLastRound(r.e.al, r.apt) ? ' · kein Vorrang (Slot zuletzt erhalten)' : ''}${r.e.plan ? ' · für einen Plan' : ''}${waitExpires(r.e) ? ' · verfällt am 1. April' : ''}</div></td><td class="r">${r.e.n}</td><td class="r">${r.pos} von ${r.of}</td><td class="r ${r.g ? 'pos' : 'muted'}">${r.g} von ${r.e.n}</td></tr>`).join('')}</tbody></table></div>
+      <p class="small muted">${rows.length} Einträge · ${sumN} Slots angefragt · Prognose für die Vergabe am ${dateShort(SM.nextSlotDay(W.day).day)} (ohne Geldprüfung).</p>` : '<p class="small muted">Kein Eintrag passt zum Filter.</p>'}</div>`;
+}
 /** Slot-Rating erklärt (Tooltip): Anteile der vier Bausteine. */
 function ratingTip(al) {
   const r = W.slotRating(al), p = r.parts || {}, v = r.v || {};
@@ -10662,9 +10742,28 @@ function slotCardHtml(c, pl, nsd) {
       <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}${a ? ` <span class="muted" title="${esc(ratingTip(a))}">· Rating ${n0(W.slotRating(a).score)}${W.waitFirst(e) ? ' · Vorrang' : W.gotLastRound(e.al, e.apt) ? ' · kein Vorrang (Slot zuletzt erhalten)' : ''}${waitExpires(e) ? ' · verfällt am 1. April' : ''}</span>` : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
   const buy = free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen · ${eurB(W.slotBuyPrice(c, 1))}</button>${free > 1 ? ` <button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="all">alle ${free} · ${eurB(W.slotBuyPrice(c, free))}</button>` : ''}` : `<button class="btn small primary" data-act="slotwait" data-apt="${c}" data-n="1">${mine.some((e) => !e.plan) ? '+1 auf der Warteliste' : 'Auf die Warteliste'}</button>`;
   return `<div class="slotrow"><div class="slothead"><div><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}${isBase ? ' · Basis' : used ? '' : ' · noch nicht im Netz'}</span></div><span class="small muted" title="1 Slot je 200.000 Passagiere im Jahr. Einen Teil halten Airlines außerhalb des Spiels (Bestandsverkehr).">${W.slotCap[c] ?? X.simCap} Slots im Spiel</span></div>
-    <div class="slotstats"><div><span>von Ihnen genutzt</span><b>${used}</b><em>tägliche Flüge</em></div><div><span>Ihre Reserve</span><b>${bought || '–'}</b><em>${bought ? 'frei für neue Flüge' : 'keine'}</em></div><div><span>sofort frei</span><b class="${free <= 0 ? 'neg' : ''}">${free}</b><em>${free > 0 ? 'je ' + eurB(W.slotBuyPrice(c, 1)) : q.length ? 'gehen an die Warteliste' : 'voll'}</em></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${q.length ? Math.min(total, qn) : '–'}</b><em>${q.length ? `an ${q.length} Wartende` : 'keine Warteliste'}</em></div></div>
+    <div class="slotstats"><div><span>von Ihnen genutzt</span><b>${used}</b><em>tägliche Flüge</em></div><div><span>Ihre Reserve</span><b>${bought || '–'}</b><em>${bought ? (() => { const hs = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day && h.n > 0), first = Math.min(...hs.map((h) => (h.since ?? W.day) + P.SLOT_IDLE.days)); return `frei für neue Flüge · ungenutzt zurück am ${dateShort(first)}`; })() : 'keine'}</em></div><div><span>sofort frei</span><b class="${free <= 0 ? 'neg' : ''}">${free}</b><em>${free > 0 ? 'je ' + eurB(W.slotBuyPrice(c, 1)) : q.length ? 'gehen an die Warteliste' : 'voll'}</em></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${q.length ? Math.min(total, qn) : '–'}</b><em>${q.length ? `an ${q.length} Wartende` : 'keine Warteliste'}</em></div></div>
     ${myTxt}${queue}
     <div class="row" style="gap:6px;flex-wrap:wrap">${buy}${bought ? ` <button class="btn small ghost" data-act="slotsell" data-apt="${c}">Reserve zurückgeben</button>` : ''}</div></div>`;
+}
+/** Ihre Slots: je Flughafen genutzt, Reserve (mit Rückgabedatum) und befristet gehaltene – wie die Liste der Wartelisten-Einträge. */
+function mySlotsHtml(pl) {
+  const num = (x) => (Number.isInteger(x) ? String(x) : NF1.format(x));
+  const apts = [...new Set([...pl.bases, ...pl.activeRoutes().flatMap((r) => [r.base, r.dest]), ...Object.keys(pl.slotHold || {})])].filter((c) => P.AIRPORTS[c] && SM.apx(c).slots !== null);
+  const rows = apts.map((c) => {
+    const used = pl.activeRoutes().reduce((a, r) => a + (r.base === c || r.dest === c ? r.freq : 0), 0);
+    const hs = (pl.slotHold[c] || []).filter((h) => h.until > W.day && h.n > 0), rs = hs.filter((h) => h.buy), ts = hs.filter((h) => !h.buy);
+    const res = rs.reduce((a, h) => a + h.n, 0), tmp = ts.reduce((a, h) => a + h.n, 0);
+    const back = res ? Math.min(...rs.map((h) => (h.since ?? W.day) + P.SLOT_IDLE.days)) : null, tUntil = tmp ? Math.min(...ts.map((h) => h.until)) : null;
+    return { c, used, res, tmp, back, tUntil, tot: used + res + tmp };
+  }).filter((x) => x.tot > 0).sort((a, b) => (pl.bases.includes(b.c) - pl.bases.includes(a.c)) || b.tot - a.tot || a.c.localeCompare(b.c));
+  if (!rows.length) return '';
+  const sum = (k) => rows.reduce((a, x) => a + x[k], 0);
+  return `<div class="card pad stack"><h3>Ihre Slots <small class="muted">${rows.length} ${rows.length === 1 ? 'Flughafen' : 'Flughäfen'} · ${num(sum('tot'))} Slots</small></h3>
+    <div class="row small" style="gap:6px;flex-wrap:wrap"><span class="chip">${num(sum('used'))} genutzt</span><span class="chip">${sum('res')} in Reserve</span>${sum('tmp') ? `<span class="chip">${sum('tmp')} befristet</span>` : ''}</div>
+    <div class="stack" style="gap:6px">${rows.map((x) => { const soon = x.back !== null && x.back - W.day <= P.SLOT_IDLE.warn;
+      return `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b class="mono">${x.c}</b><span class="small">${esc(apName(x.c))}${pl.bases.includes(x.c) ? ' · Basis' : ''} · ${num(x.used)} genutzt${x.res ? ` · ${x.res} in Reserve, ungenutzt zurück am ${dateShort(x.back)}` : ''}${x.tmp ? ` · ${x.tmp} befristet bis ${dateShort(x.tUntil)}` : ''}</span><span class="chip ${soon ? 'warn' : 'good'}">${num(x.tot)} Slot${x.tot === 1 ? '' : 's'}</span>${x.res ? `<button class="btn small" data-act="slotsell" data-apt="${x.c}">Reserve zurückgeben</button>` : ''}</div>`; }).join('')}</div>
+    <p class="small muted">Genutzt = tägliche Flüge, die dort starten oder landen. Reserve = freie Slots, die Ihnen gehören; sie gehen nach 6 Monaten ungenutzt an den Flughafen zurück. Flughäfen ohne Slotpflicht fehlen hier.</p></div>`;
 }
 VIEWS.slots = function viewSlots() {
   const pl = W.player, nsd = SM.nextSlotDay(W.day), nsIn = nsd.day - W.day;
@@ -10678,17 +10777,19 @@ VIEWS.slots = function viewSlots() {
     <div class="slotdate"><div><span class="small muted">Nächste Slotvergabe</span><b>${dateLong(nsd.day)}</b><span class="small">${nsd.summer ? 'Sommerflugplan' : 'Winterflugplan'} · in ${nsIn} Tag${nsIn === 1 ? '' : 'en'}</span></div>
       <div class="slotsum"><div><span>Flughäfen mit Warteliste</span><b>${qApts.length}</b></div><div><span>angefragt / vergeben</span><b>${ask} / ${give}</b></div><div><span>Ihre Einträge</span><b>${myQ.length ? `${myGot} von ${myAsk}` : '–'}</b><em>${myQ.length ? `Slots voraussichtlich · ${myQ.length} von ${nsd.day >= P.WAIT.from ? P.WAIT.max : P.WAIT.maxOld} Einträgen` : 'keine'}</em></div><div title="${esc(ratingTip(pl))}"><span>Ihr Slot-Rating</span><b>${n0(W.slotRating(pl).score)}</b><em>von 100 · niedriger = früher dran</em></div></div>
       <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Der erste Eintrag jeder Airline hat Vorrang – niedrigeres <b>Slot-Rating</b> zuerst, egal wann eingetragen; bei Gleichstand zählt der frühere Eintrag. Weitere Einträge derselben Airline stehen danach in der Reihenfolge der Anmeldung.</li><li>Wer bei der letzten Vergabe an einem Flughafen einen Slot von der Warteliste bekommen hat, hat dort beim nächsten Mal keinen Vorrang – seine Einträge stehen nach Anmeldezeit hinter den Vorrangplätzen.</li><li>Slot-Rating (0–100): je ein Viertel Flotte (inkl. Bestellungen), Slots im Besitz, Eigenkapital und Ergebnis seit der letzten Vergabe – jeweils gemessen an der größten Airline im Spiel.</li><li>Ab der Vergabe am 1. April 2028 höchstens ${P.WAIT.max} Einträge je Airline; weitere verfallen dann (die frühesten bleiben).</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
+    ${mySlotsHtml(pl)}
     ${myQ.length ? `<div class="card pad stack"><h3>Ihre Wartelisten-Einträge <small class="muted">${myQ.length}${nsd.day >= P.WAIT.from ? ` von höchstens ${P.WAIT.max}` : ''}</small></h3>
       <div class="stack" style="gap:6px">${myQ.map((e) => { const g = W.waitForecast(e.apt).byId[e.id] || 0, pl0 = e.plan && (pl.plans || []).find((x) => x.id === e.plan);
         return `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b class="mono">${e.apt}</b><span class="small">${esc(apName(e.apt))} · ${e.n} Slot${e.n > 1 ? 's' : ''}${pl0 ? ` für Plan ${pl0.base}–${pl0.dest}` : ''} · Platz ${W.waitPos(e)}${W.waitFirst(e) ? ' (Vorrang)' : W.gotLastRound(pl.id, e.apt) ? ' (kein Vorrang – Slot bei der letzten Vergabe erhalten)' : ''}${waitExpires(e) ? ' · verfällt am 1. April' : ''}</span><span class="chip ${g >= e.n ? 'good' : g ? 'warn' : 'crit'}">voraussichtlich ${g} von ${e.n}</span><button class="btn small" data-act="slotleave" data-id="${e.id}">Austragen</button></div>`; }).join('')}</div>
       <p class="small muted">Austragen geht jederzeit und kostet nichts – bezahlt wird erst bei der Zuteilung.</p></div>` : ''}
+    ${allWaitHtml(pl)}
     <div class="card pad stack"><h3>Slots sichern <small class="muted">ohne Streckenplanung</small></h3>
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="f" style="flex:3;min-width:200px"><span>Flughafen</span><input type="search" id="slot-apt" list="slot-apts" placeholder="Code oder Name, z. B. FRA" value="${esc(st.apt ? st.apt + ' · ' + apName(st.apt) : '')}" autocomplete="off"></label>
         <label class="f" style="flex:1;min-width:90px"><span>Anzahl</span><input type="number" id="slot-n" min="1" max="8" value="${st.n}"></label></div>
       <datalist id="slot-apts">${SM.AP_CODES.slice().sort((a, b) => apName(a).localeCompare(apName(b))).map((c) => `<option value="${c} · ${esc(apName(c))}">`).join('')}</datalist>
       <div id="slot-q">${slotQuoteHtml(st.apt, st.n)}</div></div>`;
   html += `<h3 class="sec sm">Ihre Flughäfen <small>Basen, Strecken, Reserven und Wartelisten</small></h3>${coord.length ? `<div class="stack" style="gap:8px">${coord.map((c) => slotCardHtml(c, pl, nsd)).join('')}</div>` : '<p class="small muted">Noch kein Flughafen im Netz.</p>'}
-    <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Zu jeder Basis gehören drei Slots, die bei der Eröffnung gekauft werden. Neue Strecken nutzen zuerst Ihre Reserve, fehlende Slots werden zum Tagespreis gekauft – je knapper ein Flughafen, desto teurer. Ist er voll, tragen Sie sich hier auf die Warteliste ein oder speichern die Strecke als Plan (Strecken → Pläne).</p>`;
+    <p class="small muted">Jeder tägliche Flug belegt einen Slot an beiden Enden. Zu jeder Basis gehören drei Slots, die bei der Eröffnung gekauft werden. Neue Strecken nutzen zuerst Ihre Reserve, fehlende Slots werden zum Tagespreis gekauft – je knapper ein Flughafen, desto teurer. Ist er voll, tragen Sie sich hier auf die Warteliste ein oder speichern die Strecke als Plan (Strecken → Pläne). Slots in der Reserve, die 6 Monate ungenutzt bleiben, gehen an den Flughafen zurück (Erstattung wie bei „Reserve zurückgeben“, Hinweis 30 Tage vorher); neue Strecken verbrauchen immer die älteste Reserve zuerst.</p>`;
   return html;
 };
 function strategySummary(pl) {
@@ -11335,8 +11436,8 @@ VIEWS.rivals = function viewRivals() {
       <button data-act="rivflt" data-v="same" aria-pressed="${flt === 'same'}" ${myFams.size ? '' : 'disabled title="Sie haben noch keine Flugzeuge"'}>Gleiche Muster wie ich</button>
       ${allFams.map((g) => `<button data-act="rivflt" data-v="${g}" aria-pressed="${flt === g}">${esc(P.TYPE_GROUPS[g])}</button>`).join('')}</div></div>
     <p class="small muted">Gleiche Musterfamilie heißt gleiche Piloten: Piloten haben ein Typ-Rating je Familie und sind nur dort einsetzbar – die interessanten Partner zum Abwerben oder Crew-Handel. Flugbegleiterinnen und Technik arbeiten auf allen Mustern.</p>
-    <div class="tw"><table class="t"><thead><tr><th>Airline</th><th>Modell</th><th>Musterfamilien</th><th>Basen</th><th class="r">Flotte</th><th class="r">Strecken</th><th class="r">Marge</th><th></th></tr></thead><tbody>
-    ${rows.filter(({ al }) => keep(al)).map(({ al, margin }) => `<tr><td><span class="lgi">${logoSvg(al, 18)}</span> ${esc(al.name)}${al.status !== 'active' ? ` <span class="chip crit">${al.mergedInto ? `übernommen von ${esc((W.airlines[al.mergedInto] || {}).name || '?')}` : al.status === 'insolvent' ? 'insolvent' : 'Restrukturierung'}</span>` : ''}</td><td>${al.archetype ? P.AI_ARCHETYPES[al.archetype].label : al.id === W.playerId ? 'Sie' : 'Mitspieler'}</td><td>${famsOf(al).map((g) => `<span class="chip ${al.id !== W.playerId && myFams.has(g) ? 'me' : ''}" title="${esc(P.TYPE_GROUPS[g])}${al.id !== W.playerId && myFams.has(g) ? ' – gleiche Piloten wie bei Ihnen' : ''}">${g}</span>`).join(' ') || '<span class="muted">–</span>'}</td><td>${al.bases.join(', ')}</td><td class="r">${al.fleet.length}</td><td class="r">${al.activeRoutes().length}</td><td class="r ${margin !== null ? sgn(margin) : ''}">${margin === null ? '–' : pct(margin, 1)}</td><td class="r">${al.id !== W.playerId && al.status !== 'insolvent' ? `<button class="btn small" data-act="dealwith" data-al="${al.id}">Handeln</button>` : ''}</td></tr>`).join('')}
+    <div class="tw"><table class="t rivt"><thead><tr><th>Airline · Modell · Basen</th><th>Muster</th><th class="r">Flotte · Strecken</th><th class="r">Marge</th><th></th></tr></thead><tbody>
+    ${rows.filter(({ al }) => keep(al)).map(({ al, margin }) => `<tr><td><span class="lgi">${logoSvg(al, 18)}</span> ${esc(al.name)}${al.status !== 'active' ? ` <span class="chip crit">${al.mergedInto ? `übernommen von ${esc((W.airlines[al.mergedInto] || {}).name || '?')}` : al.status === 'insolvent' ? 'insolvent' : 'Restrukturierung'}</span>` : ''}<div class="small muted">${al.archetype ? P.AI_ARCHETYPES[al.archetype].label : al.id === W.playerId ? 'Sie' : 'Mitspieler'}${al.bases.length ? ' · ' + al.bases.join(', ') : ''}</div></td><td class="chips">${famsOf(al).map((g) => `<span class="chip ${al.id !== W.playerId && myFams.has(g) ? 'me' : ''}" title="${esc(P.TYPE_GROUPS[g])}${al.id !== W.playerId && myFams.has(g) ? ' – gleiche Piloten wie bei Ihnen' : ''}">${g}</span>`).join(' ') || '<span class="muted">–</span>'}</td><td class="r">${al.fleet.length} · ${al.activeRoutes().length}</td><td class="r ${margin !== null ? sgn(margin) : ''}">${margin === null ? '–' : pct(margin, 1)}</td><td class="r">${al.id !== W.playerId && al.status !== 'insolvent' ? `<button class="btn small" data-act="dealwith" data-al="${al.id}">Handeln</button>` : ''}</td></tr>`).join('')}
   </tbody></table></div></div>`;
   const overlap = [];
   const mine = new Set(pl.activeRoutes().map((r) => SM.pairKey(r.base, r.dest)));
@@ -11499,8 +11600,8 @@ function maHtml() {
   const rows = ais.map((a) => ({ a, v: SM.maValue(W, a, pl) })).sort((x, y) => x.v.price - y.v.price);
   return `<div class="stack"><h2 class="sec">Übernahmen <small>KI-Airlines komplett kaufen</small></h2>
     ${mx > 1 ? `<div class="callout warn">Ihre Airline ist für Übernahmen noch klein: Verkäufer und Banken verlangen +${n0((mx - 1) * 100)} % auf den Kaufpreis. Ohne Aufschlag ab einem Ansehen von 40 (jetzt ${SM.standingOf(pl, W.day).v}).</div>` : ''}
-    <div class="tw"><table class="t"><thead><tr><th>Airline</th><th class="r">Flotte · Strecken</th><th class="r">Eigenkapital · Ergebnis/Monat</th><th class="r">Ihr Anteil · Angebot für den Rest</th></tr></thead><tbody>
-    ${rows.map(({ a, v }) => { const c = ui.confirm === 'ma:' + a.id; return `<tr><td><span class="lgi">${logoSvg(a, 18)}</span> ${esc(a.name)}<div class="small muted">Basis ${v.bases.join(', ')}</div></td><td class="r">${v.fleet} · ${v.routes}</td><td class="r">${eur(v.equity)}<div class="small ${v.profM < 0 ? 'neg' : 'pos'}">${eur(v.profM, { plus: true })}</div></td><td class="r">${v.f ? `${pct(v.f, 1)} · ` : ''}<b>${eur(v.price)}</b>
+    <div class="tw"><table class="t"><thead><tr><th>Airline</th><th class="r">Flotte · Strecken</th><th class="r">Eigenkapital · Ergebnis/Mon.</th><th class="r">Ihr Anteil · Preis für den Rest</th></tr></thead><tbody>
+    ${rows.map(({ a, v }) => { const c = ui.confirm === 'ma:' + a.id; return `<tr><td><span class="lgi">${logoSvg(a, 18)}</span> ${esc(a.name)}<div class="small muted">Basis ${v.bases.join(', ')}</div></td><td class="r">${v.fleet} · ${v.routes}</td><td class="r">${eur(v.equity)}<div class="small ${v.profM < 0 ? 'neg' : 'pos'}">${eur(v.profM, { plus: true })}</div></td><td class="r wrap">${v.f ? `${pct(v.f, 1)} · ` : ''}<b>${eur(v.price)}</b>
       ${v.anchor > 0.001 ? `<div class="small muted">inkl. ${pct(v.anchor)} Ankeraktionäre (+${eurB(v.ancX)})</div>` : ''}<div>${SM.maBlock(W, pl, a) ? `<span class="small muted" title="${esc(SM.maBlock(W, pl, a))}">Ankeraktionäre verkaufen nicht</span>` : c ? `<span class="small">Wirklich kaufen?</span> <button class="btn small danger" data-act="takeover" data-id="${a.id}">Ja, für ${eurB(v.price)} übernehmen</button> <button class="btn small" data-act="cancelconfirm">Nein</button>` : `<button class="btn small ${free >= v.price ? 'primary' : ''}" data-act="askma" data-id="${a.id}" ${free >= v.price ? '' : 'disabled title="Dafür reicht das Geld nicht"'}>Übernehmen</button>`}</div></td></tr>`; }).join('')}
     </tbody></table></div>
     <div class="callout ${SM.limitsLifted(pl) ? 'good' : 'info'}"><b>${SM.limitsLifted(pl) ? 'Konzern: Wachstumsgrenzen aufgehoben' : 'Nach einer Komplettübernahme gelten keine Wachstumsgrenzen mehr'}</b><span class="small">Keine Höchstzahl an Basen (sonst ${P.BASE_MAX}), keine Aufschläge für weitere Basen, Drehkreuz-Ausbau und Übernahmen. Gilt nach einem Übernahmeangebot oder mit 100 % der Aktien einer anderen Airline.</span></div>
@@ -11963,17 +12064,23 @@ function laborHtml() {
 function academyHtml() {
   const pl = W.player, A = pl.academy || {}, mx = SM.academyMax(pl), hx = SM.homeShares(pl), H = P.HOME, phase = (lv) => P.CAREER.levels[SM.ACADEMY_MAX.findIndex((x) => x >= lv)].label;
   return `<div class="stack"><h2 class="sec">Akademien <small>eigenen Nachwuchs fördern</small></h2>
-    <p class="small ink2">Der Arbeitsmarkt ist knapp – mehr Bewerbungen gibt es nur in Krisen und wenn Airlines Personal abbauen oder pleitegehen. Mit monatlicher Förderung bilden Flugschule, Kabinenakademie und Technikschule exklusiv für Sie aus: teurer als Einstellen, aber ohne Arbeitsmarkt. Mit jeder Wachstumsphase wird eine größere Stufe frei (heute bis Stufe ${mx}).</p>
+    <p class="small ink2">Der Arbeitsmarkt ist knapp – mehr Bewerbungen gibt es nur in Krisen und wenn Airlines Personal abbauen oder pleitegehen. Mit monatlicher Förderung bilden Flugschule, Kabinenakademie und Technikschule exklusiv für Sie aus: teurer als Einstellen, aber ohne Arbeitsmarkt. Mit jeder Wachstumsphase wird eine größere Stufe frei und Sie können eine weitere Schule je Bereich eröffnen (heute bis Stufe ${mx}, bis zu ${mx} Schulen je Bereich).</p>
     <div class="tiles"><div class="tile"><span>Eigener Nachwuchs</span><b>${n0(hx.n)}</b><em>${pct(hx.all)} der Belegschaft</em></div>
       <div class="tile"><span>Stimmung</span><b class="pos">+${n0(H.morale * hx.all * 100)}</b><em>Ziel, bis +${n0(H.morale * 100)} bei 100 %</em></div>
       <div class="tile"><span>Kündigungen</span><b class="pos">−${pct(H.leave * hx.all)}</b><em>kennen Unternehmen und Abläufe</em></div>
       <div class="tile"><span>Pünktlichkeit</span><b class="pos">+${n1(H.otp * hx.crew * 100)} Pkt</b><em>technische Ausfälle −${pct(H.fail * hx.tech)}</em></div></div>
-    ${Object.entries(SM.ACADEMY).map(([role, d]) => { const x = A[role] || { lv: 0 }, ready = x.lv ? x.since + d.ramp : null;
-      return `<div class="card pad stack"><div class="spread"><b>${d.label}</b>${x.lv ? `<span class="chip ${W.day >= ready ? 'good' : 'warn'}">${W.day >= ready ? `${d.out[x.lv]} pro Monat` : `erste Absolventen ${dateShort(ready)}`}</span>` : '<span class="chip">nicht gefördert</span>'}</div>
-        <div class="seg wrap">${d.cost.map((c, lv) => { const lock = lv > mx && lv > (x.lv || 0);
-          return `<button data-act="academy" data-role="${role}" data-lv="${lv}" aria-pressed="${(x.lv || 0) === lv}"${lock ? ` disabled title="ab Phase „${esc(phase(lv))}“"` : ''}>${lv ? `Stufe ${lv} · ${eur(c * cpi())}/Mon. · ${d.out[lv]}/Mon.${lock ? ` · ab ${esc(phase(lv))}` : ''}` : 'keine'}</button>`; }).join('')}</div>
-        ${role === 'pilot' ? `<label class="f" style="max-width:280px"><span>Musterberechtigung der Absolventen</span><select id="acad-group">${SM.STAFF_GROUPS.map((g) => `<option value="${g}" ${(x.group || 'A32F') === g ? 'selected' : ''}>${P.TYPE_GROUPS[g]}</option>`).join('')}</select></label>` : ''}
-        <span class="small muted">Anlaufzeit ${d.ramp} Tage.</span></div>`; }).join('')}</div>`;
+    ${Object.entries(SM.ACADEMY).map(([role, d]) => { const list = SM.acadList(pl, role), canMore = list.length < mx, tot = list.reduce((a, x) => a + (W.day >= x.since + d.ramp ? d.out[x.lv] : 0), 0);
+      const school = (x) => { const ready = x.since + d.ramp;
+        return `<div class="acad-school"><div class="spread" style="gap:8px;flex-wrap:wrap"><b class="small">${esc(d.label)} ${role === 'pilot' ? `· ${esc(P.TYPE_GROUPS[x.group] || '')}` : x.id.slice(1)}</b><span class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end"><span class="chip ${W.day >= ready ? 'good' : 'warn'}">${W.day >= ready ? `${d.out[x.lv]} pro Monat` : `erste Absolventen ${dateShort(ready)}`}</span><button class="btn small danger" data-act="academy" data-role="${role}" data-id="${x.id}" data-lv="0">schließen</button></span></div>
+          <div class="lvgrid">${d.cost.map((c, lv) => { if (!lv) return ''; const lock = lv > mx && lv > (x.lv || 0);
+            return `<button data-act="academy" data-role="${role}" data-id="${x.id}" data-lv="${lv}" aria-pressed="${(x.lv || 0) === lv}"${lock ? ` disabled title="ab Phase „${esc(phase(lv))}“"` : ''}><b>Stufe ${lv}</b><span>${eur(c * cpi())}/Mon.</span><em>${lock ? `ab ${esc(phase(lv))}` : `${d.out[lv]} Absolventen/Mon.`}</em></button>`; }).join('')}</div>
+          ${role === 'pilot' ? `<label class="f" style="max-width:300px"><span>Musterberechtigung der Absolventen</span><select class="acad-group" data-id="${x.id}">${SM.STAFF_GROUPS.map((g) => `<option value="${g}" ${(x.group || 'A32F') === g ? 'selected' : ''}>${P.TYPE_GROUPS[g]}</option>`).join('')}</select></label>` : ''}</div>`; };
+      const groups = role === 'pilot' ? SM.STAFF_GROUPS.filter((g) => pl.fleet.some((a) => P.AIRCRAFT_TYPES[a.type_id].group === g)) : [];
+      const nextG = groups.find((g) => !list.some((x) => x.group === g)) || groups[0] || 'A32F';
+      return `<div class="card pad stack"><div class="spread"><b>${d.label}${list.length > 1 ? `n <small class="muted">${list.length} Schulen</small>` : ''}</b>${list.length ? `<span class="chip good">zusammen ${tot} pro Monat</span>` : '<span class="chip">nicht gefördert</span>'}</div>
+        ${list.map(school).join('')}
+        <div class="acad-foot">${canMore ? `<button class="btn small${list.length ? '' : ' primary'}" data-act="academy" data-role="${role}" data-id="new" data-lv="1" ${role === 'pilot' ? `data-group="${nextG}"` : ''}>${list.length ? 'Weitere Schule eröffnen' : 'Schule eröffnen'}</button><span class="small muted">Start mit Stufe 1 · ${eur(d.cost[1] * cpi())}/Mon.${role === 'pilot' ? ` · ${esc(P.TYPE_GROUPS[nextG])}` : ''} · Anlaufzeit ${d.ramp} Tage</span>` : `<span class="small muted">${list.length} von ${mx} Schulen – mit jeder Wachstumsphase kommt eine dazu. Anlaufzeit neuer Schulen ${d.ramp} Tage.</span>`}</div>
+          ${role === 'pilot' ? '<span class="small muted">Je Schule eine Musterberechtigung – so bilden Sie für mehrere Flugzeugfamilien aus.</span>' : ''}</div>`; }).join('')}</div>`;
 }
 function poachHtml() {
   const pl = W.player, P0 = ui.poach || (ui.poach = { target: null, role: 'pilot:A32F', n: 5, bonus: 10000 });
@@ -11984,7 +12091,7 @@ function poachHtml() {
   const T = W.airlines[P0.target];
   const S = P.STAFF, sal = (role === 'pilot' ? S.pilotSalary[group] : role === 'cabin' ? S.cabinSalary : S.techSalary) * wageNow() * cpi();
   const theirPay = T.staff ? T.staff.pay : wageNow() * (1 + ({ premium: 0.06, lcc: -0.04 }[T.archetype] || 0)), theirMor = T.staff ? T.staff.morale : 0.62;
-  const acLv = T.academy && T.academy[role] ? T.academy[role].lv || 0 : 0;
+  const acLv = SM.acadLv(T, role);
   const p = Math.max(0.03, Math.min(0.85, (0.12 + 0.9 * (pl.staff.pay - (T.staff ? theirPay : 1 + ({ premium: 0.06, lcc: -0.04 }[T.archetype] || 0))) + 0.35 * Math.min(1, P0.bonus / (sal * 3)) + 0.8 * Math.max(0, 0.65 - theirMor)) * (1 - 0.12 * acLv)));
   const PO = P.POACH, pk = `${T.id}:${role}${role === 'pilot' ? ':' + group : ''}`;
   const last = pl.poachLog && pl.poachLog[pk] !== undefined ? pl.poachLog[pk] : null, wait = last !== null && W.day - last < PO.wait ? PO.wait - (W.day - last) : 0;
@@ -12028,7 +12135,7 @@ function onHardClick(act, b) {
   const pl = W.player;
   switch (act) {
     case 'bid': { const v = Number($(`#bid-${b.dataset.id}`).value); const res = doAction({ type: 'bid', lot: b.dataset.id, amount: v }); if (res.ok) toast('Gebot abgegeben. Zuschläge am Ende der Auktion.'); refreshAll(); return true; }
-    case 'academy': { const g = $('#acad-group'); const res = doAction({ type: 'academy', role: b.dataset.role, level: Number(b.dataset.lv), group: g ? g.value : undefined }); if (res.ok) toast(Number(b.dataset.lv) ? 'Förderung vereinbart.' : 'Förderung beendet.'); refreshAll(); return true; }
+    case 'academy': { const g = b.dataset.id && b.dataset.id !== 'new' ? document.querySelector(`.acad-group[data-id="${b.dataset.id}"]`) : null; const res = doAction({ type: 'academy', role: b.dataset.role, id: b.dataset.id, level: Number(b.dataset.lv), group: b.dataset.group || (g ? g.value : undefined) }); if (res.ok) toast(Number(b.dataset.lv) ? 'Förderung vereinbart.' : 'Förderung beendet.'); refreshAll(); return true; }
     case 'corppoach': { const c = ui.corp; const res = doAction({ type: 'poachCorp', target: c.target, apt: c.apt, budget: c.budget }); if (res.ok) toast(res.won ? `Gewonnen: Firmenkunden in ${c.apt} buchen jetzt lieber bei Ihnen.` : 'Die Firmen bleiben vorerst bei der Konkurrenz.'); refreshAll(); return true; }
     case 'poach': {
       readPoach(); const [role, group] = ui.poach.role.split(':');
@@ -12045,7 +12152,7 @@ function readPoach() { if (!ui.poach) return; const g = (id) => $(id); if (g('#p
 function onHardChange(t) {
   if (/^po-/.test(t.id)) { readPoach(); renderPane(true); return true; }
   if (/^corp-/.test(t.id) && ui.corp) { const k = t.id.slice(5); ui.corp[k === 'budget' ? 'budget' : k] = k === 'budget' ? Number(t.value) : t.value; renderPane(true); return true; }
-  if (t.id === 'acad-group') { const A = W.player.academy && W.player.academy.pilot; if (A && A.lv) doAction({ type: 'academy', role: 'pilot', level: A.lv, group: t.value }); refreshAll(); return true; }
+  if (t.classList && t.classList.contains('acad-group')) { const x = SM.acadList(W.player, 'pilot').find((y) => y.id === t.dataset.id); if (x && x.lv) doAction({ type: 'academy', role: 'pilot', id: x.id, level: x.lv, group: t.value }); refreshAll(); return true; }
   return false;
 }
 VIEWS.milestones = function viewMilestones() {
@@ -12066,7 +12173,7 @@ function careerHtml(pl, compact) {
   const L = SM.careerOf(pl), lv = SM.careerLv(pl);
   if (!L) return '';
   const C = SM.CAREER.levels, c = SM.careerChecks(W, pl);
-  const steps = `<div class="phases">${C.map((x, i) => `<div class="ph ${i < lv ? 'done' : i === lv ? 'cur' : ''}"><i>${i + 1}</i><span>${esc(x.label)}</span></div>`).join('')}</div>`;
+  const steps = `<div class="phwrap"><div class="phases">${C.map((x, i) => `<div class="ph ${i < lv ? 'done' : i === lv ? 'cur' : ''}" title="${esc(x.label)}"><i>${i + 1}</i><span>${esc(x.label)}</span></div>`).join('')}</div><div class="ph-cap small">Phase ${Math.min(lv, C.length - 1) + 1} von ${C.length}: <b>${esc(C[Math.min(lv, C.length - 1)].label)}</b>${C[lv + 1] ? ` <span class="muted">· danach ${esc(C[lv + 1].label)}</span>` : ''}</div></div>`;
   const checks = c ? `<div class="pchecks">${c.checks.map((x) => { const f = Math.max(0, Math.min(1, x.need ? x.have / x.need : 1)); return `<div class="pc ${x.ok ? 'ok' : ''}"><span>${esc(x.label)}</span><div class="bar"><i class="${x.ok ? 'good' : ''}" style="width:${(f * 100).toFixed(0)}%"></i></div><b>${x.money ? eur(x.have) : n0(x.have)} / ${x.money ? eur(x.need) : n0(x.need)}</b></div>`; }).join('')}</div>` : '<p class="small pos">Höchste Phase erreicht.</p>';
   const st = SM.standingOf(pl, W.day), room = SM.leaseRoom(pl, W.day), SB = P.STANDING;
   const stBar = `<div class="pchecks">${st.parts.map(([l, v, mx, why]) => `<div class="pc ${v >= mx * 0.8 ? 'ok' : ''}"><span title="${esc(why)}">${esc(l)}</span><div class="bar"><i class="${v >= mx * 0.8 ? 'good' : ''}" style="width:${(Math.max(0, Math.min(1, v / mx)) * 100).toFixed(0)}%"></i></div><b>${n0(v)} / ${mx}</b></div>`).join('')}</div>`;
@@ -12218,7 +12325,7 @@ VIEWS.trade = function viewTrade() {
   const ags = (W.agreements || []).filter((g) => g.until > W.day && (g.airline === me.id || g.partner === me.id));
   if (ags.length) html += `<div class="stack"><h2 class="sec">Vereinbarungen <small>Wettbewerbsverzicht</small></h2><table class="t"><tbody>${ags.map((g) => `<tr><td>${g.airline === me.id ? `<b>Sie</b> verzichten gegenüber ${esc(W.airlines[g.partner].name)}` : `<b>${esc(W.airlines[g.airline].name)}</b> verzichtet zu Ihren Gunsten`}</td><td>${g.pair.replace('-', '–')}</td><td class="r">bis ${dateY(g.until)}</td></tr>`).join('')}</tbody></table></div>`;
   const holds = Object.keys(me.slotHold || {}).map((apt) => [apt, me.heldAt(apt, W.day), Math.min(...me.slotHold[apt].filter((h) => h.until > W.day).map((h) => h.until))]).filter((x) => x[1] > 0);
-  html += `<div class="stack"><h2 class="sec">Ihre Slot-Reserve <small>freie Slots, die Ihnen gehören</small></h2>${holds.length ? `<table class="t"><tbody>${holds.map(([apt, n, until]) => `<tr><td><b>${apt}</b> ${esc(apName(apt))}</td><td class="r">${n} ${n === 1 ? 'Slot' : 'Slots'}</td><td class="r small muted">${until > 1e8 ? 'gekauft, unbefristet' : 'verfällt ab ' + dateY(until)}</td><td class="r"><button class="btn small" data-act="dealslots" data-apt="${apt}">Verkaufen</button></td></tr>`).join('')}</tbody></table>` : '<p class="small muted">Keine. Freie Slots, die Ihnen gehören – gekaufte, die drei Basis-Slots oder Slots eingestellter Strecken –, erscheinen hier und lassen sich an andere Airlines verkaufen. Kaufen und Wartelisten: Strecken → Slots.</p>'}</div>`;
+  html += `<div class="stack"><h2 class="sec">Ihre Slot-Reserve <small>freie Slots, die Ihnen gehören</small></h2>${holds.length ? `<table class="t"><tbody>${holds.map(([apt, n, until]) => `<tr><td><b>${apt}</b> ${esc(apName(apt))}</td><td class="r">${n} ${n === 1 ? 'Slot' : 'Slots'}</td><td class="r small muted wrap">${until > 1e8 ? 'gekauft, unbefristet' : 'verfällt ab ' + dateY(until)}</td><td class="r"><button class="btn small" data-act="dealslots" data-apt="${apt}">Verkaufen</button></td></tr>`).join('')}</tbody></table>` : '<p class="small muted">Keine. Freie Slots, die Ihnen gehören – gekaufte, die drei Basis-Slots oder Slots eingestellter Strecken –, erscheinen hier und lassen sich an andere Airlines verkaufen. Kaufen und Wartelisten: Strecken → Slots.</p>'}</div>`;
   const hist = myDeals().filter((d) => d.status !== 'open').sort((a, b) => (b.resolvedDay ?? b.day) - (a.resolvedDay ?? a.day)).slice(0, 12);
   if (hist.length) html += `<details class="fold" data-keep="tradeHist" ${ui.open && ui.open.tradeHist ? 'open' : ''}><summary><h2 class="sec">Verlauf <small>${hist.length} abgeschlossene Angebote</small></h2><span class="fold-hint">${ui.open && ui.open.tradeHist ? 'einklappen' : 'aufklappen'}</span></summary><div class="stack">${hist.map(dealCard).join('')}</div></details>`;
   return html;
@@ -12574,7 +12681,7 @@ function assistantHints() {
   if (pl.staff && pl.staff.pay < wageNow() - 0.01) add('wage', 'warn', 'ops', `Ihr Gehalt liegt <b>${pct(1 - pl.staff.pay / wageNow())} unter dem Marktlohn</b> – die Konkurrenz wirbt ab, die Stimmung sinkt.`, 'staff');
   { const att = pl.events.filter((e) => e.kind === 'crit' && /greift Ihre Strecke/.test(e.msg) && e.day >= W.day - 21).pop(); if (att) add('att' + att.day, 'crit', 'net', esc(att.msg) + ' Preise und Frequenz prüfen.', 'routes'); }
   { const lot = (W.auctions || []).find((a) => !a.done && pl.fleet.some((x) => P.AIRCRAFT_TYPES[x.type_id].group === P.AIRCRAFT_TYPES[a.type].group) && a.bids[pl.id] === undefined); if (lot) add('lot' + lot.id, 'info', 'strat', `Auktion: ${lot.n} frühe Lieferpositionen für ${tl(lot.type)} bis ${dateShort(lot.closes)}.`, 'fleetBuy'); }
-  if (routes.length >= 4 && !(pl.academy && Object.values(pl.academy).some((x) => x.lv)) && W.macro.laborTight > 1.25) add('acad', 'info', 'ops', 'Der Arbeitsmarkt ist angespannt. Eine geförderte <b>Flugschule</b> liefert eigenen Nachwuchs, der schwerer abzuwerben ist.', 'staff');
+  if (routes.length >= 4 && !SM.acadAll(pl).some((x) => x.lv) && W.macro.laborTight > 1.25) add('acad', 'info', 'ops', 'Der Arbeitsmarkt ist angespannt. Eine geförderte <b>Flugschule</b> liefert eigenen Nachwuchs, der schwerer abzuwerben ist.', 'staff');
   const miss = unplacedNow();
   if (miss.length) add('unpl', 'warn', 'ops', `Ohne Flugzeug: ${miss.map(([r, k]) => `${r.base}–${r.dest} (${k}×)`).join(', ')}. Diese Flüge fallen aus.`, 'fleetPlan');
   for (const a of pl.fleet) {

@@ -183,6 +183,14 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.32: Ungenutzte Slots verfallen · alle Wartelisten filtern · mehrere Akademie-Schulen
+
+- **Use it or lose it:** Slots in der Reserve (gekauft, zugeteilt oder nach Streckenschluss frei geworden), die 6 Monate (183 Tage) ungenutzt bleiben, gehen an den Flughafen zurück – Erstattung wie bei „Reserve zurückgeben“ an den Flughafen (Slotpreis × 0,5), Buchverlust als Einmalposten, Hinweis 30 Tage vorher. Neue Strecken verbrauchen immer die älteste Reserve zuerst. Bestehende Reserven ohne Datum: Frist beginnt mit dem Update. Anzeige „ungenutzt zurück am …“ je Flughafen.
+- **Alle Wartelisten:** Unter Strecken → Slots eine Tabelle aller Einträge im Spiel – filterbar nach Airline und Flughafen (Suche), mit Platz, Slot-Rating, Vorrang und Prognose.
+- **Ihre Slots:** Unter Strecken → Slots eine Liste aller Slots im Besitz – je Flughafen genutzt, in Reserve (mit Datum „ungenutzt zurück am …“) und befristet gehalten, mit „Reserve zurückgeben“; aufgebaut wie die Liste der eigenen Wartelisten-Einträge.
+- **Layout überarbeitet:** Knöpfe, Umschalter und Chips sind abgerundete Rechtecke statt Pillen – mehrzeiliger Text wird nicht mehr von den Ecken abgeschnitten. Akademie-Stufen als Kacheln (Stufe, Kosten, Absolventen) mit eigenem „schließen“. Kauf-/Leasing-, Drehkreuz- und Exklusivvertrag-Knöpfe zweizeilig (Preis darunter). Gebrauchtmarkt und Wettbewerbstabelle kompakter (keine versteckten Knöpfe mehr rechts außerhalb), Gebrauchtmarkt auf dem Handy als Liste. Auswahlfelder brechen in schmalen Spalten um, statt den gewählten Text abzuschneiden; Auswahl-Knöpfe zeigen langen Text zweizeilig statt mit „…“. Phasenleiste im schmalen Layout mit Klartext statt überlappender Beschriftung. Geprüft automatisch in allen 30 Ansichten bei 1440, 1100 und 390 Pixeln Breite.
+- **Mehrere Schulen je Akademie-Bereich:** Je Wachstumsphase eine Schule mehr (Gründung 1 … Global Player 5), jede mit eigener Förderstufe; Flugschulen mit eigener Musterberechtigung – so bildet man für mehrere Flugzeugfamilien aus. Schließen über „schließen“. Ältere Stände (eine Schule je Bereich) werden übernommen.
+
 ## Neu in 0.21.31: Kredit mit Dispo ablösen · Kaution fest · Warteliste austragen und Vorrang nach Zuteilung
 
 - **Kredit ablösen mit zeitweiligem Dispo:** Bisher musste das Guthaben 101 % der Restschuld decken. Jetzt springt die Kreditlinie für den fehlenden Teil ein (sofern frei); positive Tage führen den Dispo danach automatisch zurück. Kein Geldgewinn möglich: Eigenkapital sinkt genau um die 1 % Vorfälligkeit, die Gesamtverschuldung bleibt durch Kreditlimit und Kreditlinie begrenzt. Die Kredittabelle zeigt, wie viel aus dem Dispo käme und ob der alte Kredit teurer ist als der Dispo.
