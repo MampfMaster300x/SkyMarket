@@ -183,6 +183,26 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.31: Kredit mit Dispo ablösen · Kaution fest · Warteliste austragen und Vorrang nach Zuteilung
+
+- **Kredit ablösen mit zeitweiligem Dispo:** Bisher musste das Guthaben 101 % der Restschuld decken. Jetzt springt die Kreditlinie für den fehlenden Teil ein (sofern frei); positive Tage führen den Dispo danach automatisch zurück. Kein Geldgewinn möglich: Eigenkapital sinkt genau um die 1 % Vorfälligkeit, die Gesamtverschuldung bleibt durch Kreditlimit und Kreditlinie begrenzt. Die Kredittabelle zeigt, wie viel aus dem Dispo käme und ob der alte Kredit teurer ist als der Dispo.
+- **Kaution steigt nach Vertragsabschluss nicht mehr:** Die Sicherheitsnachforderung bei Rating B/CCC (0.21.20) entfällt. Bereits nachgeforderte Kautionen werden beim ersten Laden zurückgezahlt (Hinweis im Logbuch).
+- **Warteliste austragen:** Unter Strecken → Slots stehen jetzt alle eigenen Einträge mit „Austragen“; auch bei den Plänen gibt es „austragen“ an jedem Eintrag.
+- **Kein Vorrang nach Zuteilung:** Wer bei der letzten Vergabe an einem Flughafen einen Slot von der Warteliste bekommen hat, hat dort bei der nächsten Vergabe keinen Vorrangplatz; seine Einträge stehen nach Anmeldezeit hinter den Vorrangplätzen. Die Zuteilungen werden gespeichert (`slotGrants`); für die Vergabe am 1. Oktober 2027 werden sie – soweit noch im Logbuch – beim ersten Laden nachgetragen.
+
+## Neu in 0.21.30: Komplettübernahme hebt die Wachstumsgrenzen auf
+
+- **Konzern:** Wer eine Airline komplett übernimmt (Übernahmeangebot unter Konkurrenz → Übernahmen, oder 100 % der Aktien), für den gelten keine Wachstumsgrenzen mehr: keine Höchstzahl an Basen (sonst 4), keine Aufschläge für weitere Basen (Einrichtung und laufende Kosten), Drehkreuz-Ausbau und weitere Übernahmen. Die Zusage der Flughäfen hängt weiter am Ansehen.
+- Gespeichert als `group` an der Airline (Übernahmen mit Namen); Hinweis im Logbuch, Anzeige unter Stationen (Basen) und bei den Übernahmen.
+
+## Neu in 0.21.29: Auslastung nie über 100 % · Speicherformat der Streckenhistorie repariert
+
+- **Ursache der Werte über 100 %:** In 0.21.26 kamen zwei Spalten (geflogene Sitze je Richtung) in die Mitte des Speicherformats der Streckenhistorie. Ältere gespeicherte Tage wurden dadurch um zwei Spalten verschoben gelesen – z. B. landete die Zahl verspäteter Flüge bei „geflogene Sitze“ und der Tag bei „Fracht“. Daraus entstanden Auslastungen über 100 %, falsche Abweisungszahlen und Preisautomatik auf Basis falscher Werte.
+- **Behoben:** Neue Felder stehen jetzt hinten (`HIST_KEYS` = alte Reihenfolge + `so_out`, `so_in`), der Speicherstand trägt `hv: 2`. Stände aus 0.21.26–0.21.28 werden beim Laden erkannt und die verschobenen Tage zurückgeschoben (Erkennung: Tag steht in „cargo“, geflogene Sitze passen nicht). Ältere Stände (23 Spalten) werden direkt richtig gelesen.
+- **Überall dieselbe Auslastung:** Balken je Richtung, Streckenkennzahlen, Seitenleiste, Cockpit, Monatsbericht und Tagesverlauf rechnen mit den Sitzen der tatsächlich geflogenen Flüge; ein Tageswert kann nie unter die Zahl der Passagiere fallen.
+- **Patch-Hinweise** nur noch, wenn die Spielleitung es ausdrücklich wünscht; der nicht angeforderte Hinweis zum Slot-Rating wird nicht mehr gezeigt.
+- **Test:** Simulation mit Premiumkabine, Umsteigern, Preisautomatik und Teilbetrieb – nie mehr Passagiere als Sitze; Rundreise des Speicherformats; Reparatur eines verschobenen Stands.
+
 ## Neu in 0.21.28: Slot-Rating für die Warteliste · höchstens 3 Einträge ab 1. April 2028
 
 - **Slot-Rating (0–100):** je ein Viertel Flotte (inkl. Bestellungen), Slots im Besitz (genutzt an koordinierten Flughäfen plus Reserve), Eigenkapital und Ergebnis seit der letzten Slotvergabe – jeweils im Verhältnis zur größten Airline von Spielenden. Bestimmt die Reihenfolge der Vorrangplätze (der erste Eintrag jeder Airline; niedrigeres Rating zuerst, bei Gleichstand der frühere Eintrag); weitere Einträge folgen nach Anmeldezeit. Anzeige unter Strecken → Slots („Ihr Slot-Rating“, Tooltip mit allen Bausteinen) und in jeder Warteliste.

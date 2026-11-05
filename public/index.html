@@ -6,7 +6,7 @@
 <meta name="description" content="SKYMARKET – Airline-Wirtschaftssimulation: Hauptwelt für alle und private Runden">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b400'/%3E%3Cpath d='M26 16 L20 14.5 L13 6 L10.5 6 L14 14.5 L8 14.5 L6 11.5 L4.5 11.5 L5.5 16 L4.5 20.5 L6 20.5 L8 17.5 L14 17.5 L10.5 26 L13 26 L20 17.5 L26 16Z' fill='%231a1400'/%3E%3C/svg%3E">
 <style>[hidden]{display:none!important}</style>
-<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.28";</script>
+<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.31";</script>
 <title>Skymarket</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2807,11 +2807,17 @@ const SM = (() => {
     const rot = (al ? al.rotH(r) : rotationHours(r.base, r.dest, r.type_id, r.service, r.buffer)) * r.freq;
     return rev - cost - aircraftDayFixedGeneric(r.type_id) * acShareOf(r.type_id, rot / r.freq, r.freq) * h.length;
   }
+  /** Sitze auf geflogenen Flügen eines Tages und einer Richtung; nie weniger als die Passagiere (Schutz gegen unplausible Altwerte). */
+  function opSeats(x, d) {
+    const so = x['so_' + d], seats = x['seats_' + d] || 0, pax = x['pax_' + d] || 0;
+    const v = so !== undefined && so !== null && (so > 0 || x.cancelled > 0) && so <= seats ? so : seats;
+    return Math.max(v, pax);
+  }
   function routeLf(r, days, dir = null) {
     const h = r.hist.slice(-days);
     let s = 0, p = 0;
     // Auslastung der tatsächlich geflogenen Flüge: annullierte Flüge zählen nicht als leere Sitze
-    const so = (x, d) => (x['so_' + d] !== undefined && (x['so_' + d] > 0 || x.cancelled > 0) ? x['so_' + d] : x['seats_' + d]);
+    const so = (x, d) => opSeats(x, d);
     for (const x of h) { if (dir) { s += so(x, dir); p += x['pax_' + dir]; } else { s += so(x, 'out') + so(x, 'in'); p += x.pax; } }
     return s ? p / s : 0;
   }
@@ -3134,8 +3140,13 @@ const SM = (() => {
   /** Ansehen, ab dem n Basen ohne Aufschlag gehen. */
   const basesFreeAt = (n) => (n <= 1 ? 0 : n >= 5 ? 80 : 10 + 20 * (n - 1));
   /** Aufschlag für Basen, Drehkreuze und Übernahmen, die über das Ansehen hinausgehen. */
+  /**
+   * Konzern: Wer eine Airline komplett übernommen hat (Übernahmeangebot oder 100 % der Aktien), für den gelten die Wachstumsgrenzen nicht mehr –
+   * keine Höchstzahl an Basen, keine Aufschläge für Basen, Drehkreuze und Übernahmen.
+   */
+  function limitsLifted(al) { return !!(al && al.isPlayer && (al.group || Object.values(al.stakes || {}).some((s) => s && s.f >= 0.999))); }
   function softX(al, kind, x = 0) {
-    if (!al || !al.isPlayer) return 1;
+    if (!al || !al.isPlayer || limitsLifted(al)) return 1;
     const S = CAREER.soft, st = standing(al), bases = basesFree(st), hub = Math.min(3, Math.floor(st / 25));
     if (kind === 'base') { const ex = Math.max(0, al.bases.length + 1 - bases); return 1 + S.baseX * ex; }
     if (kind === 'baseDay') { const ex = Math.max(0, al.bases.length - bases); return 1 + S.baseDayX * ex; }
@@ -3710,7 +3721,7 @@ const SM = (() => {
      */
     waitQueue(apt) {
       const seen = new Set(), all = (this.slotWait || []).map((e, i) => ({ e, i })).filter((x) => x.e.apt === apt);
-      for (const x of all) { x.first = !seen.has(x.e.al); seen.add(x.e.al); x.s = this.airlines[x.e.al] ? this.slotRating(this.airlines[x.e.al]).score : 0; }
+      for (const x of all) { x.first = !seen.has(x.e.al) && !this.gotLastRound(x.e.al, apt); seen.add(x.e.al); x.s = this.airlines[x.e.al] ? this.slotRating(this.airlines[x.e.al]).score : 0; }
       return all.sort((a, b) => (a.first === b.first ? (a.first ? a.s - b.s || a.i - b.i : a.i - b.i) : a.first ? -1 : 1)).map((x) => x.e);
     }
     /** Ergebnis seit der letzten Slotvergabe (abgeschlossene Monate ab dem Vergabetag plus laufender Monat). */
@@ -3742,12 +3753,14 @@ const SM = (() => {
       for (const k of Object.keys(W0)) { parts[k] = mx[k] > 0 ? clamp(v[k] / mx[k], 0, 1) : 0; score += W0[k] * parts[k]; }
       return { score: Math.round(score * 1000) / 10, parts, v };
     }
-    /** Steht dieser Eintrag auf einem Vorrangplatz (erster Eintrag seiner Airline an diesem Flughafen)? */
-    waitFirst(e) { return (this.slotWait || []).find((x) => x.apt === e.apt && x.al === e.al) === e; }
+    /** Hat diese Airline bei der letzten Vergabe an diesem Flughafen einen Slot von der Warteliste bekommen? Dann kein Vorrang beim nächsten Mal. */
+    gotLastRound(alId, apt) { const d = this.slotGrants && this.slotGrants[apt + '|' + alId]; return d !== undefined && d === this.slotRoundDay; }
+    /** Steht dieser Eintrag auf einem Vorrangplatz (erster Eintrag seiner Airline an diesem Flughafen, kein Slot bei der letzten Vergabe)? */
+    waitFirst(e) { return !this.gotLastRound(e.al, e.apt) && (this.slotWait || []).find((x) => x.apt === e.apt && x.al === e.al) === e; }
     waitPos(e) { return this.waitQueue(e.apt).indexOf(e) + 1; }
     leaveWait(al, id) { const before = (this.slotWait || []).length; this.slotWait = (this.slotWait || []).filter((e) => !(e.id === id && e.al === al.id)); return before !== this.slotWait.length ? { ok: true } : { ok: false, msg: 'Eintrag nicht gefunden.' }; }
     /** Zum 1. April und 1. Oktober: freie Slots an die Warteliste verteilen – reihum je einer in der Reihenfolge von waitQueue (je Airline ein Vorrangplatz nach Slot-Rating), zum aktuellen Preis. */
-    allocateWaitlist() {
+    allocateWaitlist(due = this.day + 1) {
       if (!this.slotWait || !this.slotWait.length) return;
       this.slotWait = this.slotWait.filter((e) => this.airlines[e.al] && this.airlines[e.al].status !== 'insolvent' && e.n > 0);
       for (const apt of [...new Set(this.slotWait.map((e) => e.apt))]) {
@@ -3760,6 +3773,7 @@ const SM = (() => {
             const al = this.airlines[e.al], price = this.slotBuyPrice(apt, 1);
             if (al.spendable(this.macro.bank ?? 1) < price) { if (!e.warned) { al.log(this.day, `Warteliste ${ap(apt).name}: Ein Slot wäre frei, aber für ${Math.round(price / 1000)} Tsd. EUR reicht das Geld nicht – Sie bleiben auf der Liste`, 'warn'); e.warned = true; } e.skip = true; continue; }
             al.slotInvest(apt, price, 1); al.hold(apt, 1, 0, true); e.n--; free--; gave = true; delete e.warned;
+            (this.slotGrants = this.slotGrants || {})[apt + '|' + al.id] = due;   // für den Vorrang bei der nächsten Vergabe
             al.log(this.day, `Warteliste ${ap(apt).name}: 1 Slot zugeteilt (${Math.round(price / 1000)} Tsd. EUR)${e.n ? `, ${e.n} noch offen` : ''}`, 'good');
           }
           if (!gave) break;
@@ -3784,7 +3798,8 @@ const SM = (() => {
         for (const e of drop) { const al = this.airlines[e.al]; if (al) al.log(Math.max(this.day, due), `Warteliste ${ap(e.apt).name}: Eintrag verfallen – je Airline zählen höchstens ${P.WAIT.max} Einträge (die frühesten bleiben)`, 'warn'); }
       }
       const before = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
-      this.allocateWaitlist();
+      this.allocateWaitlist(due);
+      if (this.slotGrants) for (const [k, d] of Object.entries(this.slotGrants)) if (d < due) delete this.slotGrants[k];   // nur die letzte Vergabe zählt
       const after = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
       this.slotRoundDay = due;
       this.pushNews(Math.max(this.day, due), `Slotvergabe zum ${summer ? 'Sommer' : 'Winter'}flugplan: An jedem koordinierten Flughafen gibt es einen Slot mehr${before ? `, ${before - after} von ${before} Slots auf den Wartelisten wurden zugeteilt` : ''}. Nächster Termin: 1. ${summer ? 'Oktober' : 'April'}.`, 'info', null);
@@ -4488,7 +4503,7 @@ const SM = (() => {
         const cfg = apCfgOf(r), last = r.hist.slice(-7), nw = [];
         for (const [dir, fare] of [['out', r.fare_out], ['in', r.fare_in]]) {
           let seats = 0, pax = 0, spill = 0, dem = 0;
-          for (const h of last) { seats += (h['so_' + dir] !== undefined && (h['so_' + dir] > 0 || h.cancelled > 0) ? h['so_' + dir] : h['seats_' + dir]) || 0; pax += h['pax_' + dir] || 0; spill += h['spill_' + dir] || 0; dem += h['demand_' + dir] || 0; }
+          for (const h of last) { seats += opSeats(h, dir); pax += h['pax_' + dir] || 0; spill += h['spill_' + dir] || 0; dem += h['demand_' + dir] || 0; }
           const lf = seats ? pax / seats : 0, gap = lf - r.ap;   // Auslastung der geflogenen Flüge – Ausfälle drücken sie nicht künstlich
           let step = Math.abs(gap) < A.dead ? 0 : clamp(A.gain * gap, -cfg.spd, cfg.spd);
           { const sr = dem > 0 ? spill / dem : 0; if (sr > 0.08 && lf > r.ap - A.dead) step = Math.max(step, cfg.spd * (sr > 0.35 ? 1.6 : sr > 0.2 ? 1.1 : 0.7)); }   // viele Abweisungen: Preis rauf – je mehr, desto schneller
@@ -5330,13 +5345,22 @@ const SM = (() => {
       al.log(this.day, `Bankkredit über ${(amount / 1e6).toFixed(1).replace('.', ',')} Mio. EUR, ${years} Jahre, ${(rate * 100).toFixed(1).replace('.', ',')} % Zins`, 'info');
       return { ok: true, rate, annuity };
     }
+    /** Was die Ablösung kostet und wie viel davon aus dem Dispo käme (Umschuldung: fehlt Guthaben, springt die Kreditlinie ein). */
+    repayQuote(al, ln) {
+      const bank = this.macro.bank ?? 1, cost = ln.balance * 1.01, cash = Math.max(0, al.ledger.cash / 100), free = Math.max(0, al.creditLimit(bank) - (al.creditUsed || 0));
+      const fromCredit = Math.max(0, cost - cash);
+      return { cost, fee: ln.balance * 0.01, fromCredit, ok: fromCredit <= free + 0.01, free, creditRate: al.creditRate(this.macro.rate, bank), newRate: this.loanRate(al) };
+    }
     repayLoan(al, id) {
       const ln = al.loans.find((x) => x.id === id); if (!ln) return { ok: false, msg: 'Diesen Kredit gibt es nicht (mehr).' };
-      if (al.ledger.cash / 100 < ln.balance * 1.01) return { ok: false, msg: 'Dafür reicht der Kontostand nicht.' };
+      const q = this.repayQuote(al, ln);
+      if (!q.ok) return { ok: false, msg: `Dafür reichen Kontostand und Dispo nicht: Es fehlen ${mioTxt(q.fromCredit - q.free)}.` };
+      // Zeitweilig ins Dispo: Der fehlende Betrag wird sofort aus der Kreditlinie gezogen; positive Tage zahlen ihn danach automatisch zurück
+      if (q.fromCredit > 0) { const d = Math.round(q.fromCredit * 100) / 100; al.creditUsed = (al.creditUsed || 0) + d; al.ledger.cashOnly(d, 'credit_draw'); }
       al.ledger.cashOnly(-ln.balance, 'loan_repay'); al.ledger.post('interest', -ln.balance * 0.01, true, `Vorfälligkeit › Bankkredit${ln.id ? ' ' + ln.id : ''}`);
       al.loans = al.loans.filter((x) => x !== ln);
-      al.log(this.day, 'Kredit vorzeitig zurückgezahlt (1 % Vorfälligkeitsgebühr)', 'info');
-      return { ok: true };
+      al.log(this.day, `Kredit vorzeitig zurückgezahlt (1 % Vorfälligkeitsgebühr)${q.fromCredit > 0 ? ` – davon ${mioTxt(q.fromCredit)} vorübergehend aus dem Dispo (${(q.creditRate * 100).toFixed(1).replace('.', ',')} % Zins, wird aus den Einnahmen zurückgeführt)` : ''}`, 'info');
+      return { ok: true, fromCredit: q.fromCredit };
     }
     /** Großereignis: Charteranfragen für Fans, Mannschaften, Pilger – deutlich über der üblichen Rate. */
     eventCharters(ev, y, S, apts) {
@@ -5378,7 +5402,7 @@ const SM = (() => {
     }
     openBase(al, apt) {
       if (al.bases.includes(apt)) return { ok: false, msg: 'Dort sind Sie schon.' };
-      if (al.isPlayer && al.bases.length >= P.BASE_MAX) return { ok: false, msg: `Mehr als ${P.BASE_MAX} Basen sind nicht möglich. Schließen Sie eine Basis, um eine neue zu eröffnen.` };
+      if (al.isPlayer && al.bases.length >= P.BASE_MAX && !limitsLifted(al)) return { ok: false, msg: `Mehr als ${P.BASE_MAX} Basen sind nicht möglich. Schließen Sie eine Basis, um eine neue zu eröffnen.` };
       const appr = baseApproval(al, apt); if (!appr.ok) return { ok: false, msg: appr.msg, rejected: true };
       const lic = Math.max(0, licenceFee(this, apt) * appr.x - (al.stations[apt] ? stationFee(this, apt) : 0)), bx = softX(al, 'base');   // wer dort schon eine Station hat, zahlt nur die Differenz
       const setup = baseSetupCost(this, apt) * bx, sl = al.isPlayer ? baseSlotCost(this, apt, al) : 0;
@@ -6779,10 +6803,12 @@ const SM = (() => {
     // Die übernommene Airline verschwindet vom Markt
     ai.fleet = []; ai.loans = []; ai.creditUsed = 0; ai.ledger.cash = 0; ai.slotHold = {};
     ai.status = 'insolvent'; ai.mergedInto = al.id; ai.mergedDay = day;
+    { const g = al.group || (al.group = { since: day, names: [] }); g.names = [...(g.names || []), ai.name].slice(-10); }   // Konzern: Wachstumsgrenzen aufgehoben
     for (const d of w.deals || []) if (d.status === 'open' && (d.from === ai.id || d.to === ai.id)) d.status = 'expired';
     w.coops = (w.coops || []).filter((c) => c.a !== ai.id && c.b !== ai.id);
     w.agreements = (w.agreements || []).filter((g) => g.airline !== ai.id && g.partner !== ai.id);
     for (const a of w.auctions || []) if (!a.done && a.bids) delete a.bids[ai.id];
+    al.log(day, 'Konzern: Mit der Übernahme gelten für Ihre Airline keine Wachstumsgrenzen mehr – keine Höchstzahl an Basen, keine Aufschläge für Basen, Drehkreuze und Übernahmen.', 'good');
     al.log(day, `Übernahme: ${ai.name} gehört jetzt Ihnen – ${v.fleet} Flugzeuge, ${nR} Strecken, Basen ${ai.bases.join(', ')}, ${staffN} Beschäftigte. Angebot für ${Math.round(v.rest * 100)} % der Aktien: ${Math.round(v.price / 1e5) / 10} Mio. EUR${v.price + ownBook > eqAi ? `, ${Math.round((v.price + ownBook - eqAi) / 1e5) / 10} Mio. EUR über dem Buchwert (sofort abgeschrieben)` : ''}.`, 'good');
     w.pushNews(day, `${al.name} übernimmt ${ai.name}`, 'info', al.id);
     w.operableFreq(al);
@@ -6987,20 +7013,12 @@ const SM = (() => {
    * genau dann, wenn das Geld knapp ist. Ist das Rating 60 Tage nach der Forderung wieder BB oder besser, kommt sie zurück.
    */
   function leaseSecurity(w, al) {
-    const S = P.LEASE_SEC, day = w.day;
-    if (S.ratings.includes(al.rating) && !al.secDep) {
-      const per = {}; let tot = 0;
-      for (const a of al.fleet) if (!a.owned && a.delivery_day <= day) { const x = Math.round((a.leaseMonth || 0) * S.months); if (x > 0) { a.deposit = (a.deposit || 0) + x; per[a.id] = x; tot += x; } }
-      if (tot > 0) {
-        al.ledger.cashOnly(-tot, 'deposit'); al.secDep = { day, amt: tot, per };
-        al.log(day, `Rating ${al.rating}: Die Leasinggeber fordern Sicherheiten nach – ${mioTxt(tot)} zusätzliche Kaution (eine Monatsrate je Leasingflugzeug), sofort fällig. Zurück gibt es sie, sobald das Rating wieder BB oder besser ist.`, 'crit');
-      }
-    } else if (al.secDep && S.back.includes(al.rating) && day - al.secDep.day >= S.hold) {
-      let tot = 0; for (const [id, x] of Object.entries(al.secDep.per || {})) { const a = al.fleet.find((f) => f.id === id && !f.owned); if (a) { const y = Math.min(x, a.deposit || 0); a.deposit -= y; tot += y; } }
-      if (tot > 0) al.ledger.cashOnly(tot, 'deposit_back');
-      al.log(day, `Rating ${al.rating}: Die Leasinggeber geben die zusätzlichen Sicherheiten zurück (${mioTxt(tot)}).`, 'good');
-      delete al.secDep;
-    }
+    // 0.21.31: Die Kaution steigt nach Vertragsabschluss nicht mehr – keine Nachforderung bei schwachem Rating; frühere Nachforderungen kommen zurück
+    if (!al.secDep) return;
+    let tot = 0; for (const [id, x] of Object.entries(al.secDep.per || {})) { const a = al.fleet.find((f) => f.id === id && !f.owned); if (a) { const y = Math.min(x, a.deposit || 0); a.deposit -= y; tot += y; } }
+    if (tot > 0) al.ledger.cashOnly(tot, 'deposit_back');
+    al.log(w.day, `Die Leasinggeber verzichten auf die nachgeforderten Sicherheiten – ${mioTxt(tot)} zusätzliche Kaution zurück. Die Kaution steht mit Vertragsabschluss fest.`, 'good');
+    delete al.secDep;
   }
   /** Prüft, ob beide Seiten eines Handels in einer realistischen Spanne liegen. */
   function tradeFairness(w, A, B, give, take) {
@@ -8043,18 +8061,37 @@ const SM = (() => {
   // ===========================================================================
   // Spielstand (kompakt)
   // ===========================================================================
-  const HIST_KEYS = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'so_out', 'so_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
+  // Reihenfolge = Speicherformat (Spalten). Neue Felder immer HINTEN anfügen – sonst verrutschen gespeicherte Werte!
+  const HIST_KEYS_OLD = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
+  const HIST_KEYS = [...HIST_KEYS_OLD, 'so_out', 'so_in'];
+  // 0.21.26–0.21.28 speicherten mit so_out/so_in in der Mitte – dabei wurden ältere Einträge um zwei Spalten verschoben gelesen
+  const HIST_KEYS_BROKEN = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'so_out', 'so_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
+  const HIST_FORMAT = 2;
+  /**
+   * Reparatur eines Eintrags, der unter 0.21.26–0.21.28 verschoben gelesen wurde: Damals landete z. B. „verspätet“ in so_out,
+   * die Nachfrage in so_in und der Tag in „cargo“. Erkennung: Der Tag (d) passt nicht, steht aber in cargo; geflogene Sitze passen nicht zu den Sitzen.
+   */
+  function histUnshift(o, day) {
+    // Verschobene Einträge: Der Tag steht in „cargo“, in „d“ steht die Premium-Sitzzahl; so_out/so_in enthalten Verspätungen bzw. Nachfrage.
+    const lo = day - 130, isDay = (x) => Number.isInteger(x) && x >= lo && x <= day + 1;
+    const soOk = o.so_out === o.so_in && o.so_out <= o.seats_out && (o.so_out === o.seats_out || o.cancelled > 0) && o.pax_out <= o.so_out && o.pax_in <= o.so_in;
+    if (!(isDay(o.cargo) && (!isDay(o.d) || !soOk))) return o;
+    const t = { ...o };
+    t.late = o.so_out; t.demand_out = o.so_in; t.demand_in = o.late; t.spill_out = o.demand_out; t.spill_in = o.demand_in; t.tr_out = o.spill_out; t.tr_in = o.spill_in;
+    t.cargo = o.tr_out; t.prem = o.tr_in; t.d = o.cargo; t.trd = o.prem; t.ps = o.d; delete t.so_out; delete t.so_in;
+    return t;
+  }
   const AI_HIST_KEYS = ['seats', 'pax', 'rev', 'cost', 'pax_out', 'pax_in', 'seats_out', 'seats_in'];
   const r1 = (x) => Math.round(x * 10) / 10;
   function serialize(w, opt = {}) {
     const aiH = opt.compact ? -8 : -30, plH = opt.compact ? -30 : -60;
     return {
-      v: 4, param: P.VERSION, day: w.day, difficulty: w.difficulty, mode: w.mode || 'free', rivals: w.rivals || null, rng: w.rng.s, macro: w.macro, fuelHist: w.fuelHist.slice(-370),
+      v: 4, hv: HIST_FORMAT, param: P.VERSION, day: w.day, difficulty: w.difficulty, mode: w.mode || 'free', rivals: w.rivals || null, rng: w.rng.s, macro: w.macro, fuelHist: w.fuelHist.slice(-370),
       playerId: w.playerId, order: w.order, news: w.news.slice(-120), events: w.events.filter((e) => e.end + (e.recovery || 0) > w.day - 30), eventCounter: w.eventCounter,
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: keepDeals(w), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      aptObs: w.aptObs || {}, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, auditLog: w.auditLog || [], laborFree: w.laborFree || null, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      aptObs: w.aptObs || {}, slotGrants: w.slotGrants && Object.keys(w.slotGrants).length ? w.slotGrants : undefined, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, auditLog: w.auditLog || [], laborFree: w.laborFree || null, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
@@ -8068,7 +8105,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -8081,7 +8118,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      aptObs: s.aptObs || {}, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, auditLog: s.auditLog || [], laborFree: s.laborFree || null, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, slotGrants: s.slotGrants, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, auditLog: s.auditLog || [], laborFree: s.laborFree || null, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -8107,11 +8144,17 @@ const SM = (() => {
       // ältere Stände: Einstellungen mit sehr langer Wartezeit (früher bis 100 Tage) auf die heutige Höchstdauer kappen
       if (al.staff && al.staff.pipeline) for (const p of al.staff.pipeline) if (p.kind === 'hire' && P.STAFF.lead[p.role] && !p.sched) { const mx = s.day + Math.round(P.STAFF.lead[p.role] * P.STAFF.leadMaxFactor); if (p.ready > mx) p.ready = mx; }
       al.routes = routes.map((r) => {
-        const keys = r.hk ? AI_HIST_KEYS : HIST_KEYS;
+        // Spaltenformat der Historie: hv 2 = heutige Reihenfolge; ohne Angabe: 23 Spalten = alt, 25 Spalten = 0.21.26–28 (verschoben, wird repariert)
+        const keys = r.hk ? AI_HIST_KEYS : null;
         const { hist, hk, ...rr } = r;
         const rt = new Route({ ...rr, hist: [] });
         if (!a.archetype) rt.autoPrice = false;
-        rt.hist = hist.map((arr) => { const o = Object.fromEntries(HIST_KEYS.map((k) => [k, 0])); keys.forEach((k, i) => { o[k] = arr[i] ?? 0; }); return o; });
+        rt.hist = hist.map((arr) => {
+          const ks = keys || (s.hv >= 2 ? HIST_KEYS : arr.length <= HIST_KEYS_OLD.length ? HIST_KEYS_OLD : HIST_KEYS_BROKEN);
+          const o = Object.fromEntries(HIST_KEYS.map((k) => [k, 0])); ks.forEach((k, i) => { o[k] = arr[i] ?? 0; });
+          if (!keys && ks === HIST_KEYS_OLD) { delete o.so_out; delete o.so_in; }   // alte Einträge kennen keine geflogenen Sitze
+          return !keys && ks === HIST_KEYS_BROKEN ? histUnshift(o, s.day || 0) : o;
+        });
         if (!rt.cab) { delete rt.cab; if (a.archetype === 'premium' && !rt.closed) rt.cab = cabClone(P.CABIN.ai); }   // ältere Welten: Premium-KI bekommt Business
         return rt;
       });
@@ -8143,6 +8186,13 @@ const SM = (() => {
     // 0.20: Handelsbilanz für die Wirtschaftsprüfung, Admin-Entfernungen nicht mehr öffentlich
     auditMigrate(w);
     auditCatchUp(w);   // 0.21.21: fehlende Geschäfte nacherfassen
+    for (const h of w.humans) if (h.secDep) leaseSecurity(w, h);   // 0.21.31: nachgeforderte Kautionen sofort zurück
+    // 0.21.31: Zuteilungen der letzten Vergabe aus dem Logbuch nachtragen (soweit noch vorhanden)
+    if (w.slotGrants === undefined) {
+      w.slotGrants = {}; const due = w.slotRoundDay;
+      if (due !== undefined) { const byName = {}; for (const c of AP_CODES) byName[ap(c).name] = c;
+        for (const h of w.humans) for (const e of h.events || []) { if (e.day < due - 1 || e.day > due + 1) continue; const m = /^Warteliste (.+): \d+ Slot zugeteilt/.exec(e.msg || ''); if (m && byName[m[1]]) w.slotGrants[byName[m[1]] + '|' + h.id] = due; } }
+    }
     // 0.21.25: alte (billige) Exklusivverträge laufen nach 180 Tagen aus; bis dahin kein Kartellverfahren dort
     for (const al of w.humans) for (const [apt, g] of Object.entries(al.gateLock || {})) if (!g.until) {
       g.until = w.day + P.GATE_LOCK.oldDays;
@@ -8189,9 +8239,9 @@ const SM = (() => {
   return {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
-    ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
+    ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 
@@ -8792,9 +8842,9 @@ function monthResult(al) {
 // ---------------------------------------------------------------------------
 function rstats(r, days, al = W.player) {
   const h = r.hist.slice(-days);
-  const s = { n: h.length, flights: 0, seats: 0, pax: 0, rev: 0, cost: 0, cancelled: 0, late: 0, demand: 0, spill: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, tr: 0, trd: 0, prem: 0, cargo: 0 };
+  const s = { n: h.length, flights: 0, seats: 0, so: 0, pax: 0, rev: 0, cost: 0, cancelled: 0, late: 0, demand: 0, spill: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, tr: 0, trd: 0, prem: 0, cargo: 0 };
   for (const x of h) {
-    s.flights += x.flights; s.seats += x.seats; s.pax += x.pax; s.rev += x.rev; s.cost += x.cost; s.cancelled += x.cancelled; s.late += x.late || 0;
+    s.flights += x.flights; s.seats += x.seats; s.so += SM.opSeats(x, 'out') + SM.opSeats(x, 'in'); s.pax += x.pax; s.rev += x.rev; s.cost += x.cost; s.cancelled += x.cancelled; s.late += x.late || 0;
     s.demand += (x.demand_out || 0) + (x.demand_in || 0); s.spill += (x.spill_out || 0) + (x.spill_in || 0);
     s.pax_out += x.pax_out; s.pax_in += x.pax_in; s.seats_out += x.seats_out; s.seats_in += x.seats_in; s.tr += (x.tr_out || 0) + (x.tr_in || 0); s.trd += x.trd || 0; s.prem += x.prem || 0; s.cargo += x.cargo || 0;
   }
@@ -8802,7 +8852,7 @@ function rstats(r, days, al = W.player) {
   void rot;   // Flugzeugzeit wie in der Engine: Anteil am Betriebsfenster des Musters (Langstrecke 22 h), lange Umläufe binden ganze Flugzeuge
   s.acCost = SM.aircraftDayFixedGeneric(r.type_id) * SM.acShareOf(r.type_id, al.rotH(r), r.freq) * s.n;
   s.db1 = s.rev - s.cost; s.db2 = s.db1 - s.acCost;
-  s.lf = s.seats ? s.pax / s.seats : 0;
+  s.lf = s.so ? s.pax / s.so : 0;   // Auslastung der geflogenen Flüge (wie die Balken je Richtung)
   s.avgFare = s.pax ? (s.rev / s.pax) - P.SERVICE[r.service].ancillary * cpi() : 0;
   s.otp = s.flights ? 1 - (s.late + s.cancelled) / s.flights : null;
   return s;
@@ -9096,8 +9146,8 @@ function renderSidebar() {
   const sb = $('#sidebar'); if (!sb || getComputedStyle(sb).display === 'none') return;
   const pl = W.player, bs = SM.balanceSheet(pl), h = netHistOf(pl), nc = netCash(pl);
   const routes = pl.activeRoutes(), s7 = routes.map((r) => rstats(r, 7)), s14 = routes.map((r) => rstats(r, 14));
-  const seats7 = s7.reduce((a, x) => a + x.seats, 0), pax7 = s7.reduce((a, x) => a + x.pax, 0);
-  const seats14 = s14.reduce((a, x) => a + x.seats, 0) - seats7, pax14 = s14.reduce((a, x) => a + x.pax, 0) - pax7;
+  const seats7 = s7.reduce((a, x) => a + x.so, 0), pax7 = s7.reduce((a, x) => a + x.pax, 0);
+  const seats14 = s14.reduce((a, x) => a + x.so, 0) - seats7, pax14 = s14.reduce((a, x) => a + x.pax, 0) - pax7;
   const lf = seats7 ? pax7 / seats7 : null, lfPrev = seats14 ? pax14 / seats14 : null, otp = playerOtp();
   const cashPrev = h.length > 30 ? h[h.length - 31] : h[0];
   const sbHtml = `
@@ -9153,7 +9203,7 @@ function onUserMenu(k) {
 VIEWS.dashboard = function viewDashboard() {
   const pl = W.player, L = pl.ledger, F = fltState('dash'), routes = pl.activeRoutes(), froutes = routes.filter((r) => (!F.base || r.base === F.base) && (!F.type || r.type_id === F.type));
   const s30 = froutes.map((r) => ({ r, s: rstats(r, 30) })), s7 = routes.map((r) => rstats(r, 7));
-  const seats7 = s7.reduce((a, x) => a + x.seats, 0), pax7 = s7.reduce((a, x) => a + x.pax, 0), lf7 = seats7 ? pax7 / seats7 : null;
+  const seats7 = s7.reduce((a, x) => a + x.so, 0), pax7 = s7.reduce((a, x) => a + x.pax, 0), lf7 = seats7 ? pax7 / seats7 : null;
   const spill = s30.reduce((a, x) => a + x.s.spill, 0), dem = s30.reduce((a, x) => a + x.s.demand, 0);
   const cur = pnlCol(L.month), prev = L.months.length ? pnlCol(L.months.at(-1).acc) : null;
   const nc = netCash(pl), otp = playerOtp();
@@ -9231,7 +9281,7 @@ VIEWS.dashboard = function viewDashboard() {
 VIEWS.cockpit = function viewCockpit() {
   const pl = W.player, bs = SM.balanceSheet(pl), routes = pl.activeRoutes();
   const st7 = routes.map((r) => rstats(r, 7)), st30 = routes.map((r) => rstats(r, 30));
-  const seats = st7.reduce((s, x) => s + x.seats, 0), pax = st7.reduce((s, x) => s + x.pax, 0);
+  const seats = st7.reduce((s, x) => s + x.so, 0), pax = st7.reduce((s, x) => s + x.pax, 0);
   const db2 = st30.reduce((s, x) => s + x.db2 / Math.max(x.n, 1), 0);
   const otp = playerOtp();
   const last = pl.ledger.months.at(-1);
@@ -9384,7 +9434,7 @@ VIEWS.plans = function viewPlans() {
     const waits = (W.slotWait || []).filter((e) => e.plan === x.id);
     const acHere = pl.fleet.filter((a) => a.type_id === x.type && a.base === x.base).length;
     const sc = W.slotCost(pl, x.base, x.dest, r ? Math.max(0, x.freq - r.freq) : x.freq).cost, st = !r && !pl.stations[x.dest] ? SM.stationFee(W, x.dest) : 0;
-    const slots = ready ? '<span class="chip good">alle Slots da</span>' : Object.entries(miss).map(([a, n]) => { const e = waits.find((y) => y.apt === a); if (!e) return `<span class="chip crit">${a}: ${n} fehl${n > 1 ? 'en' : 't'} · nicht auf der Warteliste</span>`; const g = W.waitForecast(a).byId[e.id] || 0; return `<span class="chip ${g >= n ? 'good' : 'warn'}" title="Prognose für den nächsten Vergabetermin: ${g} von ${n} Slots">${a}: ${n} fehl${n > 1 ? 'en' : 't'} · Platz ${W.waitPos(e)} · am ${dateShort(SM.nextSlotDay(W.day).day)} ${g >= n ? 'voraussichtlich alle' : g ? `voraussichtlich ${g}` : 'voraussichtlich keiner'}</span>`; }).join(' ');
+    const slots = ready ? '<span class="chip good">alle Slots da</span>' : Object.entries(miss).map(([a, n]) => { const e = waits.find((y) => y.apt === a); if (!e) return `<span class="chip crit">${a}: ${n} fehl${n > 1 ? 'en' : 't'} · nicht auf der Warteliste</span>`; const g = W.waitForecast(a).byId[e.id] || 0; return `<span class="chip ${g >= n ? 'good' : 'warn'}" title="Prognose für den nächsten Vergabetermin: ${g} von ${n} Slots">${a}: ${n} fehl${n > 1 ? 'en' : 't'} · Platz ${W.waitPos(e)} · am ${dateShort(SM.nextSlotDay(W.day).day)} ${g >= n ? 'voraussichtlich alle' : g ? `voraussichtlich ${g}` : 'voraussichtlich keiner'}</span> <button class="btn small ghost" data-act="slotleave" data-id="${e.id}" title="Von der Warteliste streichen">austragen</button>`; }).join(' ');
     return `<div class="card pad stack"><div class="spread"><div><b class="mono" style="font-size:16px">${x.base}–${x.dest}</b> <span class="small muted">${esc(apName(x.dest))} · ${n0(SM.gcDistanceKm(x.base, x.dest))} km</span></div><span class="small muted">gespeichert ${dateShort(x.day)}</span></div>
       <div class="small">${r ? `Frequenz von ${r.freq}× auf <b>${x.freq}× täglich</b>` : `<b>${x.freq}× täglich</b> · ${tlx(x.type)} · Tarif ${eur(x.fo)} / ${eur(x.fi)}`}</div>
       <div class="row" style="gap:6px;flex-wrap:wrap">${slots} ${r ? '' : acHere ? `<span class="chip">${acHere}× ${x.type} in ${x.base} stationiert</span>` : `<span class="chip warn">kein ${x.type} in ${x.base} – vorher beschaffen</span>`}</div>
@@ -10230,8 +10280,8 @@ VIEWS.stations = function viewStations() {
   const lim = bx > 1 ? `Eine weitere Basis ist für Ihr Ansehen (${stv}) ein großer Schritt: Einrichtung ×${NF1.format(bx)}, laufende Kosten aller Basen +${n0(SM.CAREER.soft.baseDayX * 100 * Math.max(1, pl.bases.length + 1 - SM.basesFree(stv)))} %. Ohne Aufschlag ab Ansehen ${SM.basesFreeAt(pl.bases.length + 1)}.` : '';
   html += `<div class="card pad stack"><h3>Neue Basis beantragen</h3><p class="small ink2">Eine Basis erlaubt Strecken von dort aus und Umsteigeverbindungen über diesen Flughafen. Die Flughafengesellschaft prüft jeden Antrag nach dem <b>Ansehen</b> Ihrer Airline (jetzt ${stv} von 100): kleine Flughäfen sagen jedem zu, mittlere ab ${SB.baseReq.m}, große ab ${SB.baseReq.l}, Drehkreuze ab ${SB.baseReq.x}. Bis ${SB.baseCond} Punkte darunter gibt es eine Zusage unter Auflagen (Lizenz ×${NF1.format(SB.baseCondX)}), sonst eine Absage. Betriebslizenz nach Größe: klein bis 100 Tsd. €, mittel 100–500 Tsd. €, groß 1–2 Mio. €, Drehkreuz 2,5–4 Mio. €. Haben Sie dort schon eine Station, wird deren Gebühr angerechnet.</p>
     ${lim ? `<div class="callout warn">${esc(lim)}</div>` : ''}
-    ${pl.bases.length >= P.BASE_MAX ? `<div class="callout info"><b>${pl.bases.length} von höchstens ${P.BASE_MAX} Basen</b><span class="small">Eine neue Basis gibt es erst, wenn Sie eine bestehende schließen.</span></div>` : `<p class="small muted">${pl.bases.length} von höchstens ${P.BASE_MAX} Basen.</p>`}
-    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.status !== 'insolvent' && x.bases.includes(c)), a = SM.baseApproval(pl, c); return `<option value="${c}" ${c === pick ? 'selected' : ''}>${a.ok ? (a.cond ? '◐ ' : '✓ ') : '✕ '}${c} · ${apName(c)} · ${a.ok ? `einmalig ${eur(newBaseCost(pl, c))}, ${eur(SM.baseDayCost(c) * 30.4 * cpi())}/Monat` : `abgelehnt (Ansehen ${a.req - SB.baseCond} nötig)`}${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button ${pl.bases.length >= P.BASE_MAX ? 'disabled' : ''} class="btn" data-act="openbase" id="openbaseBtn" ${apPick.ok ? '' : 'disabled'}>${newBaseBtnTxt(pl, pick)}</button></div>
+    ${SM.limitsLifted(pl) ? `<div class="callout good"><b>Konzern: keine Höchstzahl an Basen</b><span class="small">${pl.group && pl.group.names && pl.group.names.length ? `Nach der Übernahme von ${esc(pl.group.names.join(', '))}` : 'Mit 100 % an einer anderen Airline'} gelten für Sie keine Wachstumsgrenzen: beliebig viele Basen, keine Aufschläge für Basen, Drehkreuze und Übernahmen. Die Flughäfen entscheiden weiter nach Ihrem Ansehen.</span></div>` : pl.bases.length >= P.BASE_MAX ? `<div class="callout info"><b>${pl.bases.length} von höchstens ${P.BASE_MAX} Basen</b><span class="small">Eine neue Basis gibt es erst, wenn Sie eine bestehende schließen.</span></div>` : `<p class="small muted">${pl.bases.length} von höchstens ${P.BASE_MAX} Basen. Wer eine Airline komplett übernimmt, ist an diese Grenze nicht mehr gebunden.</p>`}
+    <div class="row"><select id="newbase" style="width:auto">${cand.map((c) => { const al = W.list.find((x) => x.archetype && x.status !== 'insolvent' && x.bases.includes(c)), a = SM.baseApproval(pl, c); return `<option value="${c}" ${c === pick ? 'selected' : ''}>${a.ok ? (a.cond ? '◐ ' : '✓ ') : '✕ '}${c} · ${apName(c)} · ${a.ok ? `einmalig ${eur(newBaseCost(pl, c))}, ${eur(SM.baseDayCost(c) * 30.4 * cpi())}/Monat` : `abgelehnt (Ansehen ${a.req - SB.baseCond} nötig)`}${al ? ' · Basis ' + al.name : ''}</option>`; }).join('')}</select><button ${pl.bases.length >= P.BASE_MAX && !SM.limitsLifted(pl) ? 'disabled' : ''} class="btn" data-act="openbase" id="openbaseBtn" ${apPick.ok ? '' : 'disabled'}>${newBaseBtnTxt(pl, pick)}</button></div>
     <p class="small muted" id="newbaseNote">${apPick.msg ? esc(apPick.msg) : `${apName(pick)}: Zusage ohne Auflagen.`}</p></div>`;
   const slotApts = Object.keys(pl.stations).filter((c) => P.AIRPORTS[c]).sort();
   html += `<div class="stack"><h2 class="sec">Slots <small>Flughäfen in Ihrem Netz</small></h2><table class="t"><thead><tr><th>Flughafen</th><th class="r">für Sie frei</th><th class="r">Entgelt je Bewegung</th></tr></thead><tbody>${slotApts.map((c) => `<tr><td>${c} · ${apName(c)}</td><td class="r">${slotTxt(c)}</td><td class="r">${eur(SM.apx(c).slotFee * cpi())}</td></tr>`).join('')}</tbody></table>
@@ -10609,7 +10659,7 @@ function slotCardHtml(c, pl, nsd) {
   const myTxt = mine.length ? mine.map((e) => { const g = fc.byId[e.id] || 0; return `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><span>Platz <b>${W.waitPos(e)}</b> von ${q.length} · ${e.n} Slot${e.n > 1 ? 's' : ''}${e.plan ? ' für einen Plan' : ''}</span><span class="chip ${g >= e.n ? 'good' : g ? 'warn' : 'crit'}">am ${dateShort(nsd.day)} voraussichtlich ${g} von ${e.n}</span><button class="btn small ghost" data-act="slotleave" data-id="${e.id}">austragen</button></div>`; }).join('') : '';
   const queue = q.length ? `<details class="fold" data-keep="sq-${c}" ${ui.open && ui.open['sq-' + c] ? 'open' : ''}><summary><span class="small"><b>Warteliste ${c}</b> · ${q.length} Einträge, ${qn} Slots angefragt</span><span class="fold-hint">${ui.open && ui.open['sq-' + c] ? 'einklappen' : 'Reihenfolge'}</span></summary>
       <p class="small muted">Reihenfolge: Der erste Eintrag jeder Airline hat Vorrang – niedrigeres Slot-Rating zuerst (Flotte, Slots im Besitz, Eigenkapital, Ergebnis seit der letzten Vergabe), bei Gleichstand wer sich früher eingetragen hat. Weitere Einträge folgen danach in der Reihenfolge der Anmeldung. Vergeben wird reihum je ein Slot.</p>
-      <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}${a ? ` <span class="muted" title="${esc(ratingTip(a))}">· Rating ${n0(W.slotRating(a).score)}${W.waitFirst(e) ? ' · Vorrang' : ''}${waitExpires(e) ? ' · verfällt am 1. April' : ''}</span>` : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
+      <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}${a ? ` <span class="muted" title="${esc(ratingTip(a))}">· Rating ${n0(W.slotRating(a).score)}${W.waitFirst(e) ? ' · Vorrang' : W.gotLastRound(e.al, e.apt) ? ' · kein Vorrang (Slot zuletzt erhalten)' : ''}${waitExpires(e) ? ' · verfällt am 1. April' : ''}</span>` : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
   const buy = free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen · ${eurB(W.slotBuyPrice(c, 1))}</button>${free > 1 ? ` <button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="all">alle ${free} · ${eurB(W.slotBuyPrice(c, free))}</button>` : ''}` : `<button class="btn small primary" data-act="slotwait" data-apt="${c}" data-n="1">${mine.some((e) => !e.plan) ? '+1 auf der Warteliste' : 'Auf die Warteliste'}</button>`;
   return `<div class="slotrow"><div class="slothead"><div><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}${isBase ? ' · Basis' : used ? '' : ' · noch nicht im Netz'}</span></div><span class="small muted" title="1 Slot je 200.000 Passagiere im Jahr. Einen Teil halten Airlines außerhalb des Spiels (Bestandsverkehr).">${W.slotCap[c] ?? X.simCap} Slots im Spiel</span></div>
     <div class="slotstats"><div><span>von Ihnen genutzt</span><b>${used}</b><em>tägliche Flüge</em></div><div><span>Ihre Reserve</span><b>${bought || '–'}</b><em>${bought ? 'frei für neue Flüge' : 'keine'}</em></div><div><span>sofort frei</span><b class="${free <= 0 ? 'neg' : ''}">${free}</b><em>${free > 0 ? 'je ' + eurB(W.slotBuyPrice(c, 1)) : q.length ? 'gehen an die Warteliste' : 'voll'}</em></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${q.length ? Math.min(total, qn) : '–'}</b><em>${q.length ? `an ${q.length} Wartende` : 'keine Warteliste'}</em></div></div>
@@ -10627,7 +10677,11 @@ VIEWS.slots = function viewSlots() {
   let html = `<h2 class="sec">Slots <small>kaufen, Warteliste, Vergabetermine</small></h2>
     <div class="slotdate"><div><span class="small muted">Nächste Slotvergabe</span><b>${dateLong(nsd.day)}</b><span class="small">${nsd.summer ? 'Sommerflugplan' : 'Winterflugplan'} · in ${nsIn} Tag${nsIn === 1 ? '' : 'en'}</span></div>
       <div class="slotsum"><div><span>Flughäfen mit Warteliste</span><b>${qApts.length}</b></div><div><span>angefragt / vergeben</span><b>${ask} / ${give}</b></div><div><span>Ihre Einträge</span><b>${myQ.length ? `${myGot} von ${myAsk}` : '–'}</b><em>${myQ.length ? `Slots voraussichtlich · ${myQ.length} von ${nsd.day >= P.WAIT.from ? P.WAIT.max : P.WAIT.maxOld} Einträgen` : 'keine'}</em></div><div title="${esc(ratingTip(pl))}"><span>Ihr Slot-Rating</span><b>${n0(W.slotRating(pl).score)}</b><em>von 100 · niedriger = früher dran</em></div></div>
-      <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Der erste Eintrag jeder Airline hat Vorrang – niedrigeres <b>Slot-Rating</b> zuerst, egal wann eingetragen; bei Gleichstand zählt der frühere Eintrag. Weitere Einträge derselben Airline stehen danach in der Reihenfolge der Anmeldung.</li><li>Slot-Rating (0–100): je ein Viertel Flotte (inkl. Bestellungen), Slots im Besitz, Eigenkapital und Ergebnis seit der letzten Vergabe – jeweils gemessen an der größten Airline im Spiel.</li><li>Ab der Vergabe am 1. April 2028 höchstens ${P.WAIT.max} Einträge je Airline; weitere verfallen dann (die frühesten bleiben).</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
+      <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Der erste Eintrag jeder Airline hat Vorrang – niedrigeres <b>Slot-Rating</b> zuerst, egal wann eingetragen; bei Gleichstand zählt der frühere Eintrag. Weitere Einträge derselben Airline stehen danach in der Reihenfolge der Anmeldung.</li><li>Wer bei der letzten Vergabe an einem Flughafen einen Slot von der Warteliste bekommen hat, hat dort beim nächsten Mal keinen Vorrang – seine Einträge stehen nach Anmeldezeit hinter den Vorrangplätzen.</li><li>Slot-Rating (0–100): je ein Viertel Flotte (inkl. Bestellungen), Slots im Besitz, Eigenkapital und Ergebnis seit der letzten Vergabe – jeweils gemessen an der größten Airline im Spiel.</li><li>Ab der Vergabe am 1. April 2028 höchstens ${P.WAIT.max} Einträge je Airline; weitere verfallen dann (die frühesten bleiben).</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
+    ${myQ.length ? `<div class="card pad stack"><h3>Ihre Wartelisten-Einträge <small class="muted">${myQ.length}${nsd.day >= P.WAIT.from ? ` von höchstens ${P.WAIT.max}` : ''}</small></h3>
+      <div class="stack" style="gap:6px">${myQ.map((e) => { const g = W.waitForecast(e.apt).byId[e.id] || 0, pl0 = e.plan && (pl.plans || []).find((x) => x.id === e.plan);
+        return `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b class="mono">${e.apt}</b><span class="small">${esc(apName(e.apt))} · ${e.n} Slot${e.n > 1 ? 's' : ''}${pl0 ? ` für Plan ${pl0.base}–${pl0.dest}` : ''} · Platz ${W.waitPos(e)}${W.waitFirst(e) ? ' (Vorrang)' : W.gotLastRound(pl.id, e.apt) ? ' (kein Vorrang – Slot bei der letzten Vergabe erhalten)' : ''}${waitExpires(e) ? ' · verfällt am 1. April' : ''}</span><span class="chip ${g >= e.n ? 'good' : g ? 'warn' : 'crit'}">voraussichtlich ${g} von ${e.n}</span><button class="btn small" data-act="slotleave" data-id="${e.id}">Austragen</button></div>`; }).join('')}</div>
+      <p class="small muted">Austragen geht jederzeit und kostet nichts – bezahlt wird erst bei der Zuteilung.</p></div>` : ''}
     <div class="card pad stack"><h3>Slots sichern <small class="muted">ohne Streckenplanung</small></h3>
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="f" style="flex:3;min-width:200px"><span>Flughafen</span><input type="search" id="slot-apt" list="slot-apts" placeholder="Code oder Name, z. B. FRA" value="${esc(st.apt ? st.apt + ' · ' + apName(st.apt) : '')}" autocomplete="off"></label>
         <label class="f" style="flex:1;min-width:90px"><span>Anzahl</span><input type="number" id="slot-n" min="1" max="8" value="${st.n}"></label></div>
@@ -10795,7 +10849,7 @@ function histSeries(view) {
     r.hist.forEach((h, i) => {
       const d = h.d || (W.day - (r.hist.length - i));
       const x = by.get(d) || { d, rev: 0, cost: 0, fix: 0, pax: 0, seats: 0, fl: 0, late: 0, canc: 0, prem: 0, tr: 0, n: 0 };
-      x.rev += h.rev || 0; x.cost += h.cost || 0; x.fix += fix; x.pax += h.pax || 0; x.seats += h.seats || 0; x.fl += h.flights || 0; x.late += h.late || 0; x.canc += h.cancelled || 0; x.prem += h.prem || 0; x.tr += (h.tr_out || 0) + (h.tr_in || 0); x.n++;
+      x.rev += h.rev || 0; x.cost += h.cost || 0; x.fix += fix; x.pax += h.pax || 0; x.seats += SM.opSeats(h, 'out') + SM.opSeats(h, 'in');   // Sitze der geflogenen Flüge x.fl += h.flights || 0; x.late += h.late || 0; x.canc += h.cancelled || 0; x.prem += h.prem || 0; x.tr += (h.tr_out || 0) + (h.tr_in || 0); x.n++;
       by.set(d, x);
     });
   }
@@ -11211,7 +11265,8 @@ VIEWS.credit = function viewCredit() {
   // Kredite
   const lim = W.loanLimit(pl), rate = W.loanRate(pl);
   html += `<div class="card pad stack"><h3>Neuer Bankkredit</h3>
-    ${pl.loans.length ? `<table class="t"><thead><tr><th>Kredit</th><th class="r">Rest</th><th class="r">Zins</th><th class="r">Rate/Mon.</th><th></th></tr></thead><tbody>${pl.loans.map((l) => `<tr><td>${dateShort(l.day)} · ${l.years} J.</td><td class="r">${eur(l.balance)}</td><td class="r">${pct(l.rate, 1)}</td><td class="r">${eur(l.annuity)}</td><td class="r"><button class="btn small" data-act="repay" data-id="${l.id}">Ablösen</button></td></tr>`).join('')}</tbody></table>` : ''}
+    ${pl.loans.length ? `<table class="t"><thead><tr><th>Kredit</th><th class="r">Rest</th><th class="r">Zins</th><th class="r">Rate/Mon.</th><th></th></tr></thead><tbody>${pl.loans.map((l) => `<tr><td>${dateShort(l.day)} · ${l.years} J.</td><td class="r">${eur(l.balance)}</td><td class="r">${pct(l.rate, 1)}</td><td class="r">${eur(l.annuity)}</td><td class="r">${(() => { const q = W.repayQuote(pl, l); return `<button class="btn small" data-act="repay" data-id="${l.id}" ${q.ok ? '' : 'disabled'} title="${q.ok ? `Kostet ${eur(q.cost)} inkl. 1 % Vorfälligkeit${q.fromCredit > 0 ? `; davon ${eur(q.fromCredit)} vorübergehend aus dem Dispo` : ''}` : 'Kontostand und Dispo reichen nicht'}">Ablösen</button>${q.fromCredit > 0 && q.ok ? `<div class="small muted">${eurB(q.fromCredit)} aus dem Dispo</div>` : ''}${l.rate > q.creditRate + 0.0005 ? '<div class="small pos">teurer als der Dispo</div>' : ''}`; })()}</td></tr>`).join('')}</tbody></table>
+      <p class="small muted">Ablösen kostet 1 % Vorfälligkeit. Reicht das Guthaben nicht, springt der Dispo ein (heute ${pct(W.repayQuote(pl, pl.loans[0]).creditRate, 1)} Zins, variabel); Einnahmen führen ihn danach automatisch zurück. Lohnt sich vor allem, wenn der alte Kredit teurer ist als Dispo oder ein neuer Kredit (heute ${pct(rate, 1)}) – etwa nach einem besseren Rating.</p>` : ''}
     <div class="row small"><span>Betrag</span><div class="seg">${[1e6, 2e6, 5e6, 10e6].map((v) => `<button data-act="lq" data-k="amount" data-v="${v}" aria-pressed="${ui.loan.amount === v}">${n0(v / 1e6)} Mio.</button>`).join('')}</div>
       <span>Laufzeit</span><div class="seg">${[3, 5, 8].map((v) => `<button data-act="lq" data-k="years" data-v="${v}" aria-pressed="${ui.loan.years === v}">${v} J.</button>`).join('')}</div></div>
     <p class="small ink2">Bei Rating ${pl.rating} gibt die Bank bis ${eur(lim)} zu ${pct(rate, 1)} Zins. Monatsrate für ${eur(ui.loan.amount)}: ${eur(ui.loan.amount * (rate / 12) / (1 - (1 + rate / 12) ** -(ui.loan.years * 12)))}.</p>
@@ -11448,6 +11503,7 @@ function maHtml() {
     ${rows.map(({ a, v }) => { const c = ui.confirm === 'ma:' + a.id; return `<tr><td><span class="lgi">${logoSvg(a, 18)}</span> ${esc(a.name)}<div class="small muted">Basis ${v.bases.join(', ')}</div></td><td class="r">${v.fleet} · ${v.routes}</td><td class="r">${eur(v.equity)}<div class="small ${v.profM < 0 ? 'neg' : 'pos'}">${eur(v.profM, { plus: true })}</div></td><td class="r">${v.f ? `${pct(v.f, 1)} · ` : ''}<b>${eur(v.price)}</b>
       ${v.anchor > 0.001 ? `<div class="small muted">inkl. ${pct(v.anchor)} Ankeraktionäre (+${eurB(v.ancX)})</div>` : ''}<div>${SM.maBlock(W, pl, a) ? `<span class="small muted" title="${esc(SM.maBlock(W, pl, a))}">Ankeraktionäre verkaufen nicht</span>` : c ? `<span class="small">Wirklich kaufen?</span> <button class="btn small danger" data-act="takeover" data-id="${a.id}">Ja, für ${eurB(v.price)} übernehmen</button> <button class="btn small" data-act="cancelconfirm">Nein</button>` : `<button class="btn small ${free >= v.price ? 'primary' : ''}" data-act="askma" data-id="${a.id}" ${free >= v.price ? '' : 'disabled title="Dafür reicht das Geld nicht"'}>Übernehmen</button>`}</div></td></tr>`; }).join('')}
     </tbody></table></div>
+    <div class="callout ${SM.limitsLifted(pl) ? 'good' : 'info'}"><b>${SM.limitsLifted(pl) ? 'Konzern: Wachstumsgrenzen aufgehoben' : 'Nach einer Komplettübernahme gelten keine Wachstumsgrenzen mehr'}</b><span class="small">Keine Höchstzahl an Basen (sonst ${P.BASE_MAX}), keine Aufschläge für weitere Basen, Drehkreuz-Ausbau und Übernahmen. Gilt nach einem Übernahmeangebot oder mit 100 % der Aktien einer anderen Airline.</span></div>
     <p class="small muted">Komplettübernahme: Angebot für alle Aktien, die Sie noch nicht haben – ohne Mehrheit Börsenwert × ${NF1.format(P.CAPITAL.hostile)} (feindlich), mit Mehrheit × ${NF1.format(P.CAPITAL.tender)}${mx > 1 ? `, dazu ×${NF1.format(mx)} für Ihr Ansehen` : ''}, Ankeraktionäre großer Airlines +${pct(P.CAPITAL.anchor.prem)} auf ihren Anteil. Günstiger geht es Schritt für Schritt: erst unter <a href="#" data-act="tab" data-tab="exchange">Börse</a> Anteile kaufen (anteiliger Gewinn und Dividenden inklusive), ab 50 % den Rest übernehmen. Sie übernehmen alles: Flugzeuge mit Leasingverträgen und Krediten, Strecken samt Slots, Basen, Personal, Kasse und Bankschulden. Die Prämie über dem Buchwert wird sofort abgeschrieben.</p></div>`;
 }
 
@@ -12759,7 +12815,7 @@ function assistantAfterDays(prev) {
   }
   if (a.rep && SM.monthOf(W.day) !== SM.monthOf(prev.day) && pl.ledger.months.length) {
     const lm = pl.ledger.months.at(-1), c = pnlCol(lm.acc), routes = pl.activeRoutes(), s = routes.map((r) => rstats(r, 30));
-    const seats = s.reduce((x, y) => x + y.seats, 0), pax = s.reduce((x, y) => x + y.pax, 0);
+    const seats = s.reduce((x, y) => x + y.so, 0), pax = s.reduce((x, y) => x + y.pax, 0);
     const best = routes.map((r, i) => ({ r, d: s[i].db2 / Math.max(1, s[i].n) })).sort((x, y) => y.d - x.d)[0];
     const tip = { fin: c.net < 0 ? 'Wir verbrennen Geld – ich würde die schwächste Strecke hart prüfen.' : 'Solide. Ein Teil des Gewinns gehört als Reserve aufs Konto.',
       ops: `Pünktlichkeit ${playerOtp() === null ? '–' : pct(playerOtp())}, Stimmung ${pct(pl.staff.morale)}.`,
@@ -12917,7 +12973,7 @@ function onPaneClick(e) {
     case 'study': { const res = doAction({ type: 'study', a: b.dataset.a, b: b.dataset.b }); if (res.ok) toast(`Studie beauftragt, fertig in ${res.days} Tagen.`); refreshAll(); break; }
     case 'lq': ui.loan[b.dataset.k] = Number(b.dataset.v); renderPane(true); break;
     case 'loan': { const res = doAction({ type: 'loan', amount: ui.loan.amount, years: ui.loan.years }); if (res.ok) toast(`Kredit ausgezahlt. Rate ${eur(res.annuity)} pro Monat.`); refreshAll(); break; }
-    case 'repay': { if (doAction({ type: 'repay', id: b.dataset.id }).ok) toast('Kredit abgelöst.'); refreshAll(); break; }
+    case 'repay': { const r = doAction({ type: 'repay', id: b.dataset.id }); if (r.ok) toast(r.fromCredit > 0 ? `Kredit abgelöst – ${eur(r.fromCredit)} vorübergehend aus dem Dispo.` : 'Kredit abgelöst.'); refreshAll(); break; }
     case 'decide': doAction({ type: 'decide', id: b.dataset.id, choice: b.dataset.choice }); refreshAll(); break;
     default: break;
   }
@@ -14608,7 +14664,7 @@ function boot(hotData) {
   $('#pane').addEventListener('click', onPaneClick);
   $('#pane').addEventListener('change', onPaneChange);
   initCal();
-  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'), a = SM.baseApproval(W.player, e.target.value), nt = $('#newbaseNote'); if (bt) { bt.textContent = newBaseBtnTxt(W.player, e.target.value); bt.disabled = !a.ok || W.player.bases.length >= P.BASE_MAX; } if (nt) nt.textContent = a.msg || `${apName(e.target.value)}: Zusage ohne Auflagen.`; } });
+  $('#pane').addEventListener('change', (e) => { if (e.target.id === 'newbase') { ui.newBasePick = e.target.value; const bt = $('#openbaseBtn'), a = SM.baseApproval(W.player, e.target.value), nt = $('#newbaseNote'); if (bt) { bt.textContent = newBaseBtnTxt(W.player, e.target.value); bt.disabled = !a.ok || (W.player.bases.length >= P.BASE_MAX && !SM.limitsLifted(W.player)); } if (nt) nt.textContent = a.msg || `${apName(e.target.value)}: Zusage ohne Auflagen.`; } });
   $('#pane').addEventListener('input', (e) => {
     if (onCabRange(e, false) || onFltInput(e.target)) return;
     if (e.target.id && e.target.id.startsWith('hire-')) { const k = e.target.id.slice(5), bt = $('#hirebtn-' + k), n = Math.floor(Number(e.target.value)); if (bt && n > 0) bt.textContent = hireLbl(bt.dataset.role, n); }

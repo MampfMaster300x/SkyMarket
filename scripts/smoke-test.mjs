@@ -169,8 +169,8 @@ assert.equal(tim.admin, true, 'Tim ist Admin');
   assert.ok(rb && rb.total === 0 && !rb.sessions, 'Ben: Fenster im Hintergrund zählt nicht');
   // 0.21.26: Patch-Hinweis einmal je Konto
   { const ua = await store.get('users/anna', { type: 'json' }); delete ua.patchSeen; await store.setJSON('users/anna', ua);   // Konto von vor dem Update
-    const me1 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(Array.isArray(me1.patch) && me1.patch.length === 2 && /Wochenend/.test(me1.patch[0].title) && /Slot-Rating/.test(me1.patch[1].title), 'Patch-Hinweise für bestehende Konten (beide)');
-    { const ub = await store.get('users/ben', { type: 'json' }); ub.patchSeen = '2026-11-05-wochenende'; await store.setJSON('users/ben', ub); const mb = ok(await call('ben', 'GET', '/me'), 'me ben'); assert.ok(mb.patch.length === 1 && /Slot-Rating/.test(mb.patch[0].title), 'wer den ersten kennt, sieht nur den neuen'); }
+    const me1 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(Array.isArray(me1.patch) && me1.patch.length === 1 && /Wochenend/.test(me1.patch[0].title), 'Patch-Hinweis (nur der angeforderte) für bestehende Konten');
+    { const ub = await store.get('users/ben', { type: 'json' }); ub.patchSeen = '2026-11-05-wochenende'; await store.setJSON('users/ben', ub); const mb = ok(await call('ben', 'GET', '/me'), 'me ben'); assert.ok(!mb.patch, 'nicht angeforderter Hinweis wird nicht gezeigt'); }
     ok(await call('anna', 'POST', '/patch/seen', {}), 'gesehen'); assert.ok(!ok(await call('anna', 'GET', '/me'), 'me2').patch, 'danach nicht mehr');
     const nu = ok(await call('neu', 'POST', '/register', { username: 'NeuKonto', password: 'geheim1234' }), 'neues Konto'); assert.ok(!nu.patch && !ok(await call('neu', 'GET', '/me'), 'me3').patch, 'neue Konten sehen ihn nicht'); }
   // 0.21.26: Wochenend-Tempo der Hauptwelt (Fr 17 Uhr bis Mo 6 Uhr deutscher Zeit: 1 Tag = 1 Std.)
@@ -852,12 +852,15 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   // Leasing-Indexierung
   const ac = pl.fleet[0], u0 = ac.leaseUsd; ac.delivery_day = w.day - 365; w.step(); assert.ok(Math.abs(ac.leaseUsd / u0 - 1.03) < 1e-9, 'Leasingrate +3 % nach einem Vertragsjahr');
   // Sicherheitsnachforderung
-  const c0 = pl.ledger.cash, d0 = pl.fleet.reduce((x, a) => x + (a.deposit || 0), 0); pl.rating = 'B'; SMx.leaseSecurity(w, pl);
-  const tot = pl.secDep && pl.secDep.amt; assert.ok(tot > 0 && pl.ledger.cash === c0 - tot * 100 && pl.fleet.reduce((x, a) => x + (a.deposit || 0), 0) - d0 === tot, 'Rating B: zusätzliche Kaution, Kasse sinkt');
-  SMx.leaseSecurity(w, pl); assert.equal(pl.secDep.amt, tot, 'nur einmal je Schwächephase');
-  pl.rating = 'BB'; w.day += 61; SMx.leaseSecurity(w, pl); assert.ok(!pl.secDep && pl.ledger.cash === c0, 'Rating erholt: Kaution zurück');
+  // 0.21.31: Die Kaution steigt nach Vertragsabschluss nicht mehr – auch nicht bei schwachem Rating; frühere Nachforderungen kommen zurück
+  const c0 = pl.ledger.cash, d0 = pl.fleet.reduce((x, a) => x + (a.deposit || 0), 0); pl.rating = 'CCC'; SMx.leaseSecurity(w, pl);
+  assert.ok(!pl.secDep && pl.ledger.cash === c0 && pl.fleet.reduce((x, a) => x + (a.deposit || 0), 0) === d0, 'Rating CCC: keine zusätzliche Kaution');
+  { const a0 = pl.fleet.find((a) => !a.owned && a.delivery_day <= w.day); if (a0) { a0.deposit += 50000; pl.ledger.cashOnly(-50000, 'deposit'); pl.secDep = { day: w.day, amt: 50000, per: { [a0.id]: 50000 } };
+      const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))), p2 = w2.airlines[pl.id]; assert.ok(!p2.secDep && p2.ledger.cash === c0, 'alte Nachforderung beim Laden zurück');
+      SMx.leaseSecurity(w, pl); assert.ok(!pl.secDep && pl.ledger.cash === c0, 'und auch zum Monatsende'); } }
+  const tot = 0;
   assert.ok(Math.abs(SMx.balanceSheet(pl).check) < 0.01, 'Bilanz stimmt weiter');
-  console.log('0.21.20 ok: Branchenkrise (Geschäftsreisen', Math.round((1 - ev.demand.business) * 100) + ' %, Preise', Math.round((1 - ev.fareX) * 100) + ' %), Leasing +3 %/Jahr, Sicherheit', Math.round(tot / 1000), 'Tsd. €'); }
+  console.log('0.21.20 ok: Branchenkrise (Geschäftsreisen', Math.round((1 - ev.demand.business) * 100) + ' %, Preise', Math.round((1 - ev.fareX) * 100) + ' %), Leasing +3 %/Jahr, Kaution steigt nach Abschluss nicht', tot); }
 // 0.21.21: Wirtschaftsprüfung durchgängig – Handel → Erfassung → Jahresabschluss, Nacherfassung fehlender Geschäfte, Nachprüfung, Neugründung, Prüfbericht
 { const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
   const mk = (seed) => { const w = SMx.newWorld({ seed }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }), b = SMx.addHuman(w, { id: 'P2', name: 'Beta', code: 'BB', base: 'MUC' }); w.playerId = 'P1';
@@ -1040,5 +1043,85 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     w.slotRound(SMx.P.WAIT.from); assert.ok(w.slotWait.filter((e) => e.al === big.id && e.n > 0).length <= 3, 'zum 1. April gekürzt');
     assert.ok(big.events.some((e) => /verfallen/.test(e.msg)), 'Hinweis im Logbuch'); w.day = d0; }
   console.log('0.21.26–28 ok: Slot-Rating, max. 3 Einträge ab 1. April, Auslastung ohne annullierte Flüge, Preisautomatik hin +' + Math.round((r.pending[0][1] / f0 - 1) * 100) + ' %, zurück ' + Math.round((r.pending[0][2] / i0 - 1) * 100) + ' %');
+}
+// 0.21.29: Auslastung nie über 100 % – Speicherformat der Streckenhistorie (Spalten) und Reparatur verschobener Einträge
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 81 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HKT' }); w.playerId = 'P1'; a.ledger.equityFlow(6e8, 't'); a.prog.lv = 3;
+  w.setCabin(a, 'short', 0, 0.15); w.setCabin(a, 'long', 0, 0.15);
+  for (let i = 0; i < 5; i++) { const ac = a.acquire(w.day, 'A20N', 'HKT', 'lease', null, w); ac.delivery_day = w.day; }
+  { const ac = a.acquire(w.day, 'A21N', 'HKT', 'lease', null, w); ac.delivery_day = w.day; }
+  a.staff.pil.A32F = 90; a.staff.cab = 160; a.staff.tech = 40;
+  for (const d of ['HKG', 'KUL', 'TPE', 'CAN', 'BKK']) SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HKT', dest: d, typeId: 'A20N', freq: 1 });
+  SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HKT', dest: 'MEL', typeId: 'A21N', freq: 1 });   // Teilbetrieb (ein Flugzeug für eine lange Strecke)
+  for (const r of a.routes) SMx.applyAction(w, 'P1', { type: 'autoPrice', id: r.id, on: true, lf: 0.9 });
+  for (let i = 0; i < 45; i++) w.step();
+  let bad = 0; for (const r of a.routes) for (const h of r.hist) for (const d of ['out', 'in']) if (h['pax_' + d] > h['so_' + d] + 0.5) bad++;
+  assert.equal(bad, 0, 'nie mehr Passagiere als Sitze auf geflogenen Flügen');
+  for (const r of a.routes) for (const d of ['out', 'in']) assert.ok(SMx.routeLf(r, 7, d) <= 1 + 1e-9, r.dest + ' ' + d + ' ' + SMx.routeLf(r, 7, d));
+  // Rundreise im heutigen Format
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); const r0 = a.routes[0], r2 = w2.airlines.P1.routes[0];
+  assert.deepEqual(r2.hist.at(-1), r0.hist.at(-1), 'Historie bleibt beim Speichern erhalten');
+  // Alter Stand (vor 0.21.26, 23 Spalten) → unter 0.21.26–28 verschoben gelesen und gespeichert → wird jetzt repariert
+  const OLD = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
+  const BROKEN = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'so_out', 'so_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
+  const S = SMx.serialize(w); delete S.hv;
+  const pr = S.airlines ? null : null; void pr;
+  const routesOf = (st) => { const out = []; const walk = (o) => { if (!o || typeof o !== 'object') return; if (Array.isArray(o)) { o.forEach(walk); return; } if (Array.isArray(o.hist) && !o.hk && o.hist.length && Array.isArray(o.hist[0]) && o.hist[0].length === 25) out.push(o); for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v); }; walk(st); return out; };
+  const rs = routesOf(S); assert.ok(rs.length >= 5, 'Strecken im Speicherstand gefunden');
+  const orig = rs.map((r) => r.hist.map((arr) => Object.fromEntries(OLD.map((k, i) => [k, arr[i]]))));
+  rs.forEach((r, j) => { r.hist = r.hist.map((arr, i) => {
+    if (i >= r.hist.length - 3) { const o = Object.fromEntries([...OLD, 'so_out', 'so_in'].map((k, x) => [k, arr[x]])); return BROKEN.map((k) => o[k] ?? 0); }   // echte Einträge aus 0.21.26–28
+    const old = OLD.map((k) => orig[j][i][k]), dec = Object.fromEntries(BROKEN.map((k, x) => [k, old[x] ?? 0])); return BROKEN.map((k) => dec[k]);   // alt, verschoben gelesen und wieder gespeichert
+  }); });
+  const w3 = SMx.deserialize(JSON.parse(JSON.stringify(S)));
+  let fixed = 0, total = 0; for (const r of a.routes) { const r3 = w3.airlines.P1.routes.find((x) => x.id === r.id); r.hist.forEach((h, i) => { total++; if (OLD.every((k) => Math.abs((r3.hist[i][k] || 0) - (k === 'block_h' ? Math.round(h[k] * 10) / 10 : Math.round(h[k] || 0))) < 0.11)) fixed++; }); }
+  assert.equal(fixed, total, `verschobene Einträge repariert (${fixed} von ${total})`);
+  for (const r of w3.airlines.P1.routes) for (const d of ['out', 'in']) assert.ok(SMx.routeLf(r, 60, d) <= 1 + 1e-9, 'nach Reparatur ≤ 100 %');
+  console.log('0.21.29 ok: Auslastung ≤ 100 % auf allen Strecken (auch Teilbetrieb), Speicherformat stabil, ' + total + ' Einträge aus dem verschobenen Format korrekt gelesen');
+}
+// 0.21.30: Komplettübernahme hebt Wachstumsgrenzen auf (Basen, Aufschläge)
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 91 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAJ' }); w.playerId = 'P1'; a.ledger.equityFlow(5e9, 't');
+  a.bases.push('BRE', 'LEJ', 'DRS'); assert.ok(!w.openBase(a, 'NUE').ok, 'vorher: höchstens 4 Basen'); assert.ok(!SMx.limitsLifted(a));
+  const before = SMx.softX(a, 'baseDay');
+  const t = w.list.filter((x) => x.archetype && x.status === 'active' && !SMx.maBlock(w, a, x)).sort((x, y) => SMx.maValue(w, x, a).price - SMx.maValue(w, y, a).price)[0];
+  assert.ok(t, 'übernehmbare KI-Airline gefunden'); const r = SMx.applyAction(w, 'P1', { type: 'takeover', target: t.id }); assert.ok(r.ok, r.msg);
+  assert.ok(SMx.limitsLifted(a) && a.group && a.group.names.includes(t.name), 'Konzern nach Übernahme'); assert.equal(SMx.softX(a, 'baseDay'), 1, 'keine Aufschläge mehr'); assert.ok(before >= 1);
+  const nb = SMx.AP_CODES.find((c) => !a.bases.includes(c) && SMx.baseApproval(a, c).ok && !(SMx.apx(c).slots !== null && w.slotsFree(c) < 3));
+  const ob = w.openBase(a, nb); assert.ok(ob.ok, 'weitere Basis trotz ' + (a.bases.length - 1) + ' Basen: ' + ob.msg);
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(SMx.limitsLifted(w2.airlines.P1), 'bleibt gespeichert');
+  console.log('0.21.30 ok: nach Übernahme von', t.name, '– Basen', a.bases.length, ', keine Aufschläge, gespeichert');
+}
+// 0.21.31: Kredit ablösen mit zeitweiligem Dispo (Umschuldung)
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 95 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAJ' }); w.playerId = 'P1';
+  for (let i = 0; i < 3; i++) w.step(); a.ledger.equityFlow(4e7, 't'); a.rating = 'A';
+  const lim = a.creditLimit(w.macro.bank ?? 1); assert.ok(lim > 1e6, 'Kreditlinie vorhanden: ' + Math.round(lim));
+  const tk = w.takeLoan(a, Math.min(5e6, w.loanLimit(a)), 5); assert.ok(tk.ok, tk.msg); const ln = a.loans[0];
+  const keep = Math.max(0, ln.balance * 1.01 - lim * 0.6); a.ledger.equityFlow(-(a.ledger.cash / 100 - keep), 't');   // Guthaben reicht nicht ganz
+  const q = w.repayQuote(a, ln); assert.ok(q.ok && q.fromCredit > 0, 'Teil aus dem Dispo nötig und möglich');
+  const eq0 = SMx.balanceSheet(a).equity, cu0 = a.creditUsed || 0, r = SMx.applyAction(w, 'P1', { type: 'repay', id: ln.id }); assert.ok(r.ok, r.msg);
+  assert.ok(!a.loans.length && Math.abs((a.creditUsed - cu0) - q.fromCredit) < 1, 'Kredit weg, Differenz im Dispo');
+  assert.ok(Math.abs(SMx.balanceSheet(a).equity - (eq0 - ln.balance * 0.01)) < 1, 'Eigenkapital sinkt nur um die Vorfälligkeit'); assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt');
+  assert.ok(a.creditUsed <= a.creditLimit(w.macro.bank ?? 1) + 1, 'innerhalb der Kreditlinie');
+  // zu wenig Spielraum: abgelehnt
+  const t2 = w.takeLoan(a, Math.min(2e6, w.loanLimit(a)), 3); if (t2.ok) { const l2 = a.loans[0]; a.ledger.equityFlow(-(a.ledger.cash / 100), 't'); a.creditUsed = a.creditLimit(w.macro.bank ?? 1);
+    const r2 = SMx.applyAction(w, 'P1', { type: 'repay', id: l2.id }); assert.ok(!r2.ok && /Dispo/.test(r2.msg), 'ohne Spielraum abgelehnt: ' + r2.msg); }
+  console.log('0.21.31 ok: Kredit abgelöst, ' + Math.round(q.fromCredit / 1e3) + ' Tsd. € vorübergehend aus dem Dispo, Eigenkapital nur −1 % Vorfälligkeit');
+}
+// 0.21.31: Warteliste – austragen; wer bei der letzten Vergabe dort einen Slot bekam, hat beim nächsten Mal keinen Vorrang
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 97 }), a = SMx.addHuman(w, { id: 'P1', name: 'Klein', code: 'KL', base: 'HAM' }), b = SMx.addHuman(w, { id: 'P2', name: 'Groß', code: 'GR', base: 'MUC' }); w.playerId = 'P1';
+  a.ledger.equityFlow(3e8, 't'); b.ledger.equityFlow(9e8, 't'); for (let i = 0; i < 6; i++) b.acquire(w.day, 'DH8D', 'MUC', 'lease', null, w);
+  const apt = 'FRA'; w.slotWait = []; w.joinWait(a, apt, 1); w.slotCap[apt] -= w.slotsFree(apt) - 1;
+  w.allocateWaitlist(SMx.nextSlotDay(w.day).day); w.slotRoundDay = SMx.nextSlotDay(w.day).day;
+  assert.ok(w.gotLastRound('P1', apt), 'Zuteilung gemerkt');
+  w.joinWait(b, apt, 1); w.joinWait(a, apt, 1); w._wr = null;
+  const q = w.waitQueue(apt); assert.equal(q[0].al, 'P2', 'kleine Airline ohne Vorrang, weil sie zuletzt einen Slot bekam'); assert.ok(!w.waitFirst(q[1]));
+  const rt = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(rt.gotLastRound('P1', apt), 'gespeichert');
+  // austragen
+  const mine = w.slotWait.find((e) => e.al === 'P1'); assert.ok(SMx.applyAction(w, 'P1', { type: 'slotWaitLeave', id: mine.id }).ok, 'austragen'); assert.ok(!w.slotWait.some((e) => e.al === 'P1'), 'Eintrag weg');
+  assert.ok(!SMx.applyAction(w, 'P1', { type: 'slotWaitLeave', id: w.slotWait[0].id }).ok, 'fremde Einträge nicht');
+  console.log('0.21.31 ok: Warteliste austragen, kein Vorrang nach Zuteilung in der letzten Vergabe');
 }
 console.log('Alle Prüfungen bestanden.');

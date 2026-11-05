@@ -176,16 +176,18 @@ async function patchNote(store, seen) {
       lead: 'Von Freitag 17 Uhr bis Montag 6 Uhr (deutsche Zeit) läuft die Hauptwelt langsamer: 1 Spieltag = 1 Stunde. So verpasst am Wochenende niemand zu viel.',
       note: `Unter der Woche läuft sie wie gewohnt (${base && base.ms ? `1 Spieltag = ${Math.round(base.ms / 60000)} Minuten` : 'Tempo wie eingestellt'}). Das aktuelle Tempo steht oben neben der Uhr.`,
       more: ['Personal ist knapper – eigene Akademien wachsen mit jeder Phase, eigener Nachwuchs bringt Stimmung und Pünktlichkeit.', 'Leasingflugzeuge lassen sich übernehmen (Flotte → Übernehmen); höchstens vier Basen je Airline.', 'Eigenes Logo als 64 × 64-Bild hochladen (Unternehmen → Profil & Logo).', 'Strecken im Netz sortieren; die Auslastung zählt nur noch tatsächlich geflogene Flüge.'] },
-    '2026-11-05-slotrating': { title: 'Slot-Warteliste: Slot-Rating und höchstens 3 Einträge',
+    // nicht angefordert – wird nicht angezeigt (Patch-Hinweise nur auf ausdrücklichen Wunsch der Spielleitung)
+    '2026-11-05-slotrating': { hidden: true, title: 'Slot-Warteliste: Slot-Rating und höchstens 3 Einträge',
       lead: 'Ab der Vergabe am 1. April 2028 entscheidet ein Slot-Rating über den Vorrang: Je Airline steht der erste Eintrag vorn – niedrigeres Rating zuerst, egal wann eingetragen. Weitere Einträge folgen nach Anmeldezeit.',
       note: `Das Rating (0–100) setzt sich zu je einem Viertel aus Flotte, Slots im Besitz, Eigenkapital und Ergebnis seit der letzten Vergabe zusammen. Je Airline zählen höchstens ${P_WAIT_MAX} Einträge; weitere verfallen am 1. April (die frühesten bleiben). Ihr Rating steht unter Strecken → Slots.`,
       more: [] },
   };
   const from = Math.max(0, PATCH_IDS.indexOf(seen) + 1);
-  return PATCH_IDS.slice(from).map((id) => ({ id, ...all[id] }));
+  return PATCH_IDS.slice(from).map((id) => ({ id, ...all[id] })).filter((x) => !x.hidden);
 }
 const P_WAIT_MAX = SM.P.WAIT.max;
-const withPatch = async (store, u, out) => (u && u.patchSeen !== PATCH_ID ? { ...out, patch: await patchNote(store, u.patchSeen) } : out);
+// Patch-Hinweise für Spielende NUR, wenn die Spielleitung es ausdrücklich wünscht – dann neue Kennung an PATCH_IDS anhängen.
+const withPatch = async (store, u, out) => { if (!u || u.patchSeen === PATCH_ID) return out; const list = await patchNote(store, u.patchSeen); return list.length ? { ...out, patch: list } : out; };
 function clockDue(md, now, main = false) {
   const sp = speedInfo(md.speed);
   if (!sp.ms) return { days: 0, carry: md.carry || 0 };
