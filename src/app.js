@@ -774,7 +774,7 @@ function renderSpeed() {
   const show = cur === 'p' ? (ui.lastSpeed || (ui.mp ? 'm30' : 'x1')) : cur;
   const lbl = (k) => (isPhone() ? SM.SPEEDS[k].short.replace('/Tag', '') : SM.SPEEDS[k].short);
   sel.innerHTML = keys.map((k) => `<option value="${k}" ${k === show ? 'selected' : ''}>${lbl(k)}</option>`).join('');
-  sel.title = SM.SPEEDS[show].label;
+  sel.title = SM.SPEEDS[show].label + (ui.mp && mpState.clock && mpState.clock.weekend ? ' – Wochenend-Tempo (Fr 17 Uhr bis Mo 6 Uhr)' : '');
   $('#btnPause').setAttribute('aria-pressed', String(cur === 'p'));
   $('#btnPlay').setAttribute('aria-pressed', String(cur !== 'p'));
   const lock = !!ui.mp && !ui.mp.host;
@@ -1086,6 +1086,16 @@ VIEWS.cockpit = function viewCockpit() {
 };
 function decisionCard(d) {
   const pl = W.player, monthly = pl.staffMonthly(cpi());
+  if (d.type === 'auditpay') {
+    const b = d.bill, Y = P.AUDIT.pay, due = b.claw + b.fine, sk = Math.round(b.fine * Y.skonto / 1e4) * 1e4, cash = netCash(pl);
+    const rate = (k) => { const R = Y[k], tot = Math.round(due * R.x / 1e3) * 1e3; return `${R.n} × ${eur(Math.ceil(tot / R.n / 1e3) * 1e3)} = ${eur(tot)}${R.x > 1 ? ` (+${pct(R.x - 1)})` : ' (ohne Aufschlag)'}`; };
+    return `<div class="callout crit"><b>Wirtschaftsprüfung – Zahlungsweise wählen bis ${dateShort(d.deadline)}</b><span>${esc(d.text)}</span>
+    <div class="stack small" style="margin-top:6px">
+      <div class="row"><button class="btn small primary" data-act="decide" data-id="${d.id}" data-choice="now">Sofort zahlen</button><span class="muted">${eur(due - sk)} – ${eur(sk)} Nachlass aufs Bußgeld${cash < due - sk ? '. Reicht das Geld nicht, wird die Hälfte der Kasse bezahlt und der Rest in 12 Raten' : ''}</span></div>
+      ${['r6', 'r12', 'r24'].map((k) => `<div class="row"><button class="btn small" data-act="decide" data-id="${d.id}" data-choice="${k}">${Y[k].n} Monatsraten</button><span class="muted">${rate(k)}</span></div>`).join('')}
+      <span class="muted">Ohne Wahl bis ${dateShort(d.deadline)}: ${Y[Y.auto].n} Monatsraten. Raten werden am Monatsende abgebucht; die Rückzahlung an den Partner geht zuerst.</span>
+    </div></div>`;
+  }
   if (d.type === 'agm') {
     const last = pl.ledger.months.at(-1), res = last ? Object.entries(last.acc).reduce((a, [k, v]) => a + (k.startsWith('cf_') ? 0 : v), 0) / 100 : 0, A = P.PAYOUT;
     const opt = (k) => { const r = d.rate * SM.agmFactor(pl, k); return `${pct(r)} vom Monatsgewinn${res > 0 ? ` (zuletzt ${eur(res * r)} im Monat)` : ''}`; };
@@ -1220,6 +1230,23 @@ function routeItem(r) {
   if (open) html += routeBody(r, s7, s30);
   return html + '</div>';
 }
+/** Abweisungen je Richtung erklären: Wo genau fehlen Plätze, wie voll sind die geflogenen Flüge, was hilft wirklich? */
+function spillAdvice(r, s7, s30) {
+  const h = r.hist.slice(-7), n = Math.max(1, h.length), sum = (k) => h.reduce((a, x) => a + (x[k] || 0), 0);
+  const dir = (d) => ({ spill: sum('spill_' + d) / n, lf: SM.routeLf(r, 7, d), cx: 0 });
+  const o = dir('out'), i = dir('in'), canc = s7.cancelled || 0, fl = s7.flights || 0;
+  const name = (d) => (d === 'out' ? `${r.base} → ${r.dest}` : `${r.dest} → ${r.base}`);
+  const tot = o.spill + i.spill, parts = [['out', o], ['in', i]].filter(([, x]) => x.spill >= Math.max(1, 0.03 * tot)).map(([d, x]) => `${name(d)}: Ø ${n0(x.spill)} pro Tag (geflogene Flüge zu ${pct(x.lf)} voll)`);
+  let tip;
+  const full = (x) => x.lf >= 0.93, lop = o.spill >= i.spill ? [o, i, 'out'] : [i, o, 'in'];
+  if (lop[1].lf < 0.6 && lop[1].spill < Math.max(1, 0.03 * tot)) tip = `Nur ${name(lop[2])} ist überbucht, die Gegenrichtung ist zu ${pct(lop[1].lf)} belegt: Preis in Richtung ${name(lop[2])} erhöhen. Mehr Frequenz würde vor allem leere Rückflüge bringen.`;
+  else if (s30.n >= 7 && s30.db2 < 0) tip = 'Preis erhöhen – mehr Frequenz lohnt erst, wenn die Strecke Geld verdient.';
+  else tip = 'Preis erhöhen oder Frequenz ausbauen.';
+  const dd = lop[2], so = (x) => (x['so_' + dd] !== undefined && (x['so_' + dd] > 0 || x.cancelled > 0) ? x['so_' + dd] : x['seats_' + dd]);
+  const fullDays = h.filter((x) => so(x) > 0 && x['pax_' + dd] >= so(x) * 0.97).length, spillDays = h.filter((x) => (x['spill_' + dd] || 0) >= 1).length;
+  const why = !full(lop[0]) ? ` In Richtung ${name(dd)} war an ${fullDays} von ${h.length} Tagen ausgebucht, abgewiesen wurde an ${spillDays} Tagen${canc > 0 ? `; ${n0(canc)} von ${n0(fl)} Flügen fielen aus` : ''} – die Zahl oben ist ein Durchschnitt, starke Tage treiben sie hoch.` : '';
+  return ['good', `Reisende ohne Platz – ${parts.join(' · ') || `Ø ${n0(s7.spill / n)} pro Tag`}. ${tip}${why}`];
+}
 function insights(r, s7, s30) {
   const out = [], pl = W.player;
   { const h = pl.rotH(r), w = SM.winOf(r.type_id); if (h > w) { const k = SM.kOf(r.type_id, h), have = pl.fleet.filter((a) => a.type_id === r.type_id && a.base === r.base && a.delivery_day <= W.day).length;
@@ -1227,7 +1254,7 @@ function insights(r, s7, s30) {
     else out.push(['info', `Langstrecke: Ein Umlauf dauert ${n1(h)} Stunden und bindet ${k} Flugzeuge pro täglichem Flug.`]); } }
   const ramp = r.ramp(W.day, pl.rampT());
   if (ramp < 0.9 && W.day >= r.opened_day) out.push(['info', `Markthochlauf: Die Strecke ist erst zu ${pct(ramp)} bekannt. Marketing und eine Marketingfachkraft beschleunigen das.`]);
-  if (s7.demand > 0 && s7.spill / s7.demand > 0.06) out.push(['good', `Ø ${n0(s7.spill / 7)} Reisende pro Tag finden keinen Platz. Preis erhöhen oder Frequenz ausbauen.`]);
+  if (s7.demand > 0 && s7.spill / s7.demand > 0.06) out.push(spillAdvice(r, s7, s30));
   if (s30.n >= 14 && s30.lf < 0.6) out.push(['warn', `Nur ${pct(s30.lf)} Auslastung. Preis senken, kleineres Flugzeug oder weniger Frequenz prüfen.`]);
   if (s30.n >= 14 && s30.db1 > 0 && s30.db2 < 0) out.push(['warn', 'Deckt die direkten Flugkosten, aber nicht die Flugzeugzeit. Lohnt nur, wenn das Flugzeug sonst leer stünde.']);
   if (s30.n >= 14 && s30.db1 < 0) out.push(['crit', 'Deckt nicht einmal die direkten Flugkosten. Jeder Flug verbrennt Geld.']);
@@ -2321,13 +2348,13 @@ VIEWS.strategy = function viewStrategy() {
   const lockRows = coordS.map((c) => {
     const own = pl.gateLock && pl.gateLock[c], other = W.lockOwner(c), price = W.gateLockPrice(c);
     return `<tr><td><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))} · ${NF1.format(SM.paxEff(c))} Mio. Pax/Jahr${W.aptObs && W.aptObs[c] ? ` <span title="Im Spiel gewachsen – ursprünglich ${NF1.format(P.AIRPORTS[c].pax || 0)} Mio.">↑</span>` : ''}</span></td>
-      <td>${own ? '<span class="chip good">alle Gates bei Ihnen</span>' : other && other !== pl ? `<span class="chip crit">${esc(other.name)}</span>` : `${eur(price)} + ${eur(price * P.GATE_LOCK.monthlyRate)}/Monat`}</td>
-      <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !other ? `<button class="btn small primary" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag · ${eurB(price)}</button>` : ''}</td></tr>`;
+      <td>${own ? `<span class="chip good">alle Gates bei Ihnen</span><div class="small muted">bis ${dateY(own.until || W.day)} · kein Kartellverfahren · Kündigung: ${eur(W.gateLockRefund(own))} zurück</div>` : other && other !== pl ? `<span class="chip crit">${esc(other.name)}</span>${other.gateLock[c].until ? `<div class="small muted">bis ${dateY(other.gateLock[c].until)}</div>` : ''}` : `${eur(price)} + ${eur(price * P.GATE_LOCK.monthlyRate)}/Monat<div class="small muted">${P.GATE_LOCK.years} Jahre</div>`}</td>
+      <td>${own ? `<button class="btn small" data-act="gatelock" data-apt="${c}" data-on="0">kündigen</button>` : !other ? `<button class="btn small ${netCash(pl) >= price ? 'primary' : ''}" data-act="gatelock" data-apt="${c}" data-on="1">Exklusivvertrag · ${eurB(price)}</button>` : ''}</td></tr>`;
   }).join('');
   html += `<div class="stack"><h2 class="sec sm">Slots und Marktkontrolle</h2>
     <div class="callout info row" style="gap:8px;align-items:center"><span><b>Slots kaufen, Wartelisten und Vergabetermine</b> finden Sie jetzt unter Strecken → Slots. Nächste Vergabe: ${slotDateTxt()}.</span><button class="btn small" data-act="tab" data-tab="slots" style="margin-left:auto">Zu den Slots</button></div>
     ${lockRows ? `<div class="tw"><table class="t"><thead><tr><th>Flughafen in Ihrem Netz</th><th>Gate-Exklusivvertrag</th><th></th></tr></thead><tbody>${lockRows}</tbody></table></div>` : ''}
-    <p class="small muted">Jeder Flughafen in Ihrem Netz kann einen Gate-Exklusivvertrag bekommen: Andere Airlines können dort keine neuen Flüge mehr anbieten, bestehende bleiben. Der Preis richtet sich nach der Größe – an Großflughäfen ein Vermögen.</p></div>`;
+    <p class="small muted">Ein Gate-Exklusivvertrag ist ein genehmigtes Monopol: Andere Airlines können dort keine neuen Flüge mehr anbieten, bestehende bleiben. Die Wettbewerbsbehörde lässt ihn nur gegen einen sehr hohen Preis zu – er steigt mit der Größe des Flughafens überproportional (1 Mio. Pax ≈ ${eurB(8e6 * cpi())}, 5 Mio. ≈ ${eurB(8e6 * 5 ** 1.35 * cpi())}, 10 Mio. ≈ ${eurB(8e6 * 10 ** 1.35 * cpi())}), dazu ${pct(P.GATE_LOCK.monthlyRate, 1)} im Monat. Laufzeit ${P.GATE_LOCK.years} Jahre; solange gibt es dort kein Kartellverfahren, danach gilt wieder die Wettbewerbsaufsicht. Kündigung: ${pct(P.GATE_LOCK.refund)} des noch nicht genutzten Teils zurück.</p></div>`;
   return html;
 };
 // ---------------------------------------------------------------------------
@@ -2340,14 +2367,15 @@ const slotAptOf = (v) => { const t = String(v || '').trim(), c = t.slice(0, 3).t
 function slotQuoteHtml(apt, n) {
   const pl = W.player; if (!apt) return '<p class="small muted">Flughafen eingeben – Code (z. B. FRA) oder Name.</p>';
   n = Math.max(1, Math.min(8, Math.round(n) || 1));
-  const free = Math.max(0, W.slotsFree(apt) - W.waitBlock(apt, pl)), q = (W.slotWait || []).filter((e) => e.apt === apt && e.n > 0), qn = q.reduce((a, e) => a + e.n, 0);
+  const free = Math.max(0, W.slotsFree(apt) - W.waitBlock(apt, pl)), q = W.waitQueue(apt).filter((e) => e.n > 0), qn = q.reduce((a, e) => a + e.n, 0);
   const nsd = SM.nextSlotDay(W.day), total = Math.max(0, W.slotsFree(apt)) + 1, buyN = Math.min(n, free), ask = n - buyN || n, held = pl.heldAt(apt, W.day);
-  // Prognose: heutige Liste und Liste mit der neuen Anfrage (sie kommt zu Ihrem Eintrag ohne Plan, sonst ans Ende) – reihum je einer
+  // Prognose: heutige Liste und Liste mit der neuen Anfrage (sie kommt zu Ihrem Eintrag ohne Plan, sonst nach Flottengröße einsortiert) – reihum je einer
   const mineE = q.find((e) => e.al === pl.id && !e.plan), now = rrAlloc(total, q.map((e) => e.n));
-  const wants = q.map((e) => (e === mineE ? e.n + ask : e.n)); if (!mineE) wants.push(ask);
+  const sz = (e) => (W.airlines[e.al] ? W.airlines[e.al].fleet.length : 0), at = q.filter((e) => sz(e) <= pl.fleet.length).length;
+  const wants = q.map((e) => (e === mineE ? e.n + ask : e.n)); if (!mineE) wants.splice(at, 0, ask);
   const after = rrAlloc(total, wants), mineIdx = q.map((e, i) => (e.al === pl.id ? i : -1)).filter((i) => i >= 0);
   const myNow = mineIdx.reduce((a, i) => a + now[i], 0), myAsk = mineIdx.reduce((a, i) => a + q[i].n, 0);
-  const extra = mineIdx.reduce((a, i) => a + after[i], 0) + (mineE ? 0 : after[after.length - 1]) - myNow;
+  const extra = mineIdx.reduce((a, i) => a + after[!mineE && i >= at ? i + 1 : i], 0) + (mineE ? 0 : after[at]) - myNow;
   const list = q.length ? `<ol class="small slotq-list">${q.map((e, i) => { const a = W.airlines[e.al], me = e.al === pl.id; return `<li class="${me ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${me ? ' (Sie)' : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}${me && e.plan ? ' für einen Plan' : ''}</span><span class="${now[i] ? 'pos' : 'muted'}">→ ${now[i]} am ${dateShort(nsd.day)}</span></li>`; }).join('')}</ol>` : '';
   const nTxt = total === 1 ? 'nur ein Slot' : `${total} Slots`;
   const why = q.length && extra < ask ? ` Vergeben wird ${nTxt}, reihum zuerst an die Einträge davor.${myNow ? ` ${myNow === total ? (total === 1 ? 'Er geht' : 'Sie gehen alle') : `${myNow} davon gehen`} schon an Ihre bisherigen Einträge (${myNow} von ${myAsk}).` : ''}` : '';
@@ -2359,13 +2387,14 @@ function slotQuoteHtml(apt, n) {
 }
 function slotCardHtml(c, pl, nsd) {
   const free = Math.max(0, W.slotsFree(c) - W.waitBlock(c, pl)), bought = (pl.slotHold[c] || []).filter((h) => h.buy && h.until > W.day).reduce((a, h) => a + h.n, 0);
-  const q = (W.slotWait || []).filter((e) => e.apt === c), qn = q.reduce((a, e) => a + e.n, 0), mine = q.filter((e) => e.al === pl.id);
+  const q = W.waitQueue(c), qn = q.reduce((a, e) => a + e.n, 0), mine = q.filter((e) => e.al === pl.id);
   const fc = q.length ? W.waitForecast(c) : null, total = Math.max(0, W.slotsFree(c)) + 1;
   const used = pl.activeRoutes().reduce((a, r) => a + (r.base === c || r.dest === c ? r.freq : 0), 0);
   const X = SM.apx(c), isBase = pl.bases.includes(c);
   const myTxt = mine.length ? mine.map((e) => { const g = fc.byId[e.id] || 0; return `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><span>Platz <b>${W.waitPos(e)}</b> von ${q.length} · ${e.n} Slot${e.n > 1 ? 's' : ''}${e.plan ? ' für einen Plan' : ''}</span><span class="chip ${g >= e.n ? 'good' : g ? 'warn' : 'crit'}">am ${dateShort(nsd.day)} voraussichtlich ${g} von ${e.n}</span><button class="btn small ghost" data-act="slotleave" data-id="${e.id}">austragen</button></div>`; }).join('') : '';
   const queue = q.length ? `<details class="fold" data-keep="sq-${c}" ${ui.open && ui.open['sq-' + c] ? 'open' : ''}><summary><span class="small"><b>Warteliste ${c}</b> · ${q.length} Einträge, ${qn} Slots angefragt</span><span class="fold-hint">${ui.open && ui.open['sq-' + c] ? 'einklappen' : 'Reihenfolge'}</span></summary>
-      <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
+      <p class="small muted">Reihenfolge: kleinere Airlines zuerst (nach Flottengröße), bei gleicher Größe wer sich früher eingetragen hat. Vergeben wird reihum je ein Slot.</p>
+      <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}${a ? ` <span class="muted">· ${a.fleet.length} Flugz.</span>` : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
   const buy = free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen · ${eurB(W.slotBuyPrice(c, 1))}</button>${free > 1 ? ` <button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="all">alle ${free} · ${eurB(W.slotBuyPrice(c, free))}</button>` : ''}` : `<button class="btn small primary" data-act="slotwait" data-apt="${c}" data-n="1">${mine.some((e) => !e.plan) ? '+1 auf der Warteliste' : 'Auf die Warteliste'}</button>`;
   return `<div class="slotrow"><div class="slothead"><div><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}${isBase ? ' · Basis' : used ? '' : ' · noch nicht im Netz'}</span></div><span class="small muted" title="1 Slot je 200.000 Passagiere im Jahr. Einen Teil halten Airlines außerhalb des Spiels (Bestandsverkehr).">${W.slotCap[c] ?? X.simCap} Slots im Spiel</span></div>
     <div class="slotstats"><div><span>von Ihnen genutzt</span><b>${used}</b><em>tägliche Flüge</em></div><div><span>Ihre Reserve</span><b>${bought || '–'}</b><em>${bought ? 'frei für neue Flüge' : 'keine'}</em></div><div><span>sofort frei</span><b class="${free <= 0 ? 'neg' : ''}">${free}</b><em>${free > 0 ? 'je ' + eurB(W.slotBuyPrice(c, 1)) : q.length ? 'gehen an die Warteliste' : 'voll'}</em></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${q.length ? Math.min(total, qn) : '–'}</b><em>${q.length ? `an ${q.length} Wartende` : 'keine Warteliste'}</em></div></div>
@@ -2383,7 +2412,7 @@ VIEWS.slots = function viewSlots() {
   let html = `<h2 class="sec">Slots <small>kaufen, Warteliste, Vergabetermine</small></h2>
     <div class="slotdate"><div><span class="small muted">Nächste Slotvergabe</span><b>${dateLong(nsd.day)}</b><span class="small">${nsd.summer ? 'Sommerflugplan' : 'Winterflugplan'} · in ${nsIn} Tag${nsIn === 1 ? '' : 'en'}</span></div>
       <div class="slotsum"><div><span>Flughäfen mit Warteliste</span><b>${qApts.length}</b></div><div><span>angefragt / vergeben</span><b>${ask} / ${give}</b></div><div><span>Ihre Einträge</span><b>${myQ.length ? `${myGot} von ${myAsk}` : '–'}</b><em>${myQ.length ? 'Slots voraussichtlich' : 'keine'}</em></div></div>
-      <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
+      <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Kleinere Airlines (weniger Flugzeuge) kommen zuerst – egal, wann sie sich eingetragen haben; bei gleicher Größe zählt der frühere Eintrag.</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
     <div class="card pad stack"><h3>Slots sichern <small class="muted">ohne Streckenplanung</small></h3>
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="f" style="flex:3;min-width:200px"><span>Flughafen</span><input type="search" id="slot-apt" list="slot-apts" placeholder="Code oder Name, z. B. FRA" value="${esc(st.apt ? st.apt + ' · ' + apName(st.apt) : '')}" autocomplete="off"></label>
         <label class="f" style="flex:1;min-width:90px"><span>Anzahl</span><input type="number" id="slot-n" min="1" max="8" value="${st.n}"></label></div>
@@ -2936,15 +2965,16 @@ function miniLine(vals, f) {
 
 /** Wirtschaftsprüfung: Vorschau der Handelsbilanz mit Mitspielenden, laufende Bescheide, Selbstanzeige. */
 function auditHtml(pl) {
-  if (!ui.mp && !(pl.audit && (pl.audit.debt || pl.audit.until > W.day))) return '';
+  const debt = SM.auditDebtSum(pl.audit);
+  if (!ui.mp && !(pl.audit && (debt.n || pl.audit.until > W.day))) return '';
   const A = P.AUDIT, rows = SM.auditPreview(W, pl), au = pl.audit, ye = 365 * (Math.floor(W.day / 365) + 1) - 1;
   const cur = au && au.until > W.day;
-  if (!rows.length && !cur && !(au && au.debt)) return '';
+  if (!rows.length && !cur && !debt.n) return '';
   return `<div class="card pad stack"><div class="spread"><h3>Wirtschaftsprüfung zum Jahresabschluss</h3><span class="small muted">nächste Prüfung ${dateShort(ye)}</span></div>
-    <p class="small ink2">Die Prüfer sehen sich alle Handelsgeschäfte mit Mitspielenden an. Wer daraus mehr als ${pct(A.tol)} über Marktwert gewinnt (mindestens ${eur(A.minGain * cpi())}), muss den Vorteil zurückzahlen (an den Partner – ist der pleite, entfernt oder neu gegründet, an die Staatskasse), zahlt ein Bußgeld (${A.fine.map((x) => pct(x)).join(' / ')} beim 1./2./3. Mal) und bekommt einen Prüfvermerk (Ansehen −${A.malus[0]} für ein Jahr). Wer vorher freiwillig zurückzahlt, bleibt straffrei. Fehlt das Geld, gibt es ${A.months} Monatsraten.</p>
+    <p class="small ink2">Die Prüfer sehen sich alle Handelsgeschäfte mit Mitspielenden an. Wer daraus mehr als ${pct(A.tol)} über Marktwert gewinnt (mindestens ${eur(A.minGain * cpi())}), muss den Vorteil zurückzahlen (an den Partner – ist der pleite, entfernt oder neu gegründet, an die Staatskasse), zahlt ein Bußgeld (${A.fine.map((x) => pct(x)).join(' / ')} beim 1./2./3. Mal) und bekommt einen Prüfvermerk (Ansehen −${A.malus[0]} für ein Jahr). Wer vorher freiwillig zurückzahlt, bleibt straffrei. Wie gezahlt wird, wählen Sie nach dem Bescheid: sofort (10 % Nachlass aufs Bußgeld) oder in 6, 12 oder 24 Monatsraten (+2/+5/+12 %).</p>
     ${rows.length ? `<table class="t"><thead><tr><th>Partner</th><th class="r">erhalten · gegeben</th><th class="r">Vorteil</th><th></th></tr></thead><tbody>${rows.map((e) => `<tr><td>${esc(e.name)}<div class="small muted">${e.n} Geschäft${e.n === 1 ? '' : 'e'}</div></td><td class="r">${eur(e.got)}<div class="small muted">${eur(e.gave)}</div></td><td class="r ${e.flagged ? 'neg' : e.excess > 0 ? 'warnc' : ''}">${e.excess > 0 ? eur(e.excess) : '–'}${e.flagged ? '<div class="small">wird beanstandet</div>' : ''}</td><td class="r">${e.excess > 0 ? `<button class="btn small${e.flagged ? ' primary' : ''}" data-act="auditsettle" data-id="${e.partner}" title="Vorteil jetzt zurückzahlen – ohne Bußgeld und Prüfvermerk">Zurückzahlen</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="small muted">Keine Handelsgeschäfte mit Mitspielenden in diesem Jahr.</p>'}
     ${cur ? `<div class="callout warn"><b>Prüfvermerk bis ${dateShort(au.until)}</b><span class="small">Ansehen −${au.malus}. ${au.strikes > 1 ? `${au.strikes}. Beanstandung – ` : ''}Nach zwei Jahren ohne neue Beanstandung wird die Zählung gelöscht.</span></div>` : ''}
-    ${au && au.debt ? `<div class="callout info"><b>Ratenplan</b><span class="small">Noch ${eur(au.debt.left)} offen, monatlich ${eur(au.debt.monthly)}.</span></div>` : ''}</div>`;
+    ${debt.n ? `<div class="callout info"><b>Ratenplan${debt.n > 1 ? `e (${debt.n})` : ''}</b><span class="small">Noch ${eur(debt.left)} offen, monatlich ${eur(debt.monthly)}.</span></div>` : ''}</div>`;
 }
 VIEWS.credit = function viewCredit() {
   const pl = W.player, bs = SM.balanceSheet(pl);
@@ -3447,8 +3477,61 @@ function pixEditorHtml(pl) {
         <div class="row" style="gap:6px;flex-wrap:wrap"><span class="small muted">Vorschau:</span><img id="pixprev" width="40" height="40" alt="" class="logo-svg pix"><img id="pixprev2" width="18" height="18" alt="" class="logo-svg pix"></div>
         <div class="acv-box" style="max-width:240px">${acSvg('A20N', { ...myAcColors(pl), code: pl.code, pix: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', pixId: 'pixtail' })}</div>
       </div></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><label class="btn" for="pix-file" style="cursor:pointer">Bild hochladen (64 × 64)</label><input type="file" id="pix-file" accept="image/png,image/gif,image/jpeg,image/webp,image/bmp" hidden><span class="small muted">PNG mit Transparenz am besten; andere Größen werden auf 64 × 64 gebracht, mehr als 15 Farben werden reduziert.</span></div>
     <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn primary" data-act="pixsave">Pixel-Logo übernehmen</button><button class="btn" data-act="pixclear">Fläche leeren</button>${pl.pixLogo ? '<button class="btn" data-act="pixoff">Pixel-Logo entfernen</button>' : ''}</div>
     <p class="small muted">Zeichnen Sie mit Maus, Stift oder Finger. Das Pixel-Logo ersetzt überall das gestaltete Logo; exakt dasselbe Bild kann pro Welt nur eine Airline tragen.</p></div>`;
+}
+/** Bild hochladen: auf 64 × 64 bringen, Transparenz übernehmen, auf höchstens 15 Farben reduzieren – danach im Editor weiter bearbeitbar. */
+const PIX_MAX_FILE = 2 * 1024 * 1024;
+function pixUpload(file) {
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { toast('Bitte eine Bilddatei wählen (PNG, GIF, JPG, WebP).'); return; }
+  if (file.size > PIX_MAX_FILE) { toast('Das Bild ist zu groß (höchstens 2 MB).'); return; }
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 64; const g = c.getContext('2d', { willReadFrequently: true });
+      const w = img.naturalWidth, h = img.naturalHeight, k = Math.min(64 / w, 64 / h), dw = Math.max(1, Math.round(w * k)), dh = Math.max(1, Math.round(h * k));
+      g.imageSmoothingEnabled = k < 1;   // verkleinern glätten, kleine Pixelbilder scharf vergrößern
+      g.clearRect(0, 0, 64, 64); g.drawImage(img, Math.floor((64 - dw) / 2), Math.floor((64 - dh) / 2), dw, dh);
+      const q = pixQuantize(g.getImageData(0, 0, 64, 64).data);
+      if (!q.used) { toast('Das Bild ist leer oder komplett durchsichtig.'); return; }
+      ui.pix = { pal: [...q.pal, ...PIX_PAL0].slice(0, 15), px: q.px, col: 1, tool: 'pen', size: 1 };
+      renderPane(true);
+      toast(`Bild übernommen${w !== 64 || h !== 64 ? ` (von ${w} × ${h} auf 64 × 64)` : ''}${q.reduced ? `, ${q.colors} Farben auf ${q.pal.length} reduziert` : ''} – noch „Pixel-Logo übernehmen“ klicken.`);
+    } catch (e) { toast('Das Bild ließ sich nicht lesen.'); }
+    finally { URL.revokeObjectURL(url); }
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('Das Bild ließ sich nicht lesen.'); };
+  img.src = url;
+}
+/** Farben reduzieren: bis 15 Farben exakt, sonst k-Means (Start mit häufigster und jeweils entferntester Farbe). Alpha < 50 % = durchsichtig. */
+function pixQuantize(d) {
+  const hex = (r, g, b) => '#' + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+  const cnt = new Map(), op = [];
+  for (let i = 0; i < 4096; i++) { if (d[4 * i + 3] < 128) continue; const key = (d[4 * i] << 16) | (d[4 * i + 1] << 8) | d[4 * i + 2]; cnt.set(key, (cnt.get(key) || 0) + 1); op.push(i); }
+  const px = new Uint8Array(4096); if (!op.length) return { used: 0, px, pal: [] };
+  const rgb = (key) => [key >> 16 & 255, key >> 8 & 255, key & 255];
+  let cents;
+  if (cnt.size <= 15) cents = [...cnt.keys()].sort((a, b) => cnt.get(b) - cnt.get(a)).map(rgb);
+  else {
+    const keys = [...cnt.keys()], cols = keys.map(rgb), wts = keys.map((x) => cnt.get(x)), d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+    cents = [cols[wts.indexOf(Math.max(...wts))].slice()];
+    while (cents.length < 15) { let best = -1, bi = 0; for (let j = 0; j < cols.length; j++) { const m = Math.min(...cents.map((c) => d2(c, cols[j]))) * Math.sqrt(wts[j]); if (m > best) { best = m; bi = j; } } if (best <= 0) break; cents.push(cols[bi].slice()); }
+    for (let it = 0; it < 10; it++) {
+      const acc = cents.map(() => [0, 0, 0, 0]);
+      for (let j = 0; j < cols.length; j++) { let bk = 0, bd = Infinity; for (let k = 0; k < cents.length; k++) { const v = d2(cents[k], cols[j]); if (v < bd) { bd = v; bk = k; } } const A = acc[bk]; A[0] += cols[j][0] * wts[j]; A[1] += cols[j][1] * wts[j]; A[2] += cols[j][2] * wts[j]; A[3] += wts[j]; }
+      cents = cents.map((c, k) => (acc[k][3] ? [acc[k][0] / acc[k][3], acc[k][1] / acc[k][3], acc[k][2] / acc[k][3]] : c));
+    }
+  }
+  const pal = cents.map((c) => hex(c[0], c[1], c[2])), memo = new Map();
+  for (const i of op) {
+    const key = (d[4 * i] << 16) | (d[4 * i + 1] << 8) | d[4 * i + 2];
+    let k = memo.get(key);
+    if (k === undefined) { const c = rgb(key); let bd = Infinity; k = 0; for (let j = 0; j < cents.length; j++) { const v = (cents[j][0] - c[0]) ** 2 + (cents[j][1] - c[1]) ** 2 + (cents[j][2] - c[2]) ** 2; if (v < bd) { bd = v; k = j; } } memo.set(key, k); }
+    px[i] = k + 1;
+  }
+  return { used: op.length, px, pal, colors: cnt.size, reduced: cnt.size > 15 };
 }
 function pixPaint() {
   const c = $('#pixc'), S = ui.pix; if (!c || !S) return;
@@ -4487,6 +4570,7 @@ function refreshAll() { W.operableFreq(W.player); buildSchedules(); renderHeader
 document.addEventListener('toggle', (e) => { const d = e.target; if (!d || !d.dataset || !d.dataset.keep) return; ui.open = ui.open || {}; ui.open[d.dataset.keep] = d.open; const h = d.querySelector('.fold-hint'); if (h) h.textContent = d.open ? 'einklappen' : 'aufklappen'; }, true);
 document.addEventListener('input', (e) => { const t = e.target; if (t && (t.id === 'slot-apt' || t.id === 'slot-n')) { const st = ui.slotForm = ui.slotForm || { apt: '', n: 1 }; if (t.id === 'slot-apt') st.apt = slotAptOf(t.value) || ''; else st.n = Math.max(1, Math.min(8, Math.round(Number(t.value)) || 1)); const box = $('#slot-q'); if (box) box.innerHTML = slotQuoteHtml(st.apt, st.n); return; } });
 document.addEventListener('change', (e) => { const t = e.target; if (t && t.id === 'st-fresh' && ui.study) { ui.study.fresh = t.checked; } });
+document.addEventListener('change', (e) => { const t = e.target; if (t && t.id === 'pix-file') { pixUpload(t.files && t.files[0]); t.value = ''; } });
 document.addEventListener('change', (e) => { const t = e.target; if (!t || !t.id || !t.id.startsWith('acf-') || !ui.acf) return; const k = t.id.slice(4); ui.acf[k] = t.type === 'checkbox' ? t.checked : t.value; if (k === 'ac' || k === 'fit') ui.acf.gap = null; renderPane(true); });
 document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.id) return; const fid = t.id.startsWith('dl-cash-') ? t.id.replace('dl-cash-', 'dl-fmt-') : t.dataset && t.dataset.fmt; if (!fid) return; const f = document.getElementById(fid), v = Math.max(0, Math.round(Number(t.value) || 0)); if (f) f.textContent = v ? '= ' + eur(v) : ''; });
 function onPaneClick(e) {
@@ -5548,7 +5632,7 @@ function showAuth(mode = 'login') {
     if (mode === 'register' && password !== $('#auPw2').value) { formError('Die Passwörter stimmen nicht überein.'); return; }
     try { mpState.user = await api(mode === 'login' ? '/login' : '/register', { body: { username, password } });
       if (mpState.user.mustChange) showPwChange({ forced: true, current: password, then: () => showLobby() });
-      else if (mode === 'register' && !mpState.pendingJoin) showGuide(() => showLobby()); else showLobby(); }
+      else if (mode === 'register' && !mpState.pendingJoin) showGuide(() => showLobby()); else { showLobby(); showPatch(); } }
     catch (err) { formError(err.message); }
   });
   setTimeout(() => $('#auUser') && $('#auUser').focus(), 50);
@@ -5579,7 +5663,7 @@ async function showPlaytime(onBack) {
       <td class="r">${r.act ? fmtDur(r.avg) : '–'}</td><td class="r">${r.act || '–'}</td><td class="r">${r.sessions || '–'}</td><td>${spark(r)}</td><td class="r small">${r.online ? '<span class="pos">online</span>' : agoTxt(r.last, now)}</td></tr>
     ${open[r.key] ? `<tr class="pnl-d"><td></td><td colspan="9" class="small">${r.games.length ? r.games.map((g) => `${esc(g.name)}: <b>${fmtDur(g.ms)}</b>`).join(' · ') : 'noch keine erfasste Spielzeit'}${r.created ? ` · Konto seit ${new Date(r.created).toLocaleDateString('de-DE')}` : ''}${r.first ? ` · erste erfasste Sitzung ${new Date(r.first).toLocaleDateString('de-DE')}` : ''}</td></tr>` : ''}`).join('');
   m.innerHTML = `<div class="dialog wide pt" role="dialog" aria-modal="true"><div class="spread"><h1>Spielzeit der Spieler</h1><button class="btn small" data-pt="close">Schließen</button></div>
-    <p class="small muted">Gezählt wird die Zeit mit sichtbarem Spielfenster in einem Online-Spiel (Lebenszeichen alle 15 Sekunden). Fenster im Hintergrund, gesperrtes Handy oder Pausen über 90 Sekunden zählen nicht. Erfasst wird seit dem Update ${d.since ? `(erste Sitzung ${new Date(d.since).toLocaleDateString('de-DE')})` : ''} – frühere Spielzeit ist nicht gespeichert.</p>
+    <p class="small muted">Gezählt wird die Zeit mit sichtbarem, bedientem Spielfenster in einem Online-Spiel (Lebenszeichen alle 15–25 Sekunden). Nicht gezählt: Fenster im Hintergrund, gesperrtes Handy, ein offen stehendes Fenster ohne Maus, Tastatur oder Touch seit 10 Minuten und Lücken über 45 Sekunden (gedrosselte Hintergrund-Tabs). Zahlen vor dem 5. November 2026 können offen gelassene Fenster mitzählen. Erfasst wird seit dem Update ${d.since ? `(erste Sitzung ${new Date(d.since).toLocaleDateString('de-DE')})` : ''} – frühere Spielzeit ist nicht gespeichert.</p>
     <div class="tiles">${tiles.map(([a, b, c]) => `<div class="tile"><span>${a}</span><b>${b}</b><em>${c}</em></div>`).join('')}</div>
     <div class="stack"><h3>Alle Spieler je Tag</h3>${bars}</div>
     <div class="tw"><table class="t pt-t"><thead><tr><th class="r">#</th>${th('name', 'Spieler', '')}${th('total', 'Gesamt')}${th('today', 'Heute')}${th('w7', '7 Tage')}<th class="r">Ø je Spieltag</th><th class="r">Tage</th><th class="r">Sitzungen</th><th>30 Tage</th>${th('last', 'Zuletzt')}</tr></thead><tbody>${body}</tbody></table></div>
@@ -5749,6 +5833,7 @@ async function showAdmin(id, onBack) {
       <div class="row"><button class="btn small danger" data-adm="reset">Welt neu starten</button></div></div></section>
     <section class="stack"><h3>Ereignisse</h3><div class="adm-list">${d.events.map(eRow).join('') || '<p class="small muted">Gerade keine Ereignisse.</p>'}</div>
       <p class="small muted">Annullieren: Angekündigte Ereignisse fallen aus, laufende enden sofort. Steuern, Entgelte, CO₂-Abgabe, Zins, Wechselkurs und Kerosinsprung werden zurückgenommen; die Konjunktur erholt sich nach einer Rezession entsprechend schneller. Bereits ausgefallene Flüge bleiben ausgefallen.</p></section></div>`;
+  m.onchange = (e) => { if (e.target.id === 'adm-aa') { const nw = m.querySelector('#adm-anw'); if (nw) nw.hidden = e.target.value !== 'x:'; } };
   m.onclick = async (e) => {
     const b = e.target.closest('[data-adm]'); if (!b) return;
     const cmd = b.dataset.adm;
@@ -5780,8 +5865,9 @@ async function showAdmin(id, onBack) {
       if (sv && !isFinite(startAt)) { toast('Ungültiger Starttermin.'); b.disabled = false; return; }
       try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'resetWorld', keep: !!(m.querySelector('#adm-keep') || {}).checked, startAt: startAt || null, speed: ($('#adm-speed') || {}).value } }); toast(r.msg || 'Neu gestartet.'); if (ui.mp && ui.mp.id === id) { ui.mpLastDay = null; await mpPoll(true); } } catch (err) { toast(err.message); } showAdmin(id, onBack); return; }
     if (cmd === 'audit') {
-      const q = (s) => (m.querySelector(s) || {}).value || '', body = { cmd: 'auditOrder', b: q('#adm-ab'), a: q('#adm-aa'), amount: Number(String(q('#adm-av')).replace(',', '.')) * 1e6, state: !!(m.querySelector('#adm-as') || {}).checked };
-      if (!body.b || !body.a || body.a === body.b) { toast('Bitte begünstigte Airline und Partner wählen.'); return; }
+      const q = (s) => (m.querySelector(s) || {}).value || '', pv = q('#adm-aa'), ex = pv.startsWith('x:'), name = ex ? (pv.slice(2) || q('#adm-an').trim()) : '';
+      const body = { cmd: 'auditOrder', b: q('#adm-ab'), a: ex ? '' : pv, name, amount: Number(String(q('#adm-av')).replace(',', '.')) * 1e6, state: ex || !!(m.querySelector('#adm-as') || {}).checked, mode: q('#adm-am') || 'choice' };
+      if (!body.b || (!body.a && !body.name) || body.a === body.b) { toast(ex ? 'Bitte den Namen der Airline eingeben, die nicht mehr im Spiel ist.' : 'Bitte begünstigte Airline und Partner wählen.'); return; }
       if (!(body.amount >= 1e5)) { toast('Bitte den Vorteil in Mio. € angeben, z. B. 20.'); return; }
       if (!b.dataset.armed) { b.dataset.armed = '1'; b.classList.add('danger'); b.textContent = `Wirklich ${eur(body.amount)} Vorteil beanstanden?`; return; }
       b.disabled = true;
@@ -5803,7 +5889,7 @@ async function showAdmin(id, onBack) {
 function adminAuditHtml(a) {
   const yr = (y) => dateParts(y * 365).y, hs = a.humans, opt = (sel) => hs.map((h) => `<option value="${esc(h.id)}"${h.id === sel ? ' selected' : ''}>${esc(h.name)}</option>`).join('');
   const logRow = (r) => `<div class="adm-e"><span class="chip ${r.findings.length ? 'crit' : 'good'}">${r.late ? 'Nachprüfung' : 'Jahresabschluss'}</span><div style="min-width:0"><span class="small"><b>${dateY(r.day)}</b> · ${n0(r.n)} Geschäft${r.n === 1 ? '' : 'e'} · ${n0(r.pairs)} Paar${r.pairs === 1 ? '' : 'e'}${r.by ? ' · angeordnet' : ''}</span>
-    <div class="small ${r.findings.length ? '' : 'muted'}">${r.findings.length ? r.findings.map((f) => `${esc(f.bName)} ← ${esc(f.aName)}: Rückzahlung ${eur(f.claw)}${f.state ? ' an die Staatskasse' : ''}, Bußgeld ${eur(f.fine)}${f.claw + f.fine - f.now > 0 ? `, ${eur(f.claw + f.fine - f.now)} in Raten` : ''}`).join('<br>') : 'keine Beanstandung'}</div></div></div>`;
+    <div class="small ${r.findings.length ? '' : 'muted'}">${r.findings.length ? r.findings.map((f) => `${esc(f.bName)} ← ${esc(f.aName)}: Rückzahlung ${eur(f.claw)}${f.state ? ' an die Staatskasse' : ''}, Bußgeld ${eur(f.fine)} · ${f.mode ? esc(a.modes[f.mode] || f.mode) : f.claw + f.fine - f.now > 0 ? `${eur(f.claw + f.fine - f.now)} in Raten` : 'sofort'}`).join('<br>') : 'keine Beanstandung'}</div></div></div>`;
   const pRow = (p) => { const d = p.aTo - p.bTo, big = Math.abs(d) >= a.minGain;
     return `<tr><td>${yr(p.year)}</td><td>${esc(p.aName)} ⇄ ${esc(p.bName)}${p.late ? ` <span class="chip">${p.late} nachgeprüft</span>` : ''}</td><td class="r">${n0(p.n)}</td><td class="r">${eur(p.aTo)}</td><td class="r">${eur(p.bTo)}</td><td class="r ${big ? 'neg' : ''}">${d === 0 ? '–' : `${eur(Math.abs(d))} an ${esc(d > 0 ? p.bName : p.aName)}`}${p.adv ? `<div class="small">angeordnet ${eur(p.adv)}</div>` : ''}</td></tr>`; };
   const prev = hs.flatMap((h) => h.preview.map((e) => ({ ...e, who: h.name }))).filter((e) => e.excess > 0);
@@ -5812,12 +5898,14 @@ function adminAuditHtml(a) {
     <div class="adm-list">${a.log.map(logRow).join('') || '<p class="small muted">Noch kein Prüfbericht gespeichert – Berichte werden ab Version 0.21.21 aufbewahrt.</p>'}</div>
     ${prev.length ? `<div class="callout warn stack"><b>Vorschau zum nächsten Jahresabschluss</b><span class="small">${prev.map((e) => `${esc(e.who)} ← ${esc(e.name)}: ${eur(e.excess)} Vorteil${e.flagged ? ' – würde beanstandet' : ' (unter der Schwelle)'}`).join('<br>')}</span></div>` : ''}
     <div class="tw"><table class="t"><thead><tr><th>Jahr</th><th>Paar</th><th class="r">Geschäfte</th><th class="r">Wert von links</th><th class="r">Wert von rechts</th><th class="r">Saldo</th></tr></thead><tbody>${a.pairs.map(pRow).join('') || '<tr><td colspan="6" class="small muted">Keine Handelsgeschäfte zwischen Mitspielenden erfasst (gespeichert werden die letzten 400 Tage).</td></tr>'}</tbody></table></div>
-    ${hs.length >= 2 ? `<div class="stack"><h4>Nachprüfung anordnen</h4>
-      <div class="grid2"><label class="f"><span>Begünstigte Airline</span><select id="adm-ab">${opt(hs[0].id)}</select></label><label class="f"><span>Partner (hat den Vorteil gegeben)</span><select id="adm-aa">${opt(hs[1].id)}</select></label></div>
-      <div class="row"><label class="f" style="flex:1;min-width:140px"><span>Ungerechtfertigter Vorteil (Mio. €)</span><input type="number" id="adm-av" min="0.1" max="999" step="0.1" placeholder="z. B. 20"></label>
-        <label class="chk small" style="flex:2;min-width:220px"><input type="checkbox" id="adm-as"> Rückzahlung an die Staatskasse (z. B. weil der Partner inzwischen pleite oder neu gegründet ist)</label></div>
+    ${hs.length >= 1 ? `<div class="stack"><h4>Nachprüfung anordnen</h4>
+      <div class="grid2"><label class="f"><span>Begünstigte Airline</span><select id="adm-ab">${opt(hs[0].id)}</select></label><label class="f"><span>Partner (hat den Vorteil gegeben)</span><select id="adm-aa">${opt(hs[1] ? hs[1].id : '')}${a.former.length ? `<optgroup label="nicht mehr im Spiel">${a.former.map((n) => `<option value="x:${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>` : ''}<option value="x:">Andere, nicht mehr im Spiel …</option></select></label></div>
+      <label class="f" id="adm-anw" hidden><span>Name der Airline, die nicht mehr im Spiel ist</span><input type="text" id="adm-an" maxlength="40" placeholder="z. B. Wodubist"></label>
+      <div class="grid2"><label class="f"><span>Ungerechtfertigter Vorteil (Mio. €)</span><input type="number" id="adm-av" min="0.1" max="999" step="0.1" placeholder="z. B. 20"></label>
+        <label class="f"><span>Zahlungsweise</span><select id="adm-am">${Object.entries(a.modes).map(([k, l]) => `<option value="${k}" ${k === 'choice' ? 'selected' : ''}>${esc(l)}${k === 'choice' ? ' (7 Tage, sonst 12 Raten)' : k === 'now' ? ' (fehlt Geld: Rest in 12 Raten)' : ''}</option>`).join('')}</select></label></div>
+      <label class="chk small"><input type="checkbox" id="adm-as"> Rückzahlung an die Staatskasse statt an den Partner (bei Partnern, die nicht mehr im Spiel sind, immer)</label>
       <div class="row"><button class="btn small" data-adm="audit">Nachprüfung anordnen</button></div>
-      <p class="small muted">Wirkt wie eine Beanstandung beim Jahresabschluss: Rückzahlung, Bußgeld (10/25/50 % je nach Zahl der Beanstandungen), Prüfvermerk mit Ansehensabzug für ein Jahr; reicht das Geld nicht, Rest in 12 Monatsraten. Der Partner zahlt kein Bußgeld, wenn die Rückzahlung an die Staatskasse geht.</p></div>` : ''}
+      <p class="small muted">Für die Mitspielenden sieht das aus wie eine gewöhnliche Nachprüfung der Wirtschaftsprüfer – Logbuch, Meldung und Entscheidung nennen die Spielleitung nicht. Wirkt wie eine Beanstandung beim Jahresabschluss: Rückzahlung, Bußgeld (10/25/50 % je nach Zahl der Beanstandungen), Prüfvermerk mit Ansehensabzug für ein Jahr. Zahlungsweisen: sofort (wählt die Airline das selbst, 10 % Nachlass aufs Bußgeld), 6 Raten (+2 %), 12 Raten (+5 %), 24 Raten (+12 %). Der Partner zahlt kein Bußgeld, wenn die Rückzahlung an die Staatskasse geht.</p></div>` : ''}
   </section>`;
 }
 function adminCard(g) {
@@ -5945,13 +6033,19 @@ function scheduleNext() {
   else if (p !== null && sp) wait = Math.max(1500, Math.min(8000, (1 - (p % 1)) * sp.ms + 500));
   mpState.timer = setTimeout(() => mpPoll(false), wait);
 }
+/** Anwesenheit für die Spielzeit: Fenster sichtbar und in den letzten 10 Minuten bedient (Maus, Tastatur, Touch, Scrollen). */
+const IDLE_MS = 10 * 60000;
+let lastInput = Date.now();
+for (const ev of ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll']) addEventListener(ev, () => { lastInput = Date.now(); }, { passive: true, capture: true });
+addEventListener('focus', () => { lastInput = Date.now(); });
+function isActiveNow() { return document.visibilityState === 'visible' && Date.now() - lastInput < IDLE_MS; }
 async function mpPoll(first) {
   if (!ui.mp || mpState.busy) { scheduleNext(); return; }
   mpState.busy = true;
   const id = ui.mp.id;
   try {
     const ping = Date.now() - mpState.lastPing > 15000;
-    const r = await api(`/games/${id}/state?v=${encodeURIComponent(mpState.ver)}${ping ? `&ping=1&vis=${document.visibilityState === 'visible' ? 1 : 0}` : ''}`, { raw: true });
+    const r = await api(`/games/${id}/state?v=${encodeURIComponent(mpState.ver)}${ping ? `&ping=1&vis=${isActiveNow() ? 1 : 0}` : ''}`, { raw: true });
     if (r.status === 401) { stopOnline(); showAuth(); return; }
     if (r.status === 403 || r.status === 404) { stopOnline(); toast('Kein Zugriff mehr auf dieses Spiel – es wurde gelöscht oder die Spielleitung hat Ihre Airline entfernt.'); showLobby(); return; }
     if (!r.ok && r.status !== 204) throw new Error(`Server antwortet mit ${r.status}`);
@@ -6151,14 +6245,25 @@ function playersCard() {
     <td class="r">${fe(k.eq)}</td><td class="r ${k.net < 0 ? 'neg' : k.net > 0 ? 'pos' : ''}">${k.days ? fe(k.net, true) : '–'}</td><td class="r">${k.lf === null ? '–' : pct(k.lf)}</td></tr>`).join('');
   return `<div class="stack"><div class="spread"><h2 class="sec">${ui.mp.main ? 'Airlines in der Hauptwelt' : 'Mitspielende'} <small>${ui.mp.main ? `${visHumans().length} Airlines` : `${esc(ui.mp.name)} · Code ${esc(ui.mp.code)}`}</small></h2><span class="row" style="gap:6px"><button class="btn small" data-act="tab" data-tab="players">Alle Kennzahlen</button><button class="btn small" data-act="openchat">Chat</button><button class="btn small" data-act="invite">Einladen</button></span></div>
     <table class="t"><thead><tr><th>Airline · Spieler</th><th class="r">${ph ? 'Eigenk.' : 'Eigenkapital'}</th><th class="r">${ph ? '30 T.' : 'Ergebnis 30 T.'}</th><th class="r">${ph ? 'Ausl.' : 'Auslastung'}</th></tr></thead><tbody>${rows}</tbody></table>${more ? `<p class="small muted">… und ${more} weitere. <a href="#" data-act="tab" data-tab="players">Alle Mitspielenden</a></p>` : ''}
-    ${mpState.clock ? `<p class="small muted">Tempo: ${SM.SPEEDS[SM.speedKey(mpState.clock.speed)].label}${ui.mp.main ? ' · Hauptwelt: läuft dauerhaft, auch wenn Sie offline sind' + (ui.mp.host ? ' · Als Admin stellen Sie das Tempo ein.' : '') : ui.mp.host ? ' · Sie leiten das Spiel und stellen das Tempo oben ein.' : ' · Die Spielleitung stellt das Tempo ein.'}${ui.mpOffline ? ' · <span class="neg">Verbindung unterbrochen</span>' : ''}</p>` : ''}</div>`;
+    ${mpState.clock ? `<p class="small muted">Tempo: ${SM.SPEEDS[SM.speedKey(mpState.clock.speed)].label}${mpState.clock.weekend ? ' (Wochenend-Tempo, Fr 17 Uhr bis Mo 6 Uhr)' : ''}${ui.mp.main ? ' · Hauptwelt: läuft dauerhaft, auch wenn Sie offline sind' + (ui.mp.host ? ' · Als Admin stellen Sie das Tempo ein.' : '') : ui.mp.host ? ' · Sie leiten das Spiel und stellen das Tempo oben ein.' : ' · Die Spielleitung stellt das Tempo ein.'}${ui.mpOffline ? ' · <span class="neg">Verbindung unterbrochen</span>' : ''}</p>` : ''}</div>`;
 }
 async function onlineBoot() {
   const q = new URLSearchParams(location.search);
   if (q.get('join')) mpState.pendingJoin = { code: q.get('join').toUpperCase(), token: q.get('t') };
   try { mpState.user = await api('/me'); } catch (e) { mpState.user = null; }
   if (mpState.user && mpState.user.mustChange) showPwChange({ forced: true, then: () => showLobby() });
-  else if (mpState.user) showLobby(); else showAuth(mpState.pendingJoin ? 'register' : 'login');
+  else if (mpState.user) { showLobby(); showPatch(); } else showAuth(mpState.pendingJoin ? 'register' : 'login');
+}
+/** Patch-Hinweis einmal je Konto nach einem Update (der Server merkt sich, dass er gesehen wurde). */
+function showPatch() {
+  const p = mpState.user && mpState.user.patch; if (!p) return;
+  const box = document.createElement('div'); box.id = 'patchNote'; box.className = 'patch-ov';
+  box.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="patchT"><span class="chip good">Update</span><h1 id="patchT">${esc(p.title)}</h1><p><b>${esc(p.lead)}</b></p><p class="small ink2">${esc(p.note)}</p>
+    ${p.more && p.more.length ? `<h3>Außerdem neu</h3><ul class="small">${p.more.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    <div class="row" style="justify-content:flex-end"><button class="btn primary" type="button" id="patchOk">Verstanden</button></div></div>`;
+  document.body.appendChild(box);
+  const done = () => { box.remove(); mpState.user.patch = null; api('/patch/seen', { body: {} }).catch(() => {}); };
+  box.querySelector('#patchOk').onclick = done; box.onclick = (e) => { if (e.target === box) done(); };
 }
 
 // ---------------------------------------------------------------------------

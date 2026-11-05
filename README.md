@@ -183,6 +183,28 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.26: Wochenend-Tempo · Patch-Hinweis · Auslastung und Abweisungen richtig erklärt
+
+- **Wochenend-Tempo (Hauptwelt):** Freitag 17 Uhr bis Montag 6 Uhr (Europe/Berlin, auch über die Zeitumstellung) läuft 1 Spieltag = 1 Stunde, sonst das eingestellte Tempo (Pause bleibt Pause). Die Uhr rechnet stundenweise mit dem jeweils gültigen Tempo; der Browser zeigt das gerade gültige Tempo („Wochenend-Tempo“). Private Spiele sind nicht betroffen.
+- **Patch-Hinweis:** Beim ersten Anmelden nach dem Update erscheint einmal je Konto ein kurzer Hinweis (Wochenend-Tempo plus „Außerdem neu“); der Server merkt sich „gesehen“ (`/patch/seen`), neue Konten sehen ihn nicht. Neuer Hinweis: `PATCH_ID` und Text in `server/api.mjs` ändern.
+- **Slot-Warteliste:** Kleinere Airlines (weniger Flugzeuge inkl. Bestellungen) kommen zuerst, unabhängig vom Eintragszeitpunkt; bei gleicher Größe zählt der frühere Eintrag. Gilt für Zuteilung, Platzanzeige und Prognose; die Liste zeigt die Flottengröße.
+- **Auslastung:** zählt nur noch Sitze auf tatsächlich geflogenen Flügen – annullierte Flüge standen bisher als leere Sitze in der Statistik („keinen Platz“ und trotzdem nur 88 %). Die Preisautomatik rechnet ebenso und erhöht den Preis jetzt zuverlässig, wenn eine Richtung ausgebucht ist und viele abgewiesen werden.
+- **Hinweis „Reisende ohne Platz“:** je Richtung mit Auslastung; ist nur eine Richtung überbucht und die andere schwach belegt, lautet der Rat „Preis in dieser Richtung erhöhen“ statt „Frequenz ausbauen“; verliert die Strecke Geld, kein Rat zu mehr Frequenz. Ist die Richtung nicht voll, steht dabei, an wie vielen Tagen ausgebucht war und wie viele Flüge ausfielen.
+
+## Neu in 0.21.25: Exklusivverträge als teures, genehmigtes Monopol · genauere Spielzeit · Logo hochladen
+
+- **Exklusivvertrag (alle Gates):** Preis steigt mit der Flughafengröße überproportional – 8 Mio. € × (Mio. Passagiere)^1,35 (1 Mio. Pax ≈ 8 Mio. €, 5 Mio. ≈ 70 Mio. €, 10 Mio. ≈ 179 Mio. €, 25 Mio. ≈ 614 Mio. €), dazu 1,5 % des Preises im Monat. Laufzeit 3 Jahre, danach Verlängerung zum dann gültigen Preis. Die Wettbewerbsbehörde genehmigt den Vertrag: Für die Laufzeit gibt es an diesem Flughafen kein Kartellverfahren (kein Streckenverbot, keine Bußgelder); ein laufendes Verfahren wird eingestellt. Danach gilt wieder die Wettbewerbsaufsicht. Kündigung: 40 % des noch nicht genutzten Teils zurück.
+- **Altverträge** (zum alten, niedrigen Preis) laufen noch 180 Tage – bis dahin ebenfalls ohne Kartellverfahren – und lassen sich dann zum neuen Preis verlängern.
+- **Spielzeit genauer:** Gezählt wird nur noch die Zeit zwischen dichten Lebenszeichen (höchstens 45 s Abstand; gedrosselte Hintergrund-Tabs melden sich nur etwa einmal pro Minute und zählen nicht mehr). Ein sichtbares Fenster ohne Maus-, Tastatur-, Touch- oder Scrolleingabe seit 10 Minuten gilt als abwesend. Neue Sitzung erst nach 5 Minuten Pause.
+- **Angeordnete Nachprüfung unauffällig:** Für die Mitspielenden erscheint sie als gewöhnliche „Nachprüfung der Wirtschaftsprüfer“ (Logbuch, Meldung, Entscheidung) – ohne Hinweis auf die Spielleitung.
+- **Logo hochladen:** Unternehmen → Profil & Logo → „Bild hochladen (64 × 64)“. PNG mit Transparenz wird pixelgenau übernommen; andere Größen werden auf 64 × 64 gebracht, mehr als 15 Farben per k-Means reduziert. Danach im Pixel-Editor weiter bearbeitbar, „Pixel-Logo übernehmen“ speichert.
+
+## Neu in 0.21.24: Nachprüfung bei Partnern, die nicht mehr im Spiel sind · Zahlungsweisen
+
+- **Partner nicht mehr im Spiel:** Unter Verwaltung → Wirtschaftsprüfung lassen sich als Partner auch entfernte, insolvente und frühere Gesellschaften (Neugründung unter derselben Kennung) wählen – oder ein beliebiger Name („Andere, nicht mehr im Spiel …“). Die Rückzahlung geht dann an die Staatskasse; die heutige Airline unter der Kennung bekommt nichts und zahlt kein Bußgeld.
+- **Zahlungsweisen:** sofort · 6 Monatsraten (+2 %) · 12 Monatsraten (+5 %) · 24 Monatsraten (+12 %) · „Airline wählt“. Bei „Airline wählt“ (Standard, auch beim Jahresabschluss und bei Nachprüfungen) erscheint im Cockpit eine Entscheidung: sofort mit 10 % Nachlass aufs Bußgeld oder Raten; ohne Wahl binnen 7 Tagen 12 Raten. Fehlt bei Sofortzahlung Geld, wird die Hälfte der Kasse bezahlt und der Rest in 12 Raten. Mehrere Ratenpläne laufen nebeneinander; die Rückzahlung an den Partner geht vor.
+- **Korrektur:** Eine angeordnete Nachprüfung zählte im nächsten Jahresabschluss noch einmal mit – jetzt nicht mehr.
+
 ## Neu in 0.21.23: Spielzeit für alle, Hinweis auf neue Version
 
 - **Spielzeit:** Fenster, die vor 0.21.19 geöffnet und seitdem nicht neu geladen wurden, schickten keine Sichtbarkeitsangabe mit und wurden deshalb nie gezählt. Der Server zählt solche Lebenszeichen jetzt mit (nur ausdrücklich unsichtbare Fenster zählen nicht).

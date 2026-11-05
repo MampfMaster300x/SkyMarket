@@ -424,7 +424,9 @@ const SM = (() => {
       subsidy: { p: 0.2, minDay: 90, days: 365 },
     },
     SMALL_HELP: { fuel: 0.04, fuelFull: 10, fuelZero: 25, subsidy: 1800, subPax: 5, subFull: 15, subZero: 30 },
-    AUDIT: { minGain: 1e6, share: 0.15, tol: 0.10, fine: [0.10, 0.25, 0.5], malus: [8, 15, 25], giverFine: 0.05, months: 12, cleanYears: 2 },
+    AUDIT: { minGain: 1e6, share: 0.15, tol: 0.10, fine: [0.10, 0.25, 0.5], malus: [8, 15, 25], giverFine: 0.05, months: 12, cleanYears: 2,
+      // 0.21.24: Zahlungsweisen – sofort (Nachlass aufs Bußgeld, wenn selbst gewählt), Raten mit Aufschlag auf den Gesamtbetrag; ohne Wahl binnen 7 Tagen: 12 Raten
+      pay: { days: 7, auto: 'r12', skonto: 0.10, r6: { n: 6, x: 1.02 }, r12: { n: 12, x: 1.05 }, r24: { n: 24, x: 1.12 } } },
     STAGES: [
       { key: 'startup', label: 'Startup', min: 0, hq: 6000 },
       { key: 'regional', label: 'Regional', min: 6, hq: 12000 },
@@ -503,7 +505,9 @@ const SM = (() => {
       { label: 'Drehkreuz', setup: 4e6, monthly: 250000, minRoutes: 8, desc: 'Umsteigewellen, Transferschalter, eigenes Gepäcksystem' },
       { label: 'Mega-Hub', setup: 10e6, monthly: 600000, minRoutes: 15, desc: 'Mehrere Wellen am Tag, Lounges, schnelle Wege' },
     ],
-    GATE_LOCK: { perMioPax: 900000, monthlyRate: 0.015, maxPax: 25 },
+    // 0.21.25: Exklusivvertrag = genehmigtes Monopol – sehr teuer und mit wachsender Größe überproportional (8 Mio. × Mio. Pax^1,35),
+    // 3 Jahre Laufzeit, für die Laufzeit kein Kartellverfahren an diesem Flughafen; Kündigung: 40 % des Restwerts zurück
+    GATE_LOCK: { base: 8e6, exp: 1.35, monthlyRate: 0.015, years: 3, refund: 0.4, oldDays: 180 },
     // 200.000 Pax = 1 Slot; Anteil der etablierten Airlines je Größe (≥40, ≥15, ≥5, ≥1 Mio., kleiner); Slotpreis und Lizenz nach Größe
     SLOT_RULE: { paxPerSlot: 0.2, inc: [0.9, 0.8, 0.6, 0.3, 0], feeBase: 5, feeK: 2, priceBase: 2000, priceExp: 1.0, scarceShare: 0.3, scarceMax: 6, licenceBase: 10000, licenceExp: 1.1, stationBase: 2500, stationExp: 0.85, hubPaxPerSlot: 0.2 },
     SLOT_HOLD_FEE: 1.0,
@@ -1515,7 +1519,9 @@ const SM = (() => {
   function routeLf(r, days, dir = null) {
     const h = r.hist.slice(-days);
     let s = 0, p = 0;
-    for (const x of h) { if (dir) { s += x['seats_' + dir]; p += x['pax_' + dir]; } else { s += x.seats; p += x.pax; } }
+    // Auslastung der tatsächlich geflogenen Flüge: annullierte Flüge zählen nicht als leere Sitze
+    const so = (x, d) => (x['so_' + d] !== undefined && (x['so_' + d] > 0 || x.cancelled > 0) ? x['so_' + d] : x['seats_' + d]);
+    for (const x of h) { if (dir) { s += so(x, dir); p += x['pax_' + dir]; } else { s += so(x, 'out') + so(x, 'in'); p += x.pax; } }
     return s ? p / s : 0;
   }
   /** Einstellungen der Preisautomatik einer Strecke (fehlende Werte: Standard), geprüft und begrenzt. */
@@ -2401,21 +2407,26 @@ const SM = (() => {
     }
     /** Prognose für den nächsten Vergabetermin: freie Slots + 1 neuer, reihum je einer an die Wartenden (ohne Geldprüfung). */
     waitForecast(apt) {
-      const q = (this.slotWait || []).filter((e) => e.apt === apt && e.n > 0).map((e) => ({ e, left: e.n, got: 0 }));
+      const q = this.waitQueue(apt).filter((e) => e.n > 0).map((e) => ({ e, left: e.n, got: 0 }));
       let free = Math.max(0, this.slotsFree(apt)) + (apx(apt).slots === null ? 0 : 1), guard = 0;
       while (free > 0 && q.some((x) => x.left > 0) && guard++ < 60) for (const x of q) { if (free <= 0) break; if (x.left > 0) { x.left--; x.got++; free--; } }
       const out = {}; for (const x of q) out[x.e.id] = x.got; return { byId: out, total: Math.max(0, this.slotsFree(apt)) + 1, queue: q.length };
     }
-    waitPos(e) { const q = (this.slotWait || []).filter((x) => x.apt === e.apt); return q.indexOf(e) + 1; }
+    /** Reihenfolge der Warteliste: kleinere Airlines zuerst (Flottengröße inkl. Bestellungen), bei Gleichstand wer sich früher eingetragen hat. */
+    waitQueue(apt) {
+      return (this.slotWait || []).map((e, i) => ({ e, i })).filter((x) => x.e.apt === apt)
+        .map((x) => ({ ...x, s: this.airlines[x.e.al] ? this.airlines[x.e.al].fleet.length : 0 })).sort((a, b) => a.s - b.s || a.i - b.i).map((x) => x.e);
+    }
+    waitPos(e) { return this.waitQueue(e.apt).indexOf(e) + 1; }
     leaveWait(al, id) { const before = (this.slotWait || []).length; this.slotWait = (this.slotWait || []).filter((e) => !(e.id === id && e.al === al.id)); return before !== this.slotWait.length ? { ok: true } : { ok: false, msg: 'Eintrag nicht gefunden.' }; }
-    /** Zum 1. April und 1. Oktober: freie Slots fair an die Warteliste verteilen (reihum je einer, zum aktuellen Preis). */
+    /** Zum 1. April und 1. Oktober: freie Slots an die Warteliste verteilen – reihum je einer, kleinere Airlines zuerst (unabhängig vom Eintragszeitpunkt), zum aktuellen Preis. */
     allocateWaitlist() {
       if (!this.slotWait || !this.slotWait.length) return;
       this.slotWait = this.slotWait.filter((e) => this.airlines[e.al] && this.airlines[e.al].status !== 'insolvent' && e.n > 0);
       for (const apt of [...new Set(this.slotWait.map((e) => e.apt))]) {
         let free = this.slotsFree(apt), guard = 0;
         while (free > 0 && guard++ < 50) {
-          const q = this.slotWait.filter((e) => e.apt === apt && e.n > 0 && !e.skip); if (!q.length) break;
+          const q = this.waitQueue(apt).filter((e) => e.n > 0 && !e.skip); if (!q.length) break;   // kleinere Airlines zuerst
           let gave = false;
           for (const e of q) {
             if (free <= 0) break;
@@ -2774,7 +2785,7 @@ const SM = (() => {
         if (al.status === 'insolvent') continue;
         for (const r of al.activeRoutes()) {
           if (!r.flyingToday) continue;
-          const st = { d: this.day, flights: 0, seats: 0, cancelled: 0, cost: 0, block_h: 0, pax: 0, rev: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, late: 0,
+          const st = { d: this.day, flights: 0, seats: 0, cancelled: 0, cost: 0, block_h: 0, pax: 0, rev: 0, pax_out: 0, pax_in: 0, seats_out: 0, seats_in: 0, so_out: 0, so_in: 0, late: 0,
             demand_out: 0, demand_in: 0, spill_out: 0, spill_in: 0, tr_out: 0, tr_in: 0, cargo: 0 };
           for (const dir of ['out', 'in']) {
             const [o, d] = dir === 'out' ? [r.base, r.dest] : [r.dest, r.base];
@@ -2901,6 +2912,7 @@ const SM = (() => {
         }
       }
       st.pax += flown; st.rev += rev + anc; st['pax_' + dir] += flown; st['tr_' + dir] += flownTr; st['seats_' + dir] += f * seats;
+      st['so_' + dir] = (st['so_' + dir] || 0) + Math.max(0, f - cancelledHere) * seats;   // Sitze auf tatsächlich geflogenen Flügen (für Auslastung und Preisautomatik)
     }
     cargoShare(o, d, r) {
       let tot = 0, own = 0;
@@ -3041,7 +3053,16 @@ const SM = (() => {
         L.post('rev_ancillary', LP.partner * tick * clamp((this.day - (al.loyalty.since ?? this.day)) / 180, 0.15, 1), true, 'Vielflieger-Partner (Meilenverkauf)');
       }
       for (const [apt, lv] of Object.entries(al.hubs || {})) if (lv && al.bases.includes(apt)) L.post('stations', -P.HUB[lv].monthly * apx(apt).cost * cpi / 30.4, true, `Drehkreuz Stufe ${lv} › ${aTag(apt)}`);
-      for (const apt of Object.keys(al.gateLock || {})) L.post('stations', -al.gateLock[apt].price * P.GATE_LOCK.monthlyRate / 30.4, true, `Exklusivvertrag Gates › ${aTag(apt)}`);
+      for (const apt of Object.keys(al.gateLock || {})) {
+        const g = al.gateLock[apt];
+        if (g.until && g.until <= this.day) {
+          delete al.gateLock[apt];
+          al.log(this.day, `Exklusivvertrag in ${ap(apt).name} ausgelaufen – die Gates stehen wieder allen offen. Verlängern geht zum heutigen Preis (${mioTxt(this.gateLockPrice(apt))}); ohne Vertrag gilt wieder die Wettbewerbsaufsicht.`, 'warn');
+          this.pushNews(this.day, `${ap(apt).name}: Gates wieder für alle Airlines offen`, 'info', al.id);
+          continue;
+        }
+        L.post('stations', -g.price * P.GATE_LOCK.monthlyRate / 30.4, true, `Exklusivvertrag Gates › ${aTag(apt)}`);
+      }
       for (const [apt, hs] of Object.entries(al.slotHold || {})) { let n = 0; for (const h of hs) if (h.buy && h.until > this.day) n += h.n; if (n) L.post('slots', -n * apx(apt).slotFee * P.SLOT_HOLD_FEE * cpi, true, `Slotgebühr Reserve (ungenutzt) › ${aTag(apt)}`); }
       if (al.cargo) L.post('overhead', -P.CARGO.gsaMonth * cpi / 30.4, true, 'Frachtvertrieb (GSA)');
     }
@@ -3134,8 +3155,8 @@ const SM = (() => {
         const cfg = apCfgOf(r), last = r.hist.slice(-7), nw = [];
         for (const [dir, fare] of [['out', r.fare_out], ['in', r.fare_in]]) {
           let seats = 0, pax = 0, spill = 0, dem = 0;
-          for (const h of last) { seats += h['seats_' + dir] || 0; pax += h['pax_' + dir] || 0; spill += h['spill_' + dir] || 0; dem += h['demand_' + dir] || 0; }
-          const lf = seats ? pax / seats : 0, gap = lf - r.ap;
+          for (const h of last) { seats += (h['so_' + dir] !== undefined && (h['so_' + dir] > 0 || h.cancelled > 0) ? h['so_' + dir] : h['seats_' + dir]) || 0; pax += h['pax_' + dir] || 0; spill += h['spill_' + dir] || 0; dem += h['demand_' + dir] || 0; }
+          const lf = seats ? pax / seats : 0, gap = lf - r.ap;   // Auslastung der geflogenen Flüge – Ausfälle drücken sie nicht künstlich
           let step = Math.abs(gap) < A.dead ? 0 : clamp(A.gain * gap, -cfg.spd, cfg.spd);
           { const sr = dem > 0 ? spill / dem : 0; if (sr > 0.08 && lf > r.ap - A.dead) step = Math.max(step, cfg.spd * (sr > 0.35 ? 1.6 : sr > 0.2 ? 1.1 : 0.7)); }   // viele Abweisungen: Preis rauf – je mehr, desto schneller
           const [o, d] = dir === 'out' ? [r.base, r.dest] : [r.dest, r.base], ref = refPrice(o, d, this.macro.cpi);
@@ -3216,6 +3237,7 @@ const SM = (() => {
         const prev = al.antitrust || {}, now = {};
         for (const [c, f] of Object.entries(own[al.id] || {})) {
           const sh = f / Math.max(1, deps[c]);
+          if (al.gateLock && al.gateLock[c]) continue;   // genehmigter Exklusivvertrag: kein Verfahren für die Laufzeit
           if (f < A.minDeps || paxEff(c) < A.minPax || sh < A.share) continue;
           now[c] = { since: prev[c] ? prev[c].since : day, share: Math.round(sh * 100) / 100 };
           if (!prev[c]) { al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie haben ${Math.round(sh * 100)} % aller Abflüge. Neue Strecken dort sind untersagt; liegt Ihr Anteil in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder.`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Abflüge`, 'warn', al.id); }
@@ -3225,7 +3247,7 @@ const SM = (() => {
             if (fine > 0) { al.ledger.post('one_off', -fine, true, `Bußgeld Wettbewerbsaufsicht › ${aTag(c)}`); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (Anteil ${Math.round(sh * 100)} %). Weniger Abflüge dort oder mehr Konkurrenz beenden das Verfahren.`, 'crit'); }
           }
         }
-        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %.`, 'good');
+        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – ${al.gateLock && al.gateLock[c] ? 'der Exklusivvertrag ist genehmigt' : `Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %`}.`, 'good');
         al.antitrust = Object.keys(now).length ? now : undefined;
       }
     }
@@ -3417,6 +3439,7 @@ const SM = (() => {
       for (const [k, s] of Object.entries(al.studies)) if (!s.done && s.ready <= this.day) { s.done = true; al.log(this.day, `Marktstudie ${k} liegt vor`, 'good'); }
       this.completeStudies(al);
       for (const dcs of al.decisions) if (!dcs.resolved && dcs.deadline < this.day) {
+        if (dcs.type === 'auditpay') { this.resolveDecision(al, dcs.id, P.AUDIT.pay.auto); dcs.resolved = 'ignored'; al.log(this.day, `Keine Wahl zur Zahlungsweise: Der Prüfungsbescheid wird in ${P.AUDIT.pay[P.AUDIT.pay.auto].n} Monatsraten bezahlt.`, 'warn'); continue; }
         if (dcs.type === 'agm') { this.resolveDecision(al, dcs.id, 'yes'); dcs.resolved = 'ignored'; al.log(this.day, 'Sie haben auf der Hauptversammlung nicht abgestimmt – die Minderheit hat den Antrag allein beschlossen.', 'warn'); continue; }
         dcs.resolved = 'ignored'; al.log(this.day, 'Keine Antwort an die Gewerkschaft: Der Streik findet statt', 'warn'); if (dcs.type === 'profit') this.unionStrike(al);
       }
@@ -4111,13 +4134,15 @@ const SM = (() => {
       al.log(this.day, `${n} Slots in ${ap(apt).name} ${buyer ? `an ${buyer.name} verkauft` : 'an den Flughafen zurückgegeben'} (Erlös ${Math.round(back / 1000)} Tsd. EUR)`, 'route');
       return { ok: true, n, back };
     }
-    gateLockPrice(apt) { return Math.max(1, ap(apt).pax || 1) * P.GATE_LOCK.perMioPax * this.macro.cpi; }
+    gateLockPrice(apt) { const G = P.GATE_LOCK; return Math.round(G.base * Math.max(1, paxEff(apt)) ** G.exp * this.macro.cpi / 1e5) * 1e5; }
+    /** Erstattung bei Kündigung: Anteil am noch nicht abgelaufenen Teil der Laufzeit. */
+    gateLockRefund(g) { const G = P.GATE_LOCK, term = G.years * 365, left = g.until ? clamp((g.until - this.day) / Math.max(1, g.until - (g.since ?? 0)), 0, 1) : 0; return Math.round((g.price || 0) * G.refund * left / 1e3) * 1e3; }
     setGateLock(al, apt, on) {
       if (!P.AIRPORTS[apt]) return { ok: false, msg: 'Ungültig.' };
       al.gateLock = al.gateLock || {};
       if (!on) {
         if (!al.gateLock[apt]) return { ok: true };
-        const back = (al.gateLock[apt].price || 0) * P.RESTRUCT.gateRefund;
+        const back = this.gateLockRefund(al.gateLock[apt]);
         delete al.gateLock[apt];
         if (back > 0) { al.ledger.post('one_off', back, true, `Exklusivvertrag Gates gekündigt (Erstattung) › ${aTag(apt)}`); }
         al.log(this.day, `Exklusivvertrag in ${ap(apt).name} gekündigt${back > 0 ? ` – der Flughafen erstattet ${Math.round(back / 1000)} Tsd. EUR` : ''}`, 'route'); return { ok: true, back };
@@ -4128,10 +4153,12 @@ const SM = (() => {
       const price = this.gateLockPrice(apt);
       if (al.spendable(this.macro.bank ?? 1) < price) return { ok: false, msg: `Der Vertrag kostet ${Math.round(price / 1000)} Tsd. EUR – dafür reicht auch der Dispo nicht.` };
       al.ledger.post('one_off', -price, true, `Exklusivvertrag Gates › ${aTag(apt)}`);
-      al.gateLock[apt] = { since: this.day, price };
-      al.log(this.day, `Exklusivvertrag in ${ap(apt).name}: alle freien Gates gehören Ihnen. Andere Airlines können dort keine neuen Flüge mehr anbieten.`, 'route');
+      const until = this.day + P.GATE_LOCK.years * 365;
+      al.gateLock[apt] = { since: this.day, price, until };
+      al.log(this.day, `Exklusivvertrag in ${ap(apt).name} (${mioTxt(price)}, Laufzeit bis Tag ${until + 1}): alle freien Gates gehören Ihnen, andere Airlines können dort keine neuen Flüge mehr anbieten. Die Wettbewerbsbehörde hat den Vertrag genehmigt – für die Laufzeit gibt es dort kein Kartellverfahren.`, 'route');
       this.pushNews(this.day, `${al.name} sichert sich alle Gates in ${ap(apt).name}`, 'ai', al.id);
-      return { ok: true, price };
+      if (al.antitrust && al.antitrust[apt]) { delete al.antitrust[apt]; if (!Object.keys(al.antitrust).length) delete al.antitrust; al.log(this.day, `Wettbewerbsaufsicht: Verfahren in ${ap(apt).name} eingestellt – der Exklusivvertrag ist genehmigt.`, 'good'); }
+      return { ok: true, price, until };
     }
     /** Basis schließen: Strecken ab dort werden eingestellt (nur mit force), Flugzeuge ziehen an eine andere Basis um. */
     closeBase(al, apt, to, force) {
@@ -4164,6 +4191,7 @@ const SM = (() => {
     resolveDecision(al, id, choice) {
       const dcs = al.decisions.find((x) => x.id === id); if (!dcs || dcs.resolved) return;
       dcs.resolved = choice;
+      if (dcs.type === 'auditpay') { const m = ['now', 'r6', 'r12', 'r24'].includes(choice) ? choice : P.AUDIT.pay.auto; auditPay(this, al, dcs.bill, m, { skonto: m === 'now' }); return; }
       if (dcs.type === 'agm') {
         const A = P.PAYOUT, c = capState(al), k = ['yes', 'half', 'no'].includes(choice) ? choice : 'yes', eff = Math.round(dcs.rate * agmFactor(al, k) * 1000) / 1000;
         al.agm = { k, rate: eff, asked: dcs.rate, from: this.day, until: this.day + (k === 'no' ? A.noMonths : A.months) * 30 };
@@ -5080,7 +5108,7 @@ const SM = (() => {
     }
     for (const [apt, hs] of Object.entries(al.slotHold || {})) { const n = hs.filter((h) => h.buy && h.until > w.day).reduce((x, h) => x + h.n, 0); if (!n) continue; const buyer = w.list.find((x) => x.archetype && x.status === 'active' && (x.bases.includes(apt) || x.activeRoutes().some((r) => r.base === apt || r.dest === apt))); out.slots.push({ apt, n, value: Math.round(w.slotPrice(apt) * n * (buyer ? R.slotAI : R.slotPool)), buyer: buyer ? buyer.name : null }); }
     for (const [id, st] of Object.entries(al.stakes || {})) { const T = w.airlines[id]; if (T) out.stakes.push({ id, name: T.name, f: st.f, value: Math.round(stakeSellPrice(w, T, st.f)) }); }
-    for (const [apt, g] of Object.entries(al.gateLock || {})) out.gates.push({ apt, value: Math.round((g.price || 0) * R.gateRefund) });
+    for (const [apt, g] of Object.entries(al.gateLock || {})) out.gates.push({ apt, value: w.gateLockRefund(g) });
     out.daysLeft = al.status === 'restructuring' || al.ledger.cash < 0 ? Math.max(0, (al.isPlayer ? R.humanDays : P.INSOLVENCY_AFTER_DAYS) - al.distressDays) : null;
     return out;
   }
@@ -5655,10 +5683,10 @@ const SM = (() => {
     const A = P.AUDIT, from = w.auditFrom || 0, by = {}, since = al.joinedDay || 0;
     for (const x of w.xfers || []) {
       if (x.a !== al.id && x.b !== al.id) continue;
-      if (late ? x.late !== true : (x.late === true || x.day < from)) continue;
+      if (late ? x.late !== true : (x.late || x.day < from)) continue;   // erledigte Nachprüfungen zählen nicht noch einmal
       if (x.day < since) continue;   // Geschäfte einer früheren (abgewickelten) Gesellschaft unter derselben Kennung
       const other = x.a === al.id ? x.b : x.a;
-      const e = by[other] || (by[other] = { partner: other, got: 0, gave: 0, adv: 0, n: 0, first: x.day, state: false, manual: false }); e.n++; e.first = Math.min(e.first, x.day);
+      const e = by[other] || (by[other] = { partner: other, got: 0, gave: 0, adv: 0, n: 0, first: x.day, state: false, manual: false, pn: null }); e.n++; e.first = Math.min(e.first, x.day); if (x.pn) e.pn = x.pn;
       if (x.adv) { if (x.b === al.id) { e.adv += x.adv; e.manual = true; if (x.state) e.state = true; } continue; }   // Anordnung der Spielleitung: festgestellter Vorteil
       e.got += x.a === al.id ? x.vb : x.va; e.gave += x.a === al.id ? x.va : x.vb;
     }
@@ -5667,7 +5695,7 @@ const SM = (() => {
       const hit = ex0 >= A.minGain * w.macro.cpi && vol > 0 && net / vol >= A.share, excess = (hit ? ex0 : 0) + e.adv;
       const flagged = hit || e.adv > 0;
       const P0 = w.airlines[e.partner];
-      return { ...e, name: P0 ? P0.name : e.partner, net: Math.round(net + e.adv), vol: Math.round(vol), excess: Math.round(flagged ? excess : ex0), flagged };
+      return { ...e, name: e.pn || (P0 ? P0.name : 'ehemalige Airline'), net: Math.round(net + e.adv), vol: Math.round(vol), excess: Math.round(flagged ? excess : ex0), flagged };
     }).sort((a, b) => b.excess - a.excess);
   }
   const auditActive = (x) => x && x.status !== 'insolvent' && !x.removed;
@@ -5686,11 +5714,11 @@ const SM = (() => {
     return { ok: true, amount: e.excess, state: !B };
   }
   /** Jahresabschluss: Wirtschaftsprüfer beanstanden einseitige Vermögensverschiebungen zwischen Spielenden. */
-  function auditYear(w, { late = false, by = null } = {}) {
+  function auditYear(w, { late = false, by = null, mode = null } = {}) {
     const A = P.AUDIT, day = w.day, done = new Set(), from = w.auditFrom || 0;
-    const pool = (w.xfers || []).filter((x) => (late ? x.late === true : x.late !== true && x.day >= from));
+    const pool = (w.xfers || []).filter((x) => (late ? x.late === true : !x.late && x.day >= from));
     const rep = { day, late, by, n: pool.filter((x) => !x.adv).length, pairs: new Set(pool.map((x) => [x.a, x.b].sort().join('|'))).size, findings: [] };
-    const head = late ? (by ? `Nachprüfung auf Anordnung der ${by}` : 'Nachprüfung des letzten Jahresabschlusses') : 'Wirtschaftsprüfung zum Jahresabschluss';
+    const head = late ? (by ? 'Nachprüfung der Wirtschaftsprüfer' : 'Nachprüfung des letzten Jahresabschlusses') : 'Wirtschaftsprüfung zum Jahresabschluss';   // angeordnete Prüfungen erscheinen im Spiel als gewöhnliche Nachprüfung
     for (const G of w.humans) {
       if (!late && G.audit && G.audit.strikes && day > (G.audit.until || 0) + A.cleanYears * 365) G.audit.strikes = 0;   // nach zwei sauberen Jahren gelöscht
       if (!auditActive(G)) continue;
@@ -5701,18 +5729,17 @@ const SM = (() => {
         au.strikes = (au.strikes || 0) + 1;
         const k = Math.min(au.strikes, A.fine.length) - 1, fine = Math.round(e.excess * A.fine[k] / 1e4) * 1e4, claw = e.excess, due = claw + fine;
         au.malus = A.malus[k]; au.until = day + 365; au.findings = [...(au.findings || []), { day, partner: e.partner, name: e.name, claw, fine }].slice(-6);
-        const payee = e.state ? null : auditPayee(w, e.partner, e.first), to = payee ? payee.id : null, cash = G.spendable(w.macro.bank ?? 1);
-        let now = cash >= due ? due : Math.max(0, Math.min(due, Math.round(cash * 0.5 / 1e4) * 1e4));
-        G.ledger.post('one_off', -now, true, 'Wirtschaftsprüfung: Rückzahlung und Bußgeld');
-        const toPartner = Math.min(claw, now); if (to && toPartner > 0) L.ledger.post('one_off', toPartner, true, `Wirtschaftsprüfung: Rückzahlung erhalten › ${G.name}`);
-        if (due - now > 0) au.debt = { left: due - now, monthly: Math.ceil((due - now) / A.months / 1e3) * 1e3, to, since: e.first, clawLeft: to ? Math.max(0, claw - toPartner) : 0 };
-        G.log(day, `${head}: Die Geschäfte mit ${e.name} haben Ihnen einen ungerechtfertigten Vorteil von ${mioTxt(claw)} gebracht. Rückzahlung ${mioTxt(claw)} ${to ? `an ${e.name}` : `an die Staatskasse (${e.state ? 'auf Anordnung' : `${e.name} gibt es nicht mehr`})`}, Bußgeld ${mioTxt(fine)} (${Math.round(A.fine[k] * 100)} %${au.strikes > 1 ? `, ${au.strikes}. Beanstandung` : ''}), Prüfvermerk: Ansehen −${au.malus} für ein Jahr.${due - now > 0 ? ` Sofort bezahlt ${mioTxt(now)}, der Rest von ${mioTxt(due - now)} in ${A.months} Monatsraten.` : ''}`, 'crit');
+        const payee = e.state ? null : auditPayee(w, e.partner, e.first), to = payee ? payee.id : null;
+        const m = auditMode(mode || A.pay.mode || 'choice'), bill = { claw, fine, to, since: e.first, name: e.name };
+        G.log(day, `${head}: Die Geschäfte mit ${e.name} haben Ihnen einen ungerechtfertigten Vorteil von ${mioTxt(claw)} gebracht. Rückzahlung ${mioTxt(claw)} ${to ? `an ${e.name}` : `an die Staatskasse (${e.state && !(e.manual && w.airlines[e.partner] && auditActive(w.airlines[e.partner])) ? `${e.name} ist nicht mehr am Markt` : e.state ? 'die Prüfer ordnen die Abführung an' : `${e.name} gibt es nicht mehr`})`}, Bußgeld ${mioTxt(fine)} (${Math.round(A.fine[k] * 100)} %${au.strikes > 1 ? `, ${au.strikes}. Beanstandung` : ''}), Prüfvermerk: Ansehen −${au.malus} für ein Jahr.${m === 'choice' ? ` Sie wählen bis ${A.pay.days} Tage, wie Sie zahlen (Cockpit → Entscheidungen) – sonst ${A.pay[A.pay.auto].n} Monatsraten.` : ''}`, 'crit');
+        const paid = m === 'choice' ? auditAsk(w, G, bill) : auditPay(w, G, bill, m);
+        const now = paid.now || 0;
         if (payee) {
           const gf = Math.round(e.excess * A.giverFine / 1e4) * 1e4;
           if (gf > 0) { payee.ledger.post('one_off', -gf, true, 'Wirtschaftsprüfung: Bußgeld (Geber)'); payee.log(day, `Wirtschaftsprüfung: Sie haben ${G.name} Werte weit unter Marktpreis überlassen. ${to ? `${G.name} zahlt Ihnen ${mioTxt(claw)} zurück${due - now > 0 ? ' (teilweise in Raten)' : ''}; ` : ''}Bußgeld für Sie ${mioTxt(gf)}.`, 'warn'); }
         }
         w.pushNews(day, `${late ? 'Nachprüfung' : 'Jahresabschluss'}: Wirtschaftsprüfer beanstanden Handelsgeschäfte von ${G.name} – Rückzahlung und Bußgeld angeordnet`, 'warn', G.id);
-        rep.findings.push({ b: G.id, bName: G.name, a: e.partner, aName: e.name, claw, fine, now, state: !to, strike: au.strikes });
+        rep.findings.push({ b: G.id, bName: G.name, a: e.partner, aName: e.name, claw, fine, now, state: !to, strike: au.strikes, mode: m, rest: paid.rest || 0 });
       }
     }
     if (late) { for (const x of w.xfers || []) if (x.late === true) x.late = 'done'; }   // erledigt – bleibt zur Nachverfolgung erfasst
@@ -5743,35 +5770,75 @@ const SM = (() => {
     return n;
   }
   /** Spielleitung: Nachprüfung anordnen – festgestellter Vorteil wird wie eine Beanstandung behandelt (Rückzahlung, Bußgeld, Prüfvermerk). */
-  function auditOrder(w, { b, a, amount, state = false, by = 'Spielleitung' } = {}) {
-    const G = w.airlines[b], L = w.airlines[a], amt = Math.round(clamp(Number(amount) || 0, 0, 999e6) / 1e4) * 1e4;
+  function auditOrder(w, { b, a = '', name = '', amount, state = false, mode = 'choice', by = 'Spielleitung' } = {}) {
+    const G = w.airlines[b], L = a ? w.airlines[a] : null, amt = Math.round(clamp(Number(amount) || 0, 0, 999e6) / 1e4) * 1e4;
+    const pn = String(name || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
     if (!G || !G.isPlayer || !auditActive(G)) return { ok: false, msg: 'Begünstigte Airline nicht gefunden oder nicht aktiv.' };
-    if (!L || !L.isPlayer || L.id === G.id) return { ok: false, msg: 'Bitte eine andere Airline als Partner wählen.' };
+    if (a && (!L || !L.isPlayer)) return { ok: false, msg: 'Partner nicht gefunden.' };
+    if (L && L.id === G.id) return { ok: false, msg: 'Bitte eine andere Airline als Partner wählen.' };
+    if (!L && !pn) return { ok: false, msg: 'Bitte den Namen der Airline angeben, die nicht mehr im Spiel ist.' };
     if (amt < 1e5) return { ok: false, msg: 'Bitte einen Vorteil von mindestens 0,1 Mio. € angeben.' };
-    (w.xfers = w.xfers || []).push({ day: w.day, a: L.id, b: G.id, va: 0, vb: 0, adv: amt, late: true, manual: true, state: !!state });
-    const rep = auditYear(w, { late: true, by });
+    // Partner nicht mehr im Spiel (entfernt, insolvent, unter derselben Kennung neu gegründet): Rückzahlung an die Staatskasse
+    const gone = !L || !auditActive(L) || !!pn;
+    (w.xfers = w.xfers || []).push({ day: w.day, a: L ? L.id : 'EX:' + pn, b: G.id, va: 0, vb: 0, adv: amt, late: true, manual: true, state: !!state || gone, ...(pn || (L && !auditActive(L)) ? { pn: pn || L.name } : {}) });
+    const rep = auditYear(w, { late: true, by, mode: auditMode(mode) });
     const f = rep.findings.find((x) => x.b === G.id);
-    return f ? { ok: true, msg: `${G.name}: Rückzahlung ${mioTxt(f.claw)} ${f.state ? 'an die Staatskasse' : `an ${L.name}`}, Bußgeld ${mioTxt(f.fine)}${f.claw + f.fine - f.now > 0 ? ` – ${mioTxt(f.claw + f.fine - f.now)} in Raten` : ''}.`, finding: f } : { ok: false, msg: 'Keine Beanstandung möglich.' };
+    return f ? { ok: true, msg: `${G.name}: Rückzahlung ${mioTxt(f.claw)} ${f.state ? 'an die Staatskasse' : `an ${f.aName}`}, Bußgeld ${mioTxt(f.fine)} – ${f.mode === 'choice' ? `die Airline wählt binnen ${P.AUDIT.pay.days} Tagen, wie sie zahlt` : f.mode === 'now' ? (f.rest > 0 ? `${mioTxt(f.now)} sofort, Rest in Raten` : 'sofort bezahlt') : AUDIT_MODE_LABEL[f.mode]}.`, finding: f } : { ok: false, msg: 'Keine Beanstandung möglich.' };
   }
   /** Überblick für die Spielleitung: erfasste Geschäfte je Paar und Jahr, Vorschau, letzte Prüfberichte. */
   function adminAudit(w) {
-    const nm = (id) => (w.airlines[id] ? w.airlines[id].name : id), from = w.auditFrom || 0, pairs = {};
+    const nm = (id) => (w.airlines[id] ? w.airlines[id].name : String(id).startsWith('EX:') ? String(id).slice(3) : id), from = w.auditFrom || 0, pairs = {};
     for (const x of w.xfers || []) {
       const k = [x.a, x.b].sort().join('|'), yr = Math.floor(x.day / 365), e = pairs[k + '|' + yr] || (pairs[k + '|' + yr] = { a: x.a < x.b ? x.a : x.b, b: x.a < x.b ? x.b : x.a, year: yr, n: 0, aTo: 0, bTo: 0, adv: 0, late: 0 });
       e.n++; if (x.late) e.late++;
       if (x.adv) { e.adv += x.adv; continue; }
       if (x.a === e.a) { e.aTo += x.va; e.bTo += x.vb; } else { e.bTo += x.va; e.aTo += x.vb; }
     }
-    const humans = w.humans.filter(auditActive).map((h) => ({ id: h.id, name: h.name, joined: h.joinedDay || 0, audit: h.audit || null, preview: auditPreview(w, h).filter((e) => e.net > 0) }));
-    return { day: w.day, from, humans, pairs: Object.values(pairs).map((e) => ({ ...e, aName: nm(e.a), bName: nm(e.b) })).sort((x, y) => y.year - x.year || Math.abs(y.aTo - y.bTo) - Math.abs(x.aTo - x.bTo)), log: (w.auditLog || []).slice().reverse(), tol: P.AUDIT.tol, minGain: P.AUDIT.minGain * w.macro.cpi };
+    const humans = w.humans.filter(auditActive).map((h) => ({ id: h.id, name: h.name, joined: h.joinedDay || 0, audit: h.audit || null, debt: auditDebtSum(h.audit), preview: auditPreview(w, h).filter((e) => e.net > 0) }));
+    // Nicht mehr im Spiel: entfernte/insolvente Airlines von Spielenden und frühere Gesellschaften unter derselben Kennung
+    const former = []; for (const h of Object.values(w.airlines)) { if (!h.isPlayer) continue; if (!auditActive(h)) former.push(h.name); for (const p of h.past || []) former.push(p.name); }
+    return { day: w.day, from, humans, former: [...new Set(former)].filter((n) => !humans.some((h) => h.name === n)), modes: AUDIT_MODE_LABEL, pairs: Object.values(pairs).map((e) => ({ ...e, aName: nm(e.a), bName: nm(e.b) })).sort((x, y) => y.year - x.year || Math.abs(y.aTo - y.bTo) - Math.abs(x.aTo - x.bTo)), log: (w.auditLog || []).slice().reverse(), tol: P.AUDIT.tol, minGain: P.AUDIT.minGain * w.macro.cpi };
   }
-  /** Monatsrate aus einem Prüfungsbescheid. */
+  const AUDIT_MODES = ['now', 'r6', 'r12', 'r24', 'choice'];
+  const auditMode = (m) => (AUDIT_MODES.includes(m) ? m : 'choice');
+  const AUDIT_MODE_LABEL = { now: 'sofort', r6: '6 Monatsraten', r12: '12 Monatsraten', r24: '24 Monatsraten', choice: 'Airline wählt' };
+  /** Offene Ratenpläne (ältere Stände: ein einzelner Plan). */
+  function auditDebts(au) { if (!au) return []; if (au.debt) { au.debts = [...(au.debts || []), au.debt]; delete au.debt; } return au.debts || (au.debts = []); }
+  function auditDebtSum(au) { const ds = auditDebts(au); return { left: ds.reduce((x, d) => x + d.left, 0), monthly: ds.reduce((x, d) => x + Math.min(d.left, d.monthly), 0), n: ds.length }; }
+  /** Bescheid bezahlen: sofort (fehlt Geld, Rest in 12 Raten) oder in Raten mit Aufschlag. Rückzahlung an den Partner geht vor. */
+  function auditPay(w, G, b, mode, { skonto = false } = {}) {
+    const A = P.AUDIT, Y = A.pay, au = G.audit || (G.audit = { strikes: 0, findings: [] }), L = b.to ? w.airlines[b.to] : null;
+    const fine = skonto ? Math.round(b.fine * (1 - Y.skonto) / 1e4) * 1e4 : b.fine;
+    if (mode === 'now') {
+      const due = b.claw + fine, cash = G.spendable(w.macro.bank ?? 1), now = cash >= due ? due : Math.max(0, Math.min(due, Math.round(cash * 0.5 / 1e4) * 1e4));
+      if (now > 0) G.ledger.post('one_off', -now, true, 'Wirtschaftsprüfung: Rückzahlung und Bußgeld');
+      const toPartner = Math.min(b.claw, now); if (L && toPartner > 0) L.ledger.post('one_off', toPartner, true, `Wirtschaftsprüfung: Rückzahlung erhalten › ${G.name}`);
+      if (due - now > 0) auditDebts(au).push({ left: due - now, monthly: Math.ceil((due - now) / A.months / 1e3) * 1e3, to: b.to, since: b.since, clawLeft: b.to ? Math.max(0, b.claw - toPartner) : 0, n: A.months });
+      G.log(w.day, `Prüfungsbescheid (${b.name}): ${now >= due ? `sofort bezahlt ${mioTxt(now)}` : `sofort ${mioTxt(now)}, der Rest von ${mioTxt(due - now)} in ${A.months} Monatsraten`}${skonto && fine < b.fine ? ` – ${mioTxt(b.fine - fine)} Nachlass aufs Bußgeld` : ''}.`, 'warn');
+      return { now, rest: due - now, fine };
+    }
+    const R = Y[mode] || Y.r12, total = Math.round((b.claw + fine) * R.x / 1e3) * 1e3;
+    auditDebts(au).push({ left: total, monthly: Math.ceil(total / R.n / 1e3) * 1e3, to: b.to, since: b.since, clawLeft: b.to ? b.claw : 0, n: R.n });
+    G.log(w.day, `Prüfungsbescheid (${b.name}): Ratenzahlung – ${R.n} Monatsraten zu ${mioTxt(Math.ceil(total / R.n / 1e3) * 1e3)}, zusammen ${mioTxt(total)}${R.x > 1 ? ` (${Math.round((R.x - 1) * 100)} % Aufschlag)` : ''}. Die erste Rate ist am Monatsende fällig.`, 'warn');
+    return { now: 0, rest: total, fine };
+  }
+  /** Die Airline wählt selbst, wie sie zahlt (Entscheidung, 7 Tage). */
+  function auditAsk(w, G, b) {
+    const Y = P.AUDIT.pay, id = 'AU' + (++w.offerCounter);
+    G.decisions.push({ id, type: 'auditpay', day: w.day, deadline: w.day + Y.days, bill: b, text: `Die Wirtschaftsprüfer verlangen ${mioTxt(b.claw)} Rückzahlung${b.to ? ` an ${b.name}` : ' an die Staatskasse'} und ${mioTxt(b.fine)} Bußgeld. Wie möchten Sie zahlen?` });
+    return { now: 0, rest: b.claw + b.fine, pending: id };
+  }
+  /** Monatsraten aus Prüfungsbescheiden. */
   function auditInstallment(w, G) {
-    const d = G.audit && G.audit.debt; if (!d || d.left <= 0) return;
-    const pay = Math.min(d.left, d.monthly), L = d.to ? auditPayee(w, d.to, d.since ?? 0) : null, toL = Math.min(pay, d.clawLeft || 0);
-    G.ledger.post('one_off', -pay, true, 'Wirtschaftsprüfung: Rate'); d.left -= pay;
-    if (toL > 0) { d.clawLeft -= toL; if (L) L.ledger.post('one_off', toL, true, `Wirtschaftsprüfung: Rückzahlung erhalten › ${G.name}`); }   // Partner pleite oder neu gegründet: Rest geht an die Staatskasse
-    if (d.left <= 0) { delete G.audit.debt; G.log(w.day, 'Prüfungsbescheid vollständig bezahlt', 'good'); }
+    const ds = auditDebts(G.audit); if (!ds.length) return;
+    for (const d of ds) {
+      if (d.left <= 0) continue;
+      const pay = Math.min(d.left, d.monthly), L = d.to ? auditPayee(w, d.to, d.since ?? 0) : null, toL = Math.min(pay, d.clawLeft || 0);
+      G.ledger.post('one_off', -pay, true, 'Wirtschaftsprüfung: Rate'); d.left -= pay;
+      if (toL > 0) { d.clawLeft -= toL; if (L) L.ledger.post('one_off', toL, true, `Wirtschaftsprüfung: Rückzahlung erhalten › ${G.name}`); }   // Partner pleite oder neu gegründet: Rest geht an die Staatskasse
+    }
+    const open = ds.filter((d) => d.left > 0);
+    if (open.length < ds.length) { G.audit.debts = open; if (!open.length) G.log(w.day, 'Prüfungsbescheid vollständig bezahlt', 'good'); }
   }
   // ---------------------------------------------------------------------------
   // 0.21: Dominanz einhegen und Kleine fördern
@@ -6611,7 +6678,7 @@ const SM = (() => {
         al.pixLogo = v; al.log(day, 'Neues Pixel-Logo eingeführt', 'info');
         return { ok: true };
       }
-      case 'decide': { if (!['raise5', 'bonus', 'reject', 'share', 'yes', 'half', 'no'].includes(a.choice)) return { ok: false, msg: 'Ungültig.' }; const dc = al.decisions.find((x) => x.id === a.id); if (!dc || dc.resolved) return { ok: false, msg: 'Diese Entscheidung ist schon gefallen.' }; if ((dc.type === 'agm') !== ['yes', 'half', 'no'].includes(a.choice)) return { ok: false, msg: 'Ungültig.' }; w.resolveDecision(al, a.id, a.choice); return { ok: true }; }
+      case 'decide': { if (!['raise5', 'bonus', 'reject', 'share', 'yes', 'half', 'no', 'now', 'r6', 'r12', 'r24'].includes(a.choice)) return { ok: false, msg: 'Ungültig.' }; const dc = al.decisions.find((x) => x.id === a.id); if (!dc || dc.resolved) return { ok: false, msg: 'Diese Entscheidung ist schon gefallen.' }; if ((dc.type === 'agm') !== ['yes', 'half', 'no'].includes(a.choice) || (dc.type === 'auditpay') !== ['now', 'r6', 'r12', 'r24'].includes(a.choice)) return { ok: false, msg: 'Ungültig.' }; w.resolveDecision(al, a.id, a.choice); return { ok: true }; }
       default: return { ok: false, msg: 'Unbekannte Aktion.' };
     }
   }
@@ -6643,7 +6710,7 @@ const SM = (() => {
   // ===========================================================================
   // Spielstand (kompakt)
   // ===========================================================================
-  const HIST_KEYS = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
+  const HIST_KEYS = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'so_out', 'so_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
   const AI_HIST_KEYS = ['seats', 'pax', 'rev', 'cost', 'pax_out', 'pax_in', 'seats_out', 'seats_in'];
   const r1 = (x) => Math.round(x * 10) / 10;
   function serialize(w, opt = {}) {
@@ -6743,6 +6810,11 @@ const SM = (() => {
     // 0.20: Handelsbilanz für die Wirtschaftsprüfung, Admin-Entfernungen nicht mehr öffentlich
     auditMigrate(w);
     auditCatchUp(w);   // 0.21.21: fehlende Geschäfte nacherfassen
+    // 0.21.25: alte (billige) Exklusivverträge laufen nach 180 Tagen aus; bis dahin kein Kartellverfahren dort
+    for (const al of w.humans) for (const [apt, g] of Object.entries(al.gateLock || {})) if (!g.until) {
+      g.until = w.day + P.GATE_LOCK.oldDays;
+      al.log(w.day, `Neue Regeln für Exklusivverträge: Ihr Vertrag in ${ap(apt).name} läuft noch ${P.GATE_LOCK.oldDays} Tage. Bis dahin gibt es dort kein Kartellverfahren; verlängern geht zum neuen Preis (${mioTxt(w.gateLockPrice(apt))} für ${P.GATE_LOCK.years} Jahre).`, 'warn');
+    }
     // 0.21.22: knapper Arbeitsmarkt
     if (!w.laborFree) { w.laborFree = { pilot: 0, cabin: 0, tech: 0 }; if (w.day > 0 && w.humans.length) w.pushNews(w.day, 'Arbeitsmarkt: Piloten, Kabinen- und Technikpersonal werden knapp – Bewerbungen gibt es vor allem, wenn Airlines Personal abbauen oder pleitegehen. Eigene Akademien gewinnen an Bedeutung.', 'warn', null); }
     for (const n of w.news || []) {
@@ -6786,7 +6858,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;

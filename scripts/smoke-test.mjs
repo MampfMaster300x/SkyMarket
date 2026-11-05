@@ -1,5 +1,5 @@
 // Prüft den API-Ablauf ohne Netlify: Konten, Spiel mit Passwort, Suche, Beitritt per Code und Einladung, Zeit, Aktionen.
-import { handle, tickMain } from '../server/api.mjs';
+import { handle, tickMain, _clock } from '../server/api.mjs';
 import { memStore } from '../server/memstore.mjs';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
@@ -165,6 +165,23 @@ assert.equal(tim.admin, true, 'Tim ist Admin');
   const pt = ok(await call('tim', 'GET', '/admin/playtime'), 'Spielzeit'); const ra = pt.rows.find((r) => r.key === 'anna'), rb = pt.rows.find((r) => r.key === 'ben');
   assert.ok(ra && ra.total >= 30 && ra.sessions === 1 && ra.games.length === 1 && ra.days[pt.today] === ra.total, 'Anna: Spielzeit erfasst ' + JSON.stringify(ra && { t: ra.total, s: ra.sessions }));
   assert.ok(rb && rb.total === 0 && !rb.sessions, 'Ben: Fenster im Hintergrund zählt nicht');
+  // 0.21.26: Patch-Hinweis einmal je Konto
+  { const ua = await store.get('users/anna', { type: 'json' }); delete ua.patchSeen; await store.setJSON('users/anna', ua);   // Konto von vor dem Update
+    const me1 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(me1.patch && /Wochenend/.test(me1.patch.title), 'Patch-Hinweis für bestehende Konten');
+    ok(await call('anna', 'POST', '/patch/seen', {}), 'gesehen'); assert.ok(!ok(await call('anna', 'GET', '/me'), 'me2').patch, 'danach nicht mehr');
+    const nu = ok(await call('neu', 'POST', '/register', { username: 'NeuKonto', password: 'geheim1234' }), 'neues Konto'); assert.ok(!nu.patch && !ok(await call('neu', 'GET', '/me'), 'me3').patch, 'neue Konten sehen ihn nicht'); }
+  // 0.21.26: Wochenend-Tempo der Hauptwelt (Fr 17 Uhr bis Mo 6 Uhr deutscher Zeit: 1 Tag = 1 Std.)
+  { const C = _clock, Z = (s) => Date.parse(s);
+    assert.ok(!C.isWeekend(Z('2026-11-06T15:59:00Z')) && C.isWeekend(Z('2026-11-06T16:00:00Z')), 'Fr 17 Uhr (MEZ) beginnt das Wochenende');
+    assert.ok(C.isWeekend(Z('2026-11-08T12:00:00Z')) && C.isWeekend(Z('2026-11-09T04:59:00Z')) && !C.isWeekend(Z('2026-11-09T05:00:00Z')), 'Mo 6 Uhr endet es');
+    assert.ok(!C.isWeekend(Z('2027-07-02T14:59:00Z')) && C.isWeekend(Z('2027-07-02T15:00:00Z')) && !C.isWeekend(Z('2027-07-05T04:00:00Z')), 'Sommerzeit: Fr 17 Uhr = 15 Uhr UTC, Mo 6 Uhr = 4 Uhr UTC');
+    const md = { speed: 'm20', lastTick: Z('2026-11-06T15:00:00Z'), carry: 0 };
+    assert.equal(C.clockDue(md, Z('2026-11-06T17:00:00Z'), true).days, 4, 'Hauptwelt: 1 Std. unter der Woche (3 Tage) + 1 Std. Wochenende (1 Tag)');
+    assert.equal(C.clockDue(md, Z('2026-11-06T17:00:00Z'), false).days, 6, 'private Spiele unverändert');
+    const md2 = { speed: 'm20', lastTick: Z('2026-11-09T04:30:00Z'), carry: 0 }, d2 = C.clockDue(md2, Z('2026-11-09T05:30:00Z'), true);
+    assert.equal(d2.days, 2, 'Mo: halbe Std. Wochenende (0,5) + halbe Std. normal (1,5)'); assert.ok(Math.abs(d2.carry) < 1, 'Rest passt');
+    assert.equal(C.effSpeed({ speed: 'p' }, Z('2026-11-07T12:00:00Z'), true).key, 'p', 'Pause bleibt Pause');
+    console.log('0.21.26 ok: Wochenend-Tempo Fr 17 – Mo 6 Uhr (auch Sommerzeit), Patch-Hinweis einmal je Konto'); }
   // 0.21.22: ältere Fenster ohne vis-Angabe zählen ebenfalls; Server meldet die App-Version
   await call('ben', 'GET', `/games/${g.id}/state?ping=1`); await new Promise((r) => setTimeout(r, 40)); await call('ben', 'GET', `/games/${g.id}/state?ping=1`);
   const pt2 = ok(await call('tim', 'GET', '/admin/playtime'), 'Spielzeit 2'); assert.ok(pt2.rows.find((r) => r.key === 'ben').total >= 30, 'altes Fenster ohne vis zählt');
@@ -596,10 +613,10 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   w.xfers.push({ day: w.day, a: 'P1', b: 'P2', va: 20e6, vb: 8000, old: true });
   const pv = SMx.auditPreview(w, b).find((e) => e.partner === 'P1'); assert.ok(pv && pv.flagged && pv.excess > 15e6, 'Vorschau zeigt Beanstandung');
   const ca0 = a.ledger.cash, cb0 = b.ledger.cash;
-  SMx.auditYear(w);
+  SMx.auditYear(w, { mode: 'now' });
   assert.ok(b.audit && b.audit.malus === 8 && b.audit.strikes === 1, 'Prüfvermerk für den Begünstigten');
   assert.ok(a.ledger.cash > ca0, 'Geber bekommt Geld zurück');
-  assert.ok(cb0 - b.ledger.cash > 15e6 || (b.audit.debt && b.audit.debt.left > 0), 'Rückzahlung plus Bußgeld (oder Ratenplan)');
+  assert.ok(cb0 - b.ledger.cash > 15e6 || SMx.auditDebtSum(b.audit).left > 0, 'Rückzahlung plus Bußgeld (oder Ratenplan)');
   assert.ok(SMx.standingOf(b, w.day + 1).parts.find((x) => x[0] === 'Finanzen')[3].includes('Prüfvermerk'), 'Prüfvermerk mindert das Ansehen');
   // Selbstanzeige: freiwillig zurückzahlen, kein Bußgeld
   w.xfers.push({ day: w.day + 1, a: 'P1', b: 'P2', va: 5e6, vb: 0 }); b.ledger.cashOnly(2e7, 't');
@@ -610,9 +627,9 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     for (let i = 0; i < 3; i++) w3.step();
     w3.xfers = [{ day: w3.day, a: 'X1', b: 'Y1', va: 20e6, vb: 8000, old: true }]; w3.auditFrom = 0;
     x.status = 'insolvent'; const cx = x.ledger.cash, cy = y.ledger.cash;
-    SMx.auditYear(w3);
+    SMx.auditYear(w3, { mode: 'now' });
     assert.equal(x.ledger.cash, cx, 'pleiter Partner bekommt nichts');
-    assert.ok(cy - y.ledger.cash > 15e6 || (y.audit.debt && y.audit.debt.to === null), 'Begünstigter zahlt an die Staatskasse');
+    assert.ok(cy - y.ledger.cash > 15e6 || (y.audit.debts && y.audit.debts[0].to === null), 'Begünstigter zahlt an die Staatskasse');
   }
   // Admin-Entfernung ist nicht öffentlich
   const k = SMx.kickHuman(w, 'P2'); assert.ok(k.ok && !w.news.some((n) => /aus dem Spiel genommen/.test(n.msg)) && w.news.some((n) => /zieht sich vom Markt zurück/.test(n.msg)), 'keine öffentliche Sperrmeldung');
@@ -847,7 +864,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   // a) Viele kleine Geschenke (je unter 1 Mio., also erlaubt) summieren sich – der Jahresabschluss greift
   { const { w, a, b } = mk(31); for (let i = 0; i < 4; i++) gift(w, a, b, 950000);
     const pv = SMx.auditPreview(w, b)[0]; assert.ok(pv.flagged && pv.n === 4, 'Vorschau: beanstandet');
-    w.day = 364; const ca = a.ledger.cash, cb = b.ledger.cash; const rep = SMx.auditYear(w);
+    w.day = 364; const ca = a.ledger.cash, cb = b.ledger.cash; const rep = SMx.auditYear(w, { mode: 'now' });
     assert.ok(rep.findings.length === 1 && rep.n === 4 && b.audit.strikes === 1, 'Beanstandung im Prüfbericht');
     const f = rep.findings[0]; assert.equal(Math.round(cb - b.ledger.cash), Math.round((f.claw + f.fine) * 100), 'Begünstigter zahlt Vorteil + Bußgeld');
     assert.ok(a.ledger.cash - ca > 0 && w.auditLog.length === 1 && w.auditFrom === 365, 'Geber bekommt zurück, Bericht gespeichert, neues Prüfjahr'); }
@@ -863,7 +880,9 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     let w2 = rt(w); assert.ok(w2.deals.some((d) => d.id === 'DX'), 'Geschäft zwischen Spielenden bleibt gespeichert, auch bei vielen anderen Angeboten');
     assert.ok(w2.xfers.some((x) => x.deal === 'DX' && x.late === true), 'nacherfasst für die Nachprüfung');
     const B2 = w2.airlines.P2, cb = B2.ledger.cash; w2.step();
-    assert.ok(B2.audit && B2.audit.strikes === 1 && cb - B2.ledger.cash > 15e8, 'Nachprüfung: Rückzahlung und Bußgeld');
+    const dc = B2.decisions.find((x) => x.type === 'auditpay' && !x.resolved); assert.ok(B2.audit && B2.audit.strikes === 1 && dc, 'Nachprüfung: Airline wählt die Zahlungsweise');
+    assert.ok(SMx.applyAction(w2, 'P2', { type: 'decide', id: dc.id, choice: 'now' }).ok, 'sofort zahlen');
+    assert.ok(cb - B2.ledger.cash > 15e8, 'Nachprüfung: Rückzahlung und Bußgeld (mit Nachlass)');
     assert.ok(w2.auditLog.at(-1).late && w2.news.some((n) => /^Nachprüfung: /.test(n.msg)), 'Nachprüfung im Bericht und in den Meldungen');
     const w3 = rt(w2); w3.step(); assert.equal(w3.airlines.P2.audit.strikes, 1, 'nicht doppelt bestraft');
     assert.ok(!w3.xfers.some((x) => x.late === true) && w3.xfers.some((x) => x.deal === 'DX'), 'bleibt als erledigt erfasst'); }
@@ -873,7 +892,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     assert.equal(SMx.auditPreview(w, w.airlines.P2).length, 0, 'neue Gesellschaft haftet nicht für die alte'); }
   // e) Anordnung der Spielleitung: genau der festgestellte Vorteil, Rückzahlung an die Staatskasse, Übersicht
   { const { w, a, b } = mk(35); const ca = a.ledger.cash, cb = b.ledger.cash;
-    const r = SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 20e6, state: true }); assert.ok(r.ok, r.msg);
+    const r = SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 20e6, state: true, mode: 'now' }); assert.ok(r.ok, r.msg);
     assert.equal(r.finding.claw, 20e6); assert.equal(r.finding.fine, 2e6); assert.ok(r.finding.state, 'an die Staatskasse');
     assert.equal(Math.round((cb - b.ledger.cash) / 100), 22e6, '22 Mio. abgebucht'); assert.equal(a.ledger.cash, ca, 'Partner bekommt nichts und zahlt kein Bußgeld');
     assert.ok(!SMx.auditOrder(w, { b: 'P2', a: 'P2', amount: 5e6 }).ok && !SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 0 }).ok, 'Eingaben geprüft');
@@ -925,5 +944,79 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   { const w = SMx.newWorld({ seed: 44 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1'; a.ledger.equityFlow(5e8, 't');
     a.bases.push('BRE', 'HAJ', 'LEJ'); const r = w.openBase(a, 'DRS'); assert.ok(!r.ok && /4 Basen/.test(r.msg), 'fünfte Basis abgelehnt: ' + r.msg); }
   console.log('0.21.22 ok: Übernahme nach Vertragsende ohne Ablöse (vorher mit), Akademie-Stufen nach Phase bis 5, Absolventen als eigener Nachwuchs, Arbeitsmarkt 150+25 Piloten, Freisetzung 60 %, Krise ×1,5');
+}
+// 0.21.24: Prüfung, wenn der Partner nicht mehr im Spiel ist; Zahlungsweisen
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const mk = (seed) => { const w = SMx.newWorld({ seed }), a = SMx.addHuman(w, { id: 'P1', name: 'Wodubist', code: 'WD', base: 'HAM' }), b = SMx.addHuman(w, { id: 'P2', name: 'Lukas Air', code: 'LK', base: 'MUC' }); w.playerId = 'P2';
+    for (let i = 0; i < 3; i++) w.step(); b.ledger.equityFlow(6e7, 't'); return { w, a, b }; };
+  // a) Partner unter derselben Kennung neu gegründet: frühere Gesellschaft auswählbar, Rückzahlung an die Staatskasse
+  { const { w, a, b } = mk(51); SMx.restartHuman(w, 'P1', { name: 'Wodu Neu', code: 'WN', base: 'FRA' }); const P1 = w.airlines.P1, c1 = P1.ledger.cash;
+    const ov = SMx.adminAudit(w); assert.ok(ov.former.includes('Wodubist'), 'frühere Airline in der Auswahl: ' + JSON.stringify(ov.former));
+    const cb = b.ledger.cash, r = SMx.auditOrder(w, { b: 'P2', name: 'Wodubist', amount: 20e6, mode: 'now' }); assert.ok(r.ok && r.finding.state, r.msg);
+    assert.equal(Math.round((cb - b.ledger.cash) / 100), 22e6, 'Lukas Air zahlt 20 + 2 Mio.'); assert.equal(P1.ledger.cash, c1, 'neue Gesellschaft bekommt nichts');
+    assert.ok(SMx.adminAudit(w).pairs.some((p) => p.aName === 'Wodubist' || p.bName === 'Wodubist'), 'in der Übersicht unter dem alten Namen');
+    assert.ok(!SMx.auditOrder(w, { b: 'P2', amount: 5e6 }).ok, 'ohne Partner und Namen abgelehnt');
+    assert.ok(!SMx.auditPreview(w, b).some((e) => e.excess > 0), 'angeordnete Nachprüfung zählt im Jahresabschluss nicht noch einmal');
+    w.day = 364; assert.equal(SMx.auditYear(w, { mode: 'now' }).findings.length, 0, 'keine zweite Strafe zum 31.12.'); }
+  // b) entfernte Airline als Partner: an die Staatskasse; 24 Raten mit Aufschlag
+  { const { w, a, b } = mk(52); a.status = 'insolvent'; a.removed = true; const cb = b.ledger.cash;
+    const r = SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 10e6, mode: 'r24' }); assert.ok(r.ok && r.finding.state, r.msg);
+    assert.equal(b.ledger.cash, cb, 'Raten: heute nichts abgebucht'); const d = SMx.auditDebtSum(b.audit); assert.equal(d.left, Math.round(11e6 * 1.12 / 1e3) * 1e3, '24 Raten +12 %');
+    for (let i = 0; i < 31; i++) w.step(); assert.ok(SMx.auditDebtSum(b.audit).left < d.left, 'erste Rate am Monatsende'); }
+  // c) Airline wählt selbst; ohne Wahl 12 Raten; Sofortzahlung mit Nachlass
+  { const { w, b } = mk(53); SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 10e6 }); const dc = b.decisions.find((x) => x.type === 'auditpay');
+    assert.ok(dc && !dc.resolved, 'Entscheidung offen'); assert.ok(!SMx.applyAction(w, 'P2', { type: 'decide', id: dc.id, choice: 'yes' }).ok, 'falsche Wahl abgelehnt');
+    for (let i = 0; i < 9; i++) w.step(); assert.equal(dc.resolved, 'ignored'); assert.equal(SMx.auditDebtSum(b.audit).left > 0 || b.audit.debts.length === 0, true);
+    const w2 = mk(54); SMx.auditOrder(w2.w, { b: 'P2', a: 'P1', amount: 10e6 }); const d2 = w2.b.decisions.find((x) => x.type === 'auditpay'), c0 = w2.b.ledger.cash;
+    assert.ok(SMx.applyAction(w2.w, 'P2', { type: 'decide', id: d2.id, choice: 'now' }).ok); assert.equal(Math.round((c0 - w2.b.ledger.cash) / 100), 10e6 + 0.9e6, 'sofort: 10 Mio. + 1 Mio. Bußgeld − 10 % Nachlass');
+    assert.ok(Math.abs(SMx.balanceSheet(w2.b).check) < 0.01, 'Bilanz stimmt'); }
+  { const { w, b } = mk(55); SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 8e6, mode: 'now' }); const txt = b.events.map((e) => e.msg).join(' ') + w.news.map((n) => n.msg).join(' ');
+    assert.ok(/Nachprüfung/.test(txt) && !/Spielleitung|Anordnung|angeordnet von/i.test(txt.replace(/Rückzahlung und Bußgeld angeordnet/g, '')), 'Spieler sehen eine gewöhnliche Nachprüfung, keinen Hinweis auf die Spielleitung'); }
+  console.log('0.21.24 ok: Partner nicht mehr im Spiel (neu gegründet/entfernt) → Staatskasse, Zahlungsweisen sofort/6/12/24 Raten, Wahl durch die Airline mit Nachlass, ohne Wahl 12 Raten');
+}
+// 0.21.25: Exklusivvertrag sehr teuer, befristet, ohne Kartellverfahren
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0); const P = SMx.P;
+  const w = SMx.newWorld({ seed: 61 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAJ' }); w.playerId = 'P1';
+  const pr = (c) => w.gateLockPrice(c), big = SMx.AP_CODES.find((c) => SMx.paxEff(c) >= 9.5 && SMx.paxEff(c) < 11);
+  assert.ok(pr(big) > 150e6 * w.macro.cpi, 'Flughafen mit ~10 Mio. Pax: über 150 Mio. € (' + Math.round(pr(big) / 1e6) + ' Mio.)');
+  assert.ok(pr('HAJ') / SMx.paxEff('HAJ') < pr(big) / SMx.paxEff(big), 'überproportional mit der Größe');
+  a.ledger.equityFlow(2e9, 't');
+  const A0 = { ...P.ANTITRUST }; Object.assign(P.ANTITRUST, { share: 0, minDeps: 0, minPax: 0 });
+  a.fleet.length || SMx.applyAction(w, 'P1', { type: 'acquire', typeId: 'DH8D', base: 'HAJ', mode: 'lease' }); while (w.day <= a.fleet[0].delivery_day) w.step();
+  const dest = SMx.AP_CODES.find((c) => c !== 'HAJ' && SMx.gcDistanceKm('HAJ', c) > 250 && SMx.gcDistanceKm('HAJ', c) < 600 && SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HAJ', dest: c, typeId: 'DH8D', freq: 1 }).ok);
+  assert.ok(dest, 'Strecke eröffnet'); for (let i = 0; i < 3; i++) w.step(); w.antitrustCheck(); assert.ok(a.antitrust && a.antitrust.HAJ, 'ohne Vertrag: Verfahren');
+  const c0 = a.ledger.cash, r = SMx.applyAction(w, 'P1', { type: 'gateLock', apt: 'HAJ', on: true }); assert.ok(r.ok, r.msg);
+  assert.equal(Math.round((c0 - a.ledger.cash) / 100), Math.round(r.price), 'Preis bezahlt'); assert.equal(r.until, w.day + 3 * 365, '3 Jahre Laufzeit');
+  assert.ok(!(a.antitrust && a.antitrust.HAJ), 'Verfahren eingestellt'); w.antitrustCheck(); assert.ok(!(a.antitrust && a.antitrust.HAJ), 'kein neues Verfahren während der Laufzeit');
+  const rf = w.gateLockRefund(a.gateLock.HAJ); assert.ok(rf > 0.39 * r.price && rf <= 0.4 * r.price, 'Kündigung am Anfang: knapp 40 % zurück');
+  a.gateLock.HAJ.until = w.day + 1; w.step(); w.step(); assert.ok(!a.gateLock.HAJ, 'läuft aus'); w.antitrustCheck(); assert.ok(a.antitrust && a.antitrust.HAJ, 'danach wieder Wettbewerbsaufsicht');
+  Object.assign(P.ANTITRUST, A0);
+  a.gateLock = { HAJ: { since: 0, price: 5e6 } }; const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.equal(w2.airlines.P1.gateLock.HAJ.until, w2.day + 180, 'alter Vertrag läuft 180 Tage');
+  console.log('0.21.25 ok: Exklusivvertrag', Math.round(pr(big) / 1e6), 'Mio. € bei', big, '(' + SMx.paxEff(big).toFixed(1), 'Mio. Pax), 3 Jahre, kein Kartellverfahren, danach wieder Aufsicht, Altverträge 180 Tage');
+}
+// 0.21.26: Auslastung nach geflogenen Flügen – Ausfälle zählen nicht als leere Sitze; Preisautomatik reagiert auf Abweisungen
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 71 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HKT' }); w.playerId = 'P1'; a.ledger.equityFlow(3e8, 't');
+  const ac = a.acquire(w.day, 'A20N', 'HKT', 'lease', null, w); ac.delivery_day = w.day; a.staff.pil.A32F = 30; a.staff.cab = 40; a.staff.tech = 20;
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HKT', dest: 'HKG', typeId: 'A20N', freq: 1 }).ok);
+  for (let i = 0; i < 3; i++) w.step(); const r = a.routes[0];
+  assert.ok(r.hist.at(-1).so_out > 0, 'geflogene Sitze werden erfasst');
+  const day = (cx) => ({ flights: cx ? 2 : 2, seats: 344, cancelled: cx ? 2 : 0, pax: cx ? 0 : 200, pax_out: cx ? 0 : 172, pax_in: cx ? 0 : 28, seats_out: 172, seats_in: 172, so_out: cx ? 0 : 172, so_in: cx ? 0 : 172, demand_out: 2500, demand_in: 30, spill_out: cx ? 2500 : 2328, spill_in: cx ? 30 : 2, cost: 0, rev: 0 });
+  r.hist = [day(0), day(0), day(1), day(0), day(0), day(0), day(0)];
+  assert.equal(SMx.routeLf(r, 7, 'out'), 1, 'hin: geflogene Flüge voll (Ausfall zählt nicht)');
+  assert.ok(Math.abs(SMx.routeLf(r, 7, 'in') - 28 / 172) < 1e-9, 'zurück: echte Auslastung');
+  const old = { ...r.hist[0] }; delete old.so_out; delete old.so_in; r.hist.push(old); assert.ok(SMx.routeLf(r, 1, 'out') === 1, 'alte Einträge ohne Angabe: wie bisher');
+  r.ap = 0.9; r.opened_day = w.day - 60; r.pending = []; const f0 = r.fare_out, i0 = r.fare_in; w.playerAutoPricing(a);
+  assert.ok(r.pending.length && r.pending[0][1] > f0 && r.pending[0][2] < i0, 'Preisautomatik: hin rauf (ausgebucht, viele Abweisungen), zurück runter');
+  // Warteliste: kleinere Airlines zuerst, egal wann eingetragen
+  { const big = SMx.addHuman(w, { id: 'P2', name: 'Groß', code: 'GR', base: 'MUC' }), small = SMx.addHuman(w, { id: 'P3', name: 'Klein', code: 'KL', base: 'BER' });
+    big.ledger.equityFlow(5e8, 't'); small.ledger.equityFlow(5e8, 't'); for (let i = 0; i < 6; i++) big.acquire(w.day, 'DH8D', 'MUC', 'lease', null, w);
+    const apt = 'FRA'; w.slotWait = []; assert.ok(w.joinWait(big, apt, 2).ok && w.joinWait(small, apt, 2).ok, 'eingetragen');
+    const q = w.waitQueue(apt); assert.equal(q[0].al, 'P3', 'kleinere Airline steht vorn, obwohl später eingetragen'); assert.equal(w.waitPos(q[0]), 1);
+    w.slotCap[apt] -= w.slotsFree(apt) - 1; assert.equal(w.slotsFree(apt), 1, 'genau ein Slot frei');
+    const fc = w.waitForecast(apt); assert.equal(fc.byId[q[0].id], 1, 'Prognose: Slot an die kleine Airline');
+    const hb = big.heldAt(apt, w.day), hs = small.heldAt(apt, w.day); w.allocateWaitlist();
+    assert.equal(small.heldAt(apt, w.day) - hs, 1, 'Zuteilung an die kleine Airline'); assert.equal(big.heldAt(apt, w.day), hb, 'große geht leer aus'); }
+  console.log('0.21.26 ok: Auslastung ohne annullierte Flüge, Preisautomatik hin +' + Math.round((r.pending[0][1] / f0 - 1) * 100) + ' %, zurück ' + Math.round((r.pending[0][2] / i0 - 1) * 100) + ' %');
 }
 console.log('Alle Prüfungen bestanden.');

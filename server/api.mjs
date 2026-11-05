@@ -133,9 +133,57 @@ function packSized(w) {
   if (buf.byteLength > 4.5e6) buf = toArrayBuffer(gzipSync(Buffer.from(JSON.stringify(SM.serialize(w, { compact: true })))));
   return buf;
 }
-function clockDue(md, now) {
+// ---------------------------------------------------------------------------
+// Wochenend-Tempo der Hauptwelt: Freitag 17 Uhr bis Montag 6 Uhr (deutsche Zeit) 1 Spieltag = 1 Stunde.
+// Die Grenzen liegen auf vollen Stunden – auch in UTC –, darum wird stundenweise gerechnet.
+// ---------------------------------------------------------------------------
+const WEEKEND = { from: [5, 17], to: [1, 6], speed: 'h1' };   // [Wochentag (0 = So), Stunde] Berliner Zeit
+const BERLIN_WH = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', weekday: 'short', hour: '2-digit', hourCycle: 'h23' });
+const WD = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const weekendCache = new Map();
+function isWeekend(t) {
+  const hk = Math.floor(t / 3600000); if (weekendCache.has(hk)) return weekendCache.get(hk);
+  const pr = BERLIN_WH.formatToParts(new Date(hk * 3600000)), wd = WD[pr.find((x) => x.type === 'weekday').value], h = Number(pr.find((x) => x.type === 'hour').value);
+  const on = (wd === WEEKEND.from[0] && h >= WEEKEND.from[1]) || wd === 6 || wd === 0 || (wd === WEEKEND.to[0] && h < WEEKEND.to[1]);
+  if (weekendCache.size > 2000) weekendCache.clear();
+  weekendCache.set(hk, on); return on;
+}
+/** Tatsächliches Tempo zu einem Zeitpunkt: Hauptwelt am Wochenende 1 Std./Tag (sofern nicht pausiert oder ohnehin langsamer). */
+function effSpeed(md, t, main) {
+  const key = SM.speedKey(md.speed), sp = SM.SPEEDS[key];
+  if (main && sp.ms && sp.slow && sp.ms < SM.SPEEDS[WEEKEND.speed].ms && isWeekend(t)) return { key: WEEKEND.speed, sp: SM.SPEEDS[WEEKEND.speed], weekend: true };
+  return { key, sp, weekend: false };
+}
+/** Fortschritt seit dem letzten Takt in Spieltagen (Kommazahl), stundenweise mit dem jeweils gültigen Tempo. */
+function progressDays(md, now, main) {
+  const a = md.lastTick || now, e0 = effSpeed(md, a, main).sp;
+  let p = e0.ms ? (md.carry || 0) / e0.ms : 0, t = a;
+  while (t < now) {
+    const nh = Math.min(now, (Math.floor(t / 3600000) + 1) * 3600000), ms = effSpeed(md, t, main).sp.ms;
+    if (ms) p += (nh - t) / ms;
+    t = nh; if (p > SLOW_CAP_DAYS + 1) { p = SLOW_CAP_DAYS + 1; break; }
+  }
+  return p;
+}
+// ---------------------------------------------------------------------------
+// Patch-Hinweis: erscheint einmal je Konto beim ersten Anmelden nach dem Update (neue Konten sehen ihn nicht)
+// ---------------------------------------------------------------------------
+const PATCH_ID = '2026-11-05-wochenende';
+async function patchNote(store) {
+  const md = (await store.getMetadata(K.state(MAIN_ID)))?.metadata || {}, base = SM.SPEEDS[SM.speedKey(md.speed || MAIN_SPEED)];
+  return { id: PATCH_ID, title: 'Neu: Wochenend-Tempo in der Hauptwelt',
+    lead: 'Von Freitag 17 Uhr bis Montag 6 Uhr (deutsche Zeit) läuft die Hauptwelt langsamer: 1 Spieltag = 1 Stunde. So verpasst am Wochenende niemand zu viel.',
+    note: `Unter der Woche läuft sie wie gewohnt (${base && base.ms ? `1 Spieltag = ${Math.round(base.ms / 60000)} Minuten` : 'Tempo wie eingestellt'}). Das aktuelle Tempo steht oben neben der Uhr.`,
+    more: ['Personal ist knapper – eigene Akademien wachsen mit jeder Phase, eigener Nachwuchs bringt Stimmung und Pünktlichkeit.', 'Leasingflugzeuge lassen sich übernehmen (Flotte → Übernehmen); höchstens vier Basen je Airline.', 'Eigenes Logo als 64 × 64-Bild hochladen (Unternehmen → Profil & Logo).', 'Slot-Warteliste: Kleinere Airlines kommen zuerst – egal, wann sie sich eingetragen haben.', 'Strecken im Netz sortieren; die Auslastung zählt nur noch tatsächlich geflogene Flüge.'] };
+}
+const withPatch = async (store, u, out) => (u && u.patchSeen !== PATCH_ID ? { ...out, patch: await patchNote(store) } : out);
+function clockDue(md, now, main = false) {
   const sp = speedInfo(md.speed);
   if (!sp.ms) return { days: 0, carry: md.carry || 0 };
+  if (main && sp.slow) {
+    const p = progressDays(md, now, main), days = Math.floor(p), run = Math.min(days, MAX_DAYS_PER_TICK);
+    return { days: run, carry: (p - run) * effSpeed(md, now, main).sp.ms, backlog: days - run };
+  }
   let el = Math.max(0, now - (md.lastTick || now));
   el = sp.slow ? Math.min(el, SLOW_CAP_DAYS * sp.ms) : Math.min(el, IDLE_CAP_MS);
   const total = (md.carry || 0) + el;
@@ -149,11 +197,11 @@ async function mutateState(store, id, fn = null) {
     const cur = await store.getWithMetadata(K.state(id), { type: 'arrayBuffer' });
     if (!cur) throw Object.assign(new Error('Spiel nicht gefunden.'), { status: 404 });
     const md = { ...cur.metadata };
-    const due = clockDue(md, now);
+    const due = clockDue(md, now, id === MAIN_ID);
     if (!fn && due.days === 0) return { etag: cur.etag, md, buf: cur.data, changed: false };
     const w = unpackWorld(cur.data);
     for (let d = 0; d < due.days; d++) w.step();
-    if (due.days > 0) { md.carry = due.carry; md.lastTick = now; }
+    if (due.days > 0 || (id === MAIN_ID && effSpeed(md, md.lastTick || now, true).key !== effSpeed(md, now, true).key)) { md.carry = due.carry; md.lastTick = now; }
     let result = null;
     if (fn) result = fn(w, md, now);
     md.day = w.day; md.ver = (md.ver || 0) + 1;
@@ -169,13 +217,15 @@ async function loadMeta(store, id) { return store.get(K.meta(id), { type: 'json'
 // Spielzeit: Bei jedem Lebenszeichen eines sichtbaren Spielfensters (alle ~15 s) wächst die Zeit seit dem letzten Lebenszeichen.
 // Lücken über 90 s (Fenster zu, im Hintergrund, Handy gesperrt) zählen nicht und beginnen eine neue Sitzung.
 // ---------------------------------------------------------------------------
-const PLAY_GAP = 90000, PLAY_DAYS = 400;
+// Gezählt wird nur die Zeit zwischen dichten Lebenszeichen (sichtbare, aktive Fenster melden sich alle 15–25 s).
+// Hintergrund-Tabs drosselt der Browser auf etwa eines pro Minute – solche Lücken zählen nicht. Neue Sitzung erst nach 5 Minuten Pause.
+const PLAY_GAP = 45000, PLAY_SESSION = 300000, PLAY_DAYS = 400;
 const berlinDay = (t) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin' }).format(new Date(t));
 async function recordPlay(store, user, gameId, now = Date.now()) {
   await updateJson(store, K.play(user.key), (p) => {
     p = p || { key: user.key, name: user.name, total: 0, sessions: 0, first: now, last: 0, games: {}, days: {} };
-    const dt = p.last && now - p.last <= PLAY_GAP ? Math.max(0, now - p.last) : 0;
-    if (!dt) p.sessions = (p.sessions || 0) + 1;
+    const gap = p.last ? now - p.last : Infinity, dt = gap <= PLAY_GAP ? Math.max(0, gap) : 0;
+    if (gap > PLAY_SESSION) p.sessions = (p.sessions || 0) + 1;
     p.total += dt; p.games[gameId] = (p.games[gameId] || 0) + dt;
     const d = berlinDay(now); p.days[d] = (p.days[d] || 0) + dt;
     const keys = Object.keys(p.days); if (keys.length > PLAY_DAYS) for (const k of keys.sort().slice(0, keys.length - PLAY_DAYS)) delete p.days[k];
@@ -183,7 +233,11 @@ async function recordPlay(store, user, gameId, now = Date.now()) {
   }, null, 2);
 }
 function memberOf(meta, user) { return meta && meta.players.find((p) => p.u === user.key); }
-function clockHeader(md) { const key = SM.speedKey(md.speed), sp = SM.SPEEDS[key], now = Date.now(); return JSON.stringify({ speed: key, ms: sp.ms, lastTick: md.lastTick || now, carry: md.carry || 0, now, day: md.day || 0, startAt: md.startAt && md.startAt > now ? md.startAt : null }); }
+function clockHeader(md, main = false) {
+  const now = Date.now(), base = SM.speedKey(md.speed), e = effSpeed(md, now, main);
+  // Hauptwelt: Fortschritt auf „jetzt“ umrechnen, damit der Browser mit dem gerade gültigen Tempo weiterzählt
+  const carry = main && SM.SPEEDS[base].slow && e.sp.ms ? (progressDays(md, now, main) % 1) * e.sp.ms : md.carry || 0, last = main && SM.SPEEDS[base].slow && e.sp.ms ? now : md.lastTick || now;
+  return JSON.stringify({ speed: e.key, base, weekend: e.weekend, ms: e.sp.ms, lastTick: last, carry, now, day: md.day || 0, startAt: md.startAt && md.startAt > now ? md.startAt : null }); }
 const waiting = (md, now = Date.now()) => !!(md && md.startAt && md.startAt > now);
 const fmtStart = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
 /** Airlines eines Spiels für Lobby und Beitritt: Name, Kürzel, Basis, Spieler und Logo. */
@@ -258,7 +312,7 @@ export async function handle(req, { store }) {
       if (typeof password !== 'string' || password.length < 8 || password.length > 200) return fail(400, 'Das Passwort braucht mindestens 8 Zeichen.');
       const key = name.toLowerCase();
       const { salt, hash } = hashPw(password);
-      const res = await store.setJSON(K.user(key), { key, name, salt, hash, created: Date.now(), games: [] }, { onlyIfNew: true });
+      const res = await store.setJSON(K.user(key), { key, name, salt, hash, created: Date.now(), games: [], patchSeen: PATCH_ID }, { onlyIfNew: true });
       if (res.modified === false) return fail(409, 'Diesen Benutzernamen gibt es schon.');
       pvCache.set(key, { v: 0, t: Date.now() });
       return json({ name, key, admin: ADMINS.has(key) }, 200, { 'set-cookie': await makeCookie(store, req, { key, name }) });
@@ -269,7 +323,7 @@ export async function handle(req, { store }) {
       const u = key ? await store.get(K.user(key), { type: 'json' }) : null;
       if (!u || !checkPw(password || '', u.salt, u.hash)) return fail(401, 'Benutzername oder Passwort stimmt nicht.');
       pvCache.set(key, { v: u.pv || 0, t: Date.now() });
-      return json({ name: u.name, key, admin: ADMINS.has(key), mustChange: !!u.mustChange }, 200, { 'set-cookie': await makeCookie(store, req, u) });
+      return json(await withPatch(store, u, { name: u.name, key, admin: ADMINS.has(key), mustChange: !!u.mustChange }), 200, { 'set-cookie': await makeCookie(store, req, u) });
     }
     if (path === '/logout' && method === 'POST') return json({ ok: true }, 200, { 'set-cookie': 'sm_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
 
@@ -277,9 +331,13 @@ export async function handle(req, { store }) {
     if (path === '/me') {
       if (!user) return fail(401, 'Nicht angemeldet.');
       const u = await store.get(K.user(user.key), { type: 'json' });
-      return json({ name: user.name, key: user.key, admin: isAdmin(user), mustChange: !!(u && u.mustChange) });
+      return json(await withPatch(store, u, { name: user.name, key: user.key, admin: isAdmin(user), mustChange: !!(u && u.mustChange) }));
     }
     if (!user) return fail(401, 'Bitte zuerst anmelden.');
+    if (path === '/patch/seen' && method === 'POST') {
+      await updateJson(store, K.user(user.key), (x) => { if (!x || x.patchSeen === PATCH_ID) return undefined; x.patchSeen = PATCH_ID; return x; });
+      return json({ ok: true });
+    }
 
     // ---- Passwort ändern (eigenes Konto): altes bzw. vorläufiges Passwort bestätigen ----
     if (path === '/password' && method === 'POST') {
@@ -475,7 +533,7 @@ export async function handle(req, { store }) {
           return json({ ok: true, msg: 'Sperre aufgehoben.' });
         }
         if (cmd === 'auditOrder') {
-          const r = await mutateState(store, id, (w) => SM.auditOrder(w, { b: String(body.b || ''), a: String(body.a || ''), amount: Number(body.amount), state: !!body.state, by: 'Spielleitung' }));
+          const r = await mutateState(store, id, (w) => SM.auditOrder(w, { b: String(body.b || ''), a: String(body.a || ''), name: String(body.name || ''), amount: Number(body.amount), state: !!body.state, mode: String(body.mode || 'choice'), by: 'Spielleitung' }));
           const res = r.result || { ok: false };
           if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
           console.log(`${user.key} hat in ${id} eine Nachprüfung angeordnet: ${res.msg}`);
@@ -546,7 +604,7 @@ export async function handle(req, { store }) {
         }
         const r = await mutateState(store, id, null);
         const md = r.md, v = url.searchParams.get('v') || '';
-        const headers = { 'x-ver': r.etag || String(md.ver), 'x-clock': clockHeader(md), 'x-chat': String(meta.chatSeq || 0), 'cache-control': 'no-store', 'x-app': APP_VERSION, 'access-control-expose-headers': 'x-ver, x-clock, x-chat, x-app' };
+        const headers = { 'x-ver': r.etag || String(md.ver), 'x-clock': clockHeader(md, !!meta.main), 'x-chat': String(meta.chatSeq || 0), 'cache-control': 'no-store', 'x-app': APP_VERSION, 'access-control-expose-headers': 'x-ver, x-clock, x-chat, x-app' };
         if (v && v === headers['x-ver']) return new Response(null, { status: 204, headers });
         return new Response(r.buf, { status: 200, headers: { ...headers, 'content-type': 'application/octet-stream' } });
       }
@@ -620,12 +678,14 @@ export async function handle(req, { store }) {
         const r = await mutateState(store, id, (w, md, now) => {
           const was = SM.speedKey(md.speed);
           if (waiting(md, now)) { md.speed = speed === 'p' ? md.speed : speed; md.carry = 0; return; }   // vor dem Start: Uhr bleibt auf dem Termin
-          md.speed = speed; md.lastTick = now;
-          if (speed === 'rt') md.carry = dayMsLocal(tz, now);
+          if (meta.main && SM.SPEEDS[was].slow && SM.SPEEDS[speed].slow) { const fr = progressDays(md, now, true) % 1; md.speed = speed; md.lastTick = now; md.carry = fr * effSpeed(md, now, true).sp.ms; }
+          else { md.speed = speed; md.lastTick = now; }
+          if (meta.main && SM.SPEEDS[was].slow && SM.SPEEDS[speed].slow) { /* schon umgerechnet */ }
+          else if (speed === 'rt') md.carry = dayMsLocal(tz, now);
           else if (was !== speed) { const pw = speedInfo(was).ms, pn = speedInfo(speed).ms; md.carry = pw && pn ? Math.min(pn * 0.999, (md.carry || 0) / pw * pn) : 0; }
           if (was !== speed && w.humans.length) w.pushNews(w.day, meta.main ? `Die Hauptwelt läuft jetzt mit „${SM.SPEEDS[speed].label}“` : `Die Spielleitung stellt das Tempo auf „${SM.SPEEDS[speed].label}“`, 'info', null);
         });
-        return json({ ok: true, clock: JSON.parse(clockHeader(r.md)) });
+        return json({ ok: true, clock: JSON.parse(clockHeader(r.md, !!meta.main)) });
       }
       if (op === 'delete' && method === 'POST') {
         if (meta.host !== user.key) return fail(403, 'Nur die Spielleitung oder ein Admin kann das Spiel löschen.');
@@ -640,3 +700,4 @@ export async function handle(req, { store }) {
     return fail(status, status === 500 ? 'Interner Fehler auf dem Server.' : e.message);
   }
 }
+export const _clock = { isWeekend, effSpeed, progressDays, clockDue };
