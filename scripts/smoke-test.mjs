@@ -4,6 +4,8 @@ import { memStore } from '../server/memstore.mjs';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+// Oberfläche muss sich fehlerfrei parsen lassen (ein Syntaxfehler legt die ganze Seite lahm)
+{ const vm = await import('node:vm'); new vm.Script(fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'), { filename: 'src/app.js' }); console.log('Syntax ok: src/app.js'); }
 
 const store = memStore();
 const jar = {};
@@ -167,7 +169,8 @@ assert.equal(tim.admin, true, 'Tim ist Admin');
   assert.ok(rb && rb.total === 0 && !rb.sessions, 'Ben: Fenster im Hintergrund zählt nicht');
   // 0.21.26: Patch-Hinweis einmal je Konto
   { const ua = await store.get('users/anna', { type: 'json' }); delete ua.patchSeen; await store.setJSON('users/anna', ua);   // Konto von vor dem Update
-    const me1 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(me1.patch && /Wochenend/.test(me1.patch.title), 'Patch-Hinweis für bestehende Konten');
+    const me1 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(Array.isArray(me1.patch) && me1.patch.length === 2 && /Wochenend/.test(me1.patch[0].title) && /Slot-Rating/.test(me1.patch[1].title), 'Patch-Hinweise für bestehende Konten (beide)');
+    { const ub = await store.get('users/ben', { type: 'json' }); ub.patchSeen = '2026-11-05-wochenende'; await store.setJSON('users/ben', ub); const mb = ok(await call('ben', 'GET', '/me'), 'me ben'); assert.ok(mb.patch.length === 1 && /Slot-Rating/.test(mb.patch[0].title), 'wer den ersten kennt, sieht nur den neuen'); }
     ok(await call('anna', 'POST', '/patch/seen', {}), 'gesehen'); assert.ok(!ok(await call('anna', 'GET', '/me'), 'me2').patch, 'danach nicht mehr');
     const nu = ok(await call('neu', 'POST', '/register', { username: 'NeuKonto', password: 'geheim1234' }), 'neues Konto'); assert.ok(!nu.patch && !ok(await call('neu', 'GET', '/me'), 'me3').patch, 'neue Konten sehen ihn nicht'); }
   // 0.21.26: Wochenend-Tempo der Hauptwelt (Fr 17 Uhr bis Mo 6 Uhr deutscher Zeit: 1 Tag = 1 Std.)
@@ -1013,10 +1016,29 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     big.ledger.equityFlow(5e8, 't'); small.ledger.equityFlow(5e8, 't'); for (let i = 0; i < 6; i++) big.acquire(w.day, 'DH8D', 'MUC', 'lease', null, w);
     const apt = 'FRA'; w.slotWait = []; assert.ok(w.joinWait(big, apt, 2).ok && w.joinWait(small, apt, 2).ok, 'eingetragen');
     const q = w.waitQueue(apt); assert.equal(q[0].al, 'P3', 'kleinere Airline steht vorn, obwohl später eingetragen'); assert.equal(w.waitPos(q[0]), 1);
+    { const mid = SMx.addHuman(w, { id: 'P4', name: 'Mittel', code: 'MI', base: 'HAM' }); mid.ledger.equityFlow(5e8, 't'); for (let i = 0; i < 3; i++) mid.acquire(w.day, 'DH8D', 'HAM', 'lease', null, w); w._wr = null;
+      const sw0 = w.slotWait.slice();
+      // Groß (früh), Klein (Plan-Eintrag 2 später), Mittel: Klein hat nur einen Vorrangplatz, der zweite Eintrag steht nach Zeit hinten
+      w.slotWait.push({ id: 'WX1', al: 'P4', apt, n: 1 }); w.slotWait.push({ id: 'WX2', al: 'P3', apt, n: 1, plan: 'PL9' });
+      const q2 = w.waitQueue(apt).map((e) => e.al + (e.plan ? '*' : ''));
+      assert.deepEqual(q2, ['P3', 'P4', 'P2', 'P3*'], 'je Airline ein Vorrangplatz (klein vor mittel vor groß), weitere Einträge nach Zeit: ' + q2.join(','));
+      w.slotWait = sw0; delete w.airlines.P4; w.order = w.order.filter((x) => x !== 'P4'); }
     w.slotCap[apt] -= w.slotsFree(apt) - 1; assert.equal(w.slotsFree(apt), 1, 'genau ein Slot frei');
     const fc = w.waitForecast(apt); assert.equal(fc.byId[q[0].id], 1, 'Prognose: Slot an die kleine Airline');
     const hb = big.heldAt(apt, w.day), hs = small.heldAt(apt, w.day); w.allocateWaitlist();
     assert.equal(small.heldAt(apt, w.day) - hs, 1, 'Zuteilung an die kleine Airline'); assert.equal(big.heldAt(apt, w.day), hb, 'große geht leer aus'); }
-  console.log('0.21.26 ok: Auslastung ohne annullierte Flüge, Preisautomatik hin +' + Math.round((r.pending[0][1] / f0 - 1) * 100) + ' %, zurück ' + Math.round((r.pending[0][2] / i0 - 1) * 100) + ' %');
+  // 0.21.28: Slot-Rating (Flotte, Slots, Eigenkapital, Ergebnis seit der Vergabe) und höchstens 3 Einträge ab dem 1. April 2028
+  { const big = w.airlines.P2, small = w.airlines.P3; w._wr = null; const rs = w.slotRating(small), rb = w.slotRating(big); assert.ok(rs.score < rb.score, 'kleine Airline hat das niedrigere Rating: ' + rs.score + ' < ' + rb.score);
+    assert.ok(['fleet', 'slots', 'equity', 'profit'].every((k) => k in rb.parts), 'vier Bausteine');
+    small.ledger.equityFlow(5e9, 't'); w._wr = null; const rs2 = w.slotRating(small), rb2 = w.slotRating(big); assert.ok(rs2.parts.equity === 1 && rb2.parts.equity < 0.2 && rb2.score < rb.score, 'Eigenkapital zählt mit (relativ zur Größten)'); small.ledger.equityFlow(-5e9, 't'); w._wr = null;
+    // Einträge: vor dem 1. April bis 12, danach 3; zum 1. April werden überzählige gekürzt (die frühesten bleiben)
+    w.slotWait = []; const apts = ['FRA', 'MUC', 'LHR', 'CDG', 'AMS'].filter((c) => SMx.apx(c).slots !== null);
+    for (const c of apts) assert.ok(w.joinWait(big, c, 1).ok, 'vor dem 1. April mehr als 3 erlaubt');
+    const d0 = w.day; w.day = SMx.P.WAIT.from - 1; const lim = w.joinWait(small, 'FRA', 1); assert.ok(lim.ok);
+    for (const c of apts.slice(1, 3)) w.joinWait(small, c, 1); const x4 = w.joinWait(small, apts[3], 1); assert.ok(!x4.ok && /Höchstens 3/.test(x4.msg), 'ab dem 1. April höchstens 3: ' + x4.msg);
+    const nb = w.slotWait.filter((e) => e.al === big.id).length; assert.ok(nb > 3);
+    w.slotRound(SMx.P.WAIT.from); assert.ok(w.slotWait.filter((e) => e.al === big.id && e.n > 0).length <= 3, 'zum 1. April gekürzt');
+    assert.ok(big.events.some((e) => /verfallen/.test(e.msg)), 'Hinweis im Logbuch'); w.day = d0; }
+  console.log('0.21.26–28 ok: Slot-Rating, max. 3 Einträge ab 1. April, Auslastung ohne annullierte Flüge, Preisautomatik hin +' + Math.round((r.pending[0][1] / f0 - 1) * 100) + ' %, zurück ' + Math.round((r.pending[0][2] / i0 - 1) * 100) + ' %');
 }
 console.log('Alle Prüfungen bestanden.');

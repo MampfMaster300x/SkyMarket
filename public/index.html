@@ -6,7 +6,7 @@
 <meta name="description" content="SKYMARKET – Airline-Wirtschaftssimulation: Hauptwelt für alle und private Runden">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b400'/%3E%3Cpath d='M26 16 L20 14.5 L13 6 L10.5 6 L14 14.5 L8 14.5 L6 11.5 L4.5 11.5 L5.5 16 L4.5 20.5 L6 20.5 L8 17.5 L14 17.5 L10.5 26 L13 26 L20 17.5 L26 16Z' fill='%231a1400'/%3E%3C/svg%3E">
 <style>[hidden]{display:none!important}</style>
-<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.26";</script>
+<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.28";</script>
 <title>Skymarket</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1687,6 +1687,9 @@ const SM = (() => {
     LEASE_BUY: { endDisc: 0.95 },
     // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
     BASE_MAX: 4,
+    // 0.21.28: Warteliste – ab der Vergabe am 1. April 2028 (Tag 455) höchstens 3 Einträge je Airline; Vorrang nach Slot-Rating
+    // (Flotte, Slots im Besitz, Eigenkapital, Ergebnis seit der letzten Vergabe – je ein Viertel, gemessen am Größten im Spiel)
+    WAIT: { from: 455, max: 3, maxOld: 12, w: { fleet: 0.25, slots: 0.25, equity: 0.25, profit: 0.25 } },
     DOWNTURN: { minDay: 365, gap: 540, base: 0.03, slope: 0.015, max: 0.2, lead: [30, 60], days: [270, 420], recovery: 150,
       business: [0.72, 0.82], leisure: [0.82, 0.9], vfr: [0.9, 0.95], fare: [0.9, 0.94], bank: 0.25, req: 6 },
     LEASE_INDEX: 0.03,   // Leasingraten steigen jedes Vertragsjahr um 3 % (Spielende)
@@ -3687,7 +3690,8 @@ const SM = (() => {
       this.slotWait = this.slotWait || [];
       const mine = this.slotWait.find((e) => e.al === al.id && e.apt === apt && (e.plan || null) === plan);
       if (mine) { mine.n = plan ? n : Math.min(20, mine.n + n); return { ok: true, id: mine.id, pos: this.waitPos(mine) }; }
-      if (this.slotWait.filter((e) => e.al === al.id).length >= 12) return { ok: false, msg: 'Höchstens zwölf Wartelisten-Einträge gleichzeitig.' };
+      { const W0 = P.WAIT, lim = this.day + 1 >= W0.from ? W0.max : W0.maxOld;
+        if (this.slotWait.filter((e) => e.al === al.id).length >= lim) return { ok: false, msg: lim === W0.max ? `Höchstens ${W0.max} Wartelisten-Einträge je Airline. Ziehen Sie einen zurück, um einen neuen anzulegen.` : `Höchstens ${lim} Wartelisten-Einträge gleichzeitig.` }; }
       const e = { id: 'W' + (this.waitCounter = (this.waitCounter || 0) + 1), al: al.id, apt, n, day: this.day, plan: plan || undefined };
       this.slotWait.push(e);
       al.log(this.day, `Warteliste ${ap(apt).name}: ${n} Slot${n > 1 ? 's' : ''} angefragt (Platz ${this.waitPos(e)})`, 'route');
@@ -3700,14 +3704,49 @@ const SM = (() => {
       while (free > 0 && q.some((x) => x.left > 0) && guard++ < 60) for (const x of q) { if (free <= 0) break; if (x.left > 0) { x.left--; x.got++; free--; } }
       const out = {}; for (const x of q) out[x.e.id] = x.got; return { byId: out, total: Math.max(0, this.slotsFree(apt)) + 1, queue: q.length };
     }
-    /** Reihenfolge der Warteliste: kleinere Airlines zuerst (Flottengröße inkl. Bestellungen), bei Gleichstand wer sich früher eingetragen hat. */
+    /**
+     * Reihenfolge der Warteliste: Je Airline hat der erste Eintrag Vorrang – diese Vorrangplätze stehen vorn, kleinere Airlines zuerst
+     * (Flottengröße inkl. Bestellungen, bei Gleichstand der frühere Eintrag). Weitere Einträge derselben Airline folgen danach in der Reihenfolge der Anmeldung.
+     */
     waitQueue(apt) {
-      return (this.slotWait || []).map((e, i) => ({ e, i })).filter((x) => x.e.apt === apt)
-        .map((x) => ({ ...x, s: this.airlines[x.e.al] ? this.airlines[x.e.al].fleet.length : 0 })).sort((a, b) => a.s - b.s || a.i - b.i).map((x) => x.e);
+      const seen = new Set(), all = (this.slotWait || []).map((e, i) => ({ e, i })).filter((x) => x.e.apt === apt);
+      for (const x of all) { x.first = !seen.has(x.e.al); seen.add(x.e.al); x.s = this.airlines[x.e.al] ? this.slotRating(this.airlines[x.e.al]).score : 0; }
+      return all.sort((a, b) => (a.first === b.first ? (a.first ? a.s - b.s || a.i - b.i : a.i - b.i) : a.first ? -1 : 1)).map((x) => x.e);
     }
+    /** Ergebnis seit der letzten Slotvergabe (abgeschlossene Monate ab dem Vergabetag plus laufender Monat). */
+    profitSinceRound(al) {
+      const from = this.slotRoundDay ?? 0; let s = 0;
+      for (const m of al.ledger.months) { const L = m.label || {}; const d = (L.y || 0) * 365 + MONTH_STARTS[L.m || 0]; if (d >= from) s += monthRes(m); }
+      return s + monthRes({ acc: al.ledger.month || {} });
+    }
+    /**
+     * Slot-Rating 0–100 für den Vorrang auf der Warteliste (kleiner = früher dran): Flotte (inkl. Bestellungen), Slots im Besitz
+     * (genutzt an koordinierten Flughäfen plus Reserve), Eigenkapital und Ergebnis seit der letzten Vergabe – je am Größten im Spiel gemessen.
+     */
+    slotRating(al) {
+      const day = this.day;
+      if (!this._wr || this._wr.day !== day || this._wr.n !== this.humans.length) {
+        const vals = {}, mx = { fleet: 0, slots: 0, equity: 0, profit: 0 };
+        for (const h of this.humans) {
+          if (h.status === 'insolvent' || h.removed) continue;
+          let slots = 0; for (const r of h.activeRoutes()) for (const x of [r.base, r.dest]) if (apx(x).slots !== null) slots += r.freq;
+          for (const apt of Object.keys(h.slotHold || {})) slots += h.heldAt(apt, day);
+          const v = { fleet: h.fleet.length, slots, equity: balanceSheet(h).equity, profit: this.profitSinceRound(h) };
+          vals[h.id] = v; for (const k in mx) mx[k] = Math.max(mx[k], v[k]);
+        }
+        this._wr = { day, n: this.humans.length, vals, mx };
+      }
+      const W0 = P.WAIT.w, v = this._wr.vals[al.id], mx = this._wr.mx;
+      if (!v) return { score: 0, parts: {}, v: null };
+      const parts = {}; let score = 0;
+      for (const k of Object.keys(W0)) { parts[k] = mx[k] > 0 ? clamp(v[k] / mx[k], 0, 1) : 0; score += W0[k] * parts[k]; }
+      return { score: Math.round(score * 1000) / 10, parts, v };
+    }
+    /** Steht dieser Eintrag auf einem Vorrangplatz (erster Eintrag seiner Airline an diesem Flughafen)? */
+    waitFirst(e) { return (this.slotWait || []).find((x) => x.apt === e.apt && x.al === e.al) === e; }
     waitPos(e) { return this.waitQueue(e.apt).indexOf(e) + 1; }
     leaveWait(al, id) { const before = (this.slotWait || []).length; this.slotWait = (this.slotWait || []).filter((e) => !(e.id === id && e.al === al.id)); return before !== this.slotWait.length ? { ok: true } : { ok: false, msg: 'Eintrag nicht gefunden.' }; }
-    /** Zum 1. April und 1. Oktober: freie Slots an die Warteliste verteilen – reihum je einer, kleinere Airlines zuerst (unabhängig vom Eintragszeitpunkt), zum aktuellen Preis. */
+    /** Zum 1. April und 1. Oktober: freie Slots an die Warteliste verteilen – reihum je einer in der Reihenfolge von waitQueue (je Airline ein Vorrangplatz nach Slot-Rating), zum aktuellen Preis. */
     allocateWaitlist() {
       if (!this.slotWait || !this.slotWait.length) return;
       this.slotWait = this.slotWait.filter((e) => this.airlines[e.al] && this.airlines[e.al].status !== 'insolvent' && e.n > 0);
@@ -3738,6 +3777,12 @@ const SM = (() => {
       for (const al of this.list) al.cleanHolds(Math.max(this.day, due));
       // Zusage: Wo jemand wartet, ist mindestens der neue Slot frei – auch wenn der Flughafen vorher überbucht war
       for (const apt of new Set((this.slotWait || []).filter((e) => e.n > 0).map((e) => e.apt))) { if (apx(apt).slots === null || this.slotCap[apt] === undefined) continue; const f = this.slotsFree(apt); if (f < 1) this.slotCap[apt] += 1 - f; }
+      // Ab dem 1. April 2028: höchstens 3 Einträge je Airline – die frühesten bleiben, weitere verfallen vor der Vergabe
+      if (due >= P.WAIT.from && this.slotWait && this.slotWait.length) {
+        const cnt = {}, drop = [];
+        this.slotWait = this.slotWait.filter((e) => { cnt[e.al] = (cnt[e.al] || 0) + 1; if (cnt[e.al] <= P.WAIT.max) return true; drop.push(e); return false; });
+        for (const e of drop) { const al = this.airlines[e.al]; if (al) al.log(Math.max(this.day, due), `Warteliste ${ap(e.apt).name}: Eintrag verfallen – je Airline zählen höchstens ${P.WAIT.max} Einträge (die frühesten bleiben)`, 'warn'); }
+      }
       const before = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
       this.allocateWaitlist();
       const after = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
@@ -10521,6 +10566,16 @@ VIEWS.strategy = function viewStrategy() {
 /** Reihum-Vergabe simulieren: total Slots auf die Einträge (Liste von Wünschen) verteilen. */
 function rrAlloc(total, wants) { const got = wants.map(() => 0); let left = total, guard = 0; while (left > 0 && got.some((g, i) => g < wants[i]) && guard++ < 80) for (let i = 0; i < wants.length && left > 0; i++) if (got[i] < wants[i]) { got[i]++; left--; } return got; }
 const slotAptOf = (v) => { const t = String(v || '').trim(), c = t.slice(0, 3).toUpperCase(); if (P.AIRPORTS[c] && (t.length === 3 || /^[A-Za-z]{3}\b/.test(t))) return c; const l = t.toLowerCase(); if (l.length < 3) return null; return SM.AP_CODES.find((x) => apName(x).toLowerCase() === l) || SM.AP_CODES.find((x) => apName(x).toLowerCase().startsWith(l)) || null; };
+/** Slot-Rating erklärt (Tooltip): Anteile der vier Bausteine. */
+function ratingTip(al) {
+  const r = W.slotRating(al), p = r.parts || {}, v = r.v || {};
+  return `Slot-Rating ${n0(r.score)} von 100 – Flotte ${v.fleet ?? 0} (${pct(p.fleet || 0)}), Slots ${v.slots ?? 0} (${pct(p.slots || 0)}), Eigenkapital ${eurB(v.equity || 0)} (${pct(p.equity || 0)}), Ergebnis seit der letzten Vergabe ${eurB(v.profit || 0)} (${pct(p.profit || 0)}); jeweils im Verhältnis zur Größten im Spiel, je ein Viertel.`;
+}
+/** Wird dieser Eintrag am 1. April 2028 gekürzt (mehr als 3 Einträge der Airline, nur die frühesten bleiben)? */
+function waitExpires(e) {
+  if (SM.nextSlotDay(W.day).day < P.WAIT.from) return false;
+  const mine = (W.slotWait || []).filter((x) => x.al === e.al); return mine.indexOf(e) >= P.WAIT.max;
+}
 /** Vorschau im Formular „Slots sichern“. */
 function slotQuoteHtml(apt, n) {
   const pl = W.player; if (!apt) return '<p class="small muted">Flughafen eingeben – Code (z. B. FRA) oder Name.</p>';
@@ -10529,7 +10584,9 @@ function slotQuoteHtml(apt, n) {
   const nsd = SM.nextSlotDay(W.day), total = Math.max(0, W.slotsFree(apt)) + 1, buyN = Math.min(n, free), ask = n - buyN || n, held = pl.heldAt(apt, W.day);
   // Prognose: heutige Liste und Liste mit der neuen Anfrage (sie kommt zu Ihrem Eintrag ohne Plan, sonst nach Flottengröße einsortiert) – reihum je einer
   const mineE = q.find((e) => e.al === pl.id && !e.plan), now = rrAlloc(total, q.map((e) => e.n));
-  const sz = (e) => (W.airlines[e.al] ? W.airlines[e.al].fleet.length : 0), at = q.filter((e) => sz(e) <= pl.fleet.length).length;
+  // neuer Eintrag: erster eigener am Flughafen → Vorrangplatz nach Größe; sonst ans Ende (Reihenfolge der Anmeldung)
+  const sz = (e) => (W.airlines[e.al] ? W.slotRating(W.airlines[e.al]).score : 0), firstMine = !q.some((e) => e.al === pl.id), mySz = W.slotRating(pl).score;
+  const at = firstMine ? q.filter((e) => W.waitFirst(e) && sz(e) <= mySz).length : q.length;
   const wants = q.map((e) => (e === mineE ? e.n + ask : e.n)); if (!mineE) wants.splice(at, 0, ask);
   const after = rrAlloc(total, wants), mineIdx = q.map((e, i) => (e.al === pl.id ? i : -1)).filter((i) => i >= 0);
   const myNow = mineIdx.reduce((a, i) => a + now[i], 0), myAsk = mineIdx.reduce((a, i) => a + q[i].n, 0);
@@ -10551,8 +10608,8 @@ function slotCardHtml(c, pl, nsd) {
   const X = SM.apx(c), isBase = pl.bases.includes(c);
   const myTxt = mine.length ? mine.map((e) => { const g = fc.byId[e.id] || 0; return `<div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><span>Platz <b>${W.waitPos(e)}</b> von ${q.length} · ${e.n} Slot${e.n > 1 ? 's' : ''}${e.plan ? ' für einen Plan' : ''}</span><span class="chip ${g >= e.n ? 'good' : g ? 'warn' : 'crit'}">am ${dateShort(nsd.day)} voraussichtlich ${g} von ${e.n}</span><button class="btn small ghost" data-act="slotleave" data-id="${e.id}">austragen</button></div>`; }).join('') : '';
   const queue = q.length ? `<details class="fold" data-keep="sq-${c}" ${ui.open && ui.open['sq-' + c] ? 'open' : ''}><summary><span class="small"><b>Warteliste ${c}</b> · ${q.length} Einträge, ${qn} Slots angefragt</span><span class="fold-hint">${ui.open && ui.open['sq-' + c] ? 'einklappen' : 'Reihenfolge'}</span></summary>
-      <p class="small muted">Reihenfolge: kleinere Airlines zuerst (nach Flottengröße), bei gleicher Größe wer sich früher eingetragen hat. Vergeben wird reihum je ein Slot.</p>
-      <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}${a ? ` <span class="muted">· ${a.fleet.length} Flugz.</span>` : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
+      <p class="small muted">Reihenfolge: Der erste Eintrag jeder Airline hat Vorrang – niedrigeres Slot-Rating zuerst (Flotte, Slots im Besitz, Eigenkapital, Ergebnis seit der letzten Vergabe), bei Gleichstand wer sich früher eingetragen hat. Weitere Einträge folgen danach in der Reihenfolge der Anmeldung. Vergeben wird reihum je ein Slot.</p>
+      <ol class="small slotq-list">${q.map((e) => { const a = W.airlines[e.al], g = fc.byId[e.id] || 0; return `<li class="${e.al === pl.id ? 'me' : ''}"><span>${a ? esc(a.name) : e.al}${e.al === pl.id ? ' (Sie)' : ''}${a ? ` <span class="muted" title="${esc(ratingTip(a))}">· Rating ${n0(W.slotRating(a).score)}${W.waitFirst(e) ? ' · Vorrang' : ''}${waitExpires(e) ? ' · verfällt am 1. April' : ''}</span>` : ''}</span><span>${e.n} Slot${e.n > 1 ? 's' : ''}</span><span class="${g ? 'pos' : 'muted'}">→ ${g}</span></li>`; }).join('')}</ol></details>` : '';
   const buy = free > 0 ? `<button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="1">1 kaufen · ${eurB(W.slotBuyPrice(c, 1))}</button>${free > 1 ? ` <button class="btn small" data-act="slotbuy" data-apt="${c}" data-n="all">alle ${free} · ${eurB(W.slotBuyPrice(c, free))}</button>` : ''}` : `<button class="btn small primary" data-act="slotwait" data-apt="${c}" data-n="1">${mine.some((e) => !e.plan) ? '+1 auf der Warteliste' : 'Auf die Warteliste'}</button>`;
   return `<div class="slotrow"><div class="slothead"><div><b class="mono">${c}</b> <span class="small muted">${esc(apName(c))}${isBase ? ' · Basis' : used ? '' : ' · noch nicht im Netz'}</span></div><span class="small muted" title="1 Slot je 200.000 Passagiere im Jahr. Einen Teil halten Airlines außerhalb des Spiels (Bestandsverkehr).">${W.slotCap[c] ?? X.simCap} Slots im Spiel</span></div>
     <div class="slotstats"><div><span>von Ihnen genutzt</span><b>${used}</b><em>tägliche Flüge</em></div><div><span>Ihre Reserve</span><b>${bought || '–'}</b><em>${bought ? 'frei für neue Flüge' : 'keine'}</em></div><div><span>sofort frei</span><b class="${free <= 0 ? 'neg' : ''}">${free}</b><em>${free > 0 ? 'je ' + eurB(W.slotBuyPrice(c, 1)) : q.length ? 'gehen an die Warteliste' : 'voll'}</em></div><div><span>am ${dateShort(nsd.day)} zu vergeben</span><b>${q.length ? Math.min(total, qn) : '–'}</b><em>${q.length ? `an ${q.length} Wartende` : 'keine Warteliste'}</em></div></div>
@@ -10569,8 +10626,8 @@ VIEWS.slots = function viewSlots() {
   const st = ui.slotForm = ui.slotForm || { apt: '', n: 1 };
   let html = `<h2 class="sec">Slots <small>kaufen, Warteliste, Vergabetermine</small></h2>
     <div class="slotdate"><div><span class="small muted">Nächste Slotvergabe</span><b>${dateLong(nsd.day)}</b><span class="small">${nsd.summer ? 'Sommerflugplan' : 'Winterflugplan'} · in ${nsIn} Tag${nsIn === 1 ? '' : 'en'}</span></div>
-      <div class="slotsum"><div><span>Flughäfen mit Warteliste</span><b>${qApts.length}</b></div><div><span>angefragt / vergeben</span><b>${ask} / ${give}</b></div><div><span>Ihre Einträge</span><b>${myQ.length ? `${myGot} von ${myAsk}` : '–'}</b><em>${myQ.length ? 'Slots voraussichtlich' : 'keine'}</em></div></div>
-      <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Kleinere Airlines (weniger Flugzeuge) kommen zuerst – egal, wann sie sich eingetragen haben; bei gleicher Größe zählt der frühere Eintrag.</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
+      <div class="slotsum"><div><span>Flughäfen mit Warteliste</span><b>${qApts.length}</b></div><div><span>angefragt / vergeben</span><b>${ask} / ${give}</b></div><div><span>Ihre Einträge</span><b>${myQ.length ? `${myGot} von ${myAsk}` : '–'}</b><em>${myQ.length ? `Slots voraussichtlich · ${myQ.length} von ${nsd.day >= P.WAIT.from ? P.WAIT.max : P.WAIT.maxOld} Einträgen` : 'keine'}</em></div><div title="${esc(ratingTip(pl))}"><span>Ihr Slot-Rating</span><b>${n0(W.slotRating(pl).score)}</b><em>von 100 · niedriger = früher dran</em></div></div>
+      <ol class="small"><li>Vergeben wird nur am <b>1. April</b> und <b>1. Oktober</b>.</li><li>Dann bekommt jeder Flughafen einen Slot dazu; mit den schon freien gehen sie reihum an die Warteliste – je Eintrag einer, dann der Nächste.</li><li>Der erste Eintrag jeder Airline hat Vorrang – niedrigeres <b>Slot-Rating</b> zuerst, egal wann eingetragen; bei Gleichstand zählt der frühere Eintrag. Weitere Einträge derselben Airline stehen danach in der Reihenfolge der Anmeldung.</li><li>Slot-Rating (0–100): je ein Viertel Flotte (inkl. Bestellungen), Slots im Besitz, Eigenkapital und Ergebnis seit der letzten Vergabe – jeweils gemessen an der größten Airline im Spiel.</li><li>Ab der Vergabe am 1. April 2028 höchstens ${P.WAIT.max} Einträge je Airline; weitere verfallen dann (die frühesten bleiben).</li><li>Bezahlt wird bei der Zuteilung. Fehlt dann das Geld, rückt der Nächste vor.</li><li>Freie Slots ohne Warteschlange können Sie jederzeit sofort kaufen – auch ohne Strecke.</li></ol></div>
     <div class="card pad stack"><h3>Slots sichern <small class="muted">ohne Streckenplanung</small></h3>
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="f" style="flex:3;min-width:200px"><span>Flughafen</span><input type="search" id="slot-apt" list="slot-apts" placeholder="Code oder Name, z. B. FRA" value="${esc(st.apt ? st.apt + ' · ' + apName(st.apt) : '')}" autocomplete="off"></label>
         <label class="f" style="flex:1;min-width:90px"><span>Anzahl</span><input type="number" id="slot-n" min="1" max="8" value="${st.n}"></label></div>
@@ -14414,10 +14471,12 @@ async function onlineBoot() {
 }
 /** Patch-Hinweis einmal je Konto nach einem Update (der Server merkt sich, dass er gesehen wurde). */
 function showPatch() {
-  const p = mpState.user && mpState.user.patch; if (!p) return;
+  const raw = mpState.user && mpState.user.patch; if (!raw) return;
+  const list = Array.isArray(raw) ? raw : [raw]; if (!list.length) return;
+  const sec = (p) => `<section class="stack" style="gap:6px"><h2 style="margin:0">${esc(p.title)}</h2><p style="margin:0"><b>${esc(p.lead)}</b></p>${p.note ? `<p class="small ink2" style="margin:0">${esc(p.note)}</p>` : ''}
+    ${p.more && p.more.length ? `<h3 style="margin:4px 0 0">Außerdem neu</h3><ul class="small">${p.more.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</section>`;
   const box = document.createElement('div'); box.id = 'patchNote'; box.className = 'patch-ov';
-  box.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="patchT"><span class="chip good">Update</span><h1 id="patchT">${esc(p.title)}</h1><p><b>${esc(p.lead)}</b></p><p class="small ink2">${esc(p.note)}</p>
-    ${p.more && p.more.length ? `<h3>Außerdem neu</h3><ul class="small">${p.more.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+  box.innerHTML = `<div class="dialog" role="dialog" aria-modal="true" aria-label="Neu im Spiel"><span class="chip good">Update</span>${list.slice().reverse().map(sec).join('<hr style="border:0;border-top:1px solid var(--line, rgba(255,255,255,.12));margin:4px 0">')}
     <div class="row" style="justify-content:flex-end"><button class="btn primary" type="button" id="patchOk">Verstanden</button></div></div>`;
   document.body.appendChild(box);
   const done = () => { box.remove(); mpState.user.patch = null; api('/patch/seen', { body: {} }).catch(() => {}); };

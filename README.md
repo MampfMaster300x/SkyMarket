@@ -183,11 +183,18 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.28: Slot-Rating für die Warteliste · höchstens 3 Einträge ab 1. April 2028
+
+- **Slot-Rating (0–100):** je ein Viertel Flotte (inkl. Bestellungen), Slots im Besitz (genutzt an koordinierten Flughäfen plus Reserve), Eigenkapital und Ergebnis seit der letzten Slotvergabe – jeweils im Verhältnis zur größten Airline von Spielenden. Bestimmt die Reihenfolge der Vorrangplätze (der erste Eintrag jeder Airline; niedrigeres Rating zuerst, bei Gleichstand der frühere Eintrag); weitere Einträge folgen nach Anmeldezeit. Anzeige unter Strecken → Slots („Ihr Slot-Rating“, Tooltip mit allen Bausteinen) und in jeder Warteliste.
+- **Höchstens 3 Einträge je Airline** ab der Vergabe am 1. April 2028 (Tag 455): Neue Einträge darüber werden dann abgelehnt; bei der Vergabe am 1. April verfallen überzählige Einträge (die frühesten bleiben, Hinweis im Logbuch). Bis dahin zeigt die Liste „verfällt am 1. April“.
+- **Patch-Hinweise als Liste:** Wer einen Hinweis schon kennt, sieht nur die neuen (`PATCH_IDS` in `server/api.mjs`).
+- **Test:** `src/app.js` wird jetzt vor allen anderen Prüfungen geparst – ein Syntaxfehler in der Oberfläche fällt sofort auf.
+
 ## Neu in 0.21.26: Wochenend-Tempo · Patch-Hinweis · Auslastung und Abweisungen richtig erklärt
 
 - **Wochenend-Tempo (Hauptwelt):** Freitag 17 Uhr bis Montag 6 Uhr (Europe/Berlin, auch über die Zeitumstellung) läuft 1 Spieltag = 1 Stunde, sonst das eingestellte Tempo (Pause bleibt Pause). Die Uhr rechnet stundenweise mit dem jeweils gültigen Tempo; der Browser zeigt das gerade gültige Tempo („Wochenend-Tempo“). Private Spiele sind nicht betroffen.
 - **Patch-Hinweis:** Beim ersten Anmelden nach dem Update erscheint einmal je Konto ein kurzer Hinweis (Wochenend-Tempo plus „Außerdem neu“); der Server merkt sich „gesehen“ (`/patch/seen`), neue Konten sehen ihn nicht. Neuer Hinweis: `PATCH_ID` und Text in `server/api.mjs` ändern.
-- **Slot-Warteliste:** Kleinere Airlines (weniger Flugzeuge inkl. Bestellungen) kommen zuerst, unabhängig vom Eintragszeitpunkt; bei gleicher Größe zählt der frühere Eintrag. Gilt für Zuteilung, Platzanzeige und Prognose; die Liste zeigt die Flottengröße.
+- **Slot-Warteliste (0.21.27 präzisiert):** Je Airline hat nur der erste Eintrag an einem Flughafen Vorrang; diese Vorrangplätze stehen vorn, kleinere Airlines (weniger Flugzeuge inkl. Bestellungen) zuerst, unabhängig vom Eintragszeitpunkt, bei gleicher Größe der frühere Eintrag. Weitere Einträge derselben Airline folgen danach in der Reihenfolge der Anmeldung. Gilt für Zuteilung, Platzanzeige und Prognose; die Liste zeigt Flottengröße und „Vorrang“.
 - **Auslastung:** zählt nur noch Sitze auf tatsächlich geflogenen Flügen – annullierte Flüge standen bisher als leere Sitze in der Statistik („keinen Platz“ und trotzdem nur 88 %). Die Preisautomatik rechnet ebenso und erhöht den Preis jetzt zuverlässig, wenn eine Richtung ausgebucht ist und viele abgewiesen werden.
 - **Hinweis „Reisende ohne Platz“:** je Richtung mit Auslastung; ist nur eine Richtung überbucht und die andere schwach belegt, lautet der Rat „Preis in dieser Richtung erhöhen“ statt „Frequenz ausbauen“; verliert die Strecke Geld, kein Rat zu mehr Frequenz. Ist die Richtung nicht voll, steht dabei, an wie vielen Tagen ausgebucht war und wie viele Flüge ausfielen.
 

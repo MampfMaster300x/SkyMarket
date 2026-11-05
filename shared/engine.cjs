@@ -399,6 +399,9 @@ const SM = (() => {
     LEASE_BUY: { endDisc: 0.95 },
     // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
     BASE_MAX: 4,
+    // 0.21.28: Warteliste – ab der Vergabe am 1. April 2028 (Tag 455) höchstens 3 Einträge je Airline; Vorrang nach Slot-Rating
+    // (Flotte, Slots im Besitz, Eigenkapital, Ergebnis seit der letzten Vergabe – je ein Viertel, gemessen am Größten im Spiel)
+    WAIT: { from: 455, max: 3, maxOld: 12, w: { fleet: 0.25, slots: 0.25, equity: 0.25, profit: 0.25 } },
     DOWNTURN: { minDay: 365, gap: 540, base: 0.03, slope: 0.015, max: 0.2, lead: [30, 60], days: [270, 420], recovery: 150,
       business: [0.72, 0.82], leisure: [0.82, 0.9], vfr: [0.9, 0.95], fare: [0.9, 0.94], bank: 0.25, req: 6 },
     LEASE_INDEX: 0.03,   // Leasingraten steigen jedes Vertragsjahr um 3 % (Spielende)
@@ -2399,7 +2402,8 @@ const SM = (() => {
       this.slotWait = this.slotWait || [];
       const mine = this.slotWait.find((e) => e.al === al.id && e.apt === apt && (e.plan || null) === plan);
       if (mine) { mine.n = plan ? n : Math.min(20, mine.n + n); return { ok: true, id: mine.id, pos: this.waitPos(mine) }; }
-      if (this.slotWait.filter((e) => e.al === al.id).length >= 12) return { ok: false, msg: 'Höchstens zwölf Wartelisten-Einträge gleichzeitig.' };
+      { const W0 = P.WAIT, lim = this.day + 1 >= W0.from ? W0.max : W0.maxOld;
+        if (this.slotWait.filter((e) => e.al === al.id).length >= lim) return { ok: false, msg: lim === W0.max ? `Höchstens ${W0.max} Wartelisten-Einträge je Airline. Ziehen Sie einen zurück, um einen neuen anzulegen.` : `Höchstens ${lim} Wartelisten-Einträge gleichzeitig.` }; }
       const e = { id: 'W' + (this.waitCounter = (this.waitCounter || 0) + 1), al: al.id, apt, n, day: this.day, plan: plan || undefined };
       this.slotWait.push(e);
       al.log(this.day, `Warteliste ${ap(apt).name}: ${n} Slot${n > 1 ? 's' : ''} angefragt (Platz ${this.waitPos(e)})`, 'route');
@@ -2412,14 +2416,49 @@ const SM = (() => {
       while (free > 0 && q.some((x) => x.left > 0) && guard++ < 60) for (const x of q) { if (free <= 0) break; if (x.left > 0) { x.left--; x.got++; free--; } }
       const out = {}; for (const x of q) out[x.e.id] = x.got; return { byId: out, total: Math.max(0, this.slotsFree(apt)) + 1, queue: q.length };
     }
-    /** Reihenfolge der Warteliste: kleinere Airlines zuerst (Flottengröße inkl. Bestellungen), bei Gleichstand wer sich früher eingetragen hat. */
+    /**
+     * Reihenfolge der Warteliste: Je Airline hat der erste Eintrag Vorrang – diese Vorrangplätze stehen vorn, kleinere Airlines zuerst
+     * (Flottengröße inkl. Bestellungen, bei Gleichstand der frühere Eintrag). Weitere Einträge derselben Airline folgen danach in der Reihenfolge der Anmeldung.
+     */
     waitQueue(apt) {
-      return (this.slotWait || []).map((e, i) => ({ e, i })).filter((x) => x.e.apt === apt)
-        .map((x) => ({ ...x, s: this.airlines[x.e.al] ? this.airlines[x.e.al].fleet.length : 0 })).sort((a, b) => a.s - b.s || a.i - b.i).map((x) => x.e);
+      const seen = new Set(), all = (this.slotWait || []).map((e, i) => ({ e, i })).filter((x) => x.e.apt === apt);
+      for (const x of all) { x.first = !seen.has(x.e.al); seen.add(x.e.al); x.s = this.airlines[x.e.al] ? this.slotRating(this.airlines[x.e.al]).score : 0; }
+      return all.sort((a, b) => (a.first === b.first ? (a.first ? a.s - b.s || a.i - b.i : a.i - b.i) : a.first ? -1 : 1)).map((x) => x.e);
     }
+    /** Ergebnis seit der letzten Slotvergabe (abgeschlossene Monate ab dem Vergabetag plus laufender Monat). */
+    profitSinceRound(al) {
+      const from = this.slotRoundDay ?? 0; let s = 0;
+      for (const m of al.ledger.months) { const L = m.label || {}; const d = (L.y || 0) * 365 + MONTH_STARTS[L.m || 0]; if (d >= from) s += monthRes(m); }
+      return s + monthRes({ acc: al.ledger.month || {} });
+    }
+    /**
+     * Slot-Rating 0–100 für den Vorrang auf der Warteliste (kleiner = früher dran): Flotte (inkl. Bestellungen), Slots im Besitz
+     * (genutzt an koordinierten Flughäfen plus Reserve), Eigenkapital und Ergebnis seit der letzten Vergabe – je am Größten im Spiel gemessen.
+     */
+    slotRating(al) {
+      const day = this.day;
+      if (!this._wr || this._wr.day !== day || this._wr.n !== this.humans.length) {
+        const vals = {}, mx = { fleet: 0, slots: 0, equity: 0, profit: 0 };
+        for (const h of this.humans) {
+          if (h.status === 'insolvent' || h.removed) continue;
+          let slots = 0; for (const r of h.activeRoutes()) for (const x of [r.base, r.dest]) if (apx(x).slots !== null) slots += r.freq;
+          for (const apt of Object.keys(h.slotHold || {})) slots += h.heldAt(apt, day);
+          const v = { fleet: h.fleet.length, slots, equity: balanceSheet(h).equity, profit: this.profitSinceRound(h) };
+          vals[h.id] = v; for (const k in mx) mx[k] = Math.max(mx[k], v[k]);
+        }
+        this._wr = { day, n: this.humans.length, vals, mx };
+      }
+      const W0 = P.WAIT.w, v = this._wr.vals[al.id], mx = this._wr.mx;
+      if (!v) return { score: 0, parts: {}, v: null };
+      const parts = {}; let score = 0;
+      for (const k of Object.keys(W0)) { parts[k] = mx[k] > 0 ? clamp(v[k] / mx[k], 0, 1) : 0; score += W0[k] * parts[k]; }
+      return { score: Math.round(score * 1000) / 10, parts, v };
+    }
+    /** Steht dieser Eintrag auf einem Vorrangplatz (erster Eintrag seiner Airline an diesem Flughafen)? */
+    waitFirst(e) { return (this.slotWait || []).find((x) => x.apt === e.apt && x.al === e.al) === e; }
     waitPos(e) { return this.waitQueue(e.apt).indexOf(e) + 1; }
     leaveWait(al, id) { const before = (this.slotWait || []).length; this.slotWait = (this.slotWait || []).filter((e) => !(e.id === id && e.al === al.id)); return before !== this.slotWait.length ? { ok: true } : { ok: false, msg: 'Eintrag nicht gefunden.' }; }
-    /** Zum 1. April und 1. Oktober: freie Slots an die Warteliste verteilen – reihum je einer, kleinere Airlines zuerst (unabhängig vom Eintragszeitpunkt), zum aktuellen Preis. */
+    /** Zum 1. April und 1. Oktober: freie Slots an die Warteliste verteilen – reihum je einer in der Reihenfolge von waitQueue (je Airline ein Vorrangplatz nach Slot-Rating), zum aktuellen Preis. */
     allocateWaitlist() {
       if (!this.slotWait || !this.slotWait.length) return;
       this.slotWait = this.slotWait.filter((e) => this.airlines[e.al] && this.airlines[e.al].status !== 'insolvent' && e.n > 0);
@@ -2450,6 +2489,12 @@ const SM = (() => {
       for (const al of this.list) al.cleanHolds(Math.max(this.day, due));
       // Zusage: Wo jemand wartet, ist mindestens der neue Slot frei – auch wenn der Flughafen vorher überbucht war
       for (const apt of new Set((this.slotWait || []).filter((e) => e.n > 0).map((e) => e.apt))) { if (apx(apt).slots === null || this.slotCap[apt] === undefined) continue; const f = this.slotsFree(apt); if (f < 1) this.slotCap[apt] += 1 - f; }
+      // Ab dem 1. April 2028: höchstens 3 Einträge je Airline – die frühesten bleiben, weitere verfallen vor der Vergabe
+      if (due >= P.WAIT.from && this.slotWait && this.slotWait.length) {
+        const cnt = {}, drop = [];
+        this.slotWait = this.slotWait.filter((e) => { cnt[e.al] = (cnt[e.al] || 0) + 1; if (cnt[e.al] <= P.WAIT.max) return true; drop.push(e); return false; });
+        for (const e of drop) { const al = this.airlines[e.al]; if (al) al.log(Math.max(this.day, due), `Warteliste ${ap(e.apt).name}: Eintrag verfallen – je Airline zählen höchstens ${P.WAIT.max} Einträge (die frühesten bleiben)`, 'warn'); }
+      }
       const before = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
       this.allocateWaitlist();
       const after = (this.slotWait || []).reduce((a, e) => a + e.n, 0);
