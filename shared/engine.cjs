@@ -399,6 +399,8 @@ const SM = (() => {
     LEASE_BUY: { endDisc: 0.95 },
     // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
     BASE_MAX: 4,
+    /** Basen (0.21.33): höchstens 2 neue je Kalenderjahr; ab der 5. Basis (nur nach Komplettübernahme möglich) nur 2 Basis-Slots und eine Konzessionsabgabe von 100 Mio. € × 1,5 je weitere Basis (× Preisniveau). */
+    BASE_RULE: { perYear: 2, extraFrom: 5, extraSlots: 2, extraFee: 100e6, extraX: 1.5 },
     // 0.21.32: Ungenutzte Slots (Reserve) gehen nach 6 Monaten an den Flughafen zurück – Erstattung wie bei „Reserve zurückgeben“ (Slotpreis × 0,5); Warnung 30 Tage vorher
     SLOT_IDLE: { days: 183, warn: 30 },
     // 0.21.28: Warteliste – ab der Vergabe am 1. April 2028 (Tag 455) höchstens 3 Einträge je Airline; Vorrang nach Slot-Rating
@@ -1865,7 +1867,7 @@ const SM = (() => {
   /** Aufschlag für Basen, Drehkreuze und Übernahmen, die über das Ansehen hinausgehen. */
   /**
    * Konzern: Wer eine Airline komplett übernommen hat (Übernahmeangebot oder 100 % der Aktien), für den gelten die Wachstumsgrenzen nicht mehr –
-   * keine Höchstzahl an Basen, keine Aufschläge für Basen, Drehkreuze und Übernahmen.
+   * mehr als 4 Basen möglich (ab der 5. teuer, nur 2 Slots, höchstens 2 neue je Kalenderjahr – P.BASE_RULE), keine Aufschläge für Basen, Drehkreuze und Übernahmen.
    */
   function limitsLifted(al) { return !!(al && al.isPlayer && (al.group || Object.values(al.stakes || {}).some((s) => s && s.f >= 0.999))); }
   function softX(al, kind, x = 0) {
@@ -1878,6 +1880,14 @@ const SM = (() => {
     return 1;
   }
   const baseSetupCost = (w, apt) => { const B = P.BASE_COST; return Math.round((B.setupMin + B.setupK * Math.max(0.3, ap(apt).pax || 0.3) ** B.setupExp) * w.macro.cpi / 1000) * 1000; };
+  /** Laufende Nummer der Basis (bestehende: ihre Position, neue: die nächste). */
+  const baseOrd = (al, apt) => (al.bases.includes(apt) ? al.bases.indexOf(apt) + 1 : al.bases.length + 1);
+  /** Basis-Slots: 3, ab der 5. Basis von Spielenden nur noch 2. */
+  const baseSlotN = (al, apt) => (al && al.isPlayer && baseOrd(al, apt) >= P.BASE_RULE.extraFrom ? P.BASE_RULE.extraSlots : P.BASE_SLOTS.n);
+  /** Konzessionsabgabe ab der 5. Basis (Spielende): 100 Mio. €, je weitere Basis ×1,5. */
+  function baseExtraFee(w, al, apt) { if (!al || !al.isPlayer) return 0; const R = P.BASE_RULE, n = baseOrd(al, apt); return n >= R.extraFrom ? Math.round(R.extraFee * R.extraX ** (n - R.extraFrom) * ((w.macro && w.macro.cpi) || 1) / 1e5) * 1e5 : 0; }
+  /** Neue Basen im laufenden Kalenderjahr (nur selbst eröffnete, nicht übernommene). */
+  const baseOpensYear = (w, al) => { const y = Math.floor(w.day / 365); return ((al && al.baseOpens) || []).filter((d) => Math.floor(d / 365) === y).length; };
   const baseDayCost = (apt) => { const B = P.BASE_COST; return B.dayMin + B.dayK * Math.max(0.3, ap(apt).pax || 0.3) ** B.dayExp; };
   function careerNoteAcq(w, al, lease = false) { if (!al.prog) return; al.prog.acq = [...(al.prog.acq || []).filter((d) => d > w.day - 30), w.day]; if (lease) al.prog.leases = [...(al.prog.leases || []).filter((d) => d > w.day - P.STANDING.leaseWin), w.day]; }
   /** Phase für eine bestehende Airline aus ihrer heutigen Größe bestimmen (ohne Meldungen). */
@@ -2403,7 +2413,7 @@ const SM = (() => {
     /** Drei Slots am neuen Basisflughafen zuteilen und bezahlen (für Spielende). Fehlen freie Slots, kommen sie aus dem Pool dazu. */
     grantBaseSlots(al, apt) {
       if (!al.isPlayer || !P.AIRPORTS[apt] || apx(apt).slots === null) return 0;
-      const need = Math.max(0, P.BASE_SLOTS.n - al.heldAt(apt, this.day)); if (!need) return 0;
+      const need = Math.max(0, baseSlotN(al, apt) - al.heldAt(apt, this.day)); if (!need) return 0;
       const cost = baseSlotCost(this, apt, al), f = this.slotsFree(apt);
       if (f < need) this.slotCap[apt] = (this.slotCap[apt] || 0) + (need - Math.max(0, f));
       al.slotInvest(apt, cost, need); al.hold(apt, need, 0, true);
@@ -4126,13 +4136,15 @@ const SM = (() => {
     openBase(al, apt) {
       if (al.bases.includes(apt)) return { ok: false, msg: 'Dort sind Sie schon.' };
       if (al.isPlayer && al.bases.length >= P.BASE_MAX && !limitsLifted(al)) return { ok: false, msg: `Mehr als ${P.BASE_MAX} Basen sind nicht möglich. Schließen Sie eine Basis, um eine neue zu eröffnen.` };
+      if (al.isPlayer && baseOpensYear(this, al) >= P.BASE_RULE.perYear) return { ok: false, msg: `In ${2027 + Math.floor(this.day / 365)} haben Sie schon ${P.BASE_RULE.perYear} neue Basen eröffnet – die nächste ist ab dem 1. Januar ${2028 + Math.floor(this.day / 365)} möglich.` };
       const appr = baseApproval(al, apt); if (!appr.ok) return { ok: false, msg: appr.msg, rejected: true };
       const lic = Math.max(0, licenceFee(this, apt) * appr.x - (al.stations[apt] ? stationFee(this, apt) : 0)), bx = softX(al, 'base');   // wer dort schon eine Station hat, zahlt nur die Differenz
-      const setup = baseSetupCost(this, apt) * bx, sl = al.isPlayer ? baseSlotCost(this, apt, al) : 0;
-      if (al.spendable(this.macro.bank ?? 1) < setup + lic + sl) return { ok: false, msg: `Für die Basis (${Math.round((setup + lic + sl) / 1000)} Tsd. EUR${lic ? ' inkl. Lizenz' : ''}${sl ? ' und drei Slots' : ''}) reicht auch der Dispo nicht.` };
+      const setup = baseSetupCost(this, apt) * bx, sl = al.isPlayer ? baseSlotCost(this, apt, al) : 0, ex = baseExtraFee(this, al, apt), ord = baseOrd(al, apt), sn = baseSlotN(al, apt);
+      if (al.spendable(this.macro.bank ?? 1) < setup + lic + sl + ex) return { ok: false, msg: `Für die ${ord}. Basis (${Math.round((setup + lic + sl + ex) / 1000)} Tsd. EUR${ex ? ' inkl. Konzessionsabgabe' : ''}${lic ? ', Lizenz' : ''}${sl ? ` und ${sn} Slots` : ''}) reicht auch der Dispo nicht.` };
       al.bases.push(apt); al.station(apt);
-      if (al.isPlayer) this.grantBaseSlots(al, apt); else this.newEntrantSlots(apt);
+      if (al.isPlayer) { al.baseOpens = [...(al.baseOpens || []).filter((d) => d > this.day - 800), this.day]; this.grantBaseSlots(al, apt); } else this.newEntrantSlots(apt);
       al.ledger.post('one_off', -setup - lic, true, `Basiseröffnung › ${aTag(apt)}`);
+      if (ex) { al.ledger.post('one_off', -ex, true, `Konzessionsabgabe ${ord}. Basis › ${aTag(apt)}`); al.log(this.day, `Konzessionsabgabe für die ${ord}. Basis (${ap(apt).name}): ${Math.round(ex / 1e6)} Mio. EUR – ab der ${P.BASE_RULE.extraFrom}. Basis gehören nur ${P.BASE_RULE.extraSlots} Slots dazu`, 'route'); }
       al.log(this.day, `Basis ${ap(apt).name}: Einrichtung ${Math.round(setup / 1000)} Tsd. EUR${bx > 1 ? ` (inkl. Aufschlag ×${String(bx).replace('.', ',')}, weil Ihre Airline für so viele Basen noch klein ist)` : ''}${lic ? `, Betriebslizenz ${Math.round(lic / 1000)} Tsd. EUR` : ''}, laufend rund ${Math.round(baseDayCost(apt) * 30.4 / 1000)} Tsd. EUR im Monat`, 'route');
       al.log(this.day, `Neue Basis ${ap(apt).name} eröffnet`, 'route');
       return { ok: true };
@@ -5552,7 +5564,7 @@ const SM = (() => {
     w.coops = (w.coops || []).filter((c) => c.a !== ai.id && c.b !== ai.id);
     w.agreements = (w.agreements || []).filter((g) => g.airline !== ai.id && g.partner !== ai.id);
     for (const a of w.auctions || []) if (!a.done && a.bids) delete a.bids[ai.id];
-    al.log(day, 'Konzern: Mit der Übernahme gelten für Ihre Airline keine Wachstumsgrenzen mehr – keine Höchstzahl an Basen, keine Aufschläge für Basen, Drehkreuze und Übernahmen.', 'good');
+    al.log(day, `Konzern: Mit der Übernahme gelten gelockerte Wachstumsgrenzen – mehr als ${P.BASE_MAX} Basen möglich (ab der ${P.BASE_RULE.extraFrom}. mit Konzessionsabgabe und nur ${P.BASE_RULE.extraSlots} Slots, höchstens ${P.BASE_RULE.perYear} neue Basen je Kalenderjahr), keine Aufschläge für Basen, Drehkreuze und Übernahmen.`, 'good');
     al.log(day, `Übernahme: ${ai.name} gehört jetzt Ihnen – ${v.fleet} Flugzeuge, ${nR} Strecken, Basen ${ai.bases.join(', ')}, ${staffN} Beschäftigte. Angebot für ${Math.round(v.rest * 100)} % der Aktien: ${Math.round(v.price / 1e5) / 10} Mio. EUR${v.price + ownBook > eqAi ? `, ${Math.round((v.price + ownBook - eqAi) / 1e5) / 10} Mio. EUR über dem Buchwert (sofort abgeschrieben)` : ''}.`, 'good');
     w.pushNews(day, `${al.name} übernimmt ${ai.name}`, 'info', al.id);
     w.operableFreq(al);
@@ -5569,7 +5581,7 @@ const SM = (() => {
   /** Pflicht-Slots einer neuen Basis: Festpreis je nach Flughafengröße (Hannover rund 50 Tsd., Hamburg 135 Tsd., Frankfurt 570 Tsd. EUR). */
   function baseSlotCost(w, apt, al = null) {
     if (!coordinated(apt) || apx(apt).slots === null) return 0;
-    const B = P.BASE_SLOTS, need = Math.max(0, B.n - (al ? al.heldAt(apt, w.day) : 0)); if (!need) return 0;
+    const B = P.BASE_SLOTS, need = Math.max(0, (al ? baseSlotN(al, apt) : B.n) - (al ? al.heldAt(apt, w.day) : 0)); if (!need) return 0;
     return Math.round(need * P.SLOT_RULE.priceBase * Math.max(0.3, ap(apt).pax || 0.3) ** P.SLOT_RULE.priceExp * B.x * (w.macro ? w.macro.cpi : 1) / 100) * 100;
   }
   function slotValue(w, apt) {
@@ -6845,7 +6857,7 @@ const SM = (() => {
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: keepDeals(w), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      aptObs: w.aptObs || {}, slotGrants: w.slotGrants && Object.keys(w.slotGrants).length ? w.slotGrants : undefined, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, auditLog: w.auditLog || [], laborFree: w.laborFree || null, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      aptObs: w.aptObs || {}, slotGrants: w.slotGrants && Object.keys(w.slotGrants).length ? w.slotGrants : undefined, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, baseOpensV: w.baseOpensV || undefined, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, auditLog: w.auditLog || [], laborFree: w.laborFree || null, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
@@ -6859,7 +6871,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -6872,7 +6884,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      aptObs: s.aptObs || {}, slotGrants: s.slotGrants, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, auditLog: s.auditLog || [], laborFree: s.laborFree || null, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, slotGrants: s.slotGrants, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, baseOpensV: s.baseOpensV, agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, auditLog: s.auditLog || [], laborFree: s.laborFree || null, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -6941,6 +6953,10 @@ const SM = (() => {
     auditMigrate(w);
     auditCatchUp(w);   // 0.21.21: fehlende Geschäfte nacherfassen
     for (const h of w.humans) if (h.secDep) leaseSecurity(w, h);   // 0.21.31: nachgeforderte Kautionen sofort zurück
+    // 0.21.33: Basiseröffnungen des laufenden Kalenderjahres aus dem Logbuch nachtragen (für die Grenze von 2 je Jahr)
+    if (!w.baseOpensV) { const y = Math.floor(w.day / 365);
+      for (const h of w.humans) if (!h.baseOpens) { const ds = (h.events || []).filter((e) => Math.floor(e.day / 365) === y && /^Neue Basis .+ eröffnet$/.test(e.msg || '')).map((e) => e.day); if (ds.length) h.baseOpens = ds; }
+      w.baseOpensV = 1; }
     // 0.21.31: Zuteilungen der letzten Vergabe aus dem Logbuch nachtragen (soweit noch vorhanden)
     if (w.slotGrants === undefined) {
       w.slotGrants = {}; const due = w.slotRoundDay;
@@ -6995,7 +7011,7 @@ const SM = (() => {
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, baseExtraFee, baseOpensYear, baseSlotN, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;

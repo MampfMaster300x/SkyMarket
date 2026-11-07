@@ -183,6 +183,13 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.33: Basen nach Übernahme begrenzt · Slots und Wartelisten ein- und ausblendbar
+
+- **Höchstens 2 neue Basen je Kalenderjahr** – für alle Spieler-Airlines, auch im Konzern. Übernommene Basen zählen nicht mit. Anzeige „Neue Basen 2028: x von höchstens 2“ im Basis-Antrag.
+- **Ab der 5. Basis (nur nach Komplettübernahme möglich):** Konzessionsabgabe 100 Mio. € (× Preisniveau), jede weitere Basis ×1,5 (6. Basis 150 Mio., 7. 225 Mio. …), zusätzlich zu Einrichtung, Lizenz und Slots; nur noch 2 statt 3 Basis-Slots. Ohne Konzern bleibt es bei höchstens 4 Basen.
+- **Ein- und ausblenden:** Unter Strecken → Slots lassen sich „Regeln der Slotvergabe“, „Ihre Slots“, „Ihre Wartelisten-Einträge“, „Alle Wartelisten“ und „Ihre Flughäfen“ einzeln ausblenden, ebenso die Slot-Tabelle unter Stationen. Der Zustand bleibt im Browser gespeichert.
+- Tests: Server-Uhrtests berücksichtigen das Wochenend-Tempo (liefen freitags ab 17 Uhr sonst fehl).
+
 ## Neu in 0.21.32: Ungenutzte Slots verfallen · alle Wartelisten filtern · mehrere Akademie-Schulen
 
 - **Use it or lose it:** Slots in der Reserve (gekauft, zugeteilt oder nach Streckenschluss frei geworden), die 6 Monate (183 Tage) ungenutzt bleiben, gehen an den Flughafen zurück – Erstattung wie bei „Reserve zurückgeben“ an den Flughafen (Slotpreis × 0,5), Buchverlust als Einmalposten, Hinweis 30 Tage vorher. Neue Strecken verbrauchen immer die älteste Reserve zuerst. Bestehende Reserven ohne Datum: Frist beginnt mit dem Update. Anzeige „ungenutzt zurück am …“ je Flughafen.

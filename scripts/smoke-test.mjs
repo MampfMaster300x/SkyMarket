@@ -242,7 +242,7 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const bad = ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'orderStudy', kind: 'routes', tier: 'riesig' } }), 'ungültiges Paket');
   assert.equal(bad.ok, false);
   const m2 = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' });
-  await store.set('games/main/state', m2.data, { metadata: { ...m2.metadata, lastTick: Date.now() - 4 * 1800000 - 1000 }, onlyIfMatch: m2.etag });
+  await store.set('games/main/state', m2.data, { metadata: { ...m2.metadata, lastTick: Date.now() - 4 * 1800000 * (_clock.isWeekend(Date.now()) ? 2 : 1) - 1000 }, onlyIfMatch: m2.etag });
   await tickMain(store);
   const sa = await call('anna', 'GET', '/games/main/state?v=x');
   const ws = JSON.parse(gunzipSync(Buffer.from(sa.data)).toString());
@@ -257,7 +257,7 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
     { type: 'academy', role: 'constructor', level: 2 }, { type: 'repay', id: 'nix' }, { type: 'openBase', apt: 'constructor' }];
   for (const action of evil) { const r = await call('anna', 'POST', '/games/main/action', { action }); assert.ok(r.status < 500, 'kein Serverfehler bei ' + JSON.stringify(action)); }
   const m3 = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' });
-  await store.set('games/main/state', m3.data, { metadata: { ...m3.metadata, lastTick: Date.now() - 3 * 1800000 - 1000 }, onlyIfMatch: m3.etag });
+  await store.set('games/main/state', m3.data, { metadata: { ...m3.metadata, lastTick: Date.now() - 3 * 1800000 * (_clock.isWeekend(Date.now()) ? 2 : 1) - 1000 }, onlyIfMatch: m3.etag });
   const t3 = await tickMain(store);
   assert.ok(t3.days >= 3, 'Welt läuft nach manipulierten Aktionen weiter: ' + JSON.stringify(t3));
   const rp = ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' } }), 'Kredit fehlt');
@@ -340,7 +340,9 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   Date.now = () => real() + 3600e3;   // eine Stunde später: noch vor dem Start
   let ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Admin vor Start'); assert.equal(ad.day, 0, 'Uhr steht'); assert.equal(ad.startAt, startAt, 'Termin im Admin');
   Date.now = () => real() + 3 * 3600e3;   // eine Stunde nach dem Start = 3 Spieltage
-  ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Admin nach Start'); assert.equal(ad.day, 3, 'eine Stunde nach dem Start: 3 Tage (' + ad.day + ')'); assert.equal(ad.startAt, null, 'Termin vorbei');
+  ad = ok(await call('tim', 'GET', '/games/main/admin'), 'Admin nach Start');
+  { const w1 = _clock.isWeekend(real() + 2 * 3600e3), w2 = _clock.isWeekend(real() + 3 * 3600e3);   // am Wochenende 1 Spieltag je Stunde
+    if (w1 === w2) assert.equal(ad.day, w1 ? 1 : 3, 'eine Stunde nach dem Start: ' + (w1 ? 1 : 3) + ' Tage (' + ad.day + ')'); else assert.ok(ad.day >= 1 && ad.day <= 3, 'Start am Übergang zum Wochenende: ' + ad.day); } assert.equal(ad.startAt, null, 'Termin vorbei');
   assert.equal((await act('anna', { type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'BRE' })).ok, true, 'nach dem Start Flugzeug');
   assert.equal((await call('anna', 'POST', '/games/main/rebase', { airline: { name: 'Nordlicht', code: 'NL', base: 'HAM' } })).status, 400, 'mit Flugzeug keine Basisänderung');
   Date.now = real;
@@ -1091,6 +1093,28 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const ob = w.openBase(a, nb); assert.ok(ob.ok, 'weitere Basis trotz ' + (a.bases.length - 1) + ' Basen: ' + ob.msg);
   const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(SMx.limitsLifted(w2.airlines.P1), 'bleibt gespeichert');
   console.log('0.21.30 ok: nach Übernahme von', t.name, '– Basen', a.bases.length, ', keine Aufschläge, gespeichert');
+}
+// 0.21.33: höchstens 2 neue Basen je Kalenderjahr; ab der 5. Basis Konzessionsabgabe und nur 2 Slots
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 93 }), a = SMx.addHuman(w, { id: 'P1', name: 'Beta', code: 'BB', base: 'HAJ' }); w.playerId = 'P1'; a.ledger.equityFlow(5e9, 't'); a.brand = 1; a._st = null;
+  const ok = (c) => !a.bases.includes(c) && SMx.baseApproval(a, c).ok && SMx.apx(c).slots !== null && w.slotsFree(c) >= 3;
+  const cands = SMx.AP_CODES.filter(ok);
+  assert.ok(w.openBase(a, cands[0]).ok && w.openBase(a, cands[1]).ok, 'zwei neue Basen im ersten Jahr');
+  const r3 = w.openBase(a, cands[2]); assert.ok(!r3.ok && /1\. Januar/.test(r3.msg), 'dritte im selben Jahr abgelehnt: ' + r3.msg);
+  assert.equal(SMx.baseOpensYear(w, a), 2);
+  while (Math.floor(w.day / 365) === 0) w.day += 30;
+  assert.equal(SMx.baseOpensYear(w, a), 0, 'neues Kalenderjahr');
+  assert.ok(w.openBase(a, cands[2]).ok, 'im neuen Jahr wieder möglich (vierte Basis)');
+  const r5 = w.openBase(a, cands[3]); assert.ok(!r5.ok && /4 Basen/.test(r5.msg), 'ohne Konzern bleibt es bei 4');
+  a.group = { since: w.day, names: ['Test'] }; assert.ok(SMx.limitsLifted(a));
+  const fee = SMx.baseExtraFee(w, a, cands[3]); assert.ok(fee >= 100e6 * 0.99, 'Konzessionsabgabe für die 5. Basis: ' + fee);
+  assert.equal(SMx.baseSlotN(a, cands[3]), 2, 'nur 2 Slots ab der 5. Basis');
+  const eq0 = SMx.balanceSheet(a).equity; assert.ok(w.openBase(a, cands[3]).ok, 'fünfte Basis im Konzern');
+  assert.equal(a.heldAt(cands[3], w.day), 2, 'zwei Basis-Slots an der 5. Basis'); assert.ok(eq0 - SMx.balanceSheet(a).equity >= fee * 0.99, 'Abgabe mindert das Eigenkapital');
+  assert.ok(SMx.baseExtraFee(w, a, cands[4]) > fee * 1.4, 'sechste Basis noch teurer');
+  const r6 = w.openBase(a, cands[4]); assert.ok(!r6.ok && /1\. Januar/.test(r6.msg), 'auch im Konzern höchstens 2 neue je Kalenderjahr');
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.equal(SMx.baseOpensYear(w2, w2.airlines.P1), 2, 'Zählung bleibt gespeichert');
+  console.log('0.21.33 ok: 2 neue Basen je Kalenderjahr, 5. Basis', Math.round(fee / 1e6), 'Mio. € Abgabe und 2 Slots, 6. Basis', Math.round(SMx.baseExtraFee(w, a, cands[4]) / 1e6), 'Mio. €');
 }
 // 0.21.31: Kredit ablösen mit zeitweiligem Dispo (Umschuldung)
 { const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
