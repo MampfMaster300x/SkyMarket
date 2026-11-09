@@ -11,7 +11,7 @@ const MAIN_ID = 'main', MAIN_CODE = 'HAUPTW', MAIN_NAME = 'Hauptwelt';
 const MAIN_MAX = Math.max(4, Math.min(200, Number(process.env.MAIN_MAX_PLAYERS) || 60));
 const MAIN_SPEED = 'm20';
 // Vor dem geplanten Start: nur Vorbereitung (Logo, Assistenz, Pläne, Einstellungen ohne Kosten)
-const PRESTART_OK = new Set(['setLogo', 'setPixLogo', 'assistant', 'savePlan', 'deletePlan', 'planAuto', 'setCabin', 'insurance', 'marketingPct', 'pay']);
+const PRESTART_OK = new Set(['resume', 'takeOffer', 'dropOffer', 'crisisSkip', 'setLogo', 'setPixLogo', 'assistant', 'savePlan', 'deletePlan', 'planAuto', 'setCabin', 'insurance', 'marketingPct', 'pay']);
 const MAX_DAYS_PER_TICK = 30;          // Aufholen höchstens 30 Tage je Anfrage (Rest folgt mit der nächsten)
 const IDLE_CAP_MS = 60000;              // Schnelle Stufen: ohne Anfragen läuft höchstens eine Minute nach
 const SLOW_CAP_DAYS = 400;              // Langsame Stufen laufen auch offline weiter (bis 400 Tage Rückstand)
@@ -93,7 +93,7 @@ const isAdmin = (user) => !!user && ADMINS.has(user.key);
 
 const K = {
   user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, presence: (id) => `games/${id}/presence`, chat: (id) => `games/${id}/chat`,
-  code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`,
+  code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`, diag: 'diag/client',
 };
 async function updateJson(store, key, fn, init = null, tries = 6) {
   for (let i = 0; i < tries; i++) {
@@ -201,6 +201,22 @@ function clockDue(md, now, main = false) {
   const days = Math.floor(total / sp.ms), run = Math.min(days, MAX_DAYS_PER_TICK);
   return { days: run, carry: total - run * sp.ms, backlog: days - run };
 }
+/**
+ * 0.21.39: KI-Vertretung. Höchstens einmal je Stunde: Wer 72 Stunden weder eine Aktion geschickt noch aktiv gespielt hat (Spielzeit-Lebenszeichen),
+ * wird von der KI vertreten (al.auto); wer wieder spielt, bekommt die Airline zurück. Die Zählung beginnt für bestehende Airlines mit dem Update.
+ */
+async function autoFlags(store, w, now) {
+  if (w.autoAt && now - w.autoAt < 3600e3) return;
+  w.autoAt = now;
+  const hs = w.humans.filter((h) => h.status !== 'insolvent' && !h.removed), lim = SM.P.AUTOPILOT.hours * 3600e3;
+  const plays = await Promise.all(hs.map((h) => (h.owner ? store.get(K.play(h.owner), { type: 'json' }).catch(() => null) : null)));
+  hs.forEach((h, i) => {
+    if (!h.lastAct) h.lastAct = now;
+    const last = Math.max(h.lastAct || 0, (plays[i] && plays[i].last) || 0), on = now - last > lim;
+    if (on && !h.auto) { h.auto = now; h.log(w.day, `Seit ${SM.P.AUTOPILOT.hours} Stunden keine eigene Steuerung: Die KI vertritt Ihre Airline (Preise, Personal, Entscheidungen, freie Flugzeuge). Sobald Sie wieder spielen, übernehmen Sie selbst.`, 'warn'); }
+    else if (!on && h.auto) { h.auto = 0; h.log(w.day, 'Willkommen zurück: Die Vertretung durch die KI ist beendet, Sie steuern wieder selbst.', 'good'); }
+  });
+}
 /** Lädt den Stand, lässt fällige Tage laufen, wendet optional eine Änderung an und speichert mit Versionsprüfung. */
 async function mutateState(store, id, fn = null) {
   for (let i = 0; i < 5; i++) {
@@ -211,6 +227,7 @@ async function mutateState(store, id, fn = null) {
     const due = clockDue(md, now, id === MAIN_ID);
     if (!fn && due.days === 0) return { etag: cur.etag, md, buf: cur.data, changed: false };
     const w = unpackWorld(cur.data);
+    if (due.days > 0 && !waiting(md, now)) { try { await autoFlags(store, w, now); } catch (e) { /* Vertretung ist nicht kritisch */ } }
     for (let d = 0; d < due.days; d++) w.step();
     if (due.days > 0 || (id === MAIN_ID && effSpeed(md, md.lastTick || now, true).key !== effSpeed(md, now, true).key)) { md.carry = due.carry; md.lastTick = now; }
     let result = null;
@@ -219,6 +236,8 @@ async function mutateState(store, id, fn = null) {
     const buf = packSized(w);
     const res = await store.set(K.state(id), buf, { metadata: md, onlyIfMatch: cur.etag });
     if (res.modified !== false) return { etag: res.etag, md, buf, changed: true, result, w };
+    // Nur lesen (Abruf des Stands): Ein anderes Gerät hat gerade gespeichert – dessen Stand ist neuer, also einfach den liefern
+    if (!fn) { const nx = await store.getWithMetadata(K.state(id), { type: 'arrayBuffer' }); if (nx) return { etag: nx.etag, md: { ...nx.metadata }, buf: nx.data, changed: false }; }
   }
   throw Object.assign(new Error('Gerade viel Betrieb, bitte noch einmal versuchen.'), { status: 409 });
 }
@@ -345,6 +364,22 @@ export async function handle(req, { store }) {
       return json(await withPatch(store, u, { name: user.name, key: user.key, admin: isAdmin(user), mustChange: !!(u && u.mustChange) }));
     }
     if (!user) return fail(401, 'Bitte zuerst anmelden.');
+    // ---- Fehlerprotokoll der Geräte (Ladeprobleme, Abstürze): höchstens 30 Meldungen je Konto und Stunde, die letzten 400 bleiben ----
+    if (path === '/diag' && method === 'POST') {
+      const b = await readJson(req), str = (x, n) => (x === null || x === undefined ? null : String(x).slice(0, n));
+      const now = Date.now();
+      const e = { t: now, u: user.key, name: user.name, kind: str(b.kind, 20), msg: str(b.msg, 300), stack: str(b.stack, 1500), status: typeof b.status === 'number' ? b.status : null, detail: str(b.detail, 300),
+        build: str(b.build, 20), server: APP_VERSION, ua: str(b.ua, 250), mem: typeof b.mem === 'number' ? b.mem : null, scr: str(b.scr, 30), conn: str(b.conn, 10), vis: str(b.vis, 10), game: str(b.game, 40), day: typeof b.day === 'number' ? b.day : null,
+        extra: (() => { try { const j = JSON.stringify(b.extra || {}); return j.length <= 1500 ? JSON.parse(j) : { cut: j.slice(0, 1500) }; } catch (x) { return null; } })() };
+      try { await updateJson(store, K.diag, (list) => { list = list || []; if (list.filter((x) => x.u === user.key && now - x.t < 3600e3).length >= 30) return undefined; list.push(e); return list.slice(-400); }, [], 3); } catch (x) { /* Protokoll ist nicht kritisch */ }
+      return json({ ok: true });
+    }
+    if (path === '/admin/diag' && method === 'GET') {
+      if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+      if (url.searchParams.get('clear') === '1') { await store.setJSON(K.diag, []); return json({ ok: true, list: [] }); }
+      const list = (await store.get(K.diag, { type: 'json' })) || [];
+      return json({ now: Date.now(), list: list.slice().reverse() });
+    }
     if (path === '/patch/seen' && method === 'POST') {
       await updateJson(store, K.user(user.key), (x) => { if (!x || x.patchSeen === PATCH_ID) return undefined; x.patchSeen = PATCH_ID; return x; });
       return json({ ok: true });
@@ -653,7 +688,10 @@ export async function handle(req, { store }) {
           const st = await store.getMetadata(K.state(id));
           if (st && waiting(st.metadata)) return json({ ok: false, waiting: true, msg: `Das Spiel startet erst am ${fmtStart(st.metadata.startAt)}. Bis dahin können Sie Logo, Name und Heimatbasis festlegen, Pläne vorbereiten und Mitspielende einladen.` });
         }
-        const r = await mutateState(store, id, (w) => SM.applyAction(w, me.airlineId, action));
+        const r = await mutateState(store, id, (w, md2, now2) => {   // jede eigene Aktion zählt als Steuerung und beendet die KI-Vertretung
+          const own = w.airlines[me.airlineId]; if (own) { own.lastAct = now2; if (own.auto && action.type !== 'resume') { own.auto = 0; own.log(w.day, 'Sie steuern wieder selbst – die Vertretung durch die KI ist beendet.', 'good'); } }
+          return SM.applyAction(w, me.airlineId, action);
+        });
         const res = r.result || { ok: false };
         return json({ ok: !!res.ok, msg: res.msg || null, ver: r.etag, day: r.md.day, id: res.id ?? null, status: res.status ?? null, reply: res.reply ?? null, counterId: res.counterId ?? null });
       }

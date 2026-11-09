@@ -399,6 +399,8 @@ const SM = (() => {
     LEASE_BUY: { endDisc: 0.95 },
     // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
     BASE_MAX: 4,
+    /** 0.21.39: KI-Vertretung: nach 72 Stunden ohne eigene Steuerung (Aktion oder aktive Sitzung) führt die KI die Airline auf mittlerem Niveau weiter. */
+    AUTOPILOT: { hours: 72, targetLf: 0.85, closeAfter: 45, minMargin: 0.05, sigma: 0.25, reserve: 3e6 },
     /** Basen (0.21.33): höchstens 2 neue je Kalenderjahr; ab der 5. Basis (nur nach Komplettübernahme möglich) nur 2 Basis-Slots und eine Konzessionsabgabe von 100 Mio. € × 1,5 je weitere Basis (× Preisniveau). */
     BASE_RULE: { perYear: 2, extraFrom: 5, extraSlots: 2, extraFee: 100e6, extraX: 1.5 },
     // 0.21.32: Ungenutzte Slots (Reserve) gehen nach 6 Monaten an den Flughafen zurück – Erstattung wie bei „Reserve zurückgeben“ (Slotpreis × 0,5); Warnung 30 Tage vorher
@@ -465,7 +467,7 @@ const SM = (() => {
     POACH: { maxN: 60, maxBonus: 80000, wait: 21, corp: { u: 0.3, loss: -0.15, days: 180, wait: 60, budgets: [100e3, 250e3, 600e3] } },
     // Kapitalmarkt: Börsenwert = Eigenkapital + peX × Jahresergebnis (mind. floorEq × Eigenkapital) × Stimmung.
     // control: Aufschlag je Anteil, den die Käuferin schon hält (Kontrolle wird teuer); tender/hostile: Übernahmeangebot für den Rest mit/ohne Mehrheit.
-    CAPITAL: { peX: 5, peNeg: 2, floorEq: 0.6, minCap: 2e6, control: 0.25, impact: 0.3, fee: 0.01, sellImpact: 0.15, smooth: 0.5, maxUp: 0.25, maxDown: 0.2, lockDays: 180, buybackMax: 0.1, buybackGap: 90, buybackHist: 6, tender: 1.3, hostile: 1.5, blocking: 0.25, majority: 0.5,
+    CAPITAL: { peX: 5, peNeg: 2, peFloor: 4, stakeUp: 0.8, minDiv: 0.25, minDivExt: 0.05, floorEq: 0.6, minCap: 2e6, control: 0.25, impact: 0.3, fee: 0.01, sellImpact: 0.15, smooth: 0.5, maxUp: 0.4, maxDown: 0.2, lockDays: 180, buybackMax: 0.1, buybackGap: 90, buybackHist: 6, tender: 1.3, hostile: 1.5, blocking: 0.25, majority: 0.5,
       group: { divOpts: [0, 0.3, 0.5], specShare: 0.15, specGap: 90, reserveDays: 120 },
       anchor: { top: [0.35, 0.49], mid: [0.55, 0.8], buyerSize: 0.5, prem: 0.3 },
       issueDisc: [0.35, 0.25, 0.15, 0.1, 0.1], issueFee: 0.03, issueMax: 0.2, extMax: 0.49, issueGap: 90, divAI: 0.3, divOpts: [0, 0.25, 0.5], buybackX: 1.05,
@@ -521,10 +523,31 @@ const SM = (() => {
     // Neue Basis: drei Slots am Basisflughafen gehören zur Eröffnung (Festpreis ohne Knappheitsaufschlag, garantiert verfügbar)
     BASE_SLOTS: { n: 3, x: 1.5 },
     PNL_DETAIL_MONTHS: 12,   // so viele abgeschlossene Monate behalten die Einzelposten der P&L
-    PLAYER_AUTO_PRICE: { gain: 0.25, max_step: 0.03, dead: 0.025, max_ref: 3.0, settle_days: 14,
-      def: { min: 0, max: 2.0, spd: 0.03, plf: 0 },   // min/max: Faktor auf den Referenzpreis (min 0 = nur Kostengrenze), spd: höchster Schritt je Woche, plf: Ziel-Auslastung Premium (0 = aus)
-      lim: { min: [0, 1.5], max: [1.1, 3.0], spd: [0.01, 0.08], plf: [0.5, 0.98] } },
-    PREM_PRICE: { min: 0.6, max: 1.6, el: 1.4 },   // Premiumaufschlag je Strecke (1 = Standard), Preiselastizität der Premiumnachfrage
+    PLAYER_AUTO_PRICE: { gain: 0.35, max_step: 0.05, dead: 0.025, max_ref: 3.0, settle_days: 14,
+      def: { min: 0, max: 2.0, spd: 0.05, plf: 0, ext: 1 },   // min/max: Faktor auf den Referenzpreis (min 0 = nur Kostengrenze), spd: höchster Schritt je Woche, plf: Ziel-Auslastung Premium (0 = aus), ext: Extremfälle täglich (0/1)
+      lim: { min: [0, 1.5], max: [1.1, 3.0], spd: [0.01, 0.12], plf: [0.5, 0.98], ext: [0, 1] },
+      // 0.21.41 Extremfälle (täglich, Ø der letzten 3 Tage): Auslastung ≥ 22 Punkte unter Ziel, über 30 % Abweisungen, Konkurrenz ≥ 20 % billiger bei schwacher Auslastung
+      x: { days: 3, lowGap: 0.22, spill: 0.30, under: 0.80, step: 0.15, cool: 4, settle: 7 } },
+    PREM_PRICE: { min: 0.6, max: 1.6, el: 1.4 },
+    CODESHARE_VALUE: { share: 0.03, capMonth: 150000 },
+    AC_LOAN_PREPAY: 0.01,   // 0.21.42: Vorfälligkeit beim Ablösen eines Flugzeugkredits
+    // 0.21.41: Flughäfen ausbauen – Terminal (Kapazität, Nachfrage, Slots) und Start-/Landebahn (Code F: A380, 747-8). Bauherr: eine Spieler-Airline mit Basis oder Station dort.
+    APT_UP: { codeF: 25,
+      term: { max: 3, paxX: 0.25, demand: 0.04, slotX: 0.15, base: 40e6, perMio: 5e6, lvX: [1, 1.6, 2.5], days: [300, 365, 450] },
+      rwy: { cost: 220e6, days: 450 },
+      investor: { x: 0.8, step: 0.9, min: 0.6, years: 10, slots: 2 } },   // Bauherr: Landeentgelte und Passagiergebühren dort −20 % (je weiterer Ausbau ×0,9, höchstens −40 %), 10 Jahre; 2 Slots dazu   // 0.21.41: Wert eines Codeshares für die KI (Anteil am Streckenerlös, je Monat höchstens)
+    CRISIS_PLAN: { minHit: 0.045, cutAt: 0.75, lfDown: 0.85, lfUp: 0.88 },   // 0.21.41: Krisenvorschläge der Assistenz
+    // 0.21.41: Startangebote für neue Airlines – je Gründung 3 zufällige, 30 Tage annehmbar
+    START_OFFERS: { n: 3, valid: 30,
+      pool: {
+        study: { x: 0.1, tier: 'full' },                 // 90 % Rabatt auf die Umfassende Marktanalyse (einmal)
+        mro: { x: 0.7, days: 183 },                      // Werft mit freier Kapazität: Wartung −30 %
+        hand: { x: 0.6, days: 183 },                     // Abfertiger an der Basis: Abfertigung −40 %
+        apt: { x: 0.6, days: 365 },                      // Flughafen an der Basis: Landeentgelte und Passagiergebühren −40 %
+        crew: { pil: 8, cab: 24, tech: 4 },               // aufgelöste Regionalairline: Personal sofort
+        fuel: { share: 0.5, months: 6 },                 // Kerosinhändler: Absicherung ohne Prämie
+        mkt: { x: 0.5, days: 183 },                      // Tourismusverband: halbe Marketingkosten
+      } },   // Premiumaufschlag je Strecke (1 = Standard), Preiselastizität der Premiumnachfrage
     AI_ARCHETYPES: {
       lcc: { label: 'Low-Cost', service: 'basic', buffer: 'tight', target_lf: 0.90, price_vs_ref: 0.80, undercut: 0.10, pref_types: ['A20N'], min_margin: 0.00, forecast_sigma: 0.20, brand: 0.6, cargo: false },
       premium: { label: 'Premium-Netz', service: 'premium', buffer: 'robust', target_lf: 0.78, price_vs_ref: 1.15, undercut: 0.00, pref_types: ['A20N', 'E295'], min_margin: 0.03, forecast_sigma: 0.15, brand: 0.7, cargo: true },
@@ -643,8 +666,8 @@ const SM = (() => {
   // Wird von der Welt vor jedem Tag gesetzt (gleitender Kerosinindex); Anteil wächst mit der Distanz (Langstrecke verbraucht mehr).
   let FUEL_X = 0, DOWN_X = 1;   // DOWN_X: Preisdruck einer Branchenkrise auf alle Marktpreise
   /** Im Spiel gemessener Verkehr je Flughafen (Mio. Passagiere im Jahr) der aktuell gerechneten Welt. */
-  let APT_OBS = {}, ATTACK = {};
-  const setFuelX = (w) => { APT_OBS = (w && w.aptObs) || {}; ATTACK = (w && w.attacks) || {}; FUEL_X = w && w.macro ? clamp((w.macro.fuelIdx ?? 1) - 1, -0.3, 1.5) : 0; DOWN_X = downX(w); return FUEL_X; };
+  let APT_OBS = {}, ATTACK = {}, APT_LV = {};
+  const setFuelX = (w) => { APT_OBS = (w && w.aptObs) || {}; APT_LV = (w && w.aptUp) || {}; ATTACK = (w && w.attacks) || {}; FUEL_X = w && w.macro ? clamp((w.macro.fuelIdx ?? 1) - 1, -0.3, 1.5) : 0; DOWN_X = downX(w); return FUEL_X; };
   /** Preisdruck aller laufenden Branchenkrisen (mit Erholung nach dem Ende). */
   function downX(w) {
     let x = 1; if (!w || !w.events) return x;
@@ -653,7 +676,12 @@ const SM = (() => {
     return x;
   }
   /** Wirksame Flughafengröße: Basiswert oder – wenn größer – der im Spiel tatsächlich abgewickelte Verkehr. */
-  const paxEff = (c) => Math.max((P.AIRPORTS[c] && P.AIRPORTS[c].pax) || 0, APT_OBS[c] || 0);
+  const termLv = (c) => (APT_LV[c] && APT_LV[c].term) || 0, rwyLv = (c) => (APT_LV[c] && APT_LV[c].rwy) || 0;
+  const paxEff = (c) => Math.max((P.AIRPORTS[c] && P.AIRPORTS[c].pax) || 0, APT_OBS[c] || 0) * (1 + P.APT_UP.term.paxX * termLv(c));   // Terminalausbau: mehr Kapazität
+  const aptDemX = (c) => 1 + P.APT_UP.term.demand * termLv(c);
+  /** Mindestgröße der Flughäfen für ein Muster (Code F: A380, 747-8) – 0 = überall. Eine verlängerte Bahn hebt sie auf. */
+  const minApt = (typeId) => { const t = P.AIRCRAFT_TYPES[typeId]; return t.minAptPax || (t.mtow_t > 400 ? P.APT_UP.codeF : 0); };
+  const codeFOk = (c, m) => paxEff(c) >= m || rwyLv(c) >= 1;
   const fuelSurShare = (k) => P.FUEL_PASS.base + P.FUEL_PASS.long * Math.min(1, k / 8000);
   /** Aufschlag auf den Referenzpreis für Regionalstrecken: je kleiner der kleinere Flughafen und je kürzer die Strecke, desto höher. */
   /** Lohnniveau am Heimatflughafen (Crew, Technik): Türkei rund 62 %, Indien 36 %, Deutschland 100 %. */
@@ -824,7 +852,7 @@ const SM = (() => {
     return P.SEASON_PROFILES[prof][m];
   }
   function qPot(o, d, month = null, dow = null) {
-    const base = qBase(o, d), acc = accessibility(o, d), out = {};
+    const base = qBase(o, d), acc = accessibility(o, d) * aptDemX(o) * aptDemX(d), out = {};   // ausgebaute Terminals ziehen mehr Reisende an
     for (const s of P.SEGMENTS) {
       let f = acc;
       if (month !== null) f *= seasonFactor(o, d, s, month);
@@ -1000,8 +1028,8 @@ const SM = (() => {
   const crewFor = (seats, cabin, bh) => ({ pil: Math.max(seats, seats * bh / P.STAFF.pilotH), cab: Math.max(cabin, cabin * bh / P.STAFF.cabinH) });
   const routeKmOk = (o, d) => gcDistanceKm(o, d) >= P.MIN_ROUTE_KM;
   /** Flughafen tauglich für das Muster? (A380 braucht Code-F-Flughäfen) */
-  const aptOk = (o, d, typeId) => { const m = P.AIRCRAFT_TYPES[typeId].minAptPax; return !m || (paxEff(o) >= m && paxEff(d) >= m); };
-  const aptWhy = (o, d, typeId) => { const t = P.AIRCRAFT_TYPES[typeId], m = t.minAptPax; if (!m) return ''; const bad = [o, d].filter((c) => paxEff(c) < m); return bad.length ? `Die ${t.label} braucht Code-F-Flughäfen (ab ${m} Mio. Passagieren im Jahr) – ${bad.map((c) => `${ap(c).name} (${String(Math.round(paxEff(c) * 10) / 10).replace('.', ',')} Mio.)`).join(' und ')} ${bad.length > 1 ? 'sind' : 'ist'} zu klein. Wächst der Verkehr dort im Spiel über ${m} Mio., baut der Flughafen aus.` : ''; };
+  const aptOk = (o, d, typeId) => { const m = minApt(typeId); return !m || (codeFOk(o, m) && codeFOk(d, m)); };
+  const aptWhy = (o, d, typeId) => { const t = P.AIRCRAFT_TYPES[typeId], m = minApt(typeId); if (!m) return ''; const bad = [o, d].filter((c) => !codeFOk(c, m)); return bad.length ? `Die ${t.label} braucht Code-F-Flughäfen (ab ${m} Mio. Passagieren im Jahr oder mit verlängerter Bahn) – ${bad.map((c) => `${ap(c).name} (${String(Math.round(paxEff(c) * 10) / 10).replace('.', ',')} Mio.)`).join(' und ')} ${bad.length > 1 ? 'sind' : 'ist'} zu klein. Wächst der Verkehr dort über ${m} Mio. oder wird die Bahn verlängert (Karte → Flughafen → Ausbau), geht es.` : ''; };
   const rangeOk = (o, d, typeId) => gcDistanceKm(o, d) * P.ROUTE_DETOUR <= P.AIRCRAFT_TYPES[typeId].range_km && aptOk(o, d, typeId);
   /** Überschall: Zeitgewinn gegenüber einem Langstrecken-Jet macht Geschäftsreisende zahlungsbereit. */
   function sstBonus(o, d) {
@@ -1046,40 +1074,56 @@ const SM = (() => {
   function evaluateRoute(spec, compsOut = [], compsIn = [], opts = {}) {
     const month = opts.month ?? null, nDraws = opts.nDraws ?? 6, fuel = opts.fuelPrice ?? P.FUEL_USD_KG / P.EURUSD, cpi = opts.cpi ?? 1;
     const scale = opts.demandScale ?? 1, rng = new Rng(opts.seed ?? 1);
-    const seats = cabinSeats(spec.type_id, spec.service, spec.cab).total;
+    // 0.21.42: zweites Muster (spec.mix = { type_id, freq }) – Sitze je Flug im Mittel, Kosten je Flug je Muster
+    const mx = spec.mix && spec.mix.freq > 0 && spec.mix.freq < spec.freq && P.AIRCRAFT_TYPES[spec.mix.type_id] ? spec.mix : null;
+    const sMain = cabinSeats(spec.type_id, spec.service, spec.cab).total, sMix = mx ? cabinSeats(mx.type_id, spec.service, spec.cab).total : 0;
+    const fMix = mx ? mx.freq : 0, fMain = spec.freq - fMix;
+    const seats = mx ? (fMain * sMain + fMix * sMix) / spec.freq : sMain;
     const res = { dirs: {} }, totals = {};
     for (const [dir, o, d, comps, fare] of [['out', spec.base, spec.dest, compsOut, spec.fare_out], ['in', spec.dest, spec.base, compsIn, spec.fare_in]]) {
       const ex = withCabin((opts.offerExtra && opts.offerExtra[dir]) || {}, spec.type_id, spec.service, spec.cab);
-      const own = offer(spec.airline, fare, spec.freq, seats, spec.service, spec.otp ?? P.BUFFER_POLICY[spec.buffer].otp, spec.ramp ?? 1, spec.airline, ex);
+      // Umsteiger über das eigene Drehkreuz (nur Prognose für Spielende): Platzreserve je Rolle, danach füllen sie die freien Sitze
+      const tr = opts.transfer ? opts.transfer[dir] : null, resv = tr && tr.car > 0 ? Math.min(tr.protect * tr.car, tr.protectMax * spec.freq * seats) : 0;
+      const own = offer(spec.airline, fare, spec.freq, Math.max(1, seats - resv / spec.freq), spec.service, spec.otp ?? P.BUFFER_POLICY[spec.buffer].otp, spec.ramp ?? 1, spec.airline, ex);
       own.human = ex.human !== undefined ? !!ex.human : true;   // eigene Kapazität verdrängt etablierte Airlines nicht (KI schon)
       const offers = withIndirect(o, d, [own].concat(comps), cpi);
       const ss = opts.segScale ? opts.segScale[dir] : null;
       const { acc, market } = marketDraws(o, d, offers, month, nDraws, rng, scale, ss, cpi);
       const me = acc[spec.airline];
-      const pax = me.pax, perFlight = pax / spec.freq;
-      const prem = ex.bizPrem || 0;
-      const cr = cabinRevenue(spec.type_id, spec.service, spec.cab, spec.freq, fare, me.seg.business, pax - me.seg.business, spec.pm);
-      const fareRev = ((pax + me.seg.business * prem) * fare + cr.extra) * (P.AIRCRAFT_TYPES[spec.type_id].yieldF || 1);
-      const c = opts.costFn ? opts.costFn(o, d, perFlight, fareRev / spec.freq, dir) : legCosts(o, d, spec.type_id, spec.service, spec.buffer, perFlight, fareRev / spec.freq, fuel, cpi);
+      const loc = me.pax, trPax = tr ? Math.min(tr.car, Math.max(0, spec.freq * seats - loc)) : 0, pax = loc + trPax, perFlight = pax / spec.freq;
+      const prem = ex.bizPrem || 0, yf = P.AIRCRAFT_TYPES[spec.type_id].yieldF || 1;
+      const cr = cabinRevenue(spec.type_id, spec.service, spec.cab, spec.freq, fare, me.seg.business, loc - me.seg.business, spec.pm);
+      const locRev = ((loc + me.seg.business * prem) * fare + cr.extra) * yf, trRev = trPax * (tr ? tr.rev1 : 0) * yf, fareRev = locRev + trRev;
+      const legC = (typeId, pf, n) => (opts.costFn ? opts.costFn(o, d, pf, locRev / spec.freq * (pf / Math.max(1e-9, perFlight)), dir, typeId, n) : legCosts(o, d, typeId, spec.service, spec.buffer, pf, locRev / spec.freq * (pf / Math.max(1e-9, perFlight)), fuel, cpi));
+      let c;
+      if (!mx) c = legC(spec.type_id, perFlight, spec.freq);
+      else {   // Mittel je Flug aus beiden Mustern (Passagiere je Flug nach Sitzen)
+        const a = legC(spec.type_id, perFlight * sMain / seats, fMain), b = legC(mx.type_id, perFlight * sMix / seats, fMix);
+        c = {}; for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) if (typeof a[k] === 'number' || typeof b[k] === 'number') c[k] = ((a[k] || 0) * fMain + (b[k] || 0) * fMix) / spec.freq;
+      }
       const costs = {};
       c.pax_service = (c.pax_service || 0) + cr.cost * cpi / spec.freq;
       for (const k of COST_KEYS.concat(['disruption_expected'])) { costs[k] = (c[k] || 0) * spec.freq; totals[k] = (totals[k] || 0) + costs[k]; }
       const comp = {};
       for (const key in acc) { if (key === spec.airline || key === INDIRECT_ID || key === INCUMBENT_ID) continue; comp[acc[key].airline] = (comp[acc[key].airline] || 0) + acc[key].pax; }
-      res.dirs[dir] = { o, d, pax, seg: me.seg, unconstrained: me.unc, seats: spec.freq * seats, lf: pax / (spec.freq * seats), prem: cr.f + cr.b, premRev: cr.extra,
-        fareRev, ancRev: pax * P.SERVICE[spec.service].ancillary * cpi, costs, market, competitors: comp, incumbent: acc[INCUMBENT_ID] ? acc[INCUMBENT_ID].pax : 0, incSeats: (offers.find((x) => x.airline === INCUMBENT_ID) || {}).seats * ((offers.find((x) => x.airline === INCUMBENT_ID) || {}).freq || 0) || 0, indirect: acc[INDIRECT_ID] ? acc[INDIRECT_ID].pax : 0, bh: c._bh };
+      res.dirs[dir] = { o, d, pax, local: loc, tr: trPax, trRev, locRev, fare, freq: spec.freq, fuelKg: (c._fuelKg || 0) * spec.freq, bh: c._bh || 0, trWant: tr ? tr.want : 0, trCar: tr ? tr.car : 0, resv, seg: me.seg, unconstrained: me.unc, seats: spec.freq * seats, lf: pax / (spec.freq * seats), prem: cr.f + cr.b, premRev: cr.extra,
+        fareRev, ancRev: (loc + trPax * (tr ? tr.ancShare : 0)) * P.SERVICE[spec.service].ancillary * cpi, costs, market, competitors: comp, incumbent: acc[INCUMBENT_ID] ? acc[INCUMBENT_ID].pax : 0, incSeats: (offers.find((x) => x.airline === INCUMBENT_ID) || {}).seats * ((offers.find((x) => x.airline === INCUMBENT_ID) || {}).freq || 0) || 0, indirect: acc[INDIRECT_ID] ? acc[INDIRECT_ID].pax : 0, bh: c._bh };
     }
     const O = res.dirs.out, I = res.dirs.in;
     const revenue = O.fareRev + O.ancRev + I.fareRev + I.ancRev;
     const direct = sumObj(totals);
-    const rot1 = opts.rotH ?? rotationHours(spec.base, spec.dest, spec.type_id, spec.service, spec.buffer), rotH = rot1 * spec.freq;
-    const acShare = acShareOf(spec.type_id, rot1, spec.freq);
-    const acFixed = (opts.dayFixed ?? aircraftDayFixedGeneric(spec.type_id)) * acShare + (opts.extraDaily || 0);
+    const rot1 = opts.rotH ?? rotationHours(spec.base, spec.dest, spec.type_id, spec.service, spec.buffer);
+    let rotH = rot1 * spec.freq, acShare = acShareOf(spec.type_id, rot1, spec.freq), acFixed = (opts.dayFixed ?? aircraftDayFixedGeneric(spec.type_id)) * acShare + (opts.extraDaily || 0);
+    if (mx) {   // Flugzeugzeit je Muster
+      const rot2 = opts.rotHMix ?? rotationHours(spec.base, spec.dest, mx.type_id, spec.service, spec.buffer), sh1 = acShareOf(spec.type_id, rot1, fMain), sh2 = acShareOf(mx.type_id, rot2, fMix);
+      rotH = rot1 * fMain + rot2 * fMix; acShare = sh1 + sh2; res.acShares = { main: sh1, mix: sh2 };
+      acFixed = (opts.dayFixed ?? aircraftDayFixedGeneric(spec.type_id)) * sh1 + (opts.dayFixedMix ?? aircraftDayFixedGeneric(mx.type_id)) * sh2 + (opts.extraDaily || 0);
+    }
     const pax = O.pax + I.pax, seatsTot = O.seats + I.seats, ask = seatsTot * gcDistanceKm(spec.base, spec.dest);
     Object.assign(res, {
       revenue, fareRev: O.fareRev + I.fareRev, ancRev: O.ancRev + I.ancRev, direct, costBreakdown: totals,
       aircraftTimeCost: acFixed, aircraftShare: acShare, rotationH: rotH, db1: revenue - direct, db2: revenue - direct - acFixed,
-      pax, seats: seatsTot, lf: pax / seatsTot, raskCt: 100 * revenue / ask, caskCt: 100 * (direct + acFixed) / ask,
+      pax, seats: seatsTot, lf: pax / seatsTot, raskCt: 100 * revenue / ask, caskCt: 100 * (direct + acFixed) / ask, trPax: O.tr + I.tr, trRev: O.trRev + I.trRev, localPax: O.local + I.local,
       avgFare: pax ? (O.fareRev + I.fareRev) / pax : 0, margin: revenue ? (revenue - direct - acFixed) / revenue : 0,
     });
     return res;
@@ -1088,6 +1132,7 @@ const SM = (() => {
   // ===========================================================================
   // Kalender, Ledger, Route
   // ===========================================================================
+  function dayDate(day) { const y = 2027 + Math.floor(day / 365), doy = ((day % 365) + 365) % 365, m = monthOf(doy); return `${String(doy - MONTH_STARTS[m] + 1).padStart(2, '0')}.${String(m + 1).padStart(2, '0')}.${y}`; }
   function monthOf(day) { const doy = ((day % 365) + 365) % 365; for (let m = 0; m < 12; m++) if (doy < MONTH_STARTS[m + 1]) return m; return 11; }
   const PNL_ACCOUNTS = ['rev_ticket', 'rev_ancillary', 'rev_cargo', 'rev_acmi', 'subsidy', 'fuel', 'hedge', 'crew', 'staff_cockpit', 'staff_cabin', 'staff_tech', 'staff_extra', 'maintenance', 'navigation', 'landing', 'handling',
     'pax_fees', 'pax_service', 'distribution', 'cargo_cost', 'disruption', 'stations', 'slots', 'lease', 'depreciation', 'insurance', 'experts', 'marketing', 'loyalty', 'overhead', 'one_off', 'trade', 'interest', 'invest', 'tax'];
@@ -1188,7 +1233,16 @@ const SM = (() => {
   }
   class Route {
     constructor(o) { Object.assign(this, { pending: [], autoPrice: true, targetLf: 0.85, hist: [], closed: false, reviewNeg: 0, lastChange: -999, closedDay: null, flyingToday: 0 }, o); }
-    seats() { return this.cab ? cabinSeats(this.type_id, this.service, this.cab).total : P.AIRCRAFT_TYPES[this.type_id].seats[this.service]; }
+    seats(typeId) {
+      const one = (t) => (this.cab ? cabinSeats(t, this.service, this.cab).total : P.AIRCRAFT_TYPES[t].seats[this.service]);
+      if (typeId) return one(typeId);
+      // 0.21.42: zwei Muster auf einer Strecke – Sitze je Flug im Mittel der heutigen (sonst der geplanten) Flüge
+      if (this.mix && !this._unit && this.mix.freq > 0 && P.AIRCRAFT_TYPES[this.mix.type_id]) {
+        const fq = this._fq, m = fq ? fq.mix : Math.min(this.mix.freq, this.freq), a = fq ? fq.main : Math.max(0, this.freq - this.mix.freq);
+        return a + m > 0 ? (a * one(this.type_id) + m * one(this.mix.type_id)) / (a + m) : one(this.type_id);
+      }
+      return one(this.type_id);
+    }
     ramp(day, T = P.RAMP_T_DAYS) { const t = Math.max(0, day - this.opened_day); return P.RAMP_R0 + (1 - P.RAMP_R0) * (1 - Math.exp(-t / T)); }
     setFares(day, out, inn) { this.pending.push([day + P.PRICE_CHANGE_LAG_DAYS, out, inn]); }
     applyPending(day) { const keep = []; for (const [d, o, i] of this.pending) { if (d <= day) { this.fare_out = o; this.fare_in = i; } else keep.push([d, o, i]); } this.pending = keep; }
@@ -1409,7 +1463,7 @@ const SM = (() => {
     slotBookTotal() { let s = 0; for (const k in this.slotBook || {}) s += this.slotBook[k].v; return s; }
     cleanHolds(day) { for (const k of Object.keys(this.slotHold)) { this.slotHold[k] = this.slotHold[k].filter((h) => h.until > day && h.n > 0); if (!this.slotHold[k].length) delete this.slotHold[k]; } }
     plan(day, routes = null, horizon = 0) {
-      routes = routes || this.activeRoutes();
+      routes = (routes || this.activeRoutes()).flatMap(routeUnits);   // 0.21.42: Strecken mit zwei Mustern als zwei Einheiten
       // Einsatzarten je Flugzeug: auto (Planer verteilt), manual (nur feste Zuweisungen), reserve (nur als Ersatz).
       // assign[acId] = [[route, Stunden, Anteil am Umlauf]]; Langstrecken-Umläufe über dem Betriebsfenster binden k Flugzeuge.
       // Fehlen Flugzeuge, fliegt eine Langstrecke im Teilbetrieb (m von k Tagen).
@@ -1419,13 +1473,14 @@ const SM = (() => {
       const avail = (a) => this.available(a, day, horizon), modeOf = (a) => a.mode || 'auto';
       // Flüge seltener als täglich (wk = Flüge pro Woche): im Mittel nur wk/7 der Umlaufzeit, passt auch eine Langstrecke so in den Tag eines Flugzeugs
       const wkF = (r) => (r.wk > 0 && r.wk < 7 ? r.wk / 7 : 1), hOf = (r) => this.rotH(r) * wkF(r), isLong = (r) => wkF(r) === 1 && this.rotH(r) > winOf(r.type_id);
-      const pinnedTo = (a, r) => modeOf(a) === 'manual' && (a.pins || []).some((p) => p.route === r.id);
+      const pinnedTo = (a, r) => modeOf(a) === 'manual' && (a.pins || []).some((p) => p.route === (r._pid || r.id));
       const fits = (a, r) => a.type_id === r.type_id && a.base === r.base && avail(a);
       // 1) Feste Zuweisungen auf Kurz- und Mittelstrecken
       for (const a of this.fleet) {
         if (modeOf(a) !== 'manual' || !avail(a)) continue;
         for (const p of a.pins || []) {
-          const r = byId[p.route]; if (!r || r.type_id !== a.type_id || r.base !== a.base) continue;
+          let r = byId[p.route]; if (r && r.type_id !== a.type_id && byId[p.route + '~']) r = byId[p.route + '~'];
+          if (!r || r.type_id !== a.type_id || r.base !== a.base) continue;
           const h = hOf(r), w = Math.max(winOf(r.type_id), wkF(r) < 1 ? Math.min(P.LONG_WINDOW_H, this.rotH(r)) : 0);
           if (isLong(r)) continue;
           for (let i = 0; i < p.n && left[r.id] > 0 && used[a.id] + h <= w + 1e-9; i++) { used[a.id] += h; assign[a.id].push([r, h, wkF(r)]); left[r.id]--; }
@@ -1515,13 +1570,46 @@ const SM = (() => {
   // ===========================================================================
   // Strecken-Helfer
   // ===========================================================================
+  /**
+   * 0.21.42: Strecke mit zwei Mustern → zwei Planungseinheiten (gleiches Objekt als Prototyp): Hauptmuster (Id der Strecke) und zweites Muster (Id + „~“).
+   * Planung, Umlauf und Kosten je Flug rechnen je Einheit mit ihrem Muster; Markt, Slots und Historie bleiben bei der Strecke.
+   */
+  function mixOk(r) { return !!(r.mix && r.mix.freq > 0 && P.AIRCRAFT_TYPES[r.mix.type_id] && r.mix.type_id !== r.type_id && !(r.wk > 0 && r.wk < 7)); }
+  function mixUnit(r) {
+    if (!r._mu || r._mu.type_id !== r.mix.type_id || r._mu.freq !== Math.min(r.mix.freq, r.freq) || Object.getPrototypeOf(r._mu) !== r) {
+      const b = Object.create(r); Object.defineProperty(r, '_mu', { value: b, enumerable: false, writable: true, configurable: true });
+      b._unit = true; b._pid = r.id; b.id = r.id + '~'; b.type_id = r.mix.type_id; b.freq = Math.min(r.mix.freq, r.freq);
+    }
+    return r._mu;
+  }
+  /** Prüft ein zweites Muster für eine Strecke: { mix } (oder { mix: null } zum Entfernen) bzw. { err }. */
+  function mixCheck(w, al, r, m) {
+    if (!m || !m.typeId || !(Number(m.freq) > 0)) return { mix: null };
+    const t = P.AIRCRAFT_TYPES[m.typeId], n = Math.round(Number(m.freq));
+    if (!t) return { err: 'Unbekannter Flugzeugtyp.' };
+    if (m.typeId === r.type_id) return { mix: null };
+    if (r.wk > 0 && r.wk < 7) return { err: 'Zwei Muster gehen nur bei täglichen Flügen.' };
+    if (r.freq < 2) return { err: 'Für ein zweites Muster braucht die Strecke mindestens 2 Flüge am Tag.' };
+    if (n >= r.freq) return { err: `Höchstens ${r.freq - 1} der ${r.freq} Flüge mit dem zweiten Muster – sonst einfach umflotten.` };
+    if (t.supersonic || P.AIRCRAFT_TYPES[r.type_id].supersonic) return { err: 'Überschallflüge lassen sich nicht mischen.' };
+    if (!aptOk(r.base, r.dest, m.typeId)) return { err: aptWhy(r.base, r.dest, m.typeId) };
+    if (!rangeOk(r.base, r.dest, m.typeId)) return { err: `Die ${t.label} schafft ${r.base}–${r.dest} nicht.` };
+    if (!al.fleet.some((x) => x.type_id === m.typeId && x.base === r.base)) return { err: `In ${r.base} ist keine ${t.label} stationiert.` };
+    return { mix: { type_id: m.typeId, freq: n } };
+  }
+  function routeUnits(r) {
+    if (!mixOk(r)) return [r];
+    const a = Object.create(r); a._unit = true; a._pid = r.id; a.freq = Math.max(0, r.freq - r.mix.freq);
+    return a.freq > 0 ? [a, mixUnit(r)] : [mixUnit(r)];
+  }
   function routeDb(r, days, al) {
     const h = r.hist.slice(-days);
     if (!h.length) return 0;
     let rev = 0, cost = 0;
     for (const x of h) { rev += x.rev; cost += x.cost; }
-    const rot = (al ? al.rotH(r) : rotationHours(r.base, r.dest, r.type_id, r.service, r.buffer)) * r.freq;
-    return rev - cost - aircraftDayFixedGeneric(r.type_id) * acShareOf(r.type_id, rot / r.freq, r.freq) * h.length;
+    let ac = 0;
+    for (const u of routeUnits(r)) { const rot1 = al ? al.rotH(u) : rotationHours(u.base, u.dest, u.type_id, u.service, u.buffer); ac += aircraftDayFixedGeneric(u.type_id) * acShareOf(u.type_id, rot1, u.freq); }
+    return rev - cost - ac * h.length;
   }
   /** Sitze auf geflogenen Flügen eines Tages und einer Richtung; nie weniger als die Passagiere (Schutz gegen unplausible Altwerte). */
   function opSeats(x, d) {
@@ -1542,7 +1630,7 @@ const SM = (() => {
     const A = P.PLAYER_AUTO_PRICE, o = { ...A.def, ...((src || (r && r.apo)) || {}) }, out = {};
     for (const k of Object.keys(A.def)) {
       const v = Number(o[k]); const [lo, hi] = A.lim[k];
-      out[k] = !Number.isFinite(v) ? A.def[k] : (k === 'min' || k === 'plf') && v <= 0 ? 0 : clamp(Math.round(v * 1000) / 1000, lo, hi);
+      out[k] = !Number.isFinite(v) ? A.def[k] : (k === 'min' || k === 'plf' || k === 'ext') && v <= 0 ? 0 : clamp(Math.round(v * 1000) / 1000, lo, hi);
     }
     if (out.min && out.max < out.min + 0.1) out.max = Math.min(A.lim.max[1], out.min + 0.1);
     return out;
@@ -1571,12 +1659,73 @@ const SM = (() => {
   // ===========================================================================
   const EVENT_TYPES = {
     fuel_spike: { p: 0.06 }, fuel_drop: { p: 0.035 }, recession: { p: 0.05 }, boom: { p: 0.035 }, atc_strike: { p: 0.08 },
-    airport_strike: { p: 0.07 }, volcano: { p: 0.01 }, big_event: { p: 0.07 }, tax_change: { p: 0.04 }, rate_change: { p: 0.09 },
+    airport_strike: { p: 0.07 }, volcano: { p: 0.014 }, big_event: { p: 0.07 }, tax_change: { p: 0.04 }, rate_change: { p: 0.09 },
     health: { p: 0.007 }, pilot_shortage: { p: 0.04 }, fx_shock: { p: 0.05 },
     trade_war: { p: 0.05 }, trade_deal: { p: 0.03 }, airspace: { p: 0.045 }, carbon: { p: 0.03 }, fee_hike: { p: 0.04 }, currency_crisis: { p: 0.04 }, oil_crisis: { p: 0.018 },
     // 0.19: weitere Schocks mit echten Folgen für die Rechnung
     credit_crunch: { p: 0.018 }, oil_glut: { p: 0.008 }, downturn: { p: 0 }, grounding: { p: 0.022 }, supply_chain: { p: 0.02 }, tourism: { p: 0.045 }, labor_crisis: { p: 0.025 }, disaster: { p: 0.015 }, regulation: { p: 0.02 },
+    // 0.21.35: Geopolitik und Politik (je Monat)
+    conflict: { p: 0.025 }, flight_ban: { p: 0.045 }, sanctions: { p: 0.012 }, carrier_ban: { p: 0.03 }, unrest: { p: 0.035 }, entry_ban: { p: 0.03 },
+    open_skies: { p: 0.03 }, visa_free: { p: 0.035 }, shorthaul_ban: { p: 0.01 }, foreign_fee: { p: 0.025 }, domestic_aid: { p: 0.025 }, epidemic: { p: 0.018 }, solar: { p: 0.01 },
+    // 0.21.35: Natur (je Monat innerhalb der Saison; täglich gewürfelt)
+    heatwave: { p: 0.35 }, sandstorm: { p: 0.3 }, monsoon: { p: 0.45 }, blizzard: { p: 0.35 }, wildfire: { p: 0.25 }, quake: { p: 0.015 },
   };
+  // ---------------------------------------------------------------------------
+  // 0.21.35: Geopolitische Zonen – Sperrung für Flüge von/nach den Ländern, Überflugverbot (Kreise: Breite, Länge, Radius km)
+  // ---------------------------------------------------------------------------
+  const GEO_ZONES = [
+    { key: 'osteuropa', name: 'Osteuropa', countries: [], circles: [[49, 31, 650]], w: 2 },
+    { key: 'russland', name: 'Russland', countries: ['RU'], circles: [[56, 42, 1400], [61, 75, 1500], [60, 105, 1500], [56, 130, 1200]], w: 1 },
+    { key: 'kaukasus', name: 'Südkaukasus', countries: ['AZ', 'AM', 'GE'], circles: [[41, 45.5, 420]], w: 2 },
+    { key: 'levante', name: 'Levante', countries: ['LB', 'IL', 'JO'], circles: [[32.5, 36, 320]], w: 2 },
+    { key: 'golf', name: 'Persischer Golf', countries: ['IR', 'KW', 'BH'], circles: [[31, 50, 550]], oil: true, w: 2 },
+    { key: 'iran', name: 'Iran', countries: ['IR'], circles: [[32.5, 54, 700]], oil: true, w: 2 },
+    { key: 'rotesmeer', name: 'Rotes Meer und Jemen', countries: [], circles: [[15.5, 44, 650]], oil: true, w: 2 },
+    { key: 'sahel', name: 'Sudan und Sahel', countries: [], circles: [[15, 29, 900]], w: 2 },
+    { key: 'libyen', name: 'Libyen', countries: [], circles: [[28, 17, 650]], w: 1 },
+    { key: 'kaschmir', name: 'Kaschmir', countries: ['PK'], circles: [[34, 73.5, 420]], w: 2 },
+    { key: 'taiwan', name: 'Taiwanstraße', countries: ['TW'], circles: [[23.7, 121.2, 280]], w: 1 },
+    { key: 'korea', name: 'Koreanische Halbinsel', countries: [], circles: [[39.5, 127, 300]], w: 1 },
+    { key: 'balkan', name: 'Westbalkan', countries: ['RS'], circles: [[43.8, 20.8, 300]], w: 1 },
+    { key: 'venezuela', name: 'Venezuela', countries: ['VE'], circles: [[7.5, -66, 650]], w: 1 },
+    { key: 'horn', name: 'Horn von Afrika', countries: ['ET'], circles: [[8.5, 41, 600]], w: 1 },
+    { key: 'myanmar', name: 'Myanmar', countries: ['MM'], circles: [[21.5, 95.5, 420]], w: 1 },
+    { key: 'zentralasien', name: 'Zentralasien', countries: ['UZ'], circles: [[41, 65, 550]], w: 1 },
+  ];
+  const DEG = Math.PI / 180;
+  function havKm(la1, lo1, la2, lo2) { const p1 = la1 * DEG, p2 = la2 * DEG, dp = p2 - p1, dl = (lo2 - lo1) * DEG; const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2; return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h))); }
+  /** Punkt auf dem Großkreis von A nach B beim Anteil f. */
+  function gcAt(A, B, f) {
+    const la1 = A.lat * DEG, lo1 = A.lon * DEG, la2 = B.lat * DEG, lo2 = B.lon * DEG, d = havKm(A.lat, A.lon, B.lat, B.lon) / 6371;
+    if (d < 1e-9) return [A.lat, A.lon];
+    const a = Math.sin((1 - f) * d) / Math.sin(d), b = Math.sin(f * d) / Math.sin(d);
+    const x = a * Math.cos(la1) * Math.cos(lo1) + b * Math.cos(la2) * Math.cos(lo2), y = a * Math.cos(la1) * Math.sin(lo1) + b * Math.cos(la2) * Math.sin(lo2), z = a * Math.sin(la1) + b * Math.sin(la2);
+    return [Math.atan2(z, Math.sqrt(x * x + y * y)) / DEG, Math.atan2(y, x) / DEG];
+  }
+  /** Zusätzliche km, wenn der Großkreis o–d eine gesperrte Zone kreuzt (Ausweichen am Rand entlang); 0, wenn nicht. */
+  function zoneExtraKm(o, d, circles) {
+    const A = ap(o), B = ap(d), dist = gcDistanceKm(o, d); let extra = 0;
+    const n = Math.max(8, Math.min(60, Math.ceil(dist / 150)));
+    for (const [la, lo, rr] of circles) {
+      if (havKm(A.lat, A.lon, la, lo) > dist + rr) continue;
+      let dmin = Infinity; for (let i = 0; i <= n; i++) { const [pa, po] = gcAt(A, B, i / n); dmin = Math.min(dmin, havKm(pa, po, la, lo)); }
+      if (dmin >= rr) continue;
+      const half = Math.sqrt(rr * rr - dmin * dmin), th = 2 * Math.asin(Math.min(1, half / rr));
+      extra = Math.max(extra, rr * th - 2 * half + 60);
+    }
+    return Math.min(extra, 0.5 * dist + 250);
+  }
+  /** Heimatland einer Airline (Land der ersten Basis). */
+  const homeCountry = (al) => (al && al.bases && al.bases.length && P.AIRPORTS[al.bases[0]] ? ap(al.bases[0]).country : null);
+  /** Trifft eine Länderpaar-Regel die Strecke o–d? (dom: Inland; a/b: zwischen zwei Ländergruppen; foreign: a gegen alle anderen) */
+  function pairHit(p, o, d) {
+    const co = ap(o).country, cd = ap(d).country;
+    if (p.dom) return co === p.dom && cd === p.dom && (!p.rail || ((railTime(o, d) ?? 99) <= p.rail));
+    if (p.b) return (p.a.includes(co) && p.b.includes(cd)) || (p.a.includes(cd) && p.b.includes(co));
+    if (p.foreign) return p.a.includes(co) !== p.a.includes(cd);
+    return false;
+  }
+  const countryList = (cs) => (cs.length > 4 ? `${cs.slice(0, 3).map((c) => COUNTRY_NAMES[c] || c).join(', ')} und ${cs.length - 3} weiteren Ländern` : cs.map((c) => COUNTRY_NAMES[c] || c).join(cs.length === 2 ? ' und ' : ', ').replace(/, ([^,]+)$/, ' und $1'));
   /** Meldung, wenn ein Ereignis annulliert wird: als Gegenereignis im Spiel formuliert (Ursache und Wirkung). */
   function counterEventText(e, started) {
     const cn = (cs) => (cs && cs.length ? (cs.length > 4 ? 'mehreren Ländern' : cs.map((c) => COUNTRY_NAMES[c] || c).join(' und ')) : 'der Region');
@@ -1611,6 +1760,17 @@ const SM = (() => {
       case 'big_event': case 'mega': return { sev: 'warn', text: `Abgesagt: Die Großveranstaltung ${e.airports && e.airports.length ? 'in ' + an(e.airports) : ''} findet nicht statt.` };
       case 'own_strike': return { sev: 'good', text: 'Streik abgesagt: Einigung mit der Gewerkschaft in letzter Minute.' };
       case 'sickness': return { sev: 'good', text: 'Die Grippewelle ebbt ab: Die Crews sind wieder an Bord.' };
+      case 'conflict': return { sev: 'good', text: `${pre}Waffenstillstand: Der Luftraum ${e.countries && e.countries.length ? 'über ' + cn(e.countries) + ' ' : 'in der Konfliktregion '}ist wieder offen, die Umwege entfallen.` };
+      case 'flight_ban': return { sev: 'good', text: `${pre}Diplomatische Annäherung: ${cn(e.countries)} nehmen den Direktflugverkehr wieder auf.` };
+      case 'sanctions': return { sev: 'good', text: `${pre}Sanktionen aufgehoben: Flüge und Überflüge sind wieder erlaubt.` };
+      case 'carrier_ban': return { sev: 'good', text: `${pre}Einigung im Streit um Landerechte: Die Airlines dürfen wieder landen.` };
+      case 'unrest': return { sev: 'good', text: `Lage in ${cn(e.countries)} beruhigt: Flugbetrieb und Nachfrage normalisieren sich.` };
+      case 'entry_ban': return { sev: 'good', text: `${pre}Einreisestopp aufgehoben: Reisende sind wieder willkommen.` };
+      case 'open_skies': case 'visa_free': case 'domestic_aid': return { sev: 'warn', text: `Die Regierung nimmt die Erleichterung zurück: Die zusätzliche Nachfrage fällt weg.` };
+      case 'shorthaul_ban': return { sev: 'good', text: `Gericht kippt das Kurzstreckenverbot in ${cn([e.ban && e.ban.dom].filter(Boolean))}: Inlandsflüge sind wieder erlaubt.` };
+      case 'foreign_fee': return { sev: 'good', text: `Die Sonderabgabe für ausländische Airlines ist vom Tisch.` };
+      case 'epidemic': return { sev: 'good', text: `Entwarnung: Der Ausbruch ist eingedämmt, Reisewarnungen entfallen.` };
+      case 'heatwave': case 'sandstorm': case 'monsoon': case 'blizzard': case 'wildfire': case 'quake': case 'solar': return { sev: 'good', text: `Entwarnung: ${an(e.airports)} – der Flugbetrieb läuft wieder normal.` };
       default: return { sev: 'good', text: `Entwarnung: ${String(e.text || '').replace(/^Angekündigt: /, '').split(':')[0]} – die Lage hat sich beruhigt.` };
     }
   }
@@ -2009,7 +2169,7 @@ const SM = (() => {
         taxDelta: Object.fromEntries(COUNTRIES.map((c) => [c, 0])), laborTight: 1 };
       this.playerId = null; this.news = []; this.fuelHist = []; this.events = []; this.eventCounter = 0;
       this.seed = seed >>> 0; this._trend = {}; this._trendDay = -1;
-      this.slotCap = {}; this.candidates = []; this.acMarket = []; this.acmiOffers = []; this.offerCounter = 0; this.eventMult = 1;
+      this.slotCap = {}; this.aptUp = {}; this.aptProj = []; this.candidates = []; this.acMarket = []; this.acmiOffers = []; this.offerCounter = 0; this.eventMult = 1;
       this.deals = []; this.dealCounter = 0; this.agreements = []; this.coops = []; this.auctions = [];
       this.lessorQueue = {}; this.labor = { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 }; this.laborFree = { pilot: 0, cabin: 0, tech: 0 }; this.lessorStock = {};
       Object.assign(this.macro, { tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } });
@@ -2029,11 +2189,58 @@ const SM = (() => {
     segScale(o, d, extra = 1) { return Object.fromEntries(P.SEGMENTS.map((s) => [s, this.econFactor(o, d, s) * extra])); }
     activeEvents(day = this.day) { return this.events.filter((e) => e.start <= day && e.end + (e.recovery || 0) > day && e.scope !== 'airline'); }
     upcomingEvents(day = this.day) { return this.events.filter((e) => e.start > day && e.scope !== 'airline'); }
+    /** 0.21.41: Nachfragewirkung eines einzelnen Ereignisses auf eine Strecke (volle Stärke, Mittel über Urlaub/Geschäft/Besuch). */
+    eventFactor(e, o, d) {
+      if (e.cancelled) return 1;
+      const W8 = { leisure: 0.5, business: 0.3, vfr: 0.2 };
+      // Wirtschaftslage: Rezession/Boom wirken über die Konjunktur der Länder (Geschäftsreisen am stärksten), Handelskrieg über Zölle zwischen zwei Blöcken
+      if (e.type === 'recession' || e.type === 'boom') {
+        const cs = e.countries || [], k = [o, d].filter((c) => cs.includes(ap(c).country)).length; if (!k) return 1;
+        const x = 1 + (e.type === 'recession' ? -1 : 1) * (e.depth || e.boost || 0.06);
+        let m = 0; for (const [seg, wt] of Object.entries(W8)) m += wt * Math.pow(x, 0.5 * k * P.CHOICE[seg].econ); return m;
+      }
+      if (e.type === 'trade_war' && e.blocs && e.rate) {
+        const a = blocOf(ap(o).country), b = blocOf(ap(d).country);
+        if (!((a === e.blocs[0] && b === e.blocs[1]) || (a === e.blocs[1] && b === e.blocs[0]))) return 1;
+        return W8.leisure * (1 - 0.3 * e.rate) + W8.business * (1 - 1.1 * e.rate) + W8.vfr * (1 - 0.15 * e.rate);
+      }
+      if (!(e.demand || e.demand2 || e.pairDemand)) return 1;
+      let m = 0;
+      for (const [seg, wt] of Object.entries(W8)) {
+        let f = 1;
+        if (e.pairDemand) f = e.pair && pairHit(e.pair, o, d) ? e.pairDemand[seg] ?? 1 : 1;
+        else if (e.scope === 'all' || (e.airports && e.airports.length && (e.airports.includes(d) || e.airports.includes(o)))) f = e.demand ? e.demand[seg] ?? 1 : 1;
+        else if (e.demand2 && e.countries2 && (e.countries2.includes(ap(o).country) || e.countries2.includes(ap(d).country))) f = e.demand2[seg] ?? 1;
+        else if (e.demand && e.countries && !e.airports && (e.countries.includes(ap(o).country) || e.countries.includes(ap(d).country))) f = e.demand[seg] ?? 1;
+        m += wt * f;
+      }
+      return m;
+    }
+    /**
+     * 0.21.41: Vorschlag zur Anpassung an eine Krise (oder einen Nachfrageschub) – betroffene Strecken, Preisautomatik, Frequenz.
+     * Starker Einbruch (≤ 75 % der Nachfrage): Frequenz anteilig senken (mindestens 1); Slots bleiben als Reserve und kommen nach der Krise zurück.
+     */
+    crisisPlan(al, e) {
+      const P2 = P.CRISIS_PLAN, out = [];
+      for (const r of al.activeRoutes()) {
+        if (r.opened_day > this.day) continue;
+        const f = this.eventFactor(e, r.base, r.dest); if (Math.abs(f - 1) < P2.minHit) continue;
+        const x = { id: r.id, f, ap: !(r.ap > 0) ? (f < 1 ? P2.lfDown : P2.lfUp) : null, freq: null };
+        if (f <= P2.cutAt && !(r.wk < 7) && r.freq >= 2 && !r.crisis) x.freq = Math.max(1, Math.round(r.freq * Math.max(f, 0.5)));
+        if (x.freq === r.freq) x.freq = null;
+        if (x.ap || x.freq) out.push(x);
+      }
+      return out;
+    }
     eventAffects(e, apt) { return e.scope === 'all' || (e.airports && e.airports.includes(apt)) || (e.countries && e.countries.includes(ap(apt).country)) || (e.countries2 && e.countries2.includes(ap(apt).country)); }
     demandMult(o, d, seg, day = this.day) {
       let m = 1;
       for (const e of this.events) {
-        if (!(e.demand || e.demand2) || e.start > day || e.end + (e.recovery || 0) <= day) continue;
+        if (!(e.demand || e.demand2 || e.pairDemand) || e.start > day || e.end + (e.recovery || 0) <= day || e.cancelled) continue;
+        if (e.pairDemand) {   // Länderpaare: Einreisestopp, Open Skies, Inlandsförderung
+          if (!e.pair || !pairHit(e.pair, o, d)) continue;
+          let fp = e.pairDemand[seg] ?? 1; if (e.recovery && day >= e.end) fp = 1 + (fp - 1) * (1 - (day - e.end) / e.recovery); m *= fp; continue;
+        }
         let f = e.demand ? e.demand[seg] ?? 1 : 1;
         if (e.recovery && day >= e.end) f = 1 + (f - 1) * (1 - (day - e.end) / e.recovery);
         if (e.scope === 'all') m *= f;
@@ -2049,12 +2256,51 @@ const SM = (() => {
       let cancel = 0, delay = 0, soft = 0, hard = null, softE = null;
       for (const e of this.events) {
         if (e.start > day || e.end <= day || !e.ops || e.cancelled) continue;
-        if (!this.eventAffects(e, apt)) continue;
-        const c = e.ops.cancel || 0;
+        if (!(e.scope === 'all' || (e.airports && e.airports.includes(apt)) || (e.countries && e.countries.includes(ap(apt).country)))) continue;   // Nachbarländer (countries2) betrifft nur die Nachfrage
+        const c = e.closed && e.closed.includes(apt) ? 1 : e.ops.cancel || 0;
         cancel = 1 - (1 - cancel) * (1 - c); delay += e.ops.delay || 0;
         if (c >= 1) { if (!hard) hard = e; } else if (c > 0) { soft = 1 - (1 - soft) * (1 - c); if (!softE || c > (softE.ops.cancel || 0)) softE = e; }
       }
       return { cancel, delay, soft, hard, softE };
+    }
+    /** 0.21.35: Flugverbot für diese Strecke (Länderpaar, Landerechte, Kurzstreckenverbot) – das Ereignis oder null. */
+    /** Aktive Sperren, Abgaben und Überflugverbote eines Tages (zwischengespeichert, solange sich die Ereignisliste nicht ändert). */
+    geoLists(day = this.day) {
+      const g = this._geo;
+      if (g && g.day === day && g.n === this.events.length && g.c === this.eventCounter) return g;
+      const act = (e) => !e.cancelled && e.start <= day && e.end > day;
+      return (this._geo = { day, n: this.events.length, c: this.eventCounter, ban: this.events.filter((e) => e.ban && act(e)), ffee: this.events.filter((e) => e.ffee && act(e)), fly: this.events.filter((e) => e.overfly && act(e)) });
+    }
+    routeBan(al, o, d, day = this.day) {
+      for (const e of this.geoLists(day).ban) {
+        const b = e.ban;
+        if (b.carrier) { const hc = homeCountry(al), co = ap(o).country, cd = ap(d).country; if (hc && b.carrier.includes(hc) && (b.a.includes(co) || b.a.includes(cd)) && !b.a.includes(hc)) return e; continue; }
+        if (pairHit(b, o, d)) return e;
+      }
+      return null;
+    }
+    /** Kurzbezeichnung einer Sperre für Abflugtafel und Netz. */
+    banLabel(e) { return String(e.short || (e.text || '').replace(/^Angekündigt: /, '').split(':')[0]).trim(); }
+    /** 0.21.35: Umweg wegen gesperrter Überflugzonen → { km, x (Faktor auf Kerosin und Flugzeitkosten), e } */
+    detour(al, o, d, day = this.day) {
+      const L = this.geoLists(day).fly; if (!L.length) return { km: 0, x: 1, e: null };
+      const hc = homeCountry(al), dist = gcDistanceKm(o, d); let km = 0, ev = null;
+      const C = this._zoneCache || (this._zoneCache = {});
+      for (const e of L) {
+        if (e.overfly.from && !(hc && e.overfly.from.includes(hc))) continue;
+        const k = e.id + '|' + pairKey(o, d); let x = C[k];
+        if (x === undefined) { x = zoneExtraKm(o, d, e.overfly.circles); C[k] = x; }
+        if (x > km) { km = x; ev = e; }
+      }
+      if (Object.keys(C).length > 20000) this._zoneCache = {};
+      return { km, x: km ? Math.min(1.5, (dist + km) / dist) : 1, e: ev };
+    }
+    /** Sonderabgabe für ausländische Airlines (Faktor auf Entgelte am Flughafen). */
+    foreignFeeX(al, apt, day = this.day) {
+      const L = this.geoLists(day).ffee; if (!L.length) return 1;
+      const hc = homeCountry(al), c = ap(apt).country; let f = 1;
+      for (const e of L) if (e.ffee.country === c && hc !== c) f *= e.ffee.f;
+      return f;
     }
     /**
      * Ausfallrisiko einer Strecke an einem Tag (beide Richtungen eines Umlaufs gemeinsam). Gewürfelt wird je Umlauf mit
@@ -2064,7 +2310,8 @@ const SM = (() => {
     legRisk(al, r, day = this.day) {
       const ty = P.AIRCRAFT_TYPES[r.type_id], oO = this.opsAt(r.base, day), oD = this.opsAt(r.dest, day);
       const lbl = (e, apt) => `${String(e.text || '').replace(/^Angekündigt: /, '').split(':')[0].trim()} (${apt})`;
-      const hard = oO.hard ? lbl(oO.hard, r.base) : oD.hard ? lbl(oD.hard, r.dest) : null;
+      const ban = !oO.hard && !oD.hard ? this.routeBan(al, r.base, r.dest, day) : null;
+      const hard = oO.hard ? lbl(oO.hard, r.base) : oD.hard ? lbl(oD.hard, r.dest) : ban ? this.banLabel(ban) : null;
       const weather = (1 - (1 - oO.soft) * (1 - oD.soft)) * (1 - lv3([0, 0.2, 0.35, 0.5], al.skill('ops')));
       const sE = oO.softE && (!oD.softE || oO.softE.ops.cancel >= oD.softE.ops.cancel) ? [oO.softE, r.base] : oD.softE ? [oD.softE, r.dest] : null;
       const strike = this.events.some((e) => e.type === 'own_strike' && e.airline === al.id && e.start <= day && e.end > day && !e.averted) ? 0.7 : 0;
@@ -2138,7 +2385,7 @@ const SM = (() => {
       }
       if (e.type === 'own_strike') e.averted = true;
       for (const al of this.humans) if (al.decisions) al.decisions = al.decisions.filter((d) => d.eventId !== e.id);
-      e.cancelled = true; e.recovery = 0; e.end = Math.min(e.end, day); if (!started) e.start = day;
+      e.cancelled = true; e.recovery = 0; e.end = Math.min(e.end, day); if (!started) e.start = day; this._geo = null;
       this.recalcTariffs();
       // Im Spiel erscheint die Annullierung als eigenes Ereignis, das die Wirkung erklärt – nicht als Eingriff der Spielleitung
       const ct = counterEventText(e, started);
@@ -2203,7 +2450,8 @@ const SM = (() => {
         this.addEvent({ type: 'airport_strike', airports: [a], end: day + lead + dur, ops: { cancel: 0.8, delay: 30 }, text: `Warnstreik des Bodenpersonals in ${ap(a).name}: ${dur === 1 ? 'ein Tag' : 'zwei Tage'} mit massiven Ausfällen.`, severity: 'warn' }, lead);
       }
       if (day > 120 && roll('volcano')) {
-        const sets = [['HAM', 'BER', 'AMS', 'LHR', 'DUS', 'FRA', 'CPH', 'DUB', 'MAN'], ['FCO', 'ATH', 'IST', 'MUC', 'VIE'], ['NRT', 'HND', 'KIX', 'ICN'], ['MEX', 'CUN', 'BOG', 'LIM']];
+        const sets = [['HAM', 'BER', 'AMS', 'LHR', 'DUS', 'FRA', 'CPH', 'DUB', 'MAN'], ['FCO', 'ATH', 'IST', 'MUC', 'VIE'], ['NRT', 'HND', 'KIX', 'ICN'], ['MEX', 'CUN', 'BOG', 'LIM'],
+          ['KEF', 'DUB', 'MAN', 'EDI', 'GLA', 'OSL', 'BGO'], ['CTA', 'PMO', 'NAP', 'MLA'], ['DPS', 'CGK', 'SUB', 'LOP'], ['MNL', 'CEB'], ['FUK', 'KOJ', 'OKA'], ['GUA', 'SAL', 'SJO', 'LIR'], ['SCL', 'MDZ', 'EZE', 'AEP'], ['ANC'], ['AKL', 'WLG', 'ZQN'], ['UIO', 'GYE']];
         const aps = r.pick(sets).filter((c) => P.AIRPORTS[c]), dur = r.int(3, 8);
         this.addEvent({ type: 'volcano', airports: aps, end: day + dur, ops: { cancel: 1.0, delay: 0 }, text: `Vulkanasche: Luftraum über ${aps.map((x) => ap(x).name).join(', ')} für ${dur} Tage gesperrt.`, severity: 'crit' });
       }
@@ -2239,6 +2487,197 @@ const SM = (() => {
       }
       if (!fuelHigh && M.fuelUsd > 0.85 * M.fuelRefUsd && !this.events.some((e) => e.type === 'oil_glut' && e.end > day) && roll('oil_glut')) this.oilGlut(r.int(4, 7), r.range(0.72, 0.85));
       this.newShocks(r, M, day, roll);
+      this.geoShocks(r, M, day, roll);
+    }
+    /** 0.21.35: Geopolitik und politische Eingriffe – Konflikte mit Luftraumsperren und Umwegen, Flugverbote, Sanktionen, Landerechte, Einreise, Abkommen. */
+    geoShocks(r, M, day, roll) {
+      const live = (t, f = null) => this.events.some((e) => e.type === t && !e.cancelled && e.end > day && (!f || f(e)));
+      const cName = (c) => COUNTRY_NAMES[c] || c, nom = (c) => (COUNTRY_DATA[c] && COUNTRY_DATA[c].nom) || c;
+      const apsOf = (cs) => AP_CODES.filter((x) => cs.includes(ap(x).country));
+      const wpick = (arr, wf) => { const tot = arr.reduce((a, x) => a + wf(x), 0); let u = r.random() * tot; for (const x of arr) { u -= wf(x); if (u <= 0) return x; } return arr[arr.length - 1]; };
+      const nAps = {}; for (const c of AP_CODES) nAps[ap(c).country] = (nAps[ap(c).country] || 0) + 1;
+      const big = COUNTRIES.filter((c) => nAps[c] >= 1);
+      const dur = (a, b) => r.int(a, b), mo = (d) => Math.max(1, Math.round(d / 30));
+      // Länder, zwischen denen Spielende tatsächlich fliegen (damit Eingriffe spürbar sind)
+      const humanPairs = []; for (const h of this.humans) for (const rt of h.activeRoutes()) { const a = ap(rt.base).country, b = ap(rt.dest).country; if (a !== b) humanPairs.push([a, b]); }
+      // Konflikt: Luftraum der Länder zu, Überflugverbot (Umwege), Nachfrage in Nachbarländern bricht ein, in Ölregionen steigt Kerosin
+      if (day > 45 && roll('conflict')) {
+        const busy = new Set(this.events.filter((e) => e.zone && !e.cancelled && e.end > day).map((e) => e.zone));
+        const zs = GEO_ZONES.filter((z) => !busy.has(z.key));
+        if (zs.length) {
+          const z = wpick(zs, (x) => x.w), lead = r.int(0, 2), long = r.random() < 0.4, d = long ? dur(90, 540) : dur(10, 75);
+          const closed = apsOf(z.countries);
+          const near = COUNTRIES.filter((c) => !z.countries.includes(c) && AP_CODES.some((x) => ap(x).country === c && z.circles.some(([la, lo, rr]) => havKm(ap(x).lat, ap(x).lon, la, lo) < rr + 800)));
+          const fuelF = z.oil ? r.range(1.08, 1.2) : null; if (fuelF) M.fuelUsd *= fuelF;
+          const span = long ? `voraussichtlich ${mo(d)} Monate` : `voraussichtlich ${Math.max(2, Math.round(d / 7))} Wochen`;
+          this.addEvent({ type: 'conflict', zone: z.key, short: `Konflikt ${z.name}`, countries: z.countries, airports: closed, ops: closed.length ? { cancel: 1, delay: 0 } : null, overfly: { circles: z.circles, name: z.name },
+            countries2: near, demand2: { leisure: 0.75, business: 0.85, vfr: 0.92 }, fuelF, end: day + lead + d, recovery: 60,
+            text: `Konflikt in der Region ${z.name}: ${closed.length ? `Luftraum über ${countryList(z.countries)} gesperrt – keine Flüge von und nach dort. ` : 'Der Luftraum ist gesperrt. '}Strecken, die über die Region führen, müssen ausweichen (Umwege kosten Kerosin und Flugzeit)${near.length ? `, in ${countryList(near)} sinkt die Nachfrage` : ''}${fuelF ? `, Kerosin steigt um ${Math.round((fuelF - 1) * 100)} %` : ''} – ${span}.`, severity: 'crit' }, lead);
+        }
+      }
+      // Diplomatische Krise: zwei Länder setzen den Direktflugverkehr aus
+      if (roll('flight_ban')) {
+        let A, B;
+        if (humanPairs.length && r.random() < 0.5) [A, B] = r.pick(humanPairs);
+        else { A = r.pick(big); const cand = big.filter((c) => c !== A && AP_CODES.some((x) => ap(x).country === c && AP_CODES.some((y) => ap(y).country === A && gcDistanceKm(x, y) < 3500))); B = cand.length ? r.pick(cand) : null; }
+        if (A && B && A !== B && !live('flight_ban', (e) => e.countries.includes(A) && e.countries.includes(B))) {
+          const lead = r.int(2, 7), d = dur(14, 120);
+          this.addEvent({ type: 'flight_ban', short: `Flugverbot ${nom(A)}–${nom(B)}`, countries: [A, B], ban: { a: [A], b: [B] }, end: day + lead + d,
+            text: `Diplomatische Krise zwischen ${cName(A)} und ${cName(B)}: Ab ${lead} Tagen sind alle Direktflüge zwischen beiden Ländern ausgesetzt, voraussichtlich ${d} Tage. Flüge in andere Länder sind nicht betroffen.`, severity: 'crit' }, lead);
+        }
+      }
+      // Sanktionen: Ländergruppe gegen ein Land – Direktflüge verboten, deren Airlines dürfen das Land nicht überfliegen
+      if (day > 90 && roll('sanctions')) {
+        const T = r.pick(['RU', 'IR', 'VE', 'CU', 'MM', 'UZ', 'RS', 'PK'].filter((c) => nAps[c]));
+        const groups = [['Die EU verhängt', [...EU]], ['Die USA und Kanada verhängen', ['US', 'CA']], ['Die EU, Großbritannien und die USA verhängen', [...EU, 'GB', 'US']], ['Großbritannien verhängt', ['GB']], ['Die G7-Staaten verhängen', [...EU, 'GB', 'US', 'CA', 'JP']]];
+        const [gn, S0] = r.pick(groups), S = S0.filter((c) => nAps[c] && c !== T);
+        if (T && S.length && !live('sanctions', (e) => e.target === T)) {
+          const lead = r.int(7, 21), d = dur(180, 720), z = GEO_ZONES.find((x) => x.countries.length === 1 && x.countries[0] === T) || GEO_ZONES.find((x) => x.countries.includes(T));
+          const circles = z ? z.circles : (() => { const a = apsOf([T]), la = a.reduce((s2, x) => s2 + ap(x).lat, 0) / a.length, lo = a.reduce((s2, x) => s2 + ap(x).lon, 0) / a.length; return [[la, lo, 450]]; })();
+          this.addEvent({ type: 'sanctions', short: `Sanktionen ${nom(T)}`, target: T, countries: [T], ban: { a: S, b: [T] }, overfly: { circles, from: S, name: nom(T) }, end: day + lead + d,
+            text: `Sanktionen: ${gn} ab ${lead} Tagen Strafmaßnahmen im Streit mit ${cName(T)}. Direktflüge sind verboten, die eigenen Airlines dürfen den Luftraum über ${cName(T)} nicht mehr nutzen und fliegen Umwege – voraussichtlich ${mo(d)} Monate. Airlines aus anderen Ländern fliegen weiter.`, severity: 'crit' }, lead);
+        }
+      }
+      // Streit um Landerechte: ein Land sperrt Airlines aus einem bestimmten Land aus
+      if (roll('carrier_ban')) {
+        const hs = this.humans.filter((h) => h.status !== 'insolvent' && h.activeRoutes().length), pool = hs.length && r.random() < 0.6 ? hs : this.list.filter((a) => a.status !== 'insolvent' && a.activeRoutes().length);
+        const al = pool.length ? r.pick(pool) : null, X = homeCountry(al);
+        const dests = al ? [...new Set(al.activeRoutes().flatMap((rt) => [ap(rt.base).country, ap(rt.dest).country]).filter((c) => c !== X))] : [];
+        if (X && dests.length) {
+          const C = r.pick(dests);
+          if (!live('carrier_ban', (e) => e.ban.carrier.includes(X) && e.ban.a.includes(C))) {
+            const lead = r.int(7, 14), d = dur(30, 150);
+            this.addEvent({ type: 'carrier_ban', short: `Landerechte ${nom(C)}`, countries: [C], ban: { a: [C], carrier: [X] }, end: day + lead + d,
+              text: `Streit um Landerechte: Airlines aus ${cName(X)} dürfen ab ${lead} Tagen nicht mehr in ${cName(C)} landen – voraussichtlich ${d} Tage. Airlines aus anderen Ländern fliegen weiter.`, severity: 'crit' }, lead);
+          }
+        }
+      }
+      // Unruhen: kurz kein Flugbetrieb, danach monatelang weniger Nachfrage
+      if (roll('unrest')) {
+        const C = r.pick(big.filter((c) => !['US', 'CN', 'DE', 'GB', 'FR', 'JP'].includes(c))), aps = apsOf([C]);
+        if (aps.length && !live('unrest', (e) => e.countries.includes(C))) {
+          const d = dur(2, 7), why = r.pick(['Nach einem Umsturzversuch', 'Wegen Massenprotesten und Generalstreik', 'Nach einer umstrittenen Wahl gilt der Ausnahmezustand –']);
+          this.addEvent({ type: 'unrest', short: `Unruhen ${nom(C)}`, countries: [C], airports: aps, ops: { cancel: 1, delay: 0 }, demand: { leisure: 0.55, business: 0.7, vfr: 0.85 }, end: day + d, recovery: dur(120, 240),
+            text: `Unruhen in ${cName(C)}: ${why} ist der Luftraum ${d} Tage gesperrt. Danach meiden Urlauber und Geschäftsreisende das Land noch Monate.`, severity: 'crit' });
+        }
+      }
+      // Einreisestopp für Reisende aus einer Region (Flüge laufen, aber kaum jemand darf einreisen)
+      if (roll('entry_ban')) {
+        const C = r.pick(big), regs = [...new Set(AP_CODES.map((x) => ap(x).region))].filter((g) => g !== ap(apsOf([C])[0]).region), g = r.pick(regs);
+        const L = COUNTRIES.filter((c) => c !== C && AP_CODES.some((x) => ap(x).country === c && ap(x).region === g));
+        if (L.length) {
+          const lead = r.int(3, 10), d = dur(30, 120);
+          this.addEvent({ type: 'entry_ban', short: `Einreisestopp ${nom(C)}`, countries: [C], pair: { a: [C], b: L }, pairDemand: { leisure: 0.15, business: 0.3, vfr: 0.45 }, end: day + lead + d,
+            text: `Einreisestopp in ${cName(C)}: Reisende aus ${g === 'Nahost' ? 'dem Nahen Osten' : g} dürfen ab ${lead} Tagen kaum noch einreisen – Flüge zwischen ${cName(C)} und der Region bleiben fast leer, voraussichtlich ${d} Tage.`, severity: 'warn' }, lead);
+        }
+      }
+      // Open-Skies-Abkommen: mehr Reisende zwischen zwei Ländern
+      if (roll('open_skies')) {
+        let A, B; if (humanPairs.length && r.random() < 0.5) [A, B] = r.pick(humanPairs); else { A = r.pick(big); B = r.pick(big.filter((c) => c !== A)); }
+        if (A && B && A !== B) {
+          const lead = r.int(20, 45), d = dur(360, 900), f = r.range(1.1, 1.2);
+          this.addEvent({ type: 'open_skies', short: `Open Skies ${nom(A)}–${nom(B)}`, countries: [A, B], pair: { a: [A], b: [B] }, pairDemand: { business: 1 + (f - 1) * 0.8, leisure: f, vfr: 1 + (f - 1) * 0.7 }, end: day + lead + d,
+            text: `Open-Skies-Abkommen zwischen ${cName(A)} und ${cName(B)}: Ab ${lead} Tagen fallen Beschränkungen weg – rund ${Math.round((f - 1) * 100)} % mehr Reisende zwischen beiden Ländern für etwa ${mo(d)} Monate.`, severity: 'good' }, lead);
+        }
+      }
+      // Visafreiheit: mehr Urlauber in ein Land
+      if (roll('visa_free')) {
+        const C = r.pick(big), aps = apsOf([C]), f = r.range(1.18, 1.35);
+        if (aps.length && !live('visa_free', (e) => e.countries.includes(C))) {
+          const lead = r.int(15, 40), d = dur(270, 720);
+          this.addEvent({ type: 'visa_free', short: `Visafreiheit ${nom(C)}`, countries: [C], airports: aps, demand: { leisure: f, vfr: 1 + (f - 1) * 0.6, business: 1.04 }, end: day + lead + d,
+            text: `Visafreiheit in ${cName(C)}: Ab ${lead} Tagen entfällt die Visumpflicht für viele Länder – rund ${Math.round((f - 1) * 100)} % mehr Urlaubsreisende für etwa ${mo(d)} Monate.`, severity: 'good' }, lead);
+        }
+      }
+      // Kurzstreckenverbot: Inlandsflüge, wo der Zug höchstens 2,5 Stunden braucht
+      if (day > 120 && roll('shorthaul_ban')) {
+        const pairs = Object.entries(P.RAIL_TIME_H).map(([k, v]) => [k.split('-'), v]).filter(([[a, b], v]) => P.AIRPORTS[a] && P.AIRPORTS[b] && ap(a).country === ap(b).country && v <= 2.5);
+        const cs = [...new Set(pairs.map(([[a]]) => ap(a).country))].filter((c) => !live('shorthaul_ban', (e) => e.ban.dom === c));
+        if (cs.length) {
+          const C = r.pick(cs), list = pairs.filter(([[a]]) => ap(a).country === C).map(([[a, b]]) => `${a}–${b}`), lead = 90, d = dur(720, 1460);
+          this.addEvent({ type: 'shorthaul_ban', short: `Kurzstreckenverbot ${nom(C)}`, countries: [C], ban: { dom: C, rail: 2.5 }, end: day + lead + d,
+            text: `Kurzstreckenverbot in ${cName(C)}: Ab ${lead} Tagen sind Inlandsflüge verboten, wenn der Zug höchstens 2,5 Stunden braucht (${list.slice(0, 5).join(', ')}${list.length > 5 ? ' u. a.' : ''}) – vorerst für ${Math.round(d / 365)} Jahre.`, severity: 'warn' }, lead);
+        }
+      }
+      // Sonderabgabe für ausländische Airlines
+      if (roll('foreign_fee')) {
+        const C = r.pick(big), f = r.range(1.3, 1.7);
+        if (!live('foreign_fee', (e) => e.ffee.country === C)) {
+          const lead = r.int(20, 40), d = dur(180, 540);
+          this.addEvent({ type: 'foreign_fee', short: `Sonderabgabe ${nom(C)}`, countries: [C], ffee: { country: C, f }, end: day + lead + d,
+            text: `Sonderabgabe in ${cName(C)}: Ausländische Airlines zahlen ab ${lead} Tagen ${Math.round((f - 1) * 100)} % höhere Lande- und Abfertigungsentgelte – voraussichtlich ${mo(d)} Monate. Heimische Airlines sind ausgenommen.`, severity: 'warn' }, lead);
+        }
+      }
+      // Förderung von Inlandsreisen
+      if (roll('domestic_aid')) {
+        const C = r.pick(COUNTRIES.filter((c) => nAps[c] >= 3)), f = r.range(1.15, 1.3);
+        if (C && !live('domestic_aid', (e) => e.pair.dom === C)) {
+          const lead = r.int(10, 30), d = dur(180, 365);
+          this.addEvent({ type: 'domestic_aid', short: `Inlandsförderung ${nom(C)}`, countries: [C], pair: { dom: C }, pairDemand: { leisure: f, vfr: 1 + (f - 1) * 0.5, business: 1.03 }, end: day + lead + d,
+            text: `Tourismusförderung in ${cName(C)}: Die Regierung bezuschusst Inlandsreisen – ab ${lead} Tagen rund ${Math.round((f - 1) * 100)} % mehr Nachfrage auf Inlandsstrecken für etwa ${mo(d)} Monate.`, severity: 'good' }, lead);
+        }
+      }
+      // Regionaler Krankheitsausbruch
+      if (day > 60 && roll('epidemic')) {
+        const g = r.pick([...new Set(AP_CODES.map((x) => ap(x).region))]), cs0 = COUNTRIES.filter((c) => AP_CODES.some((x) => ap(x).country === c && ap(x).region === g));
+        const cs = [...new Set([r.pick(cs0), r.pick(cs0), r.pick(cs0)])].slice(0, r.int(1, 3)), aps = apsOf(cs);
+        if (aps.length && !live('epidemic')) {
+          const d = dur(60, 150);
+          this.addEvent({ type: 'epidemic', short: `Ausbruch ${cs.map(nom).join(', ')}`, countries: cs, airports: aps, demand: { leisure: 0.5, business: 0.6, vfr: 0.8 }, end: day + 5 + d, recovery: 90,
+            text: `Ausbruch einer Infektionskrankheit in ${countryList(cs)}: Reisewarnungen, Urlaubsreisen dorthin halbieren sich, auch Geschäftsreisen werden abgesagt – voraussichtlich ${mo(d)} Monate, danach langsame Erholung.`, severity: 'warn' }, 5);
+        }
+      }
+      // Sonnensturm: weltweit kurz Störungen der Navigation
+      if (roll('solar')) {
+        const d = r.int(1, 2);
+        this.addEvent({ type: 'solar', short: 'Sonnensturm', scope: 'all', ops: { cancel: 0.01, delay: 15 }, end: day + 1 + d,
+          text: `Sonnensturm: Störungen bei Satellitennavigation und Funk – ${d === 1 ? 'einen Tag' : 'zwei Tage'} weltweit Verspätungen, Polarrouten werden umgeplant.`, severity: 'warn' }, 1);
+      }
+    }
+    /** 0.21.35: Naturereignisse je Saison – täglich gewürfelt (Monatswahrscheinlichkeit / 30). */
+    natureDaily(r, m) {
+      const day = this.day, mult = this.eventMult || 1, roll = (k) => r.random() < EVENT_TYPES[k].p * mult / 30;
+      const around = (c, km) => AP_CODES.filter((x) => gcDistanceKm(x, c) < km);
+      const names = (aps) => aps.length > 4 ? `${aps.slice(0, 3).map((x) => ap(x).name).join(', ')} und ${aps.length - 3} weiteren Flughäfen` : aps.map((x) => ap(x).name).join(', ');
+      const pickAp = (f) => { const l = AP_CODES.filter(f); return l.length ? r.pick(l) : null; };
+      const summerN = [5, 6, 7].includes(m), winterN = [11, 0, 1].includes(m);
+      if ((summerN || winterN) && roll('heatwave')) {
+        const c = pickAp((x) => summerN ? ap(x).lat > 25 && ap(x).lat < 50 : ap(x).lat < -20 && ap(x).lat > -45);
+        if (c) { const aps = around(c, 900), d = r.int(5, 12);
+          this.addEvent({ type: 'heatwave', short: 'Hitzewelle', airports: aps, ops: { cancel: 0.03, delay: 25 }, demand: { leisure: 0.93, business: 1, vfr: 1 }, end: day + d,
+            text: `Hitzewelle rund um ${ap(c).name}: ${d} Tage über 40 Grad – begrenzte Startgewichte, Verspätungen und einzelne Ausfälle an ${aps.length} Flughäfen.`, severity: 'warn' }); }
+      }
+      if ([2, 3, 4, 5, 6].includes(m) && roll('sandstorm')) {
+        const c = pickAp((x) => ['AE', 'QA', 'SA', 'KW', 'BH', 'OM', 'EG', 'IR', 'JO', 'DZ'].includes(ap(x).country));
+        if (c) { const aps = around(c, 500), d = r.int(1, 3);
+          this.addEvent({ type: 'sandstorm', short: 'Sandsturm', airports: aps, ops: { cancel: 0.35, delay: 50 }, end: day + d,
+            text: `Sandsturm über ${names(aps)}: Sicht unter 500 Metern – ${d === 1 ? 'ein Tag' : d + ' Tage'} mit vielen Ausfällen.`, severity: 'warn' }); }
+      }
+      if ([5, 6, 7, 8].includes(m) && roll('monsoon')) {
+        const c = pickAp((x) => ['IN', 'BD', 'NP', 'LK', 'MM', 'TH', 'VN', 'PH', 'KH'].includes(ap(x).country));
+        if (c) { const aps = around(c, 450), d = r.int(3, 7);
+          this.addEvent({ type: 'monsoon', short: 'Monsun', airports: aps, ops: { cancel: 0.3, delay: 55 }, demand: { leisure: 0.85, business: 0.95, vfr: 1 }, end: day + d,
+            text: `Monsun-Starkregen bei ${ap(c).name}: überflutete Vorfelder und Zufahrten – ${d} Tage mit vielen Ausfällen an ${aps.length} Flughäfen.`, severity: 'warn' }); }
+      }
+      if (winterN && roll('blizzard')) {
+        const c = pickAp((x) => ap(x).lat > 38 && ['US', 'CA', 'RU', 'JP', 'KR', 'CN', 'DE', 'PL', 'SE', 'FI', 'NO', 'CZ', 'AT', 'CH', 'NL', 'BE', 'GB', 'DK', 'KZ'].includes(ap(x).country));
+        if (c) { const aps = around(c, 650), d = r.int(1, 3);
+          this.addEvent({ type: 'blizzard', short: 'Blizzard', airports: aps, ops: { cancel: 0.55, delay: 70 }, end: day + d,
+            text: `Blizzard über ${names(aps)}: Schneechaos – ${d === 1 ? 'einen Tag' : d + ' Tage'} fällt mehr als die Hälfte der Flüge aus.`, severity: 'crit' }); }
+      }
+      if ((summerN || [8].includes(m) || winterN) && roll('wildfire')) {
+        const c = winterN ? pickAp((x) => ap(x).country === 'AU') : pickAp((x) => (ap(x).country === 'US' && ap(x).lon < -100) || ['CA', 'GR', 'ES', 'PT', 'IT', 'TR', 'FR', 'HR', 'CY'].includes(ap(x).country));
+        if (c) { const aps = around(c, 350), d = r.int(4, 10);
+          this.addEvent({ type: 'wildfire', short: 'Waldbrände', airports: aps, ops: { cancel: 0.12, delay: 30 }, demand: { leisure: 0.7, business: 0.95, vfr: 1 }, end: day + d, recovery: 45,
+            text: `Waldbrände bei ${ap(c).name}: Rauch und Löschflüge – ${d} Tage Ausfälle, Urlauber stornieren noch Wochen danach.`, severity: 'warn' }); }
+      }
+      if (day > 30 && roll('quake')) {
+        const quakeUS = ['LAX', 'SFO', 'SEA', 'SJC', 'OAK', 'SAN', 'PDX', 'ANC'];
+        const c = pickAp((x) => ['JP', 'TR', 'IT', 'GR', 'CL', 'PE', 'MX', 'ID', 'PH', 'NZ', 'IR', 'NP', 'TW', 'EC', 'GT', 'SV', 'CR'].includes(ap(x).country) || quakeUS.includes(x));
+        if (c) { const aps = around(c, 300), d = r.int(10, 35);
+          this.addEvent({ type: 'quake', short: `Erdbeben ${ap(c).name}`, airports: aps, closed: [c], ops: { cancel: 0.25, delay: 40 }, demand: { leisure: 0.55, business: 0.75, vfr: 1.15 }, end: day + d, recovery: 150,
+            text: `Schweres Erdbeben bei ${ap(c).name}: Die Start- und Landebahn ist beschädigt, der Flughafen bleibt ${d} Tage geschlossen.${aps.length > 1 ? ` In der Region (${aps.length - 1} weitere Flughäfen) Ausfälle und Verspätungen.` : ''} Die Nachfrage erholt sich erst nach Monaten.`, severity: 'crit' }); }
+      }
     }
     /** 0.19: Kreditkrise, Stilllegungen, Lieferketten, Tourismus, Arbeitsmarkt, Naturkatastrophen, Regulierung. */
     newShocks(r, M, day, roll) {
@@ -2325,6 +2764,7 @@ const SM = (() => {
         const dur = r.int(1, 2);
         this.addEvent({ type: 'storm', airports: aps, end: this.day + dur, ops: { cancel: winter ? 0.25 : 0.12, delay: 45 }, text: `${kind} über ${aps.map((x) => ap(x).name).join(', ')}: Ausfälle und Verspätungen für ${dur} Tag${dur > 1 ? 'e' : ''}.`, severity: 'warn' });
       }
+      this.natureDaily(r, m);
       for (const e of this.events) {
         if (e.applied || e.start > this.day) continue;
         if (e.taxDelta) for (const c of e.countries) this.macro.taxDelta[c] += e.taxDelta;
@@ -2404,6 +2844,12 @@ const SM = (() => {
       let n = 0;
       for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) n += r.freq; n += al.heldAt(apt, this.day); }
       return n;
+    }
+    /** 0.21.41: Wer hält die Slots an einem Flughafen? Je Airline: genutzt (Flüge pro Tag), Reserve, Warteliste. */
+    slotHolders(apt) {
+      const out = [];
+      for (const al of this.list) { if (al.status === 'insolvent') continue; let used = 0; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) used += r.freq; const held = al.heldAt(apt, this.day); if (used || held) out.push({ id: al.id, used, held, n: used + held }); }
+      return out.sort((a, b) => b.n - a.n);
     }
     slotsFreeFor(al, apt) { if (this.lockedFor(al, apt)) return 0; const f = this.slotsFree(apt); return f === Infinity ? f : Math.max(0, f - this.waitBlock(apt, al)) + al.heldAt(apt, this.day); }
     /** Freie Slots, auf die andere schon auf der Warteliste stehen (die bekommen sie zuerst). */
@@ -2614,12 +3060,12 @@ const SM = (() => {
     }
     /** Anteil der Flugzeuge einer Strecke, die noch unter Garantie stehen (jung und seit weniger als zwei Jahren im Einsatz). */
     warrantyOf(al, r) {
-      const W = P.WARRANTY, acs = al.fleet.filter((a) => a.assigned && a.assigned.includes(r.id));
+      const W = P.WARRANTY, acs = al.fleet.filter((a) => a.assigned && a.assigned.includes(r._pid || r.id) && a.type_id === r.type_id);
       if (!acs.length) return 0;
       return acs.filter((a) => (a.age0 ?? 99) <= W.maxAge && this.day - (a.delivery_day ?? 0) < W.days).length / acs.length;
     }
     ageOf(al, r) {
-      const acs = al.fleet.filter((a) => a.assigned && a.assigned.includes(r.id));
+      const acs = al.fleet.filter((a) => a.assigned && a.assigned.includes(r._pid || r.id) && a.type_id === r.type_id);
       if (!acs.length) return P.AIRCRAFT_TYPES[r.type_id].age;
       return acs.reduce((s, a) => s + al.acAge(a, this.day) * (a.cond || 1), 0) / acs.length;
     }
@@ -2628,6 +3074,10 @@ const SM = (() => {
       const c = legCosts(o, d, r.type_id, r.service, r.buffer, pax, fareRev, this.fuelPrice, cpi);
       const age = forecast ? (r.age ?? t.age) : this.ageOf(al, r);
       c.fuel = c._fuelKg * this.fuelPriceFor(al, o) * (1 + P.AGE.fuel * age);
+      // 0.21.35: Umweg um gesperrten Luftraum (mehr Kerosin, Flugzeit, Streckengebühren) und Sonderabgaben für ausländische Airlines
+      const dt = this.detour(al, o, d);
+      if (dt.x > 1) { const bh0 = c._bh, dbh = (bh0 - (P.TAXI_BASE_H + ap(o).taxi + ap(d).taxi + P.CLIMB_DESCENT_OVERHEAD_H)) * (dt.x - 1);
+        c.fuel *= 1 + (dt.x - 1) * 0.92; c.navigation *= dt.x; c.maintenance += t.maint_bh * dbh * cpi; c._bh = bh0 + dbh; c._detourX = dt.x; if (!al.isPlayer) c.crew *= c._bh / bh0; }
       let maintF = (1 + P.AGE.maint * age) * shockX(this, 'mx');
       if (al.isPlayer) {
         const proc = 1 - lv3([0, 0.03, 0.06, 0.09], al.skill('procurement'));
@@ -2649,6 +3099,18 @@ const SM = (() => {
       const fm = this.macro.feeMult || {};
       if (fm[d]) c.landing *= fm[d];
       if (fm[o]) { c.pax_fees *= fm[o]; c.handling *= 1 + (fm[o] - 1) * 0.5; }
+      { const fo = this.foreignFeeX(al, o), fd = this.foreignFeeX(al, d); if (fo > 1) c.handling *= fo; if (fd > 1) c.landing *= fd; }
+      if (al.isPlayer && al.aptRebate) {   // 0.21.41: Bauherr eines Flughafenausbaus zahlt dort weniger Entgelte
+        const ro = al.aptRebate[o], rd = al.aptRebate[d];
+        if (ro && ro.until > this.day) c.pax_fees *= ro.x;
+        if (rd && rd.until > this.day) c.landing *= rd.x;
+      }
+      if (al.isPlayer && al.perks) {   // 0.21.41: Startangebote
+        const mro = perkOn(al, 'mro', this.day), hd = perkOn(al, 'hand', this.day), pa = perkOn(al, 'apt', this.day);
+        if (mro) c.maintenance *= mro.x;
+        if (hd && o === hd.apt && c.handling) c.handling *= hd.x;
+        if (pa) { if (o === pa.apt) c.pax_fees *= pa.x; if (d === pa.apt) c.landing *= pa.x; }
+      }
       if (!al.isPlayer || forecast) c.crew *= this.macro.wage || 1;
       if (!al.isPlayer) c.crew *= wageX(al.bases[0]);
       if (!al.isPlayer) { const cf = rivalsOf(this).cost; for (const k of ['fuel', 'maintenance', 'handling', 'crew']) if (c[k]) c[k] *= cf; }
@@ -2679,27 +3141,119 @@ const SM = (() => {
       const r = { ...spec, age: opts.age };
       const rotH = rotationHours(spec.base, spec.dest, spec.type_id, spec.service, spec.buffer, al.turnExtra(spec.base), al.turnExtra(spec.dest));
       const t = P.AIRCRAFT_TYPES[spec.type_id];
-      const dayFixed = t.value_eur * P.INSURANCE[al.insurance].rate / 365 + ovhAc(spec.type_id) * this.macro.cpi + t.lease_month * (al.fleet.some((x) => x.type_id === spec.type_id) ? 1 : riskTerms(al, spec.type_id).lease) * (P.EURUSD / this.macro.eurusd) * 12 / 365
-        + P.STAFF.techPerAc * P.STAFF.techSalary * (al.staff ? al.staff.pay : 1) * this.macro.cpi / 30.4;
+      const dayFixedOf = (tid) => { const tt = P.AIRCRAFT_TYPES[tid]; return tt.value_eur * P.INSURANCE[al.insurance].rate / 365 + ovhAc(tid) * this.macro.cpi + tt.lease_month * (al.fleet.some((x) => x.type_id === tid) ? 1 : riskTerms(al, tid).lease) * (P.EURUSD / this.macro.eurusd) * 12 / 365
+        + P.STAFF.techPerAc * P.STAFF.techSalary * (al.staff ? al.staff.pay : 1) * this.macro.cpi / 30.4; };
+      const dayFixed = dayFixedOf(spec.type_id), mx = spec.mix && spec.mix.freq > 0 && spec.mix.freq < spec.freq && P.AIRCRAFT_TYPES[spec.mix.type_id] ? spec.mix : null;
       let slotFee = 0; for (const x of [spec.base, spec.dest]) slotFee += apx(x).slotFee * spec.freq * this.macro.cpi;
       let crewSal = 0;
-      const res = evaluateRoute(spec, co, ci, {
+      // Rolle der Strecke: Ortsgäste-Nutzen und Platzreserve wie im Betrieb; Umsteiger über das Drehkreuz nur auf Wunsch (Streckenplanung, Szenarien)
+      const RL = P.ROUTE_ROLE[spec.role] || P.ROUTE_ROLE.mixed, withU = (ex) => (RL.localU ? { ...ex, extraU: Object.fromEntries(['leisure', 'business', 'vfr'].map((k) => [k, ((ex.extraU || {})[k] || 0) + RL.localU])) } : ex);
+      const tp = opts.tr ? transferPlan(this, al, spec, { month: opts.month ?? null, nDraws: opts.trDraws ?? 2, seed: (opts.seed ?? 7) + 3, scale: opts.demandScale ?? 1 }) : null;
+      const transfer = tp ? { out: { ...tp.out, protect: RL.protect, protectMax: RL.protectMax }, in: { ...tp.in, protect: RL.protect, protectMax: RL.protectMax } } : null;
+      const res = evaluateRoute(spec, co, ci, { transfer,
         month: opts.month ?? null, nDraws: opts.nDraws ?? 4, seed: opts.seed ?? 7, fuelPrice: this.fuelPrice, cpi: this.macro.cpi,
         demandScale: (opts.demandScale ?? 1) * trend * bias, segScale: { out: this.segScale(spec.base, spec.dest), in: this.segScale(spec.dest, spec.base) },
-        offerExtra: { out: withSst(this.offerExtra(al, spec.base, spec.dest), spec.base, spec.dest, spec.type_id), in: withSst(this.offerExtra(al, spec.dest, spec.base), spec.dest, spec.base, spec.type_id) },
-        costFn: (o, d, pax, fareRev) => { const c = this.costsFor(al, { ...r, base: spec.base, dest: spec.dest }, o, d, pax, fareRev, true); crewSal += (c._crewSal || 0) * spec.freq; return c; },
+        offerExtra: { out: withU(withSst(this.offerExtra(al, spec.base, spec.dest), spec.base, spec.dest, spec.type_id)), in: withU(withSst(this.offerExtra(al, spec.dest, spec.base), spec.dest, spec.base, spec.type_id)) },
+        costFn: (o, d, pax, fareRev, dir, typeId, n) => { const c = this.costsFor(al, { ...r, base: spec.base, dest: spec.dest, type_id: typeId || spec.type_id }, o, d, pax, fareRev, true); crewSal += (c._crewSal || 0) * (n ?? spec.freq); return c; },
         rotH, dayFixed, extraDaily: slotFee + (opts.extraDaily || 0),
+        ...(mx ? { dayFixedMix: dayFixedOf(mx.type_id), rotHMix: rotationHours(spec.base, spec.dest, mx.type_id, spec.service, spec.buffer, al.turnExtra(spec.base), al.turnExtra(spec.dest)) } : {}),
       });
       // Aufschlüsselung, damit die Prognose mit der Streckenliste vergleichbar ist
-      const genericAc = aircraftDayFixedGeneric(spec.type_id) * res.aircraftShare;
+      const genericAc = res.acShares ? aircraftDayFixedGeneric(spec.type_id) * res.acShares.main + aircraftDayFixedGeneric(mx.type_id) * res.acShares.mix : aircraftDayFixedGeneric(spec.type_id) * res.aircraftShare;
       res.crewSalary = crewSal; res.slotFee = slotFee; res.stationDaily = opts.extraDaily || 0;
       res.know = kn ? { lv: kn.lv, sigma: kn.sigma, src: kn.src } : null;
       res.acFull = res.aircraftTimeCost - slotFee - (opts.extraDaily || 0); res.acGeneric = genericAc;
       res.db1List = res.db1 + crewSal;                 // wie in der Streckenliste: Crew nur mit Spesen
       res.db2List = res.db1List - genericAc;           // Flugzeugzeit zur Standardrate
+      if (tp) { const flown = res.trPax / Math.max(1e-9, tp.out.car + tp.in.car); res.transfer = { flows: tp.flows.slice(0, 12), want: tp.out.want + tp.in.want, car: tp.out.car + tp.in.car,
+        other: { pax: tp.other.pax * flown, net: (tp.other.rev - tp.other.cost) * flown } }; }
       return res;
     }
 
+    /** 0.21.41 Flughafenausbau: Stand, Angebot, Bau, Fertigstellung. */
+    aptState(c) { const u = (this.aptUp && this.aptUp[c]) || {}, pr = (this.aptProj || []).find((x) => x.apt === c) || null; return { term: u.term || 0, rwy: u.rwy || 0, proj: pr, paxEff: paxEff(c), codeF: codeFOk(c, P.APT_UP.codeF) }; }
+    aptInvestQuote(al, c, kind) {
+      const U = P.APT_UP, a = ap(c); if (!a || !al.isPlayer) return { ok: false, msg: 'Ungültig.' };
+      if (!(al.bases.includes(c) || al.activeRoutes().some((r) => r.base === c || r.dest === c))) return { ok: false, msg: 'Ausbauen können Sie nur, wo Sie eine Basis haben oder hinfliegen.' };
+      const st = this.aptState(c);
+      if (st.proj) return { ok: false, msg: `In ${a.name} wird schon gebaut (${st.proj.kind === 'rwy' ? 'Bahn' : 'Terminal'}, fertig am ${dayDate(st.proj.done)}).` };
+      let cost, days, lv;
+      if (kind === 'rwy') {
+        if (st.rwy >= 1) return { ok: false, msg: 'Die Bahn ist schon verlängert.' };
+        if (paxEff(c) >= U.codeF) return { ok: false, msg: `${a.name} ist schon für Code F zugelassen (über ${U.codeF} Mio. Passagiere).` };
+        lv = 1; cost = U.rwy.cost; days = U.rwy.days;
+      } else {
+        lv = st.term + 1; if (lv > U.term.max) return { ok: false, msg: 'Das Terminal ist voll ausgebaut.' };
+        cost = (U.term.base + U.term.perMio * (a.pax || 0)) * U.term.lvX[lv - 1]; days = U.term.days[lv - 1];
+      }
+      cost = Math.round(cost * this.macro.cpi / 1e5) * 1e5;
+      const ok = al.spendable(this.macro.bank ?? 1) >= cost;
+      return { ok, msg: ok ? '' : `Dafür fehlt das Geld (${Math.round(cost / 1e6)} Mio. € nötig).`, cost, days, lv, kind };
+    }
+    aptInvest(al, c, kind) {
+      const q = this.aptInvestQuote(al, c, kind); if (!q.ok) return q;
+      const label = kind === 'rwy' ? 'Start-/Landebahn verlängert (Code F)' : `Terminal Stufe ${q.lv}`;
+      al.ledger.post('one_off', -q.cost, true, `Flughafenausbau ${ap(c).name}: ${label}`);
+      (this.aptProj = this.aptProj || []).push({ apt: c, kind, lv: q.lv, by: al.id, start: this.day, done: this.day + q.days, cost: q.cost });
+      al.log(this.day, `Flughafenausbau in ${ap(c).name} beauftragt: ${label} für ${Math.round(q.cost / 1e6)} Mio. €, fertig am ${dayDate(this.day + q.days)}`, 'info');
+      this.pushNews(this.day, `${al.name} finanziert den Ausbau von ${ap(c).name}: ${kind === 'rwy' ? 'längere Start- und Landebahn für A380 und 747-8' : `Terminal Stufe ${q.lv}`} – fertig ${dayDate(this.day + q.days)}`, 'info', al.id);
+      return { ok: true, msg: `${label} in ${ap(c).name} beauftragt – fertig am ${dayDate(this.day + q.days)}.` };
+    }
+    aptProjectsDaily() {
+      if (!this.aptProj || !this.aptProj.length) return;
+      const U = P.APT_UP, I = U.investor, left = [];
+      for (const pr of this.aptProj) {
+        if (pr.done > this.day) { left.push(pr); continue; }
+        const c = pr.apt, u = (this.aptUp = this.aptUp || {})[c] = { ...(this.aptUp[c] || {}) };
+        if (pr.kind === 'rwy') u.rwy = 1; else u.term = Math.max(u.term || 0, pr.lv);
+        setFuelX(this);
+        if (pr.kind !== 'rwy' && this.slotCap[c] !== undefined && apx(c).slots !== null) this.slotCap[c] += Math.max(2, Math.round(this.slotCap[c] * U.term.slotX));
+        const al = this.airlines[pr.by];
+        if (al && al.status !== 'insolvent') {
+          const rb = (al.aptRebate = al.aptRebate || {})[c], x = rb && rb.until > this.day ? Math.max(I.min, rb.x * I.step) : I.x;
+          al.aptRebate[c] = { x: Math.round(x * 1000) / 1000, until: this.day + I.years * 365 };
+          if (apx(c).slots !== null) al.hold(c, I.slots, 0, true);
+          al.log(this.day, `Flughafenausbau in ${ap(c).name} fertig: ${pr.kind === 'rwy' ? 'A380 und 747-8 dürfen landen' : `Terminal Stufe ${pr.lv}, Platz für ${String(Math.round(paxEff(c) * 10) / 10).replace('.', ',')} Mio. Passagiere`}. Als Bauherr zahlen Sie dort ${Math.round((1 - al.aptRebate[c].x) * 100)} % weniger Entgelte${apx(c).slots !== null ? ` und bekommen ${I.slots} Slots` : ''}.`, 'good');
+        }
+        this.pushNews(this.day, `${ap(c).name}: ${pr.kind === 'rwy' ? 'Verlängerte Bahn in Betrieb – jetzt auch für A380 und 747-8' : `Neues Terminal (Stufe ${pr.lv}) eröffnet – Platz für ${String(Math.round(paxEff(c) * 10) / 10).replace('.', ',')} Mio. Passagiere im Jahr`}`, 'info');
+      }
+      this.aptProj = left;
+    }
+    /**
+     * Drehkreuz-Analyse (0.21.41): neue Ziele ab H nach Umsteigern geordnet – grobe Schätzung für einen Flug täglich zum Marktpreis.
+     * Vorauswahl über das Potenzial zwischen den heutigen Zielen ab H und dem neuen Ziel (Umweg höchstens wie im Betrieb), dann Prognose der Umsteiger.
+     */
+    hubTargets(al, H, opts = {}) {
+      const TR = P.TRANSFER, lv = (al.hubs && al.hubs[H]) || 0, detour = TR.max_detour + 0.1 * lv;
+      const spokes = al.activeRoutes().filter((r) => r.base === H && r.opened_day <= this.day && r.role !== 'local');
+      if (!spokes.length) return [];
+      const served = new Set(al.activeRoutes().filter((r) => r.base === H || r.dest === H).map((r) => (r.base === H ? r.dest : r.base)));
+      let types = [...new Set(al.fleet.filter((a) => a.base === H).map((a) => a.type_id))].filter((t) => !P.AIRCRAFT_TYPES[t].role);
+      if (!types.length) types = [...new Set(al.fleet.map((a) => a.type_id))].filter((t) => !P.AIRCRAFT_TYPES[t].role);
+      if (!types.length) return [];
+      const pick = (c) => types.filter((t) => rangeOk(H, c, t)).sort((a, b) => P.AIRCRAFT_TYPES[a].seats.standard - P.AIRCRAFT_TYPES[b].seats.standard)[0];
+      const cand = [];
+      for (const c of AP_CODES) {
+        if (c === H || served.has(c) || !routeKmOk(H, c) || !pick(c) || this.routeBan(al, H, c)) continue;
+        const dHc = gcDistanceKm(H, c); let proxy = 0;
+        for (const r of spokes) { const X = r.dest, dab = gcDistanceKm(X, c); if (X === c || dab < TR.min_dist_km || (gcDistanceKm(X, H) + dHc) / dab > detour) continue; const q = qPot(X, c); proxy += q.leisure + q.business + q.vfr; }
+        if (proxy > 0) cand.push([c, proxy]);
+      }
+      cand.sort((a, b) => b[1] - a[1]);
+      const out = [], cpi = this.macro.cpi;
+      for (const [c] of cand.slice(0, opts.n ?? 28)) {
+        const t = pick(c), spec = { airline: al.id, base: H, dest: c, type_id: t, freq: 1, fare_out: Math.round(refPrice(H, c, cpi)), fare_in: Math.round(refPrice(c, H, cpi)), service: 'standard', buffer: 'normal', role: 'mixed' };
+        const tp = transferPlan(this, al, spec, { nDraws: 1, seed: 29 });
+        if (!tp) continue;
+        const car = tp.out.car + tp.in.car, want = tp.out.want + tp.in.want;
+        if (want < 1) continue;
+        const from = {}; for (const f of tp.flows) { const x = f.from === c ? f.to : f.from; from[x] = (from[x] || 0) + f.want; }
+        const kp = this.knownPot(al, H, c);
+        out.push({ dest: c, km: Math.round(gcDistanceKm(H, c)), type: t, seats: P.AIRCRAFT_TYPES[t].seats.standard, car, want, trRev: tp.out.rev + tp.in.rev, other: tp.other.rev - tp.other.cost,
+          local: kp.sum / 2, lv: kp.lv, from: Object.entries(from).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([x]) => x) });
+      }
+      return out.sort((a, b) => b.car - a.car);
+    }
     // Angebot
     operableFreq(al) {
       const { assign, partial } = al.plan(this.day, al.activeRoutes().filter((r) => r.opened_day <= this.day));
@@ -2707,18 +3261,20 @@ const SM = (() => {
       for (const a of al.fleet) {
         const lst = assign[a.id] || [];
         a.used_hours = lst.reduce((s, x) => s + x[1], 0);
-        a.assigned = lst.map((x) => x[0].id);
+        a.assigned = [...new Set(lst.map((x) => x[0]._pid || x[0].id))];
         // Flugstunden heute: bei Langstrecken-Umläufen fliegt jedes beteiligte Flugzeug nur seinen Anteil
         a.fhDay = lst.reduce((s, [r, , share]) => s + 2 * blockHours(r.base, r.dest, r.type_id) * (share ?? 1), 0);
         for (const [r, , share] of lst) sum[r.id] = (sum[r.id] || 0) + (share ?? 1);
       }
       // Umläufe je Tag: ganze Umläufe täglich, Teilbetrieb (z. B. Langstrecke mit einem Flugzeug) nur an jedem k-ten Tag
       const cnt = {}, d = this.day;
+      const today = (x) => { const whole = Math.floor(x + 1e-9), frac = x - whole; return whole + (frac > 1e-6 && Math.floor((d + 1) * frac + 1e-9) > Math.floor(d * frac + 1e-9) ? 1 : 0); };
       for (const r of al.activeRoutes()) {
-        r.partial = partial[r.id] || 0;
-        const x = sum[r.id] || 0, whole = Math.floor(x + 1e-9), frac = x - whole;
-        if (r.wk > 0 && r.wk < 7) { cnt[r.id] = x > 0 ? r.wk / 7 : 0; continue; }   // seltener als täglich: im Mittel wk/7 Flüge am Tag
-        cnt[r.id] = whole + (frac > 1e-6 && Math.floor((d + 1) * frac + 1e-9) > Math.floor(d * frac + 1e-9) ? 1 : 0);
+        r.partial = partial[r.id] || partial[r.id + '~'] || 0;
+        const x = sum[r.id] || 0;
+        if (r.wk > 0 && r.wk < 7) { cnt[r.id] = x > 0 ? r.wk / 7 : 0; delete r._fq; continue; }   // seltener als täglich: im Mittel wk/7 Flüge am Tag
+        if (mixOk(r)) { const m = today(x), n = today(sum[r.id + '~'] || 0); cnt[r.id] = m + n; r._fq = { main: m, mix: n }; }   // 0.21.42: zwei Muster
+        else { cnt[r.id] = today(x); delete r._fq; }
       }
       // Tagesaktuell: Umläufe mit Flugzeug heute (die Tagessimulation rechnet in buildMarkets genauso) – so sehen Netz und Karte Charter, Werft und Auslieferungen sofort
       for (const r of al.activeRoutes()) r.flyingToday = r.opened_day > d ? 0 : (cnt[r.id] || 0);
@@ -2740,9 +3296,9 @@ const SM = (() => {
           if (f <= 0) continue;
           const otp = al.otp(r.buffer);
           for (const [dir, o, d, fare] of [['out', r.base, r.dest, r.fare_out], ['in', r.dest, r.base, r.fare_in]]) {
-            // Ertragssteuerung: Für erwartete Umsteiger bleibt ein Teil der Plätze reserviert (höchstens die Hälfte)
+            // Ertragssteuerung: Für Umsteiger, die ihren Anschluss bekommen, bleibt ein Teil der Plätze reserviert (je nach Rolle höchstens die Hälfte bzw. 80 %)
             const RL = P.ROUTE_ROLE[r.role || 'mixed'];
-            const seats0 = r.seats(), resv = r.trDem && RL.protect ? Math.min(RL.protect * (r.trDem[dir] || 0), RL.protectMax * f * seats0) : 0;
+            const seats0 = r.seats(), resv = r.trCar && RL.protect ? Math.min(RL.protect * (r.trCar[dir] || 0), RL.protectMax * f * seats0) : 0;   // nur für Umsteiger, die auch weiterfliegen können
             const ex = withCabin(withSst(this.offerExtra(al, o, d), o, d, r.type_id), r.type_id, r.service, r.cab);
             if (RL.localU) { const u = ex.extraU || {}; ex.extraU = { leisure: (u.leisure || 0) + RL.localU, business: (u.business || 0) + RL.localU, vfr: (u.vfr || 0) + RL.localU }; }
             const atk = !al.isPlayer && this.attacks ? this.attacks[pairKey(o, d)] : null, cap = al.isPlayer && this.fareCaps ? this.fareCaps[pairKey(o, d)] : null;
@@ -2817,7 +3373,7 @@ const SM = (() => {
       // Warteliste: Vergabe nur zu festen Terminen (1. April, 1. Oktober) – siehe monthEnd; ein verpasster Termin wird hier nachgeholt. Pläne mit vollständigen Slots werden umgesetzt.
       { const due = lastSlotDue(this.day); if (this.slotRoundDay === undefined) this.slotRoundDay = due; else if (this.slotRoundDay < due) this.slotRound(due); }
       for (const al of this.humans) if (al.status !== 'insolvent' && al.plans && al.plans.length) this.checkPlans(al);
-      for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') { this.completeDaily(al); this.slotIdleCheck(al); }
+      for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') { this.completeDaily(al); this.slotIdleCheck(al); if (al.auto) autopilotDay(this, al); }
       expireDeals(this);
       const day = this.day, month = monthOf(day), dow = day % 7, cpi = this.macro.cpi;
       this.dailyEvents();
@@ -2838,29 +3394,55 @@ const SM = (() => {
         }
         for (const of of mk.conn) { const b = res.booked[of.key], pax = b.leisure + b.business + b.vfr; if (pax > 0.01) connDemand.push({ of, pax, biz: b.business }); }
       }
-      // Umsteiger auf Restkapazität: eine Reise, zwei Segmente, Erlös nach Distanz geteilt
-      const legKey = (r, dir) => r.id + '|' + dir;
-      const remaining = (r, dir) => { const l = local[legKey(r, dir)]; return Math.max(0, r.flyingToday * r.seats() - (l ? l.pax : 0)); };
-      const legDem = {}, transfer = {};
+      // Umsteiger auf Restkapazität: eine Reise, mehrere Segmente, Erlös nach den Einzeltarifen der Teilstrecken geteilt (0.21.41, vorher nach Entfernung)
+      const legKey = (r, dir) => r.id + '|' + dir, cap0 = (r) => r.flyingToday * r.seats(), rem = {};
+      const remaining = (r, dir) => { const k = legKey(r, dir); if (rem[k] === undefined) { const l = local[k]; rem[k] = Math.max(0, cap0(r) - (l ? l.pax : 0)); } return rem[k]; };
+      const legDem = {}, legCar = {}, transfer = {};
       for (const c of connDemand) for (const [r, dir] of c.of.conn.legs) { const k = legKey(r, dir); legDem[k] = (legDem[k] || 0) + c.pax; }
-      // Umsteigenachfrage je Strecke merken (gleitend) – Grundlage für die Platzreserve am nächsten Tag
+      // Ertragssteuerung (O&D): Ein Umsteiger ist einen freigehaltenen Platz wert, wenn sein Ticket mehr einbringt als die Ortsgäste,
+      // die er auf vollen Teilstrecken verdrängt (voll = Ortsgäste allein füllen über 70 % der Sitze, ab 100 % zählt der ganze Tarif).
+      const disp = (r, dir) => { const l = local[legKey(r, dir)], cap = cap0(r); if (!l || cap <= 0) return 0; return clamp((l.unc - 0.7 * cap) / (0.3 * cap), 0, 1) * (dir === 'out' ? r.fare_out : r.fare_in); };
+      for (const c of connDemand) { let D = 0; for (const [r, dir] of c.of.conn.legs) D += disp(r, dir); c.w = clamp(0.5 + (c.of.fare - D) / (0.2 * c.of.fare), 0, 1); }
+      // Beförderbar je Teilstrecke: lohnende Umsteiger, soweit die übrigen Teilstrecken ihrer Reise Platz haben – nur dafür gibt es eine Platzreserve
+      for (const c of connDemand) {
+        if (!(c.w > 0)) continue;
+        const legs = c.of.conn.legs, q = legs.map(([r, dir]) => Math.min(1, remaining(r, dir) / legDem[legKey(r, dir)]));
+        legs.forEach(([r, dir], n) => { let s = 1; for (let m = 0; m < q.length; m++) if (m !== n) s = Math.min(s, q[m]); const k = legKey(r, dir); legCar[k] = (legCar[k] || 0) + c.pax * s * c.w; });
+      }
+      // Je Strecke gleitend merken: gewünschte (trDem) und beförderbare lohnende Umsteiger (trCar, Grundlage der Platzreserve am nächsten Tag)
       for (const al of this.list) for (const r of al.activeRoutes()) {
         if (!r.flyingToday) continue;
         const o = legDem[legKey(r, 'out')] || 0, i = legDem[legKey(r, 'in')] || 0, t = r.trDem || { out: 0, in: 0 };
         if (o || i || r.trDem) r.trDem = { out: 0.6 * t.out + 0.4 * o, in: 0.6 * t.in + 0.4 * i };
+        const co = legCar[legKey(r, 'out')] || 0, ci = legCar[legKey(r, 'in')] || 0, tc = r.trCar || { out: 0, in: 0 };
+        if (co || ci || r.trCar) r.trCar = { out: 0.6 * tc.out + 0.4 * co, in: 0.6 * tc.in + 0.4 * ci };
       }
+      // Sitze verteilen: zuerst die lohnenden Umsteiger, dann die übrigen auf den Rest (je Durchgang anteilig nach Nachfrage)
+      for (const pass of [connDemand.filter((c) => c.w >= 0.5), connDemand.filter((c) => !(c.w >= 0.5))]) {
+        const dem = {}, take = {};
+        for (const c of pass) for (const [r, dir] of c.of.conn.legs) { const k = legKey(r, dir); dem[k] = (dem[k] || 0) + c.pax; }
+        for (const c of pass) {
+          let s = 1, neck = null; for (const [r, dir] of c.of.conn.legs) { const q = remaining(r, dir) / dem[legKey(r, dir)]; if (q < s) { s = q; neck = r; } }
+          c.s = Math.max(0, s); c.neck = neck;
+          for (const [r, dir] of c.of.conn.legs) { const k = legKey(r, dir); take[k] = (take[k] || 0) + c.pax * c.s; }
+        }
+        for (const k in take) rem[k] = Math.max(0, rem[k] - take[k]);
+      }
+      const flows = {};
       for (const c of connDemand) {
-        const legs = c.of.conn.legs;
-        let s = 1; for (const [r, dir] of legs) s = Math.min(s, remaining(r, dir) / legDem[legKey(r, dir)]);
-        const pax = c.pax * s;
+        const legs = c.of.conn.legs, s = c.s, neck = c.neck, pax = c.pax * s;
+        // Ströme über die Drehkreuze der Spielenden (für die Drehkreuz-Analyse)
+        if (this.airlines[c.of.airline] && this.airlines[c.of.airline].isPlayer) { const fk = c.of.airline + '|' + c.of.conn.hub, F = flows[fk] || (flows[fk] = {});
+          const key = legs[0][0].dest + '-' + legs[legs.length - 1][0].dest + (legs.length > 2 ? '*' : ''), e = F[key] || (F[key] = [0, 0, null]); e[0] += pax; e[1] += c.pax; if (neck && s < 0.95) e[2] = neck.id; }
         if (pax <= 0) continue;
-        const dists = legs.map(([r]) => gcDistanceKm(r.base, r.dest)), dsum = dists.reduce((a2, b2) => a2 + b2, 0);
+        const fares = legs.map(([r, dir]) => Math.max(1, dir === 'out' ? r.fare_out : r.fare_in)), fsum = fares.reduce((a2, b2) => a2 + b2, 0);
         const rev = pax * c.of.fare + c.biz * s * c.of.fare * c.of.bizPrem;
-        for (const [k, share, first] of legs.map(([r, dir], n) => [legKey(r, dir), dists[n] / dsum, n === 0])) {
+        for (const [k, share, first] of legs.map(([r, dir], n) => [legKey(r, dir), fares[n] / fsum, n === 0])) {
           if (!transfer[k]) transfer[k] = { pax: 0, rev: 0, anc: 0, biz: 0 };
           transfer[k].pax += pax; transfer[k].rev += rev * share; transfer[k].biz += c.biz * s; if (first) transfer[k].anc += pax;
         }
       }
+      for (const al of this.humans) if (al.status !== 'insolvent') hubFlowsDaily(al, flows);
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.staffCoverage(al);
       for (const al of this.list) {
         if (al.status === 'insolvent') continue;
@@ -2901,6 +3483,8 @@ const SM = (() => {
         }
       }
       if (dow === 6) for (const al of this.list) if (al.status !== 'insolvent') this.weeklyPricing(al);
+      for (const al of this.humans) if (al.status !== 'insolvent') this.playerAutoPricingExtreme(al);   // 0.21.41: Extremfälle täglich
+      this.aptProjectsDaily();   // 0.21.41: Flughafenausbau fertigstellen
       // KI-Planung über den Monat verteilt (je Airline ein fester Tag) – sonst ruckelt der Monatswechsel
       { let k = 0; for (const al of this.list) { if (!al.archetype) continue; const off = (k++ * 13) % 30; if (al.status !== 'active') continue;
         if ((day + off) % 30 === 0) aiMonthly(this, al);
@@ -2939,35 +3523,40 @@ const SM = (() => {
     fly(al, r, o, d, dir, l, t, st) {
       const L = al.ledger, ty = P.AIRCRAFT_TYPES[r.type_id], bp = P.BUFFER_POLICY[r.buffer], cpi = this.macro.cpi;
       const f = r.flyingToday, seats = r.seats();
+      // 0.21.42: zwei Muster – die ersten Flüge mit dem Hauptmuster, die übrigen mit dem zweiten; Passagiere je Flug nach Sitzen
+      const mixed = mixOk(r) && r._fq && r._fq.mix > 0, mu = mixed ? mixUnit(r) : null, nMain = mixed ? r._fq.main : Infinity;
+      const unitOf = (i) => (mixed && i >= nMain ? mu : r), seatsOf = (u) => (u === r ? r.seats(r.type_id) : u.seats());
+      let cargoKg = 0;
       const paxTotal = l.pax + t.pax, perFlight = paxTotal / f;
       const opsLv = al.skill('ops'), risk = this.legRisk(al, r), itOut = risk.it > 0, rt = L.det ? rTag(r) : null;
       const shareLocal = paxTotal > 0 ? l.pax / paxTotal : 1;
       let flown = 0, flownLocal = 0, flownTr = 0, cancelledHere = 0;
       // Bruchteile (Flüge seltener als täglich): ein Flug mit Gewicht wF steht im Mittel für wF Flüge am Tag
       for (let i = 0; i < Math.ceil(f - 1e-9); i++) {
-        const wF = Math.min(1, f - i);
-        st.flights += wF; st.seats += seats * wF;
+        const wF = Math.min(1, f - i), u = unitOf(i), sI = seatsOf(u), tyI = P.AIRCRAFT_TYPES[u.type_id], pfI = mixed && seats > 0 ? perFlight * sI / seats : perFlight;
+        st.flights += wF; st.seats += sI * wF; st._sAll = (st._sAll || 0) + sI * wF;
         const rr = this.rng;
         const lc = this.legCancel(al, r, i, this.day, risk);
         if (lc.c) {
           st.cancelled += wF; cancelledHere += wF;
           if (lc.kind === 'closed' || lc.kind === 'weather') st.cxExt = (st.cxExt || 0) + wF;
-          const care = perFlight * wF * (P.CANCEL_CARE_COST_PAX * cpi + P.EU261_CLAIM_RATE * eu261(gcDistanceKm(o, d)) * (lc.kind === 'closed' || lc.kind === 'weather' ? 0.3 : 1));
+          const care = pfI * wF * (P.CANCEL_CARE_COST_PAX * cpi + P.EU261_CLAIM_RATE * eu261(gcDistanceKm(o, d)) * (lc.kind === 'closed' || lc.kind === 'weather' ? 0.3 : 1));
           L.post('disruption', -care, true, rt && `${rt} › Annullierungen (${lc.why})`); st.cost += care; al.pushOtp(0);
           continue;
         }
         const yf = ty.yieldF || 1;
-        const c = this.costsFor(al, r, o, d, perFlight, perFlight * shareLocal * l.fare * yf);
+        const c = this.costsFor(al, u, o, d, pfI, pfI * shareLocal * l.fare * yf);
+        cargoKg += tyI.cargo_kg * wF; st._sFl = (st._sFl || 0) + sI * wF;
         const otpBase = bp.otp + lv3([0, 0.03, 0.05, 0.08], opsLv) + P.HOME.otp * homeX(al).crew - risk.delay / 120 - (itOut ? 0.4 : 0);
         const onTime = rr.random() < clamp(otpBase, 0.05, 0.98);
         const meanLate = Math.max(bp.mean_delay_min / (1 - bp.otp) - 15, 1) * (1 - lv3([0, 0.15, 0.25, 0.35], opsLv)) + risk.delay;
         const delay = onTime ? 0 : 15 + rr.expo(1 / meanLate);
         al.pushOtp(onTime ? 1 : 0);
         if (!onTime) st.late++;
-        c.disruption = delay * ty.delay_cost_min;
+        c.disruption = delay * tyI.delay_cost_min;
         for (const k of COST_KEYS.concat(['disruption'])) { L.post(k, -c[k] * wF, true, rt && (k === 'disruption' ? `${rt} › Verspätungen` : rt)); st.cost += c[k] * wF; }
         st.block_h += c._bh * wF;
-        flown += perFlight * wF; flownLocal += perFlight * shareLocal * wF; flownTr += perFlight * (1 - shareLocal) * wF;
+        flown += pfI * wF; flownLocal += pfI * shareLocal * wF; flownTr += pfI * (1 - shareLocal) * wF;
       }
       const locShare = l.pax > 0 ? flownLocal / l.pax : 0, trShare = t.pax > 0 ? flownTr / t.pax : 0;
       const yf = ty.yieldF || 1;
@@ -2981,9 +3570,11 @@ const SM = (() => {
         st.prem = (st.prem || 0) + cr.f + cr.b; st.ps = (st.ps || 0) + cr.seats;
       }
       const anc = (flownLocal + t.anc * trShare) * P.SERVICE[r.service].ancillary * cpi;
-      if (rt) { const rTr = Math.min(rev, t.rev * trShare * yf); L.post('rev_ticket', rev - rTr, true, rt); L.post('rev_ticket', rTr, true, `${rt} › Umsteiger (Anteil)`); } else L.post('rev_ticket', rev); L.post('rev_ancillary', anc, true, rt);
+      { const rTr = Math.min(rev, t.rev * trShare * yf); st.trr = (st.trr || 0) + rTr;
+        if (rt) { L.post('rev_ticket', rev - rTr, true, rt); L.post('rev_ticket', rTr, true, `${rt} › Umsteiger (Anteil)`); } else L.post('rev_ticket', rev); }
+      L.post('rev_ancillary', anc, true, rt);
       if (al.cargo && f > cancelledHere) {
-        const cap = ty.cargo_kg * (f - cancelledHere) * P.CARGO.loadMax;
+        const cap = (mixed ? cargoKg : ty.cargo_kg * (f - cancelledHere)) * P.CARGO.loadMax;
         const kg = Math.min(cap, cargoDemand(o, d, this.econFactor(o, d, 'business')) * this.cargoShare(o, d, r));
         if (kg > 0) {
           const crev = kg * cargoYield(o, d) * cpi;
@@ -2992,8 +3583,9 @@ const SM = (() => {
           st.cargo += kg; st.rev += crev; st.cost += ccost;
         }
       }
-      st.pax += flown; st.rev += rev + anc; st['pax_' + dir] += flown; st['tr_' + dir] += flownTr; st['seats_' + dir] += f * seats;
-      st['so_' + dir] = (st['so_' + dir] || 0) + Math.max(0, f - cancelledHere) * seats;   // Sitze auf tatsächlich geflogenen Flügen (für Auslastung und Preisautomatik)
+      const sAll = st._sAll || 0, sFl = st._sFl || 0; delete st._sAll; delete st._sFl;
+      st.pax += flown; st.rev += rev + anc; st['pax_' + dir] += flown; st['tr_' + dir] += flownTr; st['seats_' + dir] += mixed ? sAll : f * seats;
+      st['so_' + dir] = (st['so_' + dir] || 0) + (mixed ? sFl : Math.max(0, f - cancelledHere) * seats);   // Sitze auf tatsächlich geflogenen Flügen (für Auslastung und Preisautomatik)
     }
     cargoShare(o, d, r) {
       let tot = 0, own = 0;
@@ -3125,7 +3717,8 @@ const SM = (() => {
       for (const h of al.hangars) L.post('stations', -P.HANGAR_MONTH * apx(h).cost * cpi * proc / 30.4, true, `Hangar › ${aTag(h)}`);
       for (const e of al.experts) L.post('experts', -e.salary * cpi / 30.4, true, expTag(e));
       const tick = (L.today.rev_ticket || 0) / 100, anc0 = (L.today.rev_ancillary || 0) / 100;
-      if (al.mktPct > 0) L.post('marketing', -al.mktPct * (tick + anc0), true, `laufendes Marketing (${Math.round(al.mktPct * 1000) / 10} % vom Umsatz)`);
+      const mkX = perkOn(al, 'mkt', this.day) ? perkOn(al, 'mkt', this.day).x : 1;   // 0.21.41: Tourismusverband zahlt mit
+      if (al.mktPct > 0) L.post('marketing', -al.mktPct * (tick + anc0) * mkX, true, `laufendes Marketing (${Math.round(al.mktPct * 1000) / 10} % vom Umsatz)${mkX < 1 ? ', Hälfte vom Tourismusverband' : ''}`);
       else if (al.marketing > 0) L.post('marketing', -al.marketing / 30.4, true, 'laufendes Marketing (fester Betrag)');   // ältere Stände: fester Betrag
       if (al.loyalty && al.loyalty.lv) {
         const LP = P.LOYALTY[al.loyalty.lv];
@@ -3239,7 +3832,8 @@ const SM = (() => {
           for (const h of last) { seats += opSeats(h, dir); pax += h['pax_' + dir] || 0; spill += h['spill_' + dir] || 0; dem += h['demand_' + dir] || 0; }
           const lf = seats ? pax / seats : 0, gap = lf - r.ap;   // Auslastung der geflogenen Flüge – Ausfälle drücken sie nicht künstlich
           let step = Math.abs(gap) < A.dead ? 0 : clamp(A.gain * gap, -cfg.spd, cfg.spd);
-          { const sr = dem > 0 ? spill / dem : 0; if (sr > 0.08 && lf > r.ap - A.dead) step = Math.max(step, cfg.spd * (sr > 0.35 ? 1.6 : sr > 0.2 ? 1.1 : 0.7)); }   // viele Abweisungen: Preis rauf – je mehr, desto schneller
+          { const sr = dem > 0 ? spill / dem : 0; if (sr > 0.08 && lf > r.ap - A.dead) step = Math.max(step, cfg.spd * (sr > 0.35 ? 1.6 : sr > 0.2 ? 1.1 : 0.7));   // viele Abweisungen: Preis rauf – je mehr, desto schneller
+            else if (sr > 0.08) step = Math.max(step, 0); }   // Abweisungen trotz freier Plätze (Reserve für Umsteiger, starke Tage): nicht billiger werden
           const [o, d] = dir === 'out' ? [r.base, r.dest] : [r.dest, r.base], ref = refPrice(o, d, this.macro.cpi);
           const fc = this.fareCaps && this.fareCaps[pairKey(o, d)], lo = Math.max(Math.round(priceFloor(o, d, r, this) * 0.9), cfg.min ? Math.round(cfg.min * ref) : 0), hi = Math.max(lo, Math.round((fc && fc.al === al.id ? Math.min(cfg.max, fc.x) : cfg.max) * ref));
           let nf = fare * (1 + step);
@@ -3261,6 +3855,40 @@ const SM = (() => {
         if (Math.round(nw[0]) !== Math.round(r.fare_out) || Math.round(nw[1]) !== Math.round(r.fare_in)) { moved.push((nw[0] + nw[1]) / (r.fare_out + r.fare_in) - 1); r.setFares(this.day, nw[0], nw[1]); }
       }
       if (moved.length) al.log(this.day, `Preisautomatik: ${moved.length} Strecke${moved.length > 1 ? 'n' : ''} angepasst (Ø ${moved.reduce((a, b) => a + b, 0) / moved.length >= 0 ? '+' : ''}${(moved.reduce((a, b) => a + b, 0) / moved.length * 100).toFixed(1).replace('.', ',')} %)`, 'route');
+    }
+    /**
+     * 0.21.41: Preisautomatik in Extremfällen – täglich statt wöchentlich, Schritte bis ±15 %:
+     * Einbruch (Auslastung weit unter Ziel), Ansturm (viele Abweisungen) oder deutliche Unterbietung bei schwacher Auslastung.
+     */
+    playerAutoPricingExtreme(al) {
+      const A = P.PLAYER_AUTO_PRICE, X = A.x, hits = [];
+      for (const r of al.activeRoutes()) {
+        if (!(r.ap > 0) || r.pending.length || r.hist.length < X.days || this.day - r.opened_day < X.settle || (r.apx !== undefined && this.day - r.apx < X.cool)) continue;
+        const cfg = apCfgOf(r); if (!cfg.ext) continue;
+        const last = r.hist.slice(-X.days), nw = [], why = [];
+        for (const [dir, fare] of [['out', r.fare_out], ['in', r.fare_in]]) {
+          let seats = 0, pax = 0, spill = 0, dem = 0;
+          for (const h of last) { seats += opSeats(h, dir); pax += h['pax_' + dir] || 0; spill += h['spill_' + dir] || 0; dem += h['demand_' + dir] || 0; }
+          const [o, d] = dir === 'out' ? [r.base, r.dest] : [r.dest, r.base];
+          if (!seats) { nw.push(fare); continue; }
+          const lf = pax / seats, sr = dem > 0 ? spill / dem : 0;
+          let step = 0;
+          if (sr > X.spill && lf > r.ap - A.dead) { step = Math.min(X.step, 0.5 * sr); why.push(`${pct0(sr)} abgewiesen`); }
+          else if (lf < r.ap - X.lowGap && sr < 0.05) {
+            step = -Math.min(X.step, 0.6 * (r.ap - lf));
+            const c = this.competitorOffers(al.id, o, d).filter((q) => q.seats > 0).sort((a2, b2) => a2.fare - b2.fare)[0];
+            if (c && c.fare < fare * X.under) { step = Math.max(-X.step, Math.min(step, c.fare * 1.05 / fare - 1)); why.push(`${this.airlines[c.airline] ? this.airlines[c.airline].name : 'Konkurrenz'} ${pct0(1 - c.fare / fare)} billiger`); }
+            else why.push(`Auslastung ${pct0(lf)}`);
+          }
+          const ref = refPrice(o, d, this.macro.cpi), lo = Math.max(Math.round(priceFloor(o, d, r, this) * 0.9), cfg.min ? Math.round(cfg.min * ref) : 0), hi = Math.max(lo, Math.round(cfg.max * ref));
+          nw.push(Math.round(step ? clamp(fare * (1 + step), Math.min(lo, fare), Math.max(hi, fare)) : fare));
+        }
+        if (Math.round(nw[0]) !== Math.round(r.fare_out) || Math.round(nw[1]) !== Math.round(r.fare_in)) {
+          const ch = (nw[0] + nw[1]) / (r.fare_out + r.fare_in) - 1; r.setFares(this.day, nw[0], nw[1]); r.apx = this.day;
+          hits.push(`${r.base}–${r.dest} ${ch >= 0 ? '+' : ''}${(ch * 100).toFixed(0)} % (${why[0] || ''})`);
+        }
+      }
+      if (hits.length) al.log(this.day, `Preisautomatik, Extremfall: ${hits.slice(0, 4).join(', ')}${hits.length > 4 ? ` und ${hits.length - 4} weitere` : ''}`, 'route');
     }
     weeklyPricing(al) {
       const cfg = al.cfg, rm = al.skill('revenue');
@@ -3978,7 +4606,8 @@ const SM = (() => {
     // ------------------------------------------------------------------------
     studyPrice(al, tier) {
       const T = P.STUDIES.tiers[tier], lv = al.skillNom('analyst');
-      return { cost: Math.round(T.cost * this.macro.cpi * (1 - 0.1 * Math.min(lv, 3)) / 1000) * 1000, days: Math.max(2, Math.round(T.days * (1 - 0.15 * Math.min(lv, 3)))) };
+      const pk = perkOn(al, 'study', this.day), x = pk && pk.tier === tier ? pk.x : 1;   // 0.21.41: Startangebot
+      return { cost: Math.round(T.cost * this.macro.cpi * (1 - 0.1 * Math.min(lv, 3)) * x / 1000) * 1000, days: Math.max(2, Math.round(T.days * (1 - 0.15 * Math.min(lv, 3)))), perk: x < 1 };
     }
     orderStudy(al, kind, tier, focus, bases = null, fresh = true) {
       const S = P.STUDIES;
@@ -3990,9 +4619,10 @@ const SM = (() => {
       if (f === false) return { ok: false, msg: 'Ungültiger Schwerpunkt.' };
       al.reports = al.reports || [];
       if (al.reports.filter((r) => r.status === 'running').length >= S.maxRunning) return { ok: false, msg: `Höchstens ${S.maxRunning} Studien gleichzeitig.` };
-      const { cost, days } = this.studyPrice(al, tier);
+      const { cost, days, perk } = this.studyPrice(al, tier);
       if (al.spendable(this.macro.bank ?? 1) < cost) return { ok: false, msg: `Für die Studie (${Math.round(cost / 1000)} Tsd. EUR) reicht auch der Dispo nicht.` };
-      al.ledger.post('one_off', -cost, true, 'Beratungsstudie');
+      al.ledger.post('one_off', -cost, true, perk ? 'Beratungsstudie (Startangebot −90 %)' : 'Beratungsstudie');
+      if (perk) delete al.perks.study;
       const id = 'S' + (++this.offerCounter);
       al.reports.push({ id, kind, tier, focus: f, bases: bs || undefined, fresh: fresh ? undefined : false, day: this.day, ready: this.day + days, status: 'running', cost });
       al.log(this.day, `${S.tiers[tier].label} „${S.kinds[kind].label}“${bs ? ' ab ' + bs.join(', ') : ''}${f ? ' mit Schwerpunkt ' + focusLabel(f) : ''} beauftragt – Bericht in ${days} Tagen`, 'info');
@@ -4094,6 +4724,23 @@ const SM = (() => {
       al.loans = al.loans.filter((x) => x !== ln);
       al.log(this.day, `Kredit vorzeitig zurückgezahlt (1 % Vorfälligkeitsgebühr)${q.fromCredit > 0 ? ` – davon ${mioTxt(q.fromCredit)} vorübergehend aus dem Dispo (${(q.creditRate * 100).toFixed(1).replace('.', ',')} % Zins, wird aus den Einnahmen zurückgeführt)` : ''}`, 'info');
       return { ok: true, fromCredit: q.fromCredit };
+    }
+    /** 0.21.42: Flugzeugkredite vorzeitig ablösen (einzeln oder alle) – 1 % Vorfälligkeit, fehlender Betrag vorübergehend aus dem Dispo. */
+    acLoanQuote(al, ids) {
+      const acs = al.fleet.filter((a) => a.owned && a.loan > 0.5 && (!ids || ids.includes(a.id)));
+      const bal = acs.reduce((s2, a) => s2 + a.loan, 0), fee = bal * P.AC_LOAN_PREPAY, cost = bal + fee, bank = this.macro.bank ?? 1;
+      const cash = Math.max(0, al.ledger.cash / 100), free = Math.max(0, al.creditLimit(bank) - (al.creditUsed || 0)), fromCredit = Math.max(0, cost - cash);
+      const rate = acs.length ? acs.reduce((s2, a) => s2 + a.loan * (a.loanRate || 0.06), 0) / bal : 0;
+      return { n: acs.length, ids: acs.map((a) => a.id), bal, fee, cost, fromCredit, free, ok: acs.length > 0 && fromCredit <= free + 0.01, rate, creditRate: al.creditRate(this.macro.rate, bank), save: bal * rate / 365 };
+    }
+    repayAcLoan(al, ids) {
+      const q = this.acLoanQuote(al, ids);
+      if (!q.n) return { ok: false, msg: 'Kein Flugzeugkredit offen.' };
+      if (!q.ok) return { ok: false, msg: `Dafür reichen Kontostand und Dispo nicht: Es fehlen ${mioTxt(q.fromCredit - q.free)}.` };
+      if (q.fromCredit > 0) { const d = Math.round(q.fromCredit * 100) / 100; al.creditUsed = (al.creditUsed || 0) + d; al.ledger.cashOnly(d, 'credit_draw'); }
+      for (const a of al.fleet) if (q.ids.includes(a.id)) { al.ledger.cashOnly(-a.loan, 'loan_repay'); al.ledger.post('interest', -a.loan * P.AC_LOAN_PREPAY, true, `Vorfälligkeit › Flugzeugfinanzierung ${a.id}`); a.loan = 0; }
+      al.log(this.day, `Flugzeugkredit${q.n > 1 ? 'e' : ''} abgelöst: ${q.n > 3 ? q.n + ' Flugzeuge' : q.ids.join(', ')}, ${mioTxt(q.bal)} (${Math.round(P.AC_LOAN_PREPAY * 1000) / 10} % Vorfälligkeit)${q.fromCredit > 0 ? ` – davon ${mioTxt(q.fromCredit)} vorübergehend aus dem Dispo` : ''}`, 'info');
+      return { ok: true, n: q.n, bal: q.bal, fromCredit: q.fromCredit, msg: `${q.n > 1 ? `${q.n} Flugzeugkredite` : 'Flugzeugkredit'} abgelöst (${mioTxt(q.bal)})${q.fromCredit > 0 ? ` – ${mioTxt(q.fromCredit)} vorübergehend aus dem Dispo` : ''}.` };
     }
     /** Großereignis: Charteranfragen für Fans, Mannschaften, Pilger – deutlich über der üblichen Rate. */
     eventCharters(ev, y, S, apts) {
@@ -4342,7 +4989,139 @@ const SM = (() => {
   // ===========================================================================
   // KI
   // ===========================================================================
+  // ===========================================================================
+  // 0.21.39: KI-Vertretung für abwesende Spielende (mittleres Niveau): Entscheidungen maßvoll, Preisautomatik, Personal auffüllen,
+  // Verlustbringer schließen, freie Flugzeuge auf eine neue Strecke – keine Basen, keine Käufe, keine Kredite, keine Angriffe.
+  // ===========================================================================
+  const AUTO_CHOICE = { strike: ['raise5', '+5 % Gehalt'], profit: ['share', 'Gewinnbeteiligung'], agm: ['half', 'Kompromiss'], auditpay: ['r12', '12 Monatsraten'] };
+  // ---------- Drehkreuz-Analyse (0.21.41): Umsteigerströme je Drehkreuz, gleitend über rund zwei Wochen ----------
+  // al.hubFlows[H]['A-B'] = [befördert/Tag, gewünscht/Tag, Engpass-Strecke]; „*“ = mit zweitem Umstieg an einem weiteren Drehkreuz
+  const HUB_FLOW = { alpha: 0.08, keep: 60, min: 0.3 };
+  function hubFlowsDaily(al, flows) {
+    const prev = al.hubFlows || {}, res = {};
+    for (const H of al.bases) {
+      const F = flows[al.id + '|' + H] || {}, pv = prev[H] || {}, nx = {};
+      for (const k of new Set([...Object.keys(pv), ...Object.keys(F)])) {
+        const p = pv[k], f = F[k] || [0, 0, null];
+        const x = p ? [p[0] + HUB_FLOW.alpha * (f[0] - p[0]), p[1] + HUB_FLOW.alpha * (f[1] - p[1]), f[1] ? f[2] : p[2]] : [f[0], f[1], f[2]];
+        if (x[1] >= HUB_FLOW.min) nx[k] = x;
+      }
+      const keys = Object.keys(nx).sort((u, v) => nx[v][1] - nx[u][1]).slice(0, HUB_FLOW.keep);
+      if (keys.length) res[H] = Object.fromEntries(keys.map((k) => [k, nx[k]]));
+    }
+    al.hubFlows = Object.keys(res).length ? res : undefined;
+  }
+  const pct0 = (x) => `${Math.round(x * 100)} %`;
+  function hubFlowsOut(hf) { const o = {}; for (const H in hf) { o[H] = {}; for (const k in hf[H]) { const x = hf[H][k]; o[H][k] = [Math.round(x[0] * 100) / 100, Math.round(x[1] * 100) / 100, x[2] || null]; } } return o; }
+
+  /**
+   * Umsteiger für eine geplante Strecke ab einem eigenen Drehkreuz (Prognose, 0.21.41).
+   * Neue Reisen X → H → D und D → H → X mit allen Strecken, die heute ab H fliegen (ein Umstieg). Je Reise: Nachfrage im Markt X–D
+   * gegen die Konkurrenz, Platz auf der Anschlussstrecke (anteilig zu deren heutigen Umsteigern), Erlös nach Einzeltarifen.
+   * Ergebnis je Richtung: beförderbare Umsteiger (car), Ø-Erlösanteil je Umsteiger (rev1), Anteil mit Zusatzleistungen auf dieser Strecke (anc).
+   */
+  function transferPlan(w, al, spec, opts = {}) {
+    const H = spec.base, D = spec.dest, TR = P.TRANSFER, cpi = w.macro.cpi;
+    if (!al.isPlayer || !al.bases.includes(H) || spec.role === 'local') return null;
+    const lv = (al.hubs && al.hubs[H]) || 0, day = w.day;
+    const spokes = al.activeRoutes().filter((r) => r.base === H && r.opened_day <= day && r.role !== 'local' && r.dest !== D && (r.flyingToday > 0 || r.freq > 0));
+    if (!spokes.length) return null;
+    const isLong = gcDistanceKm(H, D) > 4000, nLong = spokes.filter((r) => gcDistanceKm(r.base, r.dest) > 4000).length + (isLong ? 1 : 0);
+    const attr = Math.min(TR.attrMax, TR.attrPerLong * nLong), conn = Math.max(0.6, TR.connH - TR.connHPerLv * lv);
+    const detour = TR.max_detour + 0.1 * lv, month = opts.month ?? null, rng = new Rng(opts.seed ?? 17), nDraws = opts.nDraws ?? 2;
+    const svcOtp = al.otp(spec.buffer || 'normal'), freqNew = spec.wk > 0 && spec.wk < 7 ? spec.wk / 7 : spec.freq;
+    const out = { out: { car: 0, want: 0, rev: 0, anc: 0 }, in: { car: 0, want: 0, rev: 0, anc: 0 }, other: { pax: 0, rev: 0, cost: 0 }, flows: [] };
+    const room = (r, dir) => {   // Platz für Umsteiger auf der Anschlussstrecke: Sitze minus Ortsgäste, Ø der letzten zwei Wochen; dazu die Umsteiger, die dort heute fliegen
+      const h = r.hist.slice(-14); if (!h.length) return [r.seats() * (r.flyingToday || r.freq) * 0.5, 0];
+      let s = 0, t = 0; for (const x of h) { s += Math.max(0, opSeats(x, dir) - ((x['pax_' + dir] || 0) - (x['tr_' + dir] || 0))); t += x['tr_' + dir] || 0; } return [s / h.length, t / h.length];
+    };
+    // Wert einer heutigen Umsteigerreise über H (Erlös aller Teilstrecken): wird sie von einer neuen Reise verdrängt, fehlt er
+    let tripV = 0; { let rv = 0, n = 0; for (const r of spokes) for (const x of r.hist.slice(-14)) { rv += x.trr || 0; n += (x.tr_out || 0) + (x.tr_in || 0); } tripV = n > 0 ? 2 * rv / n : 0; }
+    for (const r of spokes) {
+      const X = r.dest, dab = gcDistanceKm(X, D);
+      if (dab < TR.min_dist_km) continue;
+      const path = gcDistanceKm(X, H) + gcDistanceKm(H, D);
+      if (path / dab > detour) continue;
+      // zwei Richtungen: X → D (r zurück zum Drehkreuz, dann neue Strecke hin) und D → X
+      for (const [a, b, newDir, rDir, newFirst] of [[X, D, 'out', 'in', false], [D, X, 'in', 'out', true]]) {
+        const fNew = newDir === 'out' ? spec.fare_out : spec.fare_in, fR = rDir === 'out' ? r.fare_out : r.fare_in;
+        const disc = TR.discount + 0.03 * lv, fare = disc * (fNew + fR);
+        const of = offer(al.id, fare, Math.min(r.flyingToday || r.freq, freqNew), 0, newFirst ? r.service : (spec.service || 'standard'), (svcOtp * al.otp(r.buffer)) ** 0.75, 1, 'TP', w.offerExtra(al, a, b));
+        if (lv) of.freqU = of.freq * (1 + 0.25 * lv);
+        const protect = (r.role === 'feeder' ? 1 : 0) + (spec.role === 'feeder' ? 1 : 0), pf = (1 - 0.25 * lv) * (protect ? 1 - TR.feederBonus * protect / 2 : 1);
+        const extraH = (path - dab) / TR.kmh + conn, u = of.extraU || {};
+        of.penalty = { leisure: TR.penalty.leisure * pf, business: TR.penalty.business * pf, vfr: TR.penalty.vfr * pf };
+        of.extraU = { leisure: (u.leisure || 0) - TR.timeU.leisure * extraH + attr, business: (u.business || 0) - TR.timeU.business * extraH + attr, vfr: (u.vfr || 0) - TR.timeU.vfr * extraH + attr };
+        of.conn = { legs: [], hubs: [H], hub: H };
+        const comps = w.competitorOffers(al.id, a, b);
+        for (const q of al.activeRoutes()) if (q.opened_day <= day && ((q.base === a && q.dest === b) || (q.base === b && q.dest === a))) comps.push(offer(al.id, q.base === a ? q.fare_out : q.fare_in, q.freq, q.seats(), q.service, al.otp(q.buffer), 1, q.id, w.offerExtra(al, a, b)));
+        const { acc } = marketDraws(a, b, withIndirect(a, b, [of].concat(comps), cpi), month, nDraws, rng, opts.scale ?? 1, null, cpi);
+        const want = acc.TP ? acc.TP.pax : 0;
+        if (want < 0.05) continue;
+        // Platz auf der Anschlussstrecke: anteilig zu den Umsteigern, die dort heute schon mitfliegen wollen
+        const have = (r.trDem && r.trDem[rDir]) || 0, [rm, flownR] = room(r, rDir), car = Math.min(want, rm * want / Math.max(want, have + want));
+        const disp = clamp(flownR + car - rm, 0, car), ppc = (ap(rDir === 'in' ? X : H).paxfee + P.SERVICE[r.service].cost_pax) * cpi;   // verdrängte heutige Umsteiger
+        const o2 = out[newDir]; o2.want += want; o2.car += car; o2.rev += car * disc * fNew; if (newFirst) o2.anc += car;
+        out.other.pax += car - disp; out.other.rev += car * disc * fR * (P.AIRCRAFT_TYPES[r.type_id].yieldF || 1) + (newFirst ? 0 : car * P.SERVICE[r.service].ancillary * cpi) - disp * (tripV || disc * (fR + fNew));
+        out.other.cost += (car - 2 * disp) * ppc;
+        out.flows.push({ from: a, to: b, via: r.id, want, car, short: want - car > 0.5 && car < want * 0.9 });
+      }
+    }
+    for (const d of ['out', 'in']) { const o2 = out[d]; o2.rev1 = o2.car > 0 ? o2.rev / o2.car : 0; o2.ancShare = o2.car > 0 ? o2.anc / o2.car : 0; }
+    out.flows.sort((x, y) => y.want - x.want);
+    return out;
+  }
+
+  function autopilotDay(w, al) {
+    const A = P.AUTOPILOT, day = w.day, act = (a) => applyAction(w, al.id, a), note = (t, k = 'info') => al.log(day, `Vertretung (KI): ${t}`, k);
+    for (const d of al.decisions) if (!d.resolved && d.deadline - day <= 1 && AUTO_CHOICE[d.type]) {
+      const [ch, lab] = AUTO_CHOICE[d.type]; if (act({ type: 'decide', id: d.id, choice: ch }).ok) note(`${String(d.text || d.type).split(':')[0]} – entschieden: ${lab}.`);
+    }
+    const off = hashStr(al.id) % 30;
+    if ((day + off) % 7 === 0) {
+      let n = 0; for (const r of al.activeRoutes()) if (!(r.ap > 0) && act({ type: 'autoPrice', id: r.id, on: true, lf: A.targetLf }).ok) n++;
+      if (n) note(`Preisautomatik auf ${n} Strecke${n > 1 ? 'n' : ''} eingeschaltet (Ziel ${Math.round(A.targetLf * 100)} % Auslastung).`);
+      const fs = act({ type: 'fillStaff' }); if (fs.ok && fs.n) note(fs.msg);
+    }
+    if ((day + off) % 30 === 0) {
+      for (const r of al.activeRoutes()) {
+        if (day - r.opened_day < A.closeAfter || r.hist.length < 30) continue;
+        const h = r.hist.slice(-30), db1 = h.reduce((x, y) => x + (y.rev || 0) - (y.cost || 0), 0);
+        if (db1 < 0 && act({ type: 'closeRoute', id: r.id }).ok) note(`${r.base}–${r.dest} eingestellt – deckte seit 30 Tagen nicht einmal die direkten Kosten (${Math.round(db1 / 30)} EUR pro Tag).`, 'warn');
+      }
+      if (autopilotNewRoute(w, al, note)) autopilotNewRoute(w, al, note);   // höchstens zwei neue Strecken je Monat
+    }
+  }
+  function autopilotNewRoute(w, al, note) {
+    const A = P.AUTOPILOT, day = w.day, cpi = w.macro.cpi;
+    if (al.spendable(w.macro.bank ?? 1) < A.reserve * cpi) return;
+    const idle = al.fleet.filter((a) => a.delivery_day <= day && !(a.assigned || []).length && (a.status === 'ok' || !a.status) && !(a.acmi && a.acmi.end > day) && al.bases.includes(a.base));
+    if (!idle.length) return;
+    const a = idle[0], base = a.base, t = a.type_id, rng = new Rng(hashStr(`${w.seed}|auto|${al.id}|${day}`));
+    const cfg = { ...P.AI_ARCHETYPES.regional, service: 'standard', buffer: 'normal', price_vs_ref: 1.0, undercut: 0.03 };
+    const served = new Set(al.activeRoutes().flatMap((r) => [r.base + r.dest, r.dest + r.base]));
+    const cands = AP_CODES.filter((d) => d !== base && !served.has(base + d) && routeKmOk(base, d) && rangeOk(base, d, t) && !w.routeBan(al, base, d) && !w.opsAt(d).hard)
+      .sort((x, y) => potSum(base, y) - potSum(base, x)).slice(0, 14);
+    const scored = [];
+    for (const d of cands) {
+      const co = w.competitorOffers(al.id, base, d), ci = w.competitorOffers(al.id, d, base);
+      const spec = { airline: al.id, base, dest: d, type_id: t, freq: 1, fare_out: aiRulePrice(base, d, cfg, co.map((c) => c.fare), cpi), fare_in: aiRulePrice(d, base, cfg, ci.map((c) => c.fare), cpi), service: 'standard', buffer: 'normal', cab: cabClone(al.cabinCfg()) };
+      const res = evaluateRoute(spec, co, ci, { nDraws: 2, seed: day, fuelPrice: w.fuelPrice, demandScale: Math.exp(rng.gauss(0, A.sigma)), cpi,
+        segScale: { out: w.segScale(base, d), in: w.segScale(d, base) }, offerExtra: { out: w.offerExtra(al, base, d), in: w.offerExtra(al, d, base) } });
+      if (res.margin >= A.minMargin && res.db2 > 0) scored.push([res.db2, spec]);
+    }
+    for (const [db2, spec] of scored.sort((x, y) => y[0] - x[0]).slice(0, 3)) {
+      const r = applyAction(w, al.id, { type: 'openRoute', base, dest: spec.dest, typeId: t, freq: 1, fo: Math.round(spec.fare_out), fi: Math.round(spec.fare_in), service: 'standard', buffer: 'normal' });
+      if (r.ok) {
+        const nr = al.activeRoutes().find((x) => x.base === base && x.dest === spec.dest);
+        if (nr && !(nr.ap > 0)) applyAction(w, al.id, { type: 'autoPrice', id: nr.id, on: true, lf: A.targetLf });
+        note(`Neue Strecke ${base}–${spec.dest} mit der freien ${P.AIRCRAFT_TYPES[t].label} (Prognose rund ${Math.round(db2)} EUR Streckenbeitrag pro Tag).`, 'good');
+        return true;
+      }
+    }
+  }
   function aiOpen(w, al, spec, why) {
+    if (w.routeBan(al, spec.base, spec.dest) || w.opsAt(spec.base).hard || w.opsAt(spec.dest).hard) return false;   // 0.21.35: nicht in gesperrte Länder
     w.takeSlots(al, spec.base, spec.dest, spec.freq);
     al.openRoute(w.day + P.LEASE_DELIVERY_DAYS, spec.base, spec.dest, spec.type_id, spec.freq, spec.fare_out, spec.fare_in, spec.service, spec.buffer, al.cfg.target_lf, true, false);
     w.pushNews(w.day, `${al.name} kündigt ${ap(spec.base).name}–${ap(spec.dest).name} an: ${spec.freq}x täglich, ab ${Math.round(Math.min(spec.fare_out, spec.fare_in))} EUR${why ? ' · ' + why : ''}`, 'ai', al.id);
@@ -4988,6 +5767,25 @@ const SM = (() => {
   // 'rt' (Echtzeit) gibt es nicht mehr – alte Spiele laufen mit 1 Tag = 1 Std. weiter
   const speedKey = (v) => (SPEEDS[v] ? v : v === 'rt' ? 'h1' : ({ 0: 'p', 1: 'x1', 2: 'x2', 4: 'x4', 10: 'x10' }[Number(v)] || 'p'));
   /** Menschliche Airline hinzufügen (Einzelspieler: PLY; Mehrspieler: P1–P4). */
+  /** 0.21.41: Startangebote – Partner vor Ort mit freien Kapazitäten, zeitlich begrenzt. */
+  function startOffers(w, al) {
+    const S = P.START_OFFERS, g = new Rng(hashStr(w.seed + ':offers:' + al.id + ':' + w.day + ':' + al.name)), keys = Object.keys(S.pool);
+    for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(g.random() * (i + 1)); [keys[i], keys[j]] = [keys[j], keys[i]]; }
+    al.offers = keys.slice(0, S.n).map((k, i) => ({ id: 'O' + (i + 1), k, until: w.day + S.valid }));
+  }
+  function offerText(al, o) {
+    const S = P.START_OFFERS.pool[o.k] || {}, b = ap(al.bases[0]).name, pc = (x) => Math.round((1 - x) * 100) + ' %', mo = (d) => Math.round(d / 30.4);
+    return ({
+      study: { t: '90 % Rabatt auf eine große Marktstudie', d: `Ein Beratungshaus hat gerade Leerlauf: Die Umfassende Marktanalyse kostet einmalig nur ${Math.round(S.x * 100)} % des Preises.` },
+      mro: { t: `Freie Werftkapazität in ${b}`, d: `Die örtliche Werft sucht Auslastung: Wartung ${pc(S.x)} günstiger, ${mo(S.days)} Monate lang.` },
+      hand: { t: `Bodenabfertiger in ${b} mit freien Kapazitäten`, d: `Abfertigung an Ihrer Basis ${pc(S.x)} günstiger, ${mo(S.days)} Monate lang.` },
+      apt: { t: `Neukundenrabatt des Flughafens ${b}`, d: `Landeentgelte und Passagiergebühren an Ihrer Basis ${pc(S.x)} günstiger, ${mo(S.days)} Monate lang.` },
+      crew: { t: 'Personal einer aufgelösten Regionalairline', d: `${S.pil} Piloten, ${S.cab} Flugbegleiter und ${S.tech} Techniker fangen sofort an – ohne Wartezeit, zum Marktlohn. Die Piloten bekommen die Musterberechtigung Ihrer häufigsten Flotte.` },
+      fuel: { t: 'Kerosin-Absicherung ohne Prämie', d: `Ein Händler sichert ${Math.round(S.share * 100)} % Ihres Kerosins ${S.months} Monate zum heutigen Preis ab – die Prämie entfällt. Lohnt, sobald Ihre Flugzeuge fliegen.` },
+      mkt: { t: `Tourismusverband ${b} zahlt mit`, d: `Die Hälfte Ihrer Marketingkosten übernimmt der Verband, ${mo(S.days)} Monate lang.` },
+    })[o.k] || { t: o.k, d: '' };
+  }
+  const perkOn = (al, k, day) => al.perks && al.perks[k] && (al.perks[k].until === undefined || al.perks[k].until > day) ? al.perks[k] : null;
   function addHuman(w, { id = null, name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = null, owner = null, quiet = false } = {}) {
     if (!P.AIRPORTS[base]) throw new Error('Unbekannter Flughafen');
     { const bad = startBaseMsg(w, base); if (bad) throw new Error(bad); }
@@ -5001,6 +5799,7 @@ const SM = (() => {
     w.grantBaseSlots(al, base);
     { const lic = licenceFee(w, base); if (lic > 0) { al.ledger.post('one_off', -lic, true, `Betriebslizenz und Gründung › ${aTag(base)}`); al.log(w.day, `Betriebslizenz und Gründung am Heimatflughafen ${ap(base).name}: ${Math.round(lic / 1000)} Tsd. EUR`, 'info'); } }
     al.log(w.day, `${name} gegründet in ${ap(base).name}, Startkapital ${(diff.equity / 1e6).toFixed(0)} Mio. EUR`, 'info');
+    startOffers(w, al);
     if (!quiet && (humans > 0 || w.day > 0)) w.pushNews(w.day, `Neue Airline am Markt: ${name} mit Basis ${ap(base).name}`, 'info', id);
     al._day = w.day;
     return al;
@@ -5297,17 +6096,34 @@ const SM = (() => {
     let s = 0; for (const m of ms) for (const k in m.acc) if (!k.startsWith('cf_') && k !== 'one_off' && k !== 'invest') s += m.acc[k];
     return s / 100 / ms.length * 12;
   }
+  /** 0.21.37: Operatives Ergebnis der letzten (bis zu) sechs Monate aufs Jahr gerechnet – Grundlage für das KGV (ohne Sondereffekte und Beteiligungserträge). */
+  function earnRecent(al) {
+    const ms = al.ledger.months.slice(-6); if (ms.length < 3) return 0;
+    let s = 0; for (const m of ms) for (const k in m.acc) if (!k.startsWith('cf_') && k !== 'one_off' && k !== 'invest') s += m.acc[k];
+    return s / 100 / ms.length * 12;
+  }
+  let _fundDepth = 0;
   function fundCap(w, al) {
-    const C = P.CAPITAL, E = balanceSheet(al).equity, r = opResult(al), v = E + (r >= 0 ? C.peX : C.peNeg) * r;
+    const C = P.CAPITAL, E = balanceSheet(al).equity, r12 = opResult(al), r6 = earnRecent(al);
+    // Ertragskraft: Mischung aus Jahres- und Halbjahresschnitt (wächst eine Airline schnell, zählt das jüngere Ergebnis mit); Verluste wie bisher aus dem Jahresschnitt
+    const r = r12 >= 0 && r6 >= 0 ? 0.5 * (r12 + r6) : r12;
+    let up = 0;   // Beteiligungen: stille Reserven (Börsenwert über Buchwert) zu 80 %
+    if (!_fundDepth && al.stakes) { _fundDepth++; try { for (const id in al.stakes) { const T = w.airlines[id], st = al.stakes[id]; if (T && T.status !== 'insolvent' && !T.removed) up += Math.max(0, mktCap(w, T) * st.f - st.book); } } finally { _fundDepth--; } }
+    const v = E + C.stakeUp * up + (r >= 0 ? C.peX : C.peNeg) * r;
     return Math.max(v, C.floorEq * Math.max(E, 0), C.minCap * w.macro.cpi);
   }
-  /** Börsenwert: wird nur zum Monatswechsel neu festgestellt (geglättet, höchstens +25 %/−20 % je Monat). Kapitalmaßnahmen verschieben ihn sofort um das bewegte Geld. */
-  function mktCap(w, al) { const c = capState(al); if (typeof c.mc === 'number' && c.mc > 0) return c.mc; return Math.max(P.CAPITAL.minCap * (w.macro ? w.macro.cpi : 1), fundCap(w, al) * (c.sent || 1)); }
+  /** Untergrenze: Eine profitable Airline ist mindestens das Vierfache ihres operativen Jahresergebnisses wert (KGV ≥ 4). */
+  const capFloor = (w, al) => P.CAPITAL.peFloor * Math.max(0, Math.min(earnRecent(al), Math.max(opResult(al), 0) * 2.5));
+  /** Börsenwert: wird zum Monatswechsel neu festgestellt (geglättet, höchstens +40 %/−20 % je Monat), nie unter KGV 4. Kapitalmaßnahmen verschieben ihn sofort um das bewegte Geld. */
+  function mktCap(w, al) {
+    const c = capState(al), base = typeof c.mc === 'number' && c.mc > 0 ? c.mc : Math.max(P.CAPITAL.minCap * (w.macro ? w.macro.cpi : 1), fundCap(w, al) * (c.sent || 1));
+    return Math.max(base, capFloor(w, al));
+  }
   function updateCap(w, al) {
-    const C = P.CAPITAL, c = capState(al), target = Math.max(C.minCap * w.macro.cpi, fundCap(w, al) * (c.sent || 1));
+    const C = P.CAPITAL, c = capState(al), target = Math.max(C.minCap * w.macro.cpi, fundCap(w, al) * (c.sent || 1), capFloor(w, al));
     if (!(typeof c.mc === 'number' && c.mc > 0)) { c.mc = target; return; }
-    const nx = c.mc + C.smooth * (target - c.mc);
-    c.mc = Math.max(C.minCap * w.macro.cpi, clamp(nx, c.mc * (1 - C.maxDown), c.mc * (1 + C.maxUp)));
+    const cur = Math.max(c.mc, capFloor(w, al)), nx = cur + C.smooth * (target - cur);
+    c.mc = Math.max(C.minCap * w.macro.cpi, capFloor(w, al), clamp(nx, cur * (1 - C.maxDown), cur * (1 + C.maxUp)));
   }
   const capShift = (w, al, d) => { const c = capState(al); c.mc = Math.max(P.CAPITAL.minCap * w.macro.cpi, mktCap(w, al) + d); };
   /** Preis für q (Anteil 0–1) der Airline T, gekauft von B: Kursaufschlag durch die eigene Nachfrage (je größer das Paket, desto teurer),
@@ -5460,6 +6276,15 @@ const SM = (() => {
     w.coops = (w.coops || []).filter((c) => !(c.stake && (c.a === id || c.b === id)));
   }
   /** Monatsabschluss am Kapitalmarkt: Stimmung, Kursverlauf, anteiliger Gewinn, Dividenden, Anleihen. */
+  /** 0.21.37: Wirksame Ausschüttungsquote. Satzung: Liegen mehr als 5 % der Aktien einer Spieler-Airline bei anderen, gehen mindestens 25 % des Monatsgewinns an die Aktionäre –
+   *  außer die Kasse reicht nicht (weniger als das Doppelte der Ausschüttung) oder das Eigenkapital ist negativ. */
+  function divRate(T, res) {
+    const C = P.CAPITAL, c = capState(T), own = c.div ?? 0;
+    if (!T.isPlayer || (c.ext || 0) < C.minDivExt || !(res > 0) || own >= C.minDiv) return own;
+    const pay = C.minDiv * res * (c.ext || 0);
+    if (T.ledger.cash / 100 < 2 * pay || balanceSheet(T).equity <= 0) return own;
+    return C.minDiv;
+  }
   function capitalMonth(w) {
     const r = w.rng, C = P.CAPITAL;
     for (const T of w.list) {
@@ -5469,7 +6294,7 @@ const SM = (() => {
       updateCap(w, T);
       c.hist = [...(c.hist || []), Math.round(mktCap(w, T) / 1e4) / 100].slice(-24);
       // anteiliger Gewinn (Equity-Methode) und Dividenden an die Aktionäre
-      const hs = holdersOf(w, T), D = (c.div ?? 0) * Math.max(0, res);
+      const rate = divRate(T, res), hs = holdersOf(w, T), D = rate * Math.max(0, res);
       for (const h of hs) {
         const st = h.al.stakes[T.id], share = h.f * res, div = h.f * D;
         h.al.ledger.post('invest', share, false, `Ergebnisanteil Beteiligung › ${T.name}`); st.book += share; st.inc = (st.inc || 0) + share;
@@ -5477,7 +6302,7 @@ const SM = (() => {
       }
       // Ausschüttung: KI zahlt nur an Airline-Aktionäre (Streubesitz ist nicht modelliert), Spielende an alle Aktionäre außerhalb
       const paid = T.isPlayer ? D * c.ext : D * hs.reduce((x, h) => x + h.f, 0);
-      if (paid > 0) { T.ledger.equityFlow(-paid, 'dividend'); capShift(w, T, -paid); if (T.isPlayer) T.log(w.day, `Dividende an Ihre Aktionäre: ${Math.round(paid / 1000)} Tsd. EUR (${Math.round(c.div * 100)} % vom Gewinn, ${Math.round(c.ext * 100)} % der Aktien liegen außerhalb)`, 'info'); }
+      if (paid > 0) { T.ledger.equityFlow(-paid, 'dividend'); capShift(w, T, -paid); if (T.isPlayer) T.log(w.day, `Dividende an Ihre Aktionäre: ${Math.round(paid / 1000)} Tsd. EUR (${Math.round(rate * 100)} % vom Gewinn${rate > (c.div ?? 0) ? ' – Mindestquote laut Satzung' : ''}, ${Math.round(c.ext * 100)} % der Aktien liegen außerhalb)`, 'info'); }
       // Anleihen: Kupon, Rückzahlung
       for (const b of T.bonds || []) T.ledger.post('interest', -b.amount * b.rate / 12, true, `Anleihe ${b.id || ''}: Zinsen`);
       for (const b of (T.bonds || []).filter((x) => x.until <= w.day)) { T.ledger.cashOnly(-b.amount, 'bond_repay'); T.log(w.day, `Anleihe fällig: ${Math.round(b.amount / 1e5) / 10} Mio. EUR zurückgezahlt`, 'info'); }
@@ -5663,6 +6488,25 @@ const SM = (() => {
     }
     return out;
   }
+  /**
+   * 0.21.41: Kooperationen (Codeshare, Allianz) sind gegenseitig. Jede nur einmal im Angebot (nicht auf beiden Seiten, nicht doppelt)
+   * und nur, wenn sie über eine schon bestehende Vereinbarung hinausgeht. Codeshare nur auf Strecken, die mindestens eine Seite fliegt.
+   */
+  function coopCheck(w, A, B, give, take) {
+    const all = give.concat(take).filter((x) => x.k === 'coop'), seen = new Set();
+    for (const it of all) {
+      const key = it.kind + '|' + (it.pair || '');
+      if (seen.has(key)) return it.kind === 'alliance' ? 'Die Allianz steht schon im Angebot – sie gilt für beide Seiten, also nur einmal eintragen.' : `Der Codeshare auf ${it.pair.replace('-', '–')} steht schon im Angebot – er gilt für beide Seiten, also nur einmal eintragen.`;
+      seen.add(key);
+      const ex = coopExisting(w, A, B, it);
+      if (ex && ex.until >= w.day + it.days - 30) return `${it.kind === 'alliance' ? 'Die Allianz' : `Der Codeshare auf ${it.pair.replace('-', '–')}`} mit ${B.name} läuft schon bis ${dayDate(ex.until)} – ein neuer bringt nichts dazu.`;
+      if (it.kind === 'codeshare' && !pairRoute(A, it.pair) && !pairRoute(B, it.pair)) return `Auf ${it.pair.replace('-', '–')} fliegt keine der beiden Airlines – ein Codeshare ergibt dort keinen Sinn.`;
+    }
+    return null;
+  }
+  function coopExisting(w, A, B, it) {
+    return (w.coops || []).find((c) => c.until > w.day && c.kind === it.kind && (it.kind === 'alliance' || c.pair === it.pair) && ((c.a === A.id && c.b === B.id) || (c.a === B.id && c.b === A.id))) || null;
+  }
   /** Prüft, ob „giver“ die Positionen abgeben kann. Gibt eine Fehlermeldung oder null zurück. */
   function checkSide(w, giver, receiver, items) {
     const cash = items.filter((x) => x.k === 'cash').reduce((s, x) => s + x.amount, 0);
@@ -5730,12 +6574,17 @@ const SM = (() => {
         vout += v;
       }
     }
+    const coopSeen = new Set();
     for (const it of aiGets.concat(aiGives)) {
       if (it.k !== 'coop') continue;
-      const months = it.days / 30;
+      // 0.21.41: gegenseitig – jede Kooperation zählt einmal, egal auf welcher Seite sie steht, und nur die Laufzeit über eine bestehende hinaus
+      const key = it.kind + '|' + (it.pair || ''); if (coopSeen.has(key)) continue; coopSeen.add(key);
+      const ex = coopExisting(w, ai, partner, it), extra = ex ? Math.max(0, w.day + it.days - ex.until) : it.days;
+      const months = extra / 30;
+      if (months <= 0) continue;
       if (it.kind === 'codeshare') {
-        const mr = pairRoute(ai, it.pair), pr = pairRoute(partner, it.pair);
-        if (mr && pr) { const h = mr.hist.slice(-30), rev = h.length ? h.reduce((s, x) => s + x.rev, 0) / h.length : 0; vin += rev * 0.05 * 30 * months; }
+        const mr = pairRoute(ai, it.pair), pr = pairRoute(partner, it.pair), CS = P.CODESHARE_VALUE;
+        if (mr && pr) { const h = mr.hist.slice(-30), rev = h.length ? h.reduce((s, x) => s + x.rev, 0) / h.length : 0; vin += Math.min(rev * CS.share * 30, CS.capMonth * w.macro.cpi) * months; }
         else if (mr) vin += 30000 * months; else vout += 20000 * months;
       } else {
         const overlap = partner.activeRoutes().filter((r) => pairRoute(ai, pairKey(r.base, r.dest))).length;
@@ -6042,7 +6891,7 @@ const SM = (() => {
     }
     const last = al.ledger.months.at(-1); if (!last) return;
     const res = monthRes(last); if (res <= 0 || !(al.agm.rate > 0)) return;
-    const already = (c.div || 0) * ext * res, pay = Math.round(Math.max(0, al.agm.rate * res - already) / 1000) * 1000;
+    const already = divRate(al, res) * ext * res, pay = Math.round(Math.max(0, al.agm.rate * res - already) / 1000) * 1000;
     if (pay <= 0) return;
     al.ledger.equityFlow(-pay, 'dividend'); al.divOut = (al.divOut || 0) + pay; capShift(w, al, -pay);
     al.log(w.day, `Ausschüttung laut Hauptversammlung: ${mioTxt(pay)} (${Math.round(al.agm.rate * 100)} % des Monatsgewinns${already > 0 ? ', abzüglich Ihrer Dividende an die Aktionäre' : ''})`, 'info');
@@ -6412,6 +7261,7 @@ const SM = (() => {
       const give = cleanItems(a.give).filter((x) => x.k !== 'acAny'), take = cleanItems(a.take).filter((x) => x.k !== 'acAny');
       if (!give.length && !take.length) return { ok: false, msg: 'Das Angebot ist leer.' };
       if (give.some((x) => x.k === 'exit') && take.some((x) => x.k === 'exit' && give.some((y) => y.k === 'exit' && y.pair === x.pair))) return { ok: false, msg: 'Beide Seiten können nicht von derselben Strecke zurücktreten.' };
+      { const cErr = coopCheck(w, al, to, give, take); if (cErr) return { ok: false, msg: cErr }; }
       if (w.deals.filter((d) => d.status === 'open' && d.from === al.id).length >= DEAL_MAX_OPEN) return { ok: false, msg: `Höchstens ${DEAL_MAX_OPEN} offene Angebote gleichzeitig.` };
       const err = checkSide(w, al, to, give); if (err) return { ok: false, msg: err };
       let orig = null;
@@ -6553,7 +7403,7 @@ const SM = (() => {
         if (!al.bases.includes(base) || !P.AIRPORTS[dest] || !P.AIRCRAFT_TYPES[type] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
         { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %).` }; }
         if (P.AIRCRAFT_TYPES[type].role) return { ok: false, msg: `${P.AIRCRAFT_TYPES[type].label} fliegt keine Linie – ${P.AIRCRAFT_TYPES[type].role === 'cargo' ? 'Frachter' : 'Privatjets'} arbeiten im Charter-Pool (Flotte → Charter).` };
-        if (!routeKmOk(base, dest)) return { ok: false, msg: 'Unter 300 km lohnt kein Flug.' };
+        if (!routeKmOk(base, dest)) return { ok: false, msg: `Unter ${P.MIN_ROUTE_KM} km gibt es keine Linienflüge.` };
         if (!aptOk(base, dest, type)) return { ok: false, msg: aptWhy(base, dest, type) };
         if (!rangeOk(base, dest, type)) return { ok: false, msg: 'Reichweite zu kurz.' };
         if (al.activeRoutes().some((r) => pairKey(r.base, r.dest) === pairKey(base, dest))) return { ok: false, msg: `${base}–${dest} fliegen Sie schon. Ändern Sie die Frequenz in der Streckenliste.` };
@@ -6574,6 +7424,7 @@ const SM = (() => {
         const r = al.openRoute(start, base, dest, type, freq, fo, fi, service, buffer, 0.85, false);
         if (wk < 7) r.wk = wk;
         if (['feeder', 'local'].includes(a.role)) r.role = a.role;
+        if (a.mix) { const m = mixCheck(w, al, r, a.mix); if (m.mix) r.mix = m.mix; }   // 0.21.42: zweites Muster gleich beim Eröffnen
         w.takeSlots(al, base, dest, freq);
         if (w.humans.length > 1) w.pushNews(day, `${al.name} kündigt ${ap(base).name}–${ap(dest).name} an: ${freq}x täglich, ab ${Math.round(Math.min(fo, fi))} EUR`, 'ai', al.id);
         w.operableFreq(al);
@@ -6611,6 +7462,20 @@ const SM = (() => {
           if (unplaced[r.id]) out.msg = `Nicht genug Flugzeugzeit: ${unplaced[r.id]} Umlauf/Umläufe fliegen erst mit einem weiteren Flugzeug vom Typ ${P.AIRCRAFT_TYPES[r.type_id].label}.`;
           al.log(day, `${r.base}–${r.dest}: ${old[0]}x ${P.SERVICE[old[1]].label} ${P.BUFFER_POLICY[old[2]].label} → ${nf}x ${P.SERVICE[ns].label} ${P.BUFFER_POLICY[nb].label}`, 'route');
         }
+        // 0.21.42: zweites Muster (z. B. 2× A320neo + 1× A350) – a.mix = { typeId, freq } setzt, a.mix = null entfernt
+        if (a.mix !== undefined) {
+          const m = mixCheck(w, al, r, a.mix);
+          if (m.err) out.msg = (out.msg ? out.msg + ' ' : '') + m.err;
+          else if (m.mix) { const was = r.mix ? `${r.mix.freq}× ${P.AIRCRAFT_TYPES[r.mix.type_id].label}` : null; r.mix = m.mix;
+            const now = `${r.mix.freq} von ${r.freq} Flügen mit ${P.AIRCRAFT_TYPES[r.mix.type_id].label}`;
+            if (was !== `${r.mix.freq}× ${P.AIRCRAFT_TYPES[r.mix.type_id].label}`) al.log(day, `${r.base}–${r.dest}: ${now}`, 'route');
+            const { unplaced } = al.plan(day, null, P.LEASE_DELIVERY_DAYS);
+            out.msg = unplaced[r.id + '~'] ? `${now} – ${unplaced[r.id + '~']} Umlauf/Umläufe fliegen erst mit einer weiteren ${P.AIRCRAFT_TYPES[r.mix.type_id].label} in ${r.base}.` : `${r.base}–${r.dest}: ${now}.`; }
+          else if (r.mix) { al.log(day, `${r.base}–${r.dest}: wieder nur mit ${P.AIRCRAFT_TYPES[r.type_id].label}`, 'route'); delete r.mix; out.msg = `${r.base}–${r.dest} fliegt wieder nur mit ${P.AIRCRAFT_TYPES[r.type_id].label}.`; }
+        }
+        if (r.mix && !mixOk(r)) delete r.mix;
+        if (r.mix && r.mix.freq >= r.freq) r.mix.freq = r.freq - 1;
+        if (r.mix && r.mix.freq < 1) delete r.mix;
         r.autoPrice = false;
         w.operableFreq(al);
         return out;
@@ -6683,6 +7548,53 @@ const SM = (() => {
       }
       case 'marketingPct': al.mktPct = clamp(Math.round(num(a.v) * 1000) / 1000, 0, P.MKT_PCT_MAX); al.marketing = 0; return { ok: true };
       case 'setCabin': return w.setCabin(al, String(a.haul || ''), num(a.f), num(a.b));
+      case 'takeOffer': case 'dropOffer': {   // 0.21.41: Startangebote
+        const o = (al.offers || []).find((x) => x.id === a.id); if (!o) return { ok: false, msg: 'Angebot nicht gefunden.' };
+        if (o.until <= day) { al.offers = al.offers.filter((x) => x !== o); return { ok: false, msg: 'Das Angebot ist abgelaufen.' }; }
+        const S = P.START_OFFERS.pool[o.k], T = offerText(al, o), drop = () => { al.offers = al.offers.filter((x) => x !== o); if (!al.offers.length) delete al.offers; };
+        if (a.type === 'dropOffer') { drop(); return { ok: true, msg: 'Angebot abgelehnt.' }; }
+        al.perks = al.perks || {};
+        if (o.k === 'study') al.perks.study = { x: S.x, tier: S.tier };
+        else if (o.k === 'mro' || o.k === 'mkt') al.perks[o.k] = { x: S.x, until: day + S.days };
+        else if (o.k === 'hand' || o.k === 'apt') al.perks[o.k] = { x: S.x, until: day + S.days, apt: al.bases[0] };
+        else if (o.k === 'crew') {
+          const cnt = {}; for (const x of al.fleet) { const gp = P.AIRCRAFT_TYPES[x.type_id].group; cnt[gp] = (cnt[gp] || 0) + 1; }
+          const gp = Object.entries(cnt).sort((x, y) => y[1] - x[1])[0]?.[0] || 'A32F';
+          al.staff.pil[gp] = (al.staff.pil[gp] || 0) + S.pil; al.staff.cab = (al.staff.cab || 0) + S.cab; al.staff.tech = (al.staff.tech || 0) + S.tech;
+          al.log(day, `Personal übernommen: ${S.pil} Piloten (${P.TYPE_GROUPS && P.TYPE_GROUPS[gp] ? P.TYPE_GROUPS[gp] : gp}), ${S.cab} Flugbegleiter, ${S.tech} Techniker`, 'info');
+        } else if (o.k === 'fuel') {
+          if (!(w.estFuelKgMonth(al) > 0)) return { ok: false, msg: 'Noch kein Kerosinverbrauch – erst lohnt es, wenn Ihre Flugzeuge fliegen. Das Angebot gilt bis zum ' + (o.until - day) + '. Tag.' };
+          const r = w.setHedge(al, S.share, S.months); if (!r.ok) return r;
+          if (r.cost > 0) al.ledger.post('hedge', r.cost, true, 'Kerosin-Absicherung: Prämie erlassen (Startangebot)');
+        }
+        drop(); al.log(day, `Startangebot angenommen: ${T.t}`, 'info');
+        return { ok: true, msg: `Angenommen: ${T.t}.` };
+      }
+      case 'aptInvest': return w.aptInvest(al, String(a.apt || ''), a.kind === 'rwy' ? 'rwy' : 'term');   // 0.21.41: Flughafen ausbauen
+      case 'crisisAdjust': {   // 0.21.41: Vorschlag der Assistenz zu einem Ereignis übernehmen
+        const e = w.events.find((x) => x.id === a.event); if (!e) return { ok: false, msg: 'Ereignis nicht gefunden.' };
+        const plan = w.crisisPlan(al, e); if (!plan.length) return { ok: false, msg: 'Nichts anzupassen.' };
+        let nAp = 0, nF = 0; const notes = [];
+        for (const x of plan) {
+          const r = route(x.id); if (!r) continue;
+          if (x.ap) { r.ap = x.ap; nAp++; }
+          if (x.freq) { const old = r.freq, end = e.end + (e.recovery || 0), res = applyAction(w, alId, { type: 'editRoute', id: r.id, freq: x.freq });
+            if (res.ok && r.freq === x.freq) { r.crisis = { e: e.id, freq: old, end }; nF++; notes.push(`${r.base}–${r.dest} ${old}× → ${x.freq}×`);
+              // frei gewordene Slots bleiben bis nach der Krise Reserve (die 6-Monats-Frist beginnt erst mit ihrem Ende)
+              for (const c of [r.base, r.dest]) { const hs = al.slotHold[c]; const h = hs && hs[hs.length - 1]; if (h && h.buy) h.since = Math.max(h.since ?? day, end); } } }
+        }
+        al.crisisDone = { ...(al.crisisDone || {}), [e.id]: day };
+        const msg = `Anpassung an „${String(e.short || e.text || '').split(':')[0]}“: ${nAp ? `Preisautomatik auf ${nAp} Strecke${nAp > 1 ? 'n' : ''}` : ''}${nAp && nF ? ', ' : ''}${nF ? `Frequenz gesenkt: ${notes.join(', ')}` : ''}.`;
+        al.log(day, msg, 'route'); return { ok: true, msg };
+      }
+      case 'crisisSkip': { const e = w.events.find((x) => x.id === a.event); if (!e) return { ok: false, msg: 'Ereignis nicht gefunden.' }; al.crisisDone = { ...(al.crisisDone || {}), [e.id]: day }; return { ok: true }; }
+      case 'crisisRestore': {   // Frequenzen nach der Krise zurück
+        const rs = al.activeRoutes().filter((r) => r.crisis && (!a.id || r.id === a.id)); if (!rs.length) return { ok: false, msg: 'Nichts zurückzunehmen.' };
+        const done = [], miss = [];
+        for (const r of rs) { const f = r.crisis.freq, res = applyAction(w, alId, { type: 'editRoute', id: r.id, freq: f }); if (res.ok && r.freq === f) { done.push(`${r.base}–${r.dest} ${f}×`); delete r.crisis; } else miss.push(`${r.base}–${r.dest}: ${res.msg || 'nicht möglich'}`); }
+        if (done.length) al.log(day, `Nach der Krise wieder wie vorher: ${done.join(', ')}`, 'route');
+        return { ok: done.length > 0, msg: done.length ? `Zurück auf die alte Frequenz: ${done.join(', ')}.${miss.length ? ' Nicht möglich: ' + miss.join('; ') : ''}` : miss.join('; ') };
+      }
       case 'autoPrice': {   // id: eine Strecke; ohne id: alle Strecken und künftige. cfg: { min, max, spd, plf } (Teilangaben ergänzen die bisherigen)
         // keep (ohne id): nur Standard und Strecken mit eingeschalteter Automatik ändern, nichts ein- oder ausschalten
         const keep = !a.id && !!a.keep;
@@ -6728,6 +7640,7 @@ const SM = (() => {
       case 'orderStudy': return w.orderStudy(al, String(a.kind || ''), String(a.tier || ''), a.focus || null, Array.isArray(a.bases) ? a.bases : null, a.fresh !== false);
       case 'loan': { const years = [3, 5, 8].includes(num(a.years)) ? num(a.years) : 5; return w.takeLoan(al, clamp(num(a.amount), 0, 50e6), years); }
       case 'repay': return w.repayLoan(al, a.id);
+      case 'repayAc': return w.repayAcLoan(al, Array.isArray(a.ids) ? a.ids.map(String) : a.id ? [String(a.id)] : null);   // 0.21.42: Flugzeugkredite ablösen (ohne id: alle)
       case 'assistant': {
         const ids = ['lena', 'marco', 'aiko', 'sam'];
         if (!ids.includes(a.id)) return { ok: false, msg: 'Unbekannte Assistenz.' };
@@ -6795,6 +7708,7 @@ const SM = (() => {
         al.pixLogo = v; al.log(day, 'Neues Pixel-Logo eingeführt', 'info');
         return { ok: true };
       }
+      case 'resume': { if (al.auto) { al.auto = 0; al.log(day, 'Sie steuern wieder selbst – die Vertretung durch die KI ist beendet.', 'good'); } return { ok: true }; }
       case 'decide': { if (!['raise5', 'bonus', 'reject', 'share', 'yes', 'half', 'no', 'now', 'r6', 'r12', 'r24'].includes(a.choice)) return { ok: false, msg: 'Ungültig.' }; const dc = al.decisions.find((x) => x.id === a.id); if (!dc || dc.resolved) return { ok: false, msg: 'Diese Entscheidung ist schon gefallen.' }; if ((dc.type === 'agm') !== ['yes', 'half', 'no'].includes(a.choice) || (dc.type === 'auditpay') !== ['now', 'r6', 'r12', 'r24'].includes(a.choice)) return { ok: false, msg: 'Ungültig.' }; w.resolveDecision(al, a.id, a.choice); return { ok: true }; }
       default: return { ok: false, msg: 'Unbekannte Aktion.' };
     }
@@ -6829,7 +7743,7 @@ const SM = (() => {
   // ===========================================================================
   // Reihenfolge = Speicherformat (Spalten). Neue Felder immer HINTEN anfügen – sonst verrutschen gespeicherte Werte!
   const HIST_KEYS_OLD = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
-  const HIST_KEYS = [...HIST_KEYS_OLD, 'so_out', 'so_in'];
+  const HIST_KEYS = [...HIST_KEYS_OLD, 'so_out', 'so_in', 'trr'];   // trr: Umsteigererlös (Anteil) dieser Strecke, ab 0.21.41
   // 0.21.26–0.21.28 speicherten mit so_out/so_in in der Mitte – dabei wurden ältere Einträge um zwei Spalten verschoben gelesen
   const HIST_KEYS_BROKEN = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'so_out', 'so_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
   const HIST_FORMAT = 2;
@@ -6857,21 +7771,21 @@ const SM = (() => {
       seed: w.seed, slotCap: w.slotCap, slotV: w.slotV || undefined, namedNext: w.namedNext || undefined, eventMult: w.eventMult,
       candidates: w.candidates, acMarket: w.acMarket, acmiOffers: w.acmiOffers, offerCounter: w.offerCounter,
       deals: keepDeals(w), dealCounter: w.dealCounter, agreements: (w.agreements || []).filter((g) => g.until > w.day), slotWait: w.slotWait && w.slotWait.length ? w.slotWait : undefined, waitCounter: w.waitCounter || undefined,
-      aptObs: w.aptObs || {}, slotGrants: w.slotGrants && Object.keys(w.slotGrants).length ? w.slotGrants : undefined, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, baseOpensV: w.baseOpensV || undefined, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, auditLog: w.auditLog || [], laborFree: w.laborFree || null, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
+      aptObs: w.aptObs || {}, slotGrants: w.slotGrants && Object.keys(w.slotGrants).length ? w.slotGrants : undefined, scheduled: w.scheduled || [], glutPlanned: !!w.glutPlanned, slotRoundDay: w.slotRoundDay, baseOpensV: w.baseOpensV || undefined, autoAt: w.autoAt || undefined, aptUp: w.aptUp && Object.keys(w.aptUp).length ? w.aptUp : undefined, aptProj: w.aptProj && w.aptProj.length ? w.aptProj : undefined, agmV: w.agmV || 0, themes: w.themes || {}, attacks: w.attacks || {}, fareCaps: w.fareCaps || {}, xfers: w.xfers || [], auditFrom: w.auditFrom || 0, auditLog: w.auditLog || [], laborFree: w.laborFree || null, entrantCounter: w.entrantCounter || 0, coops: (w.coops || []).filter((c) => c.until > w.day), auctions: (w.auctions || []).filter((a) => !a.done || a.closes > w.day - 90), lessorQueue: w.lessorQueue || {}, labor: w.labor, lessorStock: w.lessorStock || {},
       airlines: w.list.map((al) => ({
         id: al.id, name: al.name, archetype: al.archetype, color: al.color, code: al.code, difficulty: al.difficulty, sigma: al.sigma, owner: al.owner || null, joinedDay: al.joinedDay || 0, prefTypes: al.prefTypes || null,
         bases: al.bases, fleet: al.fleet.map((a) => { const { assigned, fhDay, ...rest } = a; return rest; }),
         routes: al.routes.filter((r) => !r.closed || (al.isPlayer && (w.day - (r.closedDay ?? w.day)) < 60)).map((r) => ({
           id: r.id, airline: r.airline, base: r.base, dest: r.dest, type_id: r.type_id, freq: r.freq, fare_out: r.fare_out, fare_in: r.fare_in,
           service: r.service, buffer: r.buffer, opened_day: r.opened_day, pending: r.pending, autoPrice: r.autoPrice, targetLf: r.targetLf,
-          closed: r.closed, closedDay: r.closedDay, reviewNeg: r.reviewNeg, lastChange: r.lastChange, hk: al.isPlayer ? 0 : 1, wk: r.wk > 0 && r.wk < 7 ? r.wk : undefined, role: r.role || undefined, cab: r.cab || undefined, ap: r.ap || undefined, apo: r.apo || undefined, pm: r.pm || undefined, trDem: r.trDem ? { out: r.trDem.out, in: r.trDem.in } : undefined,
+          closed: r.closed, closedDay: r.closedDay, reviewNeg: r.reviewNeg, lastChange: r.lastChange, hk: al.isPlayer ? 0 : 1, wk: r.wk > 0 && r.wk < 7 ? r.wk : undefined, role: r.role || undefined, mix: r.mix && r.mix.freq > 0 ? { type_id: r.mix.type_id, freq: r.mix.freq } : undefined, cab: r.cab || undefined, ap: r.ap || undefined, apo: r.apo || undefined, pm: r.pm || undefined, trDem: r.trDem ? { out: r.trDem.out, in: r.trDem.in } : undefined, trCar: r.trCar ? { out: r1(r.trCar.out), in: r1(r.trCar.in) } : undefined, crisis: r.crisis || undefined, apx: r.apx !== undefined ? r.apx : undefined,
           hist: (al.isPlayer ? r.hist.slice(plH) : r.hist.slice(aiH)).map((h) => (al.isPlayer ? HIST_KEYS : AI_HIST_KEYS).map((k) => (k === 'block_h' ? r1(h[k] || 0) : Math.round(h[k] || 0)))),
         })),
         typesIntroduced: al.typesIntroduced, creditUsed: al.creditUsed, lossCarry: al.lossCarry, monthPnlStart: al.monthPnlStart,
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -6884,7 +7798,7 @@ const SM = (() => {
     Object.assign(w, { difficulty: s.difficulty || 'normal', mode: s.mode || 'career', rivals: s.rivals || null, day: s.day, macro: s.macro, fuelHist: s.fuelHist || [], playerId: s.playerId, news: s.news || [], events: s.events || [], eventCounter: s.eventCounter || 0,
       seed: s.seed, slotCap: s.slotCap || {}, slotV: s.slotV || 0, namedNext: s.namedNext || {}, eventMult: s.eventMult || 1, candidates: s.candidates || [], acMarket: (s.acMarket || []).filter((o) => P.AIRCRAFT_TYPES[o.type] && !P.AIRCRAFT_TYPES[o.type].launch), acmiOffers: s.acmiOffers || [], offerCounter: s.offerCounter || 0,
       entrantCounter: s.entrantCounter || 0, deals: s.deals || [], dealCounter: s.dealCounter || 0, agreements: s.agreements || [], slotWait: s.slotWait || [], waitCounter: s.waitCounter || 0, coops: s.coops || [], auctions: s.auctions || [],
-      aptObs: s.aptObs || {}, slotGrants: s.slotGrants, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, baseOpensV: s.baseOpensV, agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, auditLog: s.auditLog || [], laborFree: s.laborFree || null, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
+      aptObs: s.aptObs || {}, slotGrants: s.slotGrants, scheduled: s.scheduled || [], glutPlanned: !!s.glutPlanned, slotRoundDay: s.slotRoundDay, baseOpensV: s.baseOpensV, autoAt: s.autoAt, aptUp: s.aptUp || {}, aptProj: s.aptProj || [], agmV: s.agmV || 0, themes: s.themes || {}, attacks: s.attacks || {}, fareCaps: s.fareCaps || {}, xfers: s.xfers || null, auditFrom: s.auditFrom || 0, auditLog: s.auditLog || [], laborFree: s.laborFree || null, lessorStock: s.lessorStock || {}, lessorQueue: s.lessorQueue || {}, labor: s.labor || { m: 0, pilot: 0, cabin: 0, tech: 0, aiAc: 0 } });
     w.macro = Object.assign({ tariffs: {}, carbon: {}, feeMult: {}, wage: 1, fuelPressure: 0, cycle: { phase: 0, period: 54, amp: 0.08 } }, w.macro);
     setFuelX(w);
     for (const c of COUNTRIES) { if (w.macro.econ[c] === undefined) w.macro.econ[c] = 1; if (w.macro.econTarget[c] === undefined) w.macro.econTarget[c] = 1; if (w.macro.taxDelta[c] === undefined) w.macro.taxDelta[c] = 0; }
@@ -7007,11 +7921,11 @@ const SM = (() => {
   }
 
   return {
-    P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
+    P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, GEO_ZONES, homeCountry, zoneExtraKm, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
-    ovhAc, incentiveAt, evaluateRoute, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
+    ovhAc, incentiveAt, evaluateRoute, routeUnits, mixOk, mixCheck, transferPlan, hubFlowsDaily, offerText, perkOn, minApt, dayDate, aiDealValue, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, baseExtraFee, baseOpensYear, baseSlotN, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, baseExtraFee, baseOpensYear, baseSlotN, earnRecent, opResult, updateCap, divRate, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;

@@ -183,6 +183,202 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.42: Zwei Flugzeugmuster je Strecke, Flugzeugkredite ablösen, Prognose im Detail
+
+- **Zwei Muster auf einer Strecke**, z. B. 2× A320neo + 1× A350 an starken Tagen oder für Umsteigerwellen:
+  - Einstellbar in der Streckenplanung und unter Strecke → Bearbeiten („Zweites Muster“ und „davon Flüge mit dem zweiten Muster“). Ab 2 Flügen täglich, mindestens ein Flug mit dem Hauptmuster. Das zweite Muster muss an der Basis stehen und die Strecke schaffen; kein Überschall.
+  - Planung und Umläufe je Muster: Die Flugzeuge des zweiten Musters fliegen ihre Umläufe auf derselben Strecke, auch fest zugewiesen. Fehlt eines, nennt der Einsatzplan das Muster.
+  - Im Betrieb hat jeder Flug sein Muster: Sitze, Kerosin, Wartung, Crew, Gebühren, Verspätungskosten und Frachtraum. Die Passagiere verteilen sich nach Sitzen. Markt, Tarife, Slots und Historie bleiben bei der Strecke; die Sitze je Flug sind das Mittel der heutigen Flüge.
+  - Prognose und Streckenbeitrag (DB2) rechnen Kosten und Flugzeugzeit je Muster. Beispiel HAM–PMI 3× täglich: 1.080 / 1.160 / 1.320 Sitze am Tag mit 3× A320neo / 2× A320neo + 1× A321neo / 3× A321neo.
+  - Anzeige: „Airbus A320neo + 1× Airbus A321neo“ in der Strecke; die Flotte zeigt die Strecke bei beiden Mustern.
+  - Speicherstand: Feld `mix` je Strecke.
+- **Flugzeugkredite ablösen:**
+  - Finanzierte Flugzeuge lassen sich jederzeit einzeln (Flotte oder Finanzen → Kredit) oder alle auf einmal ablösen.
+  - Kosten: Restschuld plus 1 % Vorfälligkeit. Reicht das Guthaben nicht, springt der Dispo ein und wird aus den Einnahmen zurückgeführt.
+  - Ab dann fallen die Zinsen weg; die Karte zeigt die Ersparnis pro Tag. Die Flottenzeile zeigt Restschuld und Zins.
+- **Prognose im Detail** (Streckenplanung → „Prognose im Detail“, aufklappbar, Zustand bleibt gespeichert):
+  - Je Richtung, je Flug und pro Tag: Flüge, Blockzeit, Sitze; Passagiere gesamt, aus dem Markt, Umsteiger, nach Urlaub/Geschäft/Besuch und Premium; Auslastung.
+  - Tarif und Ø-Erlös je Passagier; Erlöse aus Tickets, Premiumaufschlag, Umsteiger-Anteil und Zusatzleistungen.
+  - Jede Kostenart, Kerosin mit kg je Flug; DB1.
+  - Darunter die Brücke zur Streckenliste: DB1 nach allen Flugkosten, + Crew-Gehälter, − Flugzeugzeit zur Standardrate, = DB2, und das Ergebnis nach allen Kosten.
+  - Kennzahlen: Erlös und Kosten je Sitzkilometer, Verbrauch je Passagier (kg und l je 100 km), Gewinnschwelle (Passagiere am Tag und Auslastung).
+  - Auf dem Handy ohne die Spalte „je Flug“.
+- **Strecke bearbeiten:** Die Auswahlfelder brechen um, statt abgeschnitten zu werden.
+
+## Neu in 0.21.41: Umsteiger richtig gerechnet, Drehkreuz-Analyse
+
+Anlass: Strecken ab einem Drehkreuz (z. B. NAS–MIA, NAS–FLL) waren im Betrieb unprofitabel, obwohl die Planung sie als sehr profitabel geschätzt hatte.
+
+- **Platzreserve für Umsteiger:**
+  - Bisher wurde sie nach den Umsteigern bemessen, die mitfliegen *wollten*, auch wenn ihr Anschlussflug voll war. Die Plätze blieben leer, Ortsgäste wurden abgewiesen (z. B. 57 % Auslastung und trotzdem über 1.000 Abweisungen am Tag).
+  - Jetzt gilt sie nur noch für Umsteiger, die ihren Anschluss bekommen und mehr einbringen als die Ortsgäste, die dafür keinen Platz bekommen. Voll heißt dabei: Ortsgäste allein füllen über 70 % der Sitze.
+  - Lohnende Umsteiger bekommen zuerst Plätze, die übrigen nur noch freie. Zwei volle Zubringer halten also keine Plätze mehr füreinander frei. Ein Kurz-zu-Kurz-Umsteiger zahlt 80 % beider Tarife und würde dafür zwei voll zahlende Ortsgäste verdrängen.
+- **Erlösaufteilung:**
+  - Eine Umsteigerreise wird jetzt nach den Einzeltarifen der Teilstrecken aufgeteilt, nicht mehr nach Kilometern. Jede Strecke bekommt ihren Tarif abzüglich Umsteigerrabatt.
+  - Vorher bekam ein 300-km-Zubringer bei einer Reise nach Europa nur rund 4 % des Ticketpreises, trug aber Gebühren und Abfertigung voll. Die Langstrecke bekam mehr als ihren eigenen Tarif.
+  - Am Gesamtergebnis des Netzes ändert das kaum etwas, wohl aber an der Bewertung der einzelnen Strecken.
+- **Preisautomatik:** Wird mehr als 8 % der Ortsgäste abgewiesen, senkt sie den Preis nicht mehr, auch wenn die Auslastung unter dem Ziel liegt. Vorher drückte sie auf Zubringern die Tarife (z. B. auf 36–47 €), weil reservierte Plätze leer blieben. Heruntergefahrene Tarife steigen nur schrittweise wieder.
+- **Streckenplanung mit Umsteigern:**
+  - Die Prognose schätzt die Umsteiger über das eigene Drehkreuz. Neue Reisen mit allen heutigen Strecken ab der Basis rechnet sie gegen die Konkurrenz im jeweiligen Markt, mit Platz auf dem Anschlussflug, Platzreserve je Rolle und Erlösanteil.
+  - Passagiere, Auslastung, Umsatz und DB enthalten die Umsteiger. Ein Hinweis nennt die wichtigsten Reisen und volle Anschlüsse.
+  - Dazu kommt ein grober Richtwert für die übrigen Strecken (zusätzliche Umsteiger abzüglich verdrängter).
+  - Die Rolle der Strecke (Gemischt/Zubringer/Endziel) zählt jetzt auch in der Prognose.
+  - Testlauf NAS–MIA: Prognose 60.221 € Erlös am Tag, Ist 60.221 €.
+- **Neuer Reiter Strecken → Drehkreuze:**
+  - Je Basis: Umsteiger pro Tag, Erlös aus Umsteigern und sein Anteil, Umsteigezeit und Attraktivität.
+  - „Was das Drehkreuz bringt“.
+  - „Wohin Ihre Umsteiger reisen“: die gefragtesten Reisen mit Interesse-Balken, wie viele mitfliegen und welcher Anschluss voll ist.
+  - „Engpässe“: welche Strecke wie viele Reisen bremst.
+  - „Ihre Strecken ab …“: wer wie viele Umsteiger trägt.
+  - „Neue Ziele für Umsteiger“: grob geschätzte Umsteiger für einen täglichen Flug, woher sie kommen, dazu der Ortsmarkt und ein Knopf „Planen“.
+  - Unter Strategie → Drehkreuze führt ein Knopf dorthin.
+- **Streckenkarte:** Der Erlösanteil der Umsteiger pro Tag steht jetzt im Hinweis.
+- **Fehler behoben:** Ein Ziel unter 250 km (z. B. HAJ–DUS), auf der Karte angeklickt, ließ die Zielauswahl auf einen anderen Flughafen springen (Alicante). Jetzt bleibt das Ziel, und ein Hinweis erklärt die Mindestentfernung. Die Fehlermeldung beim Eröffnen nennt jetzt die richtige Grenze (250 statt 300 km).
+- **Speicherstand:** Neue Spalte `trr` (Umsteigererlös je Strecke und Tag), hinten angefügt. Je Strecke gibt es `trCar` (Grundlage der Platzreserve), je Airline `hubFlows` (Ströme je Drehkreuz, gleitend über rund zwei Wochen).
+
+### Außerdem in 0.21.41
+
+- **Assistenz und Live-Updates:**
+  - „Öffnen“ und „Strecke öffnen“ gingen oft ins Leere. Die Seitenleiste wurde neu gezeichnet, während der Finger oder die Maus noch auf dem Knopf lag. Solange gedrückt wird, zeichnet jetzt nichts neu.
+  - Angriffe auf eigene Strecken öffnen direkt die Strecke.
+- **Krisenvorschläge:**
+  - Für Ereignisse, die eigene Strecken spürbar treffen (ab rund 4,5 % Nachfrage), gibt es einen Vorschlag mit „Vorschlag übernehmen“ / „Nein danke“: im Dashboard, in der Weltlage und bei der Assistenz.
+  - Abgedeckt sind Ereignisse mit Nachfragewirkung, Rezession und Aufschwung (über die Konjunktur der Länder, Geschäftsreisen am stärksten) sowie Handelskrieg (über Zölle zwischen den Blöcken).
+  - Der Vorschlag: Preisautomatik einschalten (Ziel 85 % im Einbruch, 88 % im Aufschwung). Ab −25 % Nachfrage wird die Frequenz anteilig gesenkt, mindestens 1×.
+  - Frei gewordene Slots bleiben bis nach der Krise Reserve; die 6-Monats-Frist beginnt erst danach.
+  - Nach der Krise bietet ein Knopf „Zurücknehmen“ die alten Frequenzen an.
+- **Preisautomatik stärker:**
+  - Standard-Tempo ±5 % je Woche statt ±3 %; wählbar bis ±12 %.
+  - **Extremfälle** (an, abschaltbar): täglich statt wöchentlich, bis ±15 % je Schritt, danach 4 Tage Pause. Das greift bei Einbruch (Auslastung über 22 Punkte unter Ziel, kaum Abweisungen), Ansturm (über 30 % abgewiesen) und deutlicher Unterbietung (über 20 % billiger bei schwacher Auslastung). Bei Unterbietung geht der Preis bis knapp über den Konkurrenten.
+- **Startangebote:** Neue Airlines bekommen zur Gründung drei zufällige Angebote, 30 Tage annehmbar:
+  - 90 % Rabatt auf die Umfassende Marktanalyse;
+  - freie Werftkapazität (Wartung −30 %, 6 Monate);
+  - Bodenabfertiger an der Basis (−40 %, 6 Monate);
+  - Neukundenrabatt des Flughafens (Lande- und Passagierentgelte −40 %, 1 Jahr);
+  - Personal einer aufgelösten Regionalairline (8 Piloten, 24 Flugbegleiter, 4 Techniker sofort);
+  - Kerosin-Absicherung ohne Prämie (50 %, 6 Monate);
+  - Tourismusverband zahlt die Hälfte des Marketings (6 Monate).
+- **Codeshare-Handel abgesichert:** Ein Codeshare oder eine Allianz konnte mehrfach oder auf beiden Seiten ins Angebot gestellt werden, mit Geld obendrauf, und die KI nahm an.
+  - Jetzt steht jede Kooperation nur einmal im Angebot. Sie gilt ohnehin für beide Seiten.
+  - Sie muss über eine bestehende hinausgehen, und ein Codeshare nur auf Strecken, die eine Seite fliegt.
+  - Die KI bewertet jede Kooperation einmal, nur die zusätzliche Laufzeit und höchstens 150.000 € im Monat.
+- **Flughäfen ausbauen** (Karte → Flughafen, nur mit Basis oder Station dort):
+  - **Terminal** in 3 Stufen: je Stufe +25 % Kapazität (Passagiere im Jahr), +4 % Nachfrage auf allen Strecken dorthin, +15 % Slots, für alle Airlines. Kosten: (40 Mio. € + 5 Mio. € je Mio. Passagiere) × 1 / 1,6 / 2,5; Bauzeit 10–15 Monate.
+  - **Bahn verlängern**: Code F für A380 und 747-8, 220 Mio. €, 15 Monate.
+  - Neu: Auch die 747-8 braucht Code F (ab 25 Mio. Passagieren oder verlängerte Bahn). Bestehende Strecken fliegen weiter.
+  - Bauherr: 10 Jahre −20 % Lande- und Passagierentgelte dort (je weiterem Ausbau ×0,9, höchstens −40 %), dazu 2 Slots. Die Kosten sind ein Einmalposten.
+  - Pro Flughafen läuft höchstens ein Bau gleichzeitig.
+- **Slots im Flughafenfenster:** wer wie viele Slots hält (genutzt und Reserve), mit Anteil, dazu die freien Slots.
+- **Flotte sortieren** nach Einsatzzeit pro Tag, Auslastung der geflogenen Strecken, Alter, nächstem C-Check, Muster oder Basis, auf- oder absteigend. Jede Flottenzeile zeigt Einsatz und Auslastung.
+- **Ergebnis eindeutig beschriftet:** Seitenleiste „Ergebnis gestern“ mit Ø 30 Tage darunter; im Dashboard „Ergebnis Ø … (letzte 30 Tage; gestern …)“. Vorher sah es nach zwei verschiedenen Ergebnissen aus (+65.973 € gestern, +128.494 € im Schnitt).
+
+## Neu in 0.21.40: Werftdauer gerundet
+
+- Flotte: Die Dauer des nächsten C-Checks wird als ganze Zahl von Tagen angezeigt (vorher z. B. „7.7639999 Tage“). Die Anzeige rundet den Technik-Bonus jetzt genauso wie die Werft selbst.
+
+## Neu in 0.21.39: KI-Vertretung für abwesende Airlines
+
+- **Wann:** Hat jemand 72 Stunden lang weder eine Aktion geschickt noch aktiv gespielt (Spielzeit-Lebenszeichen eines sichtbaren Fensters), führt die KI die Airline weiter. Der Server prüft das höchstens einmal je Stunde, für alle Online-Spiele. Für bestehende Airlines beginnt die Zählung mit dem Update.
+- **Ende:** Jede eigene Aktion beendet die Vertretung sofort. Wer das Spiel öffnet, übernimmt automatisch wieder und bekommt einen Hinweis. Wer nur aktiv spielt, ohne etwas zu tun, übernimmt spätestens bei der nächsten stündlichen Prüfung.
+- **Was die Vertretung tut** (mittleres Niveau, alles im Logbuch als „Vertretung (KI): …“):
+  - Offene Entscheidungen kurz vor Fristende maßvoll beantworten: Streikdrohung → +5 % Gehalt, Gewinnbeteiligung → zustimmen, Hauptversammlung → Kompromiss, Prüfungsbescheid → 12 Monatsraten.
+  - Wöchentlich die Preisautomatik auf allen Strecken einschalten (Ziel 85 % Auslastung) und fehlendes Personal einstellen.
+  - Monatlich Strecken einstellen, die seit 30 Tagen nicht einmal die direkten Kosten decken (frühestens 45 Tage nach Eröffnung).
+  - Bis zu zwei freie Flugzeuge je Monat auf eine neue Strecke ab ihrer Basis setzen. Bewertet werden die 14 größten Märkte mit Standardprodukt und marktüblichem Preis, mit bewusst ungenauer Prognose. Vorausgesetzt sind ein Puffer von 3 Mio. € und keine Sperren am Ziel.
+- **Was die Vertretung nicht tut:** keine Flugzeuge kaufen oder leasen, keine Basen, keine Kredite, keine Aktiengeschäfte, keine Angriffe auf andere.
+- **Anzeige:** Unter Mitspielende steht ein Chip „KI-Vertretung“. Im Dashboard der eigenen Airline erscheint ein Hinweis mit „Selbst übernehmen“.
+
+## Neu in 0.21.38: Keine Zahlen mehr zu abgewiesenen Reisenden
+
+Wie viele Reisende gern mitgeflogen wären, zeigt das Spiel nicht mehr. Die Nachfrage lässt sich nur noch aus der Auslastung herleiten. Die bisherige Zahl war ein Mittelwert über Tage und Richtungen und passte oft nicht zur Auslastung: Es hieß „hätten mehr gewollt“, obwohl die Auslastung unter 100 % lag.
+
+- **Strecke:** Statt „Reisende ohne Platz …“ kommt ein Hinweis nur noch, wenn eine Richtung in den letzten 7 Tagen zu mindestens 95 % ausgelastet ist. Ist nur eine Richtung voll, gibt es den Rat, dort den Preis zu erhöhen.
+- **Umsteiger:** Es steht nur noch die tatsächliche Zahl da („Ø 104 Umsteiger pro Tag über DFW“), ohne „gewollt hätten …“.
+- **Dashboard:** Die Kachel „Auslastung 7 Tage“ zeigt darunter die Auslastung über 30 Tage statt „abgewiesen x % der Nachfrage“. „voll“ bei den Auslastungsbalken heißt ab 95 % Auslastung.
+- **Drehkreuze:** Die Spalte Umsteiger/Tag zeigt nur die tatsächlichen Umsteiger.
+- **Assistenz und Berater:** Sie melden volle Strecken nach der Auslastung (ab 95 %), nicht mehr nach abgewiesenen Reisenden.
+- **Preisautomatik:** Die Erklärung erwähnt keine Abweisungen mehr. Gesteuert wird weiter wie bisher.
+
+## Neu in 0.21.37: Börsenwert und KGV realistischer
+
+**Problem:** Eine Spieler-Airline mit stark gestiegenem Gewinn stand bei KGV 1,7. Dafür gab es drei Gründe:
+- Der Kurs zog höchstens +25 % je Monat nach und hinkte rasch wachsenden Gewinnen monatelang hinterher.
+- Der Börsenwert rechnete mit dem Zwölfmonatsschnitt, das angezeigte KGV dagegen mit dem Halbjahresergebnis.
+- In das KGV flossen Sondereffekte und Beteiligungserträge ein.
+
+So ließen sich Anteile viel zu billig kaufen.
+
+**Neu:**
+- **Ertragskraft:** Das operative Ergebnis zählt als Mittel aus dem Zwölf- und dem Sechsmonatsschnitt. Wer schnell wächst, wird schneller höher bewertet.
+- **Untergrenze:** Eine profitable Airline ist mindestens das Vierfache ihres operativen Jahresergebnisses wert (KGV ≥ 4). Das gilt sofort, auch für laufende Spielstände, und damit auch für Aktienkäufe und Übernahmeangebote.
+- **Nachziehen:** Der Kurs folgt bis zu +40 % je Monat (vorher +25 %). Nach unten bleibt es bei −20 %.
+- **Beteiligungen:** Stille Reserven (Börsenwert über Buchwert) zählen zu 80 % zum Börsenwert der Halterin.
+- **KGV-Anzeige:** Börsenwert ÷ operatives Jahresergebnis (letzte sechs Monate hochgerechnet, ohne Sondereffekte und Beteiligungserträge). Die eigene Kachel zeigt zusätzlich das operative Ergebnis.
+- In einer Testwelt nach gut einem Jahr liegen profitable Airlines bei KGV 6,5–50, typisch 7–15.
+- **Mindestdividende (Satzung):** Liegen mehr als 5 % der Aktien einer Spieler-Airline bei anderen, gehen in Gewinnmonaten mindestens 25 % des Monatsgewinns an die Aktionäre, auch wenn 0 % gewählt ist.
+  - Ausnahmen: Die Kasse hat weniger als das Doppelte der Ausschüttung, oder das Eigenkapital ist negativ.
+  - Wer mehr wählt (50 %), zahlt mehr.
+  - Unter Börse → Ihre Beteiligungen steht die Quote je Beteiligung („Quote 25 % (Mindestquote)“), bei der eigenen Airline ein Hinweis.
+
+## Neu in 0.21.36: Nach Entfernung filtern
+
+- **Streckenplanung:** Über der Zielauswahl gibt es eine Filterleiste.
+  - Entfernung: bis 800 km, 800–2.000, 2.000–4.500, 4.500–8.000, über 8.000 km oder eine eigene Spanne mit km von/bis.
+  - Ordnen: nach Region, nach Entfernung auf- oder absteigend (gruppiert nach Entfernungsbereich) oder nach Größe des Flughafens.
+  - „Nur in Reichweite“ des gewählten Musters.
+  - Die Auswahl zeigt „x von y Zielen“. Das aktuelle Ziel bleibt wählbar, auch wenn es außerhalb des Filters liegt.
+- **Netz:** Zusätzlicher Entfernungsfilter neben Muster, Status und Suche. Er wirkt mit Sortierung und „Filter zurücksetzen“ zusammen.
+- **Märkte:** Die Marktliste („Märkte ab …“) und die Marktchancen lassen sich nach Entfernung filtern. Die Liste lässt sich außerdem nach Entfernung statt nach Potenzial sortieren.
+
+## Neu in 0.21.35: Geopolitik, politische Eingriffe und mehr Naturereignisse
+
+Neue Ereignisse (Häufigkeit je Monat, mal Schwierigkeitsfaktor; „Realistisch“ = ×1,35). Alle erscheinen als Meldung, im Logbuch betroffener Airlines, unter Karte → Weltlage und lassen sich von der Spielleitung annullieren (mit passender Gegenmeldung).
+
+**Geopolitik**
+- **Konflikt** (2,5 %): Eine von 17 Zonen (z. B. Osteuropa, Russland, Südkaukasus, Levante, Persischer Golf, Iran, Rotes Meer, Sudan/Sahel, Libyen, Kaschmir, Taiwanstraße, Westbalkan, Venezuela, Horn von Afrika, Myanmar, Zentralasien). Der Luftraum der Länder in der Zone ist gesperrt, es gibt keine Flüge von und nach dort. **Strecken, deren Großkreis die Zone kreuzt, fliegen Umwege** (Ausweichen am Rand: z. B. FRA–ICN um Russland +1.600 km, rund +19 % Kerosin, Flugzeit und Streckengebühren). In Nachbarländern sinkt die Nachfrage (−25 % Urlaub), in Ölregionen steigt Kerosin um 8–20 %. Dauer 10 Tage bis 18 Monate.
+- **Diplomatische Krise** (4,5 %): Zwei Länder setzen alle Direktflüge zueinander aus (14–120 Tage). In der Hälfte der Fälle trifft es ein Länderpaar, zwischen dem Spielende fliegen.
+- **Sanktionen** (1,2 %): EU, USA/Kanada, Großbritannien oder G7 gegen ein Land. Direktflüge sind verboten, und **nur die Airlines der sanktionierenden Länder** dürfen das Land nicht überfliegen (Umwege). Alle anderen fliegen weiter. Dauer 6–24 Monate.
+- **Streit um Landerechte** (3 %): Airlines aus einem bestimmten Land (Heimatland = Land der ersten Basis) dürfen nicht mehr in einem anderen Land landen (30–150 Tage). Ausländische Konkurrenz fliegt weiter.
+- **Unruhen/Umsturzversuch** (3,5 %): Luftraum 2–7 Tage zu, danach monatelang weniger Nachfrage (langsame Erholung).
+
+**Politische Eingriffe**
+- **Einreisestopp** (3 %): Ein Land lässt Reisende aus einer Region kaum noch einreisen. Die Flüge laufen, sind aber fast leer (−85 % Urlaub zwischen Land und Region).
+- **Open-Skies-Abkommen** (3 %): +10–20 % Reisende zwischen zwei Ländern für 1–2,5 Jahre.
+- **Visafreiheit** (3,5 %): +18–35 % Urlaubsreisende in ein Land.
+- **Kurzstreckenverbot** (1 %): Inlandsflüge sind verboten, wo der Zug höchstens 2,5 Stunden braucht (Angaben aus der Bahn-Tabelle, z. B. HAM–BER). Vorlauf 90 Tage, Dauer 2–4 Jahre.
+- **Sonderabgabe für ausländische Airlines** (2,5 %): +30–70 % Lande- und Abfertigungsentgelte für alle außer heimischen Airlines.
+- **Tourismusförderung** (2,5 %): +15–30 % Nachfrage auf Inlandsstrecken eines Landes.
+- **Regionaler Krankheitsausbruch** (1,8 %): 1–3 Länder einer Region, Urlaub −50 %, 2–5 Monate plus Erholung.
+
+**Natur** (täglich gewürfelt, nur in der Saison): Hitzewelle (Sommer; Verspätungen, wenige Ausfälle), Sandsturm (Golf, Nordafrika, März–Juli), Monsun (Süd- und Südostasien, Juni–Sept.), Blizzard (Nordwinter; mehr als die Hälfte der Flüge fällt aus), Waldbrände (Sommer; Australien im Südsommer), **schweres Erdbeben** (Flughafen 10–35 Tage geschlossen, Region mit Ausfällen, Nachfrage erholt sich über 5 Monate), Sonnensturm (weltweit kurz Verspätungen). Vulkanasche ist jetzt in 14 Regionen möglich (u. a. Island, Ätna, Bali, Mittelamerika, Anden, Neuseeland).
+
+**Anzeige**
+- **Karte:** Gesperrte Überflugzonen erscheinen als rot gestrichelte Flächen (mit Tooltip). Gesperrte Länder sind grau („Luftraum gesperrt“).
+- **Netz → Strecke:** Hinweise zu Flugverbot, Sperrung (auch angekündigte), Umweg in km und % sowie Sonderabgabe. Die Abflugtafel nennt den Grund („Flugverbot Deutschland–Türkei“).
+- **Planung:** Dieselben Hinweise schon vor dem Eröffnen.
+- **Weltlage:** Karte „Ihre Strecken unter Sperren, Verboten und Umwegen“.
+- **Assistenz:** Meldet Strecken, die länger als drei Wochen gesperrt sind.
+- **KI-Airlines** eröffnen keine Strecken in gesperrte Länder oder Länderpaare.
+
+Vereinfachung: Umwege verteuern Kerosin, Flugzeit-Kosten und Streckengebühren, ändern aber nicht den Umlaufplan der Flugzeuge.
+
+## Neu in 0.21.34: Hauptwelt lädt zuverlässig (vor allem auf dem Handy) · Fehlerprotokoll
+
+**Ursache der Ladeprobleme:** Nach „Weiterspielen“ blieb die Lobby ohne Rückmeldung stehen, während der Spielstand (in einer vollen Hauptwelt rund 0,5–1 MB, entpackt 3 MB und mehr) lud. Ein zweiter Tipp – oder ein noch hängender Abruf von vorher (Handy im Funkloch, App kurz gewechselt) – startete einen zweiten Ladevorgang, der sich mit dem ersten überkreuzte:
+- Lief noch ein alter Abruf, brach der neue sofort mit „Spielstand nicht geladen“ ab → zurück in der Lobby.
+- Kam die Antwort des alten Abrufs an, nachdem der neue schon begonnen hatte, wurde der Spielstand ohne Zuordnung zur eigenen Airline übernommen → die Assistenz-Auswahl erschien, und die erste Aktion endete mit „Airline nicht gefunden“.
+
+**Behoben:**
+- Nach „Weiterspielen“ erscheint sofort eine Ladeanzeige (Verbinden → Übertragen → Entpacken → Welt aufbauen) statt der Lobby; ein zweiter Tipp ist nicht mehr möglich, „Zurück zur Lobby“ bricht sauber ab.
+- Jeder Ladevorgang hat eine eigene Kennung; Antworten eines älteren Vorgangs werden verworfen. Ein hängender Abruf blockiert nichts mehr.
+- Zeitlimits (Spielstand 45 s beim Öffnen, 25 s danach, sonst 20 s) und bis zu 3 Versuche mit kurzer Pause; schlägt alles fehl, ein Dialog mit Grund und „Erneut versuchen“.
+- Der Spielstand wird erst übernommen, wenn die eigene Airline darin gefunden ist (über die Anmeldung oder – nach einem Neustart der Welt – über den Besitzer, aktive Airline vor insolventer). Fehlt sie, gibt es eine klare Meldung statt Assistenz-Auswahl mit fremder oder leerer Airline; Aktionen ohne geladene Airline laden den Stand neu.
+- Server: Ruft ein Gerät den Stand ab, während ein anderes gerade speichert, bekommt es den neueren Stand statt „Gerade viel Betrieb“.
+
+**Fehlerprotokoll (Admin):** Lobby → Verwaltung → „Fehlerprotokoll“ bzw. Menü → „Fehlerprotokoll“. Geräte melden fehlgeschlagenes Laden (mit Grund, HTTP-Status, Versuch), einen Neustart der Seite während des Ladens (typisch, wenn ein Handy den Tab aus dem Speicher wirft), Laden über 8 Sekunden (mit Größe und Zeiten für Übertragen, Entpacken, Aufbauen), Abruffehler und Skriptfehler – jeweils mit Gerät, Browser, Arbeitsspeicher, Netz und Version. Höchstens 30 Meldungen je Konto und Stunde, die letzten 400 bleiben; „Leeren“ setzt zurück.
+
+- Tests: Uhr-abhängige Server-Tests (Nachholen über Nacht) berücksichtigen das Wochenend-Tempo.
+
 ## Neu in 0.21.33: Basen nach Übernahme begrenzt · Slots und Wartelisten ein- und ausblendbar
 
 - **Höchstens 2 neue Basen je Kalenderjahr** – für alle Spieler-Airlines, auch im Konzern. Übernommene Basen zählen nicht mit. Anzeige „Neue Basen 2028: x von höchstens 2“ im Basis-Antrag.

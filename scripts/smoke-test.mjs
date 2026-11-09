@@ -1,7 +1,7 @@
 // Prüft den API-Ablauf ohne Netlify: Konten, Spiel mit Passwort, Suche, Beitritt per Code und Einladung, Zeit, Aktionen.
 import { handle, tickMain, _clock } from '../server/api.mjs';
 import { memStore } from '../server/memstore.mjs';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 // Oberfläche muss sich fehlerfrei parsen lassen (ein Syntaxfehler legt die ganze Seite lahm)
@@ -143,7 +143,7 @@ if (lot) {
   assert.equal(r.ok, true, JSON.stringify(r));
   console.log('Auktion:', lot.type, 'Gebot ok');
 }
-r = ok(await call('anna', 'POST', `/games/${g.id}/action`, { action: { type: 'dealPropose', to: benAl.id, give: [{ k: 'coop', kind: 'alliance', days: 180 }], take: [{ k: 'coop', kind: 'alliance', days: 180 }] } }), 'Allianz-Angebot');
+r = ok(await call('anna', 'POST', `/games/${g.id}/action`, { action: { type: 'dealPropose', to: benAl.id, give: [{ k: 'coop', kind: 'alliance', days: 180 }], take: [] } }), 'Allianz-Angebot');   // 0.21.41: Kooperation gilt für beide Seiten – nur einmal eintragen
 assert.equal(r.ok, true, JSON.stringify(r));
 r = ok(await call('ben', 'POST', `/games/${g.id}/action`, { action: { type: 'dealRespond', id: r.id, choice: 'accept' } }), 'Allianz annehmen');
 assert.equal(r.ok, true, JSON.stringify(r));
@@ -219,9 +219,11 @@ assert.equal((await call('ben', 'POST', '/games/main/action', { action: { type: 
 // offline weiterlaufen: 30 Stunden zurückdatieren, stündlicher Lauf holt nach
 const ms = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' });
 assert.equal(ms.metadata.speed, 'm20', 'Hauptwelt: 20 Min. pro Tag');
-await store.set('games/main/state', ms.data, { metadata: { ...ms.metadata, lastTick: Date.now() - 15 * 3600000 - 1000 }, onlyIfMatch: ms.etag });
+const mdBack = { ...ms.metadata, lastTick: Date.now() - 15 * 3600000 - 1000 };
+await store.set('games/main/state', ms.data, { metadata: mdBack, onlyIfMatch: ms.etag });
+const expDays = Math.min(30, Math.floor(_clock.progressDays(mdBack, Date.now(), true)));   // am Wochenende 1 Tag je Stunde
 const tk = await tickMain(store);
-assert.ok(tk.days >= 30, 'Tick holt 30 Tage nach: ' + JSON.stringify(tk));
+assert.ok(tk.days >= expDays && tk.days >= 15, `Tick holt ${expDays} Tage nach: ` + JSON.stringify(tk));
 // Neustart: nur nach Insolvenz, außer freiwillig
 const benId = mi.players.find((p) => p.name === 'Ben').airlineId;
 assert.equal((await call('ben', 'POST', '/games/main/restart', { airline: { name: 'Phoenix', code: 'PH', base: 'VIE' } })).status, 409, 'nicht insolvent');
@@ -263,6 +265,39 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const rp = ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' } }), 'Kredit fehlt');
   assert.equal(rp.ok, false); assert.ok(rp.msg, 'Meldung beim fehlenden Kredit');
   console.log('Robust ok: 10 manipulierte Aktionen abgewiesen, Welt läuft weiter (+' + t3.days + ' Tage)'); }
+// 0.21.39: KI-Vertretung – nach 72 Stunden ohne Aktion und ohne aktive Sitzung übernimmt die KI, eine eigene Aktion beendet sie
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const load = async () => { const m = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' }); return { m, w: SMx.deserialize(JSON.parse(gunzipSync(Buffer.from(m.data)).toString())) }; };
+  const save = async (m, w, back) => { const buf = gzipSync(Buffer.from(JSON.stringify(SMx.serialize(w)))); await store.set('games/main/state', buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), { metadata: { ...m.metadata, lastTick: Date.now() - back }, onlyIfMatch: m.etag }); };
+  let { m, w } = await load(); const al = w.humans.find((h) => h.owner === 'anna' && h.status !== 'insolvent');
+  assert.ok(al, 'Anna hat eine Airline in der Hauptwelt');
+  al.lastAct = Date.now() - 73 * 3600e3; w.autoAt = 0; await store.delete('play/anna');
+  await save(m, w, 3 * 1800000 * (_clock.isWeekend(Date.now()) ? 2 : 1) + 1000);
+  await tickMain(store);
+  ({ m, w } = await load()); const a2 = w.airlines[al.id];
+  assert.ok(a2.auto, 'nach 72 Stunden vertritt die KI'); assert.ok(a2.events.some((e) => /vertritt Ihre Airline/.test(e.msg)), 'Hinweis im Logbuch');
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'resume' } }), 'zurück übernehmen');
+  ({ m, w } = await load()); assert.ok(!w.airlines[al.id].auto && w.airlines[al.id].lastAct > Date.now() - 60000, 'eigene Aktion beendet die Vertretung');
+  // Engine: Vertretung handelt maßvoll (Preisautomatik, Personal, freie Flugzeuge) und hält die Bilanz
+  const v = SMx.newWorld({ seed: 55 }), p = SMx.addHuman(v, { id: 'P1', name: 'Abwesend', code: 'AW', base: 'HAJ' }); v.playerId = 'P1'; p.ledger.equityFlow(60e6, 't');
+  SMx.applyAction(v, 'P1', { type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAJ' }); SMx.applyAction(v, 'P1', { type: 'openRoute', base: 'HAJ', dest: 'PMI', typeId: 'A20N', freq: 1, fo: 400, fi: 400 });
+  SMx.applyAction(v, 'P1', { type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAJ' });
+  for (let i = 0; i < 20; i++) v.step();
+  p.auto = 1; const e0 = p.events.length; for (let i = 0; i < 70; i++) v.step();
+  const acts = p.events.slice(e0).filter((e) => /^Vertretung \(KI\)/.test(e.msg)).map((e) => e.msg);
+  assert.ok(acts.some((x) => /Preisautomatik/.test(x)) && acts.some((x) => /Neue Strecke/.test(x)), 'Vertretung: ' + acts.join(' | '));
+  assert.ok(p.activeRoutes().every((r) => r.ap > 0), 'alle Strecken mit Preisautomatik'); assert.ok(Math.abs(SMx.balanceSheet(p).check) < 1, 'Bilanz ausgeglichen');
+  console.log('0.21.39 ok: KI-Vertretung nach 72 h, Ende durch eigene Aktion; ' + acts.length + ' Vertretungsschritte in 70 Tagen');
+}
+// 0.21.34: Fehlerprotokoll der Geräte – senden darf jedes Konto, lesen nur Admins; Flut je Konto begrenzt
+{ ok(await call('anna', 'POST', '/diag', { kind: 'load', msg: 'Zeitüberschreitung', status: 0, ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari/604.1', extra: { attempt: 2, game: 'main' } }), 'Diag senden');
+  assert.equal((await call('anna', 'GET', '/admin/diag')).status, 403, 'Protokoll nur für Admins');
+  const dg = ok(await call('tim', 'GET', '/admin/diag'), 'Diag lesen'); const e0 = dg.list.find((x) => x.u === 'anna');
+  assert.ok(e0 && e0.kind === 'load' && e0.extra.attempt === 2 && e0.server, 'Meldung mit Zusatzangaben im Protokoll');
+  for (let i = 0; i < 40; i++) await call('ben', 'POST', '/diag', { kind: 'js', msg: 'x' + i });
+  const dg2 = ok(await call('tim', 'GET', '/admin/diag'), 'Diag lesen 2'); assert.equal(dg2.list.filter((x) => x.u === 'ben').length, 30, 'höchstens 30 je Konto und Stunde');
+  ok(await call('tim', 'GET', '/admin/diag?clear=1'), 'Diag leeren');
+  console.log('0.21.34 ok: Fehlerprotokoll (Senden, nur Admins lesen, 30/Stunde je Konto, leeren)'); }
 { const L = { type: 'setLogo', shape: 'hex', sym: 'eagle', c1: '#0b3d91', c2: '#ffcc00' };
   assert.equal(ok(await call('anna', 'POST', '/games/main/action', { action: L }), 'Logo Anna').ok, true);
   const dup = ok(await call('ben', 'POST', '/games/main/action', { action: L }), 'Logo Ben gleich');
@@ -679,7 +714,8 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const att = Object.values(w.attacks).filter((a) => a.al === 'B1');
   if (att.length) assert.ok(!big.events.slice(logs0).some((e) => /wehren|Preisangriff|greif/.test(e.msg || '')) && !w.news.slice(news0).some((n) => /greif|Preiskampf/.test(n.msg)), 'Gegenwehr im Stillen');
   { const c0 = big.ledger.cash; SMx.dominanceMonth(w); const paid = (c0 - big.ledger.cash) / 100;
-    assert.ok(Math.abs(paid - big.agm.rate * 20e6) <= 1000, `Ausschüttung laut Beschluss gezahlt (${paid})`);
+    const pre = SMx.divRate(big, 20e6) * (SMx.capState(big).ext || 0) * 20e6;   // 0.21.37: Mindestdividende ist schon abgezogen
+    assert.ok(Math.abs(paid - Math.max(0, big.agm.rate * 20e6 - pre)) <= 1000, `Ausschüttung laut Beschluss gezahlt (${paid})`);
     // Ablehnen kostet Ansehen; wer alle Aktien hält, bekommt keine Versammlung
     const st0 = SMx.standingOf(big, w.day + 1).v; big.agm = { k: 'no', rate: 0.05, asked: 0.4, from: w.day, until: w.day + 180 }; big._st = null;
     assert.equal(st0 - SMx.standingOf(big, w.day + 1).v, SMx.P.PAYOUT.noMalus, 'Ansehen −' + SMx.P.PAYOUT.noMalus + ' nach Überstimmen der Minderheit');
@@ -1068,7 +1104,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const BROKEN = ['flights', 'seats', 'cancelled', 'cost', 'block_h', 'pax', 'rev', 'pax_out', 'pax_in', 'seats_out', 'seats_in', 'so_out', 'so_in', 'late', 'demand_out', 'demand_in', 'spill_out', 'spill_in', 'tr_out', 'tr_in', 'cargo', 'prem', 'd', 'trd', 'ps'];
   const S = SMx.serialize(w); delete S.hv;
   const pr = S.airlines ? null : null; void pr;
-  const routesOf = (st) => { const out = []; const walk = (o) => { if (!o || typeof o !== 'object') return; if (Array.isArray(o)) { o.forEach(walk); return; } if (Array.isArray(o.hist) && !o.hk && o.hist.length && Array.isArray(o.hist[0]) && o.hist[0].length === 25) out.push(o); for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v); }; walk(st); return out; };
+  const routesOf = (st) => { const out = []; const walk = (o) => { if (!o || typeof o !== 'object') return; if (Array.isArray(o)) { o.forEach(walk); return; } if (Array.isArray(o.hist) && !o.hk && o.hist.length && Array.isArray(o.hist[0]) && o.hist[0].length >= 25) out.push(o); for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v); }; walk(st); return out; };
   const rs = routesOf(S); assert.ok(rs.length >= 5, 'Strecken im Speicherstand gefunden');
   const orig = rs.map((r) => r.hist.map((arr) => Object.fromEntries(OLD.map((k, i) => [k, arr[i]]))));
   rs.forEach((r, j) => { r.hist = r.hist.map((arr, i) => {
@@ -1093,6 +1129,56 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const ob = w.openBase(a, nb); assert.ok(ob.ok, 'weitere Basis trotz ' + (a.bases.length - 1) + ' Basen: ' + ob.msg);
   const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(SMx.limitsLifted(w2.airlines.P1), 'bleibt gespeichert');
   console.log('0.21.30 ok: nach Übernahme von', t.name, '– Basen', a.bases.length, ', keine Aufschläge, gespeichert');
+}
+// 0.21.37: Börsenwert – KGV nie unter 4 (operatives Ergebnis), schnelleres Nachziehen, stille Reserven in Beteiligungen
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 31 }), a = SMx.addHuman(w, { id: 'P1', name: 'Kurs', code: 'KQ', base: 'HAJ' }); w.playerId = 'P1';
+  for (let i = 0; i < 120; i++) w.step();
+  const c = SMx.capState(a); c.mc = 20e6;   // Kurs hinkt hinterher
+  // sechs starke Monate: 25 Mio. operatives Ergebnis je Monat (Erlös), plus ein Sondergewinn, der nicht zählt
+  const ms = a.ledger.months.slice(-6); for (const m of ms) { m.acc.rev_pax = (m.acc.rev_pax || 0) + 25e6 * 100; }
+  ms.at(-1).acc.one_off = (ms.at(-1).acc.one_off || 0) + 500e6 * 100;
+  const e6 = SMx.earnRecent(a), cap = SMx.mktCap(w, a);
+  assert.ok(e6 > 250e6 && cap >= 4 * Math.min(e6, Math.max(SMx.opResult(a), 0) * 2.5) - 1, `KGV nicht unter 4: Börsenwert ${Math.round(cap / 1e6)} Mio., Ergebnis ${Math.round(e6 / 1e6)} Mio.`);
+  assert.ok(cap / e6 >= 3.99, 'KGV ' + (cap / e6).toFixed(1));
+  const before = SMx.capState(a).mc; SMx.updateCap(w, a); assert.ok(SMx.capState(a).mc >= before && SMx.capState(a).mc <= Math.max(before, cap) * 1.41, 'Nachziehen höchstens +40 %');
+  const B = w.list.find((x) => !x.isPlayer && x.status !== 'insolvent'); const p0 = SMx.stakeBuyPrice(w, B.isPlayer ? B : a, a, 0.05);
+  assert.ok(p0 >= 0.05 * 4 * Math.min(e6, SMx.opResult(a) * 2.5) * 0.99, 'Aktienkauf zum Mindestwert');
+  // Mindestdividende: mehr als 5 % der Aktien bei anderen → mindestens 25 % des Gewinns, auch wenn 0 % gewählt
+  { const cs = SMx.capState(a); cs.div = 0; cs.ext = 0.111; a.ledger.equityFlow(50e6, 't');
+    assert.equal(SMx.divRate(a, 10e6), 0.25, 'Mindestquote greift'); cs.ext = 0.03; assert.equal(SMx.divRate(a, 10e6), 0, 'unter 5 % außerhalb frei wählbar');
+    cs.ext = 0.111; assert.equal(SMx.divRate(a, -5e6), 0, 'im Verlustmonat keine Pflicht'); cs.div = 0.5; assert.equal(SMx.divRate(a, 10e6), 0.5, 'höhere eigene Quote bleibt'); cs.div = 0; cs.ext = 0; }
+  console.log('0.21.37 ok: Börsenwert ' + Math.round(cap / 1e6) + ' Mio. statt 20 Mio. (KGV ' + (cap / e6).toFixed(1) + ' auf das operative Ergebnis, Sondergewinn zählt nicht)');
+}
+// 0.21.35: Geopolitik und Natur – Konflikt mit Überflugverbot (Umweg), Flugverbot zwischen Ländern, Landerechte, Kurzstreckenverbot, Einreisestopp, Annullieren
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 77 }), a = SMx.addHuman(w, { id: 'P1', name: 'Geo', code: 'GQ', base: 'FRA' }); w.playerId = 'P1'; a.ledger.equityFlow(8e8, 't'); a.brand = 1; a._st = null;
+  for (const [d, t] of [['ICN', 'A359'], ['IST', 'A20N'], ['DXB', 'A359']]) { SMx.applyAction(w, 'P1', { type: 'acquire', typeId: t, mode: 'lease', base: 'FRA' }); assert.ok(SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'FRA', dest: d, typeId: t, freq: 1 }).ok, 'Strecke ' + d); }
+  for (let i = 0; i < 40; i++) w.step();
+  const R = (d) => a.routes.find((x) => x.dest === d && !x.closed), z = SMx.GEO_ZONES.find((x) => x.key === 'russland');
+  const f0 = w.costsFor(a, R('ICN'), 'FRA', 'ICN', 200, 1e5, true).fuel;
+  const ev = w.addEvent({ type: 'conflict', zone: 'russland', short: 'Konflikt Russland', countries: z.countries, airports: SMx.AP_CODES.filter((x) => SMx.P.AIRPORTS[x].country === 'RU'), ops: { cancel: 1, delay: 0 }, overfly: { circles: z.circles, name: 'Russland' }, countries2: ['FI'], demand2: { leisure: 0.75, business: 0.85, vfr: 0.92 }, end: w.day + 30, recovery: 60, text: 'Konflikt: Test', severity: 'crit' });
+  const dt = w.detour(a, 'FRA', 'ICN'), f1 = w.costsFor(a, R('ICN'), 'FRA', 'ICN', 200, 1e5, true).fuel;
+  assert.ok(dt.km > 800 && f1 > f0 * 1.1, 'Umweg um Russland verteuert FRA–ICN: +' + Math.round(dt.km) + ' km');
+  assert.ok(w.opsAt('SVO').hard && !w.opsAt('HEL').hard, 'Russland gesperrt, Finnland nicht (nur Nachfrage)');
+  assert.ok(w.demandMult('HEL', 'ARN', 'leisure') < 0.8, 'Nachfrage im Nachbarland sinkt');
+  w.addEvent({ type: 'flight_ban', short: 'Flugverbot Deutschland–Türkei', countries: ['DE', 'TR'], ban: { a: ['DE'], b: ['TR'] }, end: w.day + 20, text: 'Flugverbot: Test', severity: 'crit' });
+  assert.ok(/Flugverbot/.test(w.legRisk(a, R('IST')).hard || ''), 'FRA–IST fällt wegen Flugverbot aus'); assert.ok(!w.routeBan(a, 'FRA', 'MUC'), 'Inland nicht betroffen');
+  w.addEvent({ type: 'carrier_ban', short: 'Landerechte VAE', countries: ['AE'], ban: { a: ['AE'], carrier: ['DE'] }, end: w.day + 20, text: 'Landerechte: Test', severity: 'crit' });
+  assert.ok(w.legRisk(a, R('DXB')).hard, 'deutsche Airline darf nicht in die VAE'); assert.ok(!w.routeBan({ bases: ['LHR'] }, 'LHR', 'DXB'), 'britische schon');
+  w.addEvent({ type: 'shorthaul_ban', countries: ['DE'], ban: { dom: 'DE', rail: 2.5 }, end: w.day + 100, text: 'Kurzstreckenverbot: Test', severity: 'warn' });
+  assert.ok(w.routeBan(a, 'HAM', 'BER') && !w.routeBan(a, 'FRA', 'MUC'), 'Kurzstreckenverbot nur, wo der Zug höchstens 2,5 h braucht');
+  w.addEvent({ type: 'entry_ban', countries: ['TR'], pair: { a: ['TR'], b: ['DE'] }, pairDemand: { leisure: 0.15, business: 0.3, vfr: 0.45 }, end: w.day + 20, text: 'Einreisestopp: Test', severity: 'warn' });
+  assert.ok(w.demandMult('FRA', 'IST', 'leisure') < 0.2 && w.demandMult('FRA', 'CDG', 'leisure') > 0.9, 'Einreisestopp nur zwischen den Ländern');
+  assert.ok(w.cancelEvent(ev.id).ok && w.detour(a, 'FRA', 'ICN').km === 0 && !w.opsAt('SVO').hard, 'Annullieren hebt Sperre und Umweg auf');
+  // Generatoren: ein Jahr mit erhöhter Häufigkeit – alle neuen Arten entstehen ohne Fehler, Bilanz bleibt ausgeglichen
+  w.eventMult = 3; const seen = new Set();
+  for (let i = 0; i < 365; i++) { w.step(); for (const e of w.events) seen.add(e.type); }
+  const neu = ['conflict', 'flight_ban', 'carrier_ban', 'unrest', 'entry_ban', 'open_skies', 'visa_free', 'foreign_fee', 'domestic_aid', 'heatwave', 'sandstorm', 'monsoon', 'blizzard', 'wildfire'].filter((k) => seen.has(k));
+  assert.ok(neu.length >= 8, 'neue Ereignisarten im Jahr: ' + neu.join(', '));
+  assert.ok(Math.abs(SMx.balanceSheet(a).check) < 1, 'Bilanz ausgeglichen');
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); const act = (W) => W.events.filter((e) => (e.ban || e.overfly) && e.end > W.day).map((e) => e.id).join(); assert.equal(act(w2), act(w), 'laufende Sperren bleiben gespeichert');
+  console.log('0.21.35 ok: Konflikt mit Umweg (+' + Math.round(dt.km) + ' km FRA–ICN), Flugverbot, Landerechte, Kurzstreckenverbot, Einreisestopp, Annullieren; im Jahr:', neu.join(', '));
 }
 // 0.21.33: höchstens 2 neue Basen je Kalenderjahr; ab der 5. Basis Konzessionsabgabe und nur 2 Slots
 { const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
@@ -1181,5 +1267,145 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   // ältere Stände (ein Objekt je Bereich) werden zur Liste
   a.academy.cabin = { lv: 2, since: 5 }; const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); const c2 = SMx.acadList(w2.airlines.P1, 'cabin'); assert.ok(c2.length === 1 && c2[0].lv === 2 && c2[0].id, 'alter Stand übernommen');
   console.log('0.21.32 ok: mehrere Schulen je Bereich (Netzwerk: 3), je Schule eigene Musterberechtigung, schließen, alte Stände übernommen');
+}
+// 0.21.41: Umsteiger – Erlös nach Einzeltarifen, Platzreserve nur für lohnende und beförderbare Umsteiger, Prognose mit Umsteigern, Drehkreuz-Analyse
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const mk = (seed) => { const w = SMx.newWorld({ seed }), a = SMx.addHuman(w, { id: 'P1', name: 'Hub Air', code: 'HB', base: 'NAS' }); w.playerId = 'P1'; a.ledger.equityFlow(3e9, 't'); if (a.prog) a.prog.lv = 4;
+    for (const k of ['dailyEvents', 'generateMonthlyEvents', 'monthlyMacro', 'geoShocks']) w[k] = () => {}; w.slotsOkFor = () => true; w.takeSlots = () => {}; w.slotCost = () => ({ cost: 0, parts: [] });
+    for (const g of Object.keys(a.staff.pil)) a.staff.pil[g] = 2000; a.staff.cab = 8000; a.staff.tech = 2000; return { w, a, A: (x) => SMx.applyAction(w, 'P1', x) }; };
+  { const { w, a, A } = mk(41);
+    for (let i = 0; i < 12; i++) A({ type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'NAS' }); for (let i = 0; i < 2; i++) A({ type: 'acquire', typeId: 'A359', mode: 'buy', base: 'NAS' });
+    for (const x of a.fleet) x.delivery_day = w.day;
+    for (const d of ['MIA', 'FLL', 'ATL', 'BOS', 'JFK', 'ORD']) assert.ok(A({ type: 'openRoute', base: 'NAS', dest: d, typeId: 'A20N', freq: 2, role: d === 'MIA' ? 'feeder' : 'mixed' }).ok, d);
+    for (const d of ['LHR', 'MAD']) assert.ok(A({ type: 'openRoute', base: 'NAS', dest: d, typeId: 'A359', freq: 1 }).ok, d);
+    for (let i = 0; i < 40; i++) w.step();
+    // Erlösanteil der kurzen Zubringerstrecke: ihr Tarif abzüglich Umsteigerrabatt (nach Entfernung wären es bei Europa-Reisen nur wenige Prozent)
+    const mia = a.activeRoutes().find((r) => r.dest === 'MIA'), h = mia.hist.slice(-20); let tr = 0, trr = 0; for (const x of h) { tr += x.tr_out + x.tr_in; trr += x.trr || 0; }
+    assert.ok(tr > 50, 'Umsteiger auf NAS–MIA: ' + tr); const y = trr / tr / ((mia.fare_out + mia.fare_in) / 2); assert.ok(y > 0.6 && y < 1.05, 'Erlösanteil je Umsteiger ≈ Tarif × Rabatt: ' + y.toFixed(2));
+    for (const r of a.activeRoutes()) if (r.trCar) for (const d of ['out', 'in']) assert.ok(r.trCar[d] <= (r.trDem ? r.trDem[d] : 0) + 1e-6, 'beförderbar ≤ gewünscht ' + r.dest);
+    // Prognose mit Umsteigern
+    const spec = { airline: 'P1', base: 'NAS', dest: 'MCO', type_id: 'A20N', freq: 2, fare_out: 120, fare_in: 120, service: 'standard', buffer: 'normal' };
+    const f0 = w.forecastFor(a, spec, { nDraws: 2, exact: true }), f1 = w.forecastFor(a, spec, { nDraws: 2, exact: true, tr: true }), fl = w.forecastFor(a, { ...spec, role: 'local' }, { nDraws: 2, exact: true, tr: true });
+    assert.ok(f1.trPax > 0 && f1.transfer && f1.transfer.want > 0 && f1.transfer.flows.length, 'Prognose kennt Umsteiger: ' + f1.trPax);
+    assert.ok(Math.abs(f1.pax - f1.localPax - f1.trPax) < 1e-6 && f1.lf <= 1 + 1e-9, 'Passagiere = Ortsgäste + Umsteiger, nie mehr als Sitze');
+    assert.ok(!f0.trPax && !fl.trPax && !fl.transfer, 'ohne Wunsch bzw. als Endziel keine Umsteiger');
+    // Drehkreuz-Analyse: Ströme, neue Ziele, Speichern
+    const F = a.hubFlows && a.hubFlows.NAS; assert.ok(F && Object.keys(F).length > 5, 'Umsteigerströme über NAS erfasst');
+    const tg = w.hubTargets(a, 'NAS'); assert.ok(tg.length > 3 && tg.every((x) => x.dest && x.car >= 0 && x.from.length), 'neue Ziele für Umsteiger');
+    const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))), a2 = w2.airlines.P1, m2 = a2.routes.find((r) => r.id === mia.id);
+    assert.ok(a2.hubFlows && Object.keys(a2.hubFlows.NAS).length === Object.keys(F).length && m2.trCar && m2.hist.at(-1).trr === mia.hist.at(-1).trr, 'Speichern: Ströme, Reserve-Grundlage, Umsteigererlös');
+    console.log('0.21.41 ok: Erlösanteil NAS–MIA je Umsteiger', y.toFixed(2), '× Tarif · Prognose MCO mit', Math.round(f1.trPax), 'Umsteigern ·', tg.length, 'Zielvorschläge, z. B.', tg.slice(0, 3).map((x) => x.dest).join(', ')); }
+  // Zwei volle Zubringer: Kurz-zu-Kurz-Umsteiger verdrängen keine voll zahlenden Ortsgäste (keine Platzreserve)
+  { const { w, a, A } = mk(42);
+    for (let i = 0; i < 2; i++) A({ type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'NAS' }); for (const x of a.fleet) x.delivery_day = w.day;
+    for (const d of ['MIA', 'BOS']) { const ref = SMx.refPrice('NAS', d, w.macro.cpi); assert.ok(A({ type: 'openRoute', base: 'NAS', dest: d, typeId: 'A20N', freq: 1, role: 'feeder', fo: Math.round(ref * 0.5), fi: Math.round(ref * 0.5) }).ok); }
+    for (const r of a.activeRoutes()) delete r.ap;
+    for (let i = 0; i < 30; i++) w.step();
+    for (const r of a.activeRoutes()) { const c = r.trCar ? r.trCar.out : 0; assert.ok(r.trDem && r.trDem.out > 1 && c < 0.25 * r.trDem.out, `${r.dest}: keine Reserve für Umsteiger, die weniger bringen als verdrängte Ortsgäste (${c.toFixed(1)} von ${r.trDem ? r.trDem.out.toFixed(1) : 0})`); }
+    console.log('0.21.41 ok: volle Zubringer halten keine Plätze für Kurz-zu-Kurz-Umsteiger frei'); }
+  // Preisautomatik: viele Abweisungen trotz freier Plätze → nicht billiger
+  { const { w, a, A } = mk(43); A({ type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'NAS' }); for (const x of a.fleet) x.delivery_day = w.day;
+    assert.ok(A({ type: 'openRoute', base: 'NAS', dest: 'ATL', typeId: 'A20N', freq: 1, fo: 200, fi: 200 }).ok); const r = a.activeRoutes()[0]; r.ap = 0.9; r.opened_day = w.day - 60; r.pending = [];
+    r.hist = Array.from({ length: 7 }, () => ({ seats_out: 180, so_out: 180, pax_out: 110, spill_out: 40, demand_out: 150, seats_in: 180, so_in: 180, pax_in: 175, spill_in: 0, demand_in: 175 }));
+    w.playerAutoPricing(a); const nf = r.pending.length ? r.pending[0][1] : r.fare_out; assert.ok(nf >= 200, 'Abweisungen: Preis sinkt nicht trotz 61 % Auslastung: ' + nf);
+    const short = A({ type: 'openRoute', base: 'NAS', dest: 'MIA', typeId: 'A20N', freq: 1 }); assert.ok(short.ok || !/300 km/.test(short.msg), 'Mindestentfernung im Text stimmt');
+    console.log('0.21.41 ok: Preisautomatik senkt nicht, solange viele abgewiesen werden'); }
+}
+// 0.21.41: Krisenvorschläge, Preisautomatik für Extremfälle, Startangebote, Codeshare-Handel, Flughafenausbau
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const mk = (seed, base = 'HAM') => { const w = SMx.newWorld({ seed }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base }); w.playerId = 'P1'; a.ledger.equityFlow(3e9, 't'); if (a.prog) a.prog.lv = 4;
+    for (const k of ['dailyEvents', 'generateMonthlyEvents', 'geoShocks']) w[k] = () => {}; w.slotsOkFor = () => true; w.takeSlots = () => {}; w.slotCost = () => ({ cost: 0, parts: [] });
+    for (const g of Object.keys(a.staff.pil)) a.staff.pil[g] = 2000; a.staff.cab = 8000; a.staff.tech = 2000; return { w, a, A: (x) => SMx.applyAction(w, 'P1', x) }; };
+  // Startangebote: drei zur Gründung, annehmen/ablehnen, Marktstudie −90 %
+  { const { w, a, A } = mk(51); assert.ok(a.offers && a.offers.length === 3 && a.offers.every((o) => o.until === w.day + 30 && SMx.offerText(a, o).t), 'drei Startangebote');
+    a.offers[0] = { id: 'O1', k: 'study', until: w.day + 30 }; const p0 = w.studyPrice(a, 'full').cost;
+    assert.ok(A({ type: 'takeOffer', id: 'O1' }).ok && w.studyPrice(a, 'full').cost <= Math.round(p0 * 0.1 / 1000) * 1000 + 1000, 'Marktstudie 90 % günstiger');
+    assert.ok(A({ type: 'dropOffer', id: a.offers[0].id }).ok && a.offers.length === 1, 'ablehnen');
+    a.offers[0] = { id: 'O9', k: 'mro', until: w.day - 1 }; assert.ok(!A({ type: 'takeOffer', id: 'O9' }).ok, 'abgelaufen');
+    console.log('0.21.41 ok: Startangebote (3 zur Gründung, Marktstudie −90 %, ablehnen, Ablauf)'); }
+  // Krisenvorschlag: starker Einbruch → Preisautomatik und weniger Frequenz, Slots bleiben bis nach der Krise, danach zurück
+  { const { w, a, A } = mk(52); for (let i = 0; i < 3; i++) A({ type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'HAM' }); for (const x of a.fleet) x.delivery_day = w.day;
+    assert.ok(A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 3 }).ok && A({ type: 'openRoute', base: 'HAM', dest: 'LHR', typeId: 'A20N', freq: 2 }).ok);
+    for (let i = 0; i < 5; i++) w.step();
+    const e = w.addEvent({ type: 'big_event', airports: ['PMI'], demand: { leisure: 0.4, business: 0.6, vfr: 0.5 }, end: w.day + 120, text: 'Test: Einbruch auf Mallorca', severity: 'crit' });
+    const plan = w.crisisPlan(a, e), pmi = a.activeRoutes().find((r) => r.dest === 'PMI'), lhr = a.activeRoutes().find((r) => r.dest === 'LHR');
+    assert.ok(plan.length === 1 && plan[0].id === pmi.id && plan[0].ap && plan[0].freq === 1 + 0 * plan[0].freq || plan[0].freq === Math.max(1, Math.round(3 * 0.5)), 'Plan nur für betroffene Strecke: ' + JSON.stringify(plan));
+    assert.ok(w.crisisPlan(a, { type: 'recession', countries: ['DE'], depth: 0.1, id: 'X' }).length === 2, 'Rezession trifft beide Strecken ab Hamburg');
+    const res = A({ type: 'crisisAdjust', event: e.id }); assert.ok(res.ok && pmi.ap > 0 && pmi.freq < 3 && pmi.crisis && pmi.crisis.freq === 3 && !lhr.ap, 'übernommen: ' + res.msg);
+    assert.ok((a.slotHold.PMI || []).filter((h) => h.buy).every((h) => h.since >= e.end), 'frei gewordene Slots verfallen nicht während der Krise');
+    assert.ok(a.crisisDone[e.id] && !w.crisisPlan(a, e).some((x) => x.freq), 'nicht doppelt kürzen');
+    assert.ok(A({ type: 'crisisSkip', event: e.id }).ok);
+    for (let i = 0; i < 125; i++) w.step();
+    const back = A({ type: 'crisisRestore' }); assert.ok(back.ok && pmi.freq === 3 && !pmi.crisis, 'nach der Krise zurück: ' + back.msg);
+    console.log('0.21.41 ok: Krisenvorschlag (Preisautomatik, Frequenz 3× →', plan[0].freq + '×, Slots bleiben, danach zurück)'); }
+  // Preisautomatik: Extremfälle täglich und in großen Schritten
+  { const { w, a, A } = mk(53); A({ type: 'acquire', typeId: 'A20N', mode: 'buy', base: 'HAM' }); for (const x of a.fleet) x.delivery_day = w.day;
+    assert.ok(A({ type: 'openRoute', base: 'HAM', dest: 'LHR', typeId: 'A20N', freq: 1, fo: 200, fi: 200 }).ok); const r = a.activeRoutes()[0];
+    assert.ok(A({ type: 'autoPrice', id: r.id, on: true, lf: 0.85 }).ok && SMx.apCfgOf(r).ext === 1, 'Extremfälle ab Werk an'); r.opened_day = w.day - 60; r.pending = [];
+    r.hist = Array.from({ length: 5 }, () => ({ seats_out: 180, so_out: 180, pax_out: 70, spill_out: 0, demand_out: 70, seats_in: 180, so_in: 180, pax_in: 70, spill_in: 0, demand_in: 70 }));
+    w.playerAutoPricingExtreme(a); const f1 = r.pending.length ? r.pending.at(-1)[1] : r.fare_out;
+    assert.ok(f1 < 200 * 0.9 && f1 >= 200 * 0.84, 'Einbruch: sofort bis zu −15 %: ' + f1);
+    r.pending = []; w.playerAutoPricingExtreme(a); assert.ok(!r.pending.length, 'danach Pause');
+    r.apx = w.day - 10; r.hist = Array.from({ length: 5 }, () => ({ seats_out: 180, so_out: 180, pax_out: 180, spill_out: 150, demand_out: 330, seats_in: 180, so_in: 180, pax_in: 180, spill_in: 150, demand_in: 330 }));
+    w.playerAutoPricingExtreme(a); const f2 = r.pending.length ? r.pending.at(-1)[1] : r.fare_out; assert.ok(f2 > f1 * 1.1, 'Ansturm: sofort deutlich rauf: ' + f1 + ' → ' + f2);
+    assert.ok(A({ type: 'autoPrice', id: r.id, on: true, cfg: { ext: 0 } }).ok && SMx.apCfgOf(r).ext === 0, 'abschaltbar');
+    console.log('0.21.41 ok: Preisautomatik in Extremfällen', 200, '→', f1, '(Einbruch), dann', f2, '(Ansturm)'); }
+  // Codeshare-Handel: gleiche Kooperation nicht doppelt, KI zählt sie nur einmal
+  { const { w, a, A } = mk(54); const ai = w.list.find((x) => !x.isPlayer && x.status !== 'insolvent' && x.activeRoutes().length);
+    const r0 = ai.activeRoutes()[0], pair = SMx.pairKey(r0.base, r0.dest), cs = { k: 'coop', kind: 'codeshare', pair, days: 365 };
+    const dup = A({ type: 'dealPropose', to: ai.id, give: [cs, { ...cs }], take: [{ k: 'cash', v: 1e6 }] }); assert.ok(!dup.ok && /nur einmal/.test(dup.msg), 'doppelt: ' + dup.msg);
+    const both = A({ type: 'dealPropose', to: ai.id, give: [cs], take: [{ ...cs }, { k: 'cash', v: 1e6 }] }); assert.ok(!both.ok && /nur einmal/.test(both.msg), 'beide Seiten: ' + both.msg);
+    const one = SMx.aiDealValue(w, ai, { from: a.id, to: ai.id, give: [cs], take: [] }), two = SMx.aiDealValue(w, ai, { from: a.id, to: ai.id, give: [cs], take: [{ ...cs }] }), three = SMx.aiDealValue(w, ai, { from: a.id, to: ai.id, give: [cs, { ...cs }, { ...cs }], take: [] });
+    assert.ok(Math.abs(one.vin - two.vin) < 1e-6 && Math.abs(one.vin - three.vin) < 1e-6 && Math.abs(one.vout - three.vout) < 1e-6, 'KI-Bewertung zählt die Kooperation einmal');
+    console.log('0.21.41 ok: Codeshare-Handel (nicht doppelt, nicht auf beiden Seiten, KI zählt einmal)'); }
+  // Flughafenausbau: Bahn (Code F), Terminal (Kapazität, Nachfrage, Slots), Bauherrenrabatt
+  { const { w, a, A } = mk(55, 'HAJ'); for (const g of Object.keys(a.staff.pil)) a.staff.pil[g] = 0; a.staff.cab = 0; a.staff.tech = 0;   // ohne Flugbetrieb keine Gehälter
+    assert.ok(!SMx.rangeOk('HAJ', 'JFK', 'A388') && !SMx.rangeOk('HAJ', 'JFK', 'B748') && SMx.rangeOk('HAJ', 'JFK', 'B77W'), 'Code F: A380 und 747-8 nicht in Hannover');
+    const r1 = A({ type: 'aptInvest', apt: 'HAJ', kind: 'rwy' }); assert.ok(r1.ok, r1.msg); assert.ok(!A({ type: 'aptInvest', apt: 'HAJ', kind: 'term' }).ok, 'ein Bau gleichzeitig');
+    assert.ok(!A({ type: 'aptInvest', apt: 'MUC', kind: 'term' }).ok, 'nur mit Basis oder Station');
+    for (let i = 0; i < 451; i++) w.step();
+    assert.ok(SMx.rangeOk('HAJ', 'JFK', 'A388') && a.aptRebate.HAJ.x === 0.8 && a.heldAt('HAJ', w.day) >= 2, 'Bahn fertig: Code F, Rabatt, Slots');
+    const q0 = SMx.qPot('HAJ', 'FRA').business, pe0 = SMx.paxEff('HAJ'), cap0 = w.slotCap.HAJ;
+    assert.ok(A({ type: 'aptInvest', apt: 'HAJ', kind: 'term' }).ok); for (let i = 0; i < 301; i++) w.step();
+    assert.ok(SMx.paxEff('HAJ') > pe0 * 1.2 && SMx.qPot('HAJ', 'FRA').business > q0 * 1.03 && a.aptRebate.HAJ.x < 0.8, 'Terminal: mehr Kapazität, Nachfrage, mehr Rabatt');
+    const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(w2.aptUp.HAJ.term === 1 && w2.aptUp.HAJ.rwy === 1 && w2.airlines.P1.aptRebate.HAJ, 'Speichern');
+    assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt');
+    console.log('0.21.41 ok: Flughafenausbau Hannover (Bahn: A380/747-8, Terminal', pe0, '→', SMx.paxEff('HAJ').toFixed(1), 'Mio., Slots', cap0, '→', w.slotCap.HAJ + ')'); }
+}
+// 0.21.42: zwei Flugzeugmuster auf einer Strecke, Flugzeugkredite ablösen, Prognose im Detail
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 71 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1'; a.ledger.equityFlow(2e9, 't'); if (a.prog) a.prog.lv = 4;
+  for (const k of ['dailyEvents', 'generateMonthlyEvents', 'geoShocks']) w[k] = () => {}; w.slotsOkFor = () => true; w.takeSlots = () => {}; w.slotCost = () => ({ cost: 0, parts: [] });
+  const A = (x) => SMx.applyAction(w, 'P1', x);
+  for (const t of ['A20N', 'A20N', 'A21N']) assert.ok(A({ type: 'acquire', typeId: t, mode: 'buy', base: 'HAM' }).ok);
+  for (const x of a.fleet) x.delivery_day = w.day;
+  assert.ok(A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 3, mix: { typeId: 'A21N', freq: 1 } }).ok);
+  const r = a.activeRoutes()[0]; assert.deepEqual(r.mix, { type_id: 'A21N', freq: 1 }, 'zweites Muster beim Eröffnen');
+  assert.ok(!A({ type: 'editRoute', id: r.id, mix: { typeId: 'A21N', freq: 3 } }).msg === false || r.mix.freq === 1, 'nicht alle Flüge mit dem zweiten Muster');
+  for (let i = 0; i < 12; i++) w.step();
+  const a21 = a.fleet.find((x) => x.type_id === 'A21N'), a20 = a.fleet.filter((x) => x.type_id === 'A20N');
+  assert.ok(a21.assigned.includes(r.id) && a20.some((x) => x.assigned.includes(r.id)), 'beide Muster eingeplant');
+  assert.deepEqual(r._fq, { main: 2, mix: 1 }, 'heute 2× A320neo + 1× A321neo');
+  const h = r.hist.at(-1), sA = SMx.P.AIRCRAFT_TYPES.A20N.seats.standard, sB = SMx.P.AIRCRAFT_TYPES.A21N.seats.standard;
+  assert.equal(h.seats_out, 2 * sA + sB, 'Sitze je Richtung = Summe beider Muster');
+  assert.ok(Math.abs(r.seats() - (2 * sA + sB) / 3) < 1e-9, 'Sitze je Flug im Mittel');
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.deepEqual(w2.airlines.P1.routes[0].mix, r.mix, 'gespeichert');
+  // Prognose liegt zwischen den reinen Varianten
+  const sp = { airline: 'P1', base: 'HAM', dest: 'PMI', type_id: 'A20N', freq: 3, fare_out: 150, fare_in: 150, service: 'standard', buffer: 'normal' };
+  const f1 = w.forecastFor(a, sp, { exact: true }), f2 = w.forecastFor(a, { ...sp, mix: { type_id: 'A21N', freq: 1 } }, { exact: true }), f3 = w.forecastFor(a, { ...sp, type_id: 'A21N' }, { exact: true });
+  assert.ok(f1.seats < f2.seats && f2.seats < f3.seats && f1.direct < f2.direct && f2.direct < f3.direct, 'gemischte Prognose dazwischen');
+  assert.ok(f2.dirs.out.fuelKg > 0 && f2.dirs.out.bh > 0 && f2.dirs.out.fare === 150, 'Prognose im Detail: Verbrauch, Blockzeit, Tarif je Richtung');
+  // Prüfungen beim Bearbeiten
+  assert.ok(/Höchstens 2/.test(A({ type: 'editRoute', id: r.id, mix: { typeId: 'A21N', freq: 3 } }).msg || ''), 'zu viele Flüge mit dem zweiten Muster');
+  assert.ok(/stationiert/.test(A({ type: 'editRoute', id: r.id, mix: { typeId: 'B789', freq: 1 } }).msg || ''), 'Muster muss an der Basis stehen');
+  assert.ok(A({ type: 'editRoute', id: r.id, freq: 1 }).ok && !r.mix, 'eine Frequenz: kein zweites Muster mehr');
+  assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt');
+  console.log('0.21.42 ok: HAM–PMI 2× A320neo + 1× A321neo (', h.seats_out, 'Sitze je Richtung), Prognose', Math.round(f1.seats), '<', Math.round(f2.seats), '<', Math.round(f3.seats), 'Sitze am Tag');
+  // Flugzeugkredite ablösen
+  const own = a.fleet.filter((x) => x.owned && x.loan > 0), bal = own.reduce((s2, x) => s2 + x.loan, 0); assert.ok(own.length === 3 && bal > 0);
+  const one = A({ type: 'repayAc', id: own[0].id }); assert.ok(one.ok && own[0].loan === 0 && own[1].loan > 0, 'einzeln: ' + one.msg);
+  const q2 = w.acLoanQuote(a); a.ledger.equityFlow(-(a.ledger.cash / 100 - (q2.cost - Math.min(1e6, q2.free / 2))), 't'); const all = A({ type: 'repayAc' }); assert.ok(all.ok && all.n === 2 && all.fromCredit > 0 && own.every((x) => x.loan === 0), 'alle, Rest aus dem Dispo: ' + all.msg);
+  assert.ok(!A({ type: 'repayAc' }).ok, 'nichts mehr offen'); assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt nach Ablösen');
+  console.log('0.21.42 ok: Flugzeugkredite abgelöst (einzeln und alle, fehlender Betrag aus dem Dispo)');
 }
 console.log('Alle Prüfungen bestanden.');
