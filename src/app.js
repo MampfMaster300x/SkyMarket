@@ -1252,7 +1252,7 @@ function routeItem(r) {
   const tdy = todayOps(r), cxTxt = tdy.canc > 0 ? (tdy.all ? `heute fällt alles aus: ${tdy.why.join(', ')}` : `heute ${n0(tdy.canc)} von ${tdy.n} Umläufen annulliert: ${tdy.why.join(', ')}`) : null;
   const lfo = SM.routeLf(r, 7, 'out'), lfi = SM.routeLf(r, 7, 'in');
   let html = `<div class="ritem${open ? ' open' : ''}"><button class="rhead" data-act="toggle" data-id="${r.id}" aria-expanded="${open}">
-    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${freqTxt(r)}${r.role === 'feeder' ? ' · Zubringer' : r.role === 'local' ? ' · Endziel' : ''} · ${tlx(r.type_id)}${r.mix ? ` + ${r.mix.freq}× ${tlx(r.mix.type_id)}` : ''} · ${svcLabel(r.service)}${r.ap ? ` · <span class="chip" title="Preisautomatik: ${esc(apSummary(SM.apCfgOf(r), r.ap))}">Auto ${pct(r.ap)}</span>${r.pm && r.pm !== 1 ? ` <span class="chip" title="Premiumaufschlag">Premium ${pct(r.pm)}</span>` : ''}` : ''}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}${cxTxt ? ` · <span class="neg">${esc(cxTxt)}</span>` : ''}</div></div>
+    <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${freqTxt(r)}${r.role === 'feeder' ? ' · Zubringer' : r.role === 'local' ? ' · Endziel' : ''} · ${tlx(r.type_id)} · ${svcLabel(r.service)}${r.ap ? ` · <span class="chip" title="Preisautomatik: ${esc(apSummary(SM.apCfgOf(r), r.ap))}">Auto ${pct(r.ap)}</span>${r.pm && r.pm !== 1 ? ` <span class="chip" title="Premiumaufschlag">Premium ${pct(r.pm)}</span>` : ''}` : ''}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}${cxTxt ? ` · <span class="neg">${esc(cxTxt)}</span>` : ''}</div></div>
     <div class="rdb ${s30.db2 < 0 ? 'neg' : 'pos'}">${s30.n ? eur(s30.db2 / s30.n, { plus: true }) : '–'}<small>DB2 pro Tag</small></div>
     <div class="lfrow"><span>hin</span><div class="bar"><i class="me" style="width:${(lfo * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfo) : '–'}</span></div>
     <div class="lfrow"><span>zurück</span><div class="bar"><i class="me" style="width:${(lfi * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfi) : '–'}</span></div>
@@ -1330,7 +1330,6 @@ function routeBody(r, s7, s30) {
         <label class="f" style="flex:1"><span>Flugzeugtyp</span><select id="ef-ty-${r.id}">${[...new Set([r.type_id, ...W.player.fleet.filter((x) => x.base === r.base).map((x) => x.type_id)])].filter((t) => SM.rangeOk(r.base, r.dest, t)).map((t) => `<option value="${t}" ${t === r.type_id ? 'selected' : ''}>${t} · ${P.AIRCRAFT_TYPES[t].seats[r.service]} Sitze</option>`).join('')}</select></label>
         <label class="f" style="flex:1"><span>Puffer</span><select id="ef-b-${r.id}">${Object.keys(P.BUFFER_POLICY).map((b) => `<option value="${b}" ${b === r.buffer ? 'selected' : ''}>${bufLabel(b)}</option>`).join('')}</select></label>
       </div>
-      ${mixFieldsHtml({ type: r.type_id, freq: r.freq, wk: r.wk, dest: r.dest, mix: r.mix }, r.base, `ef-mix-${r.id}`, `ef-mixn-${r.id}`, true)}
       ${(() => {
         const coordEnds = [r.base, r.dest]; if (r.freq >= 8 || (r.wk && r.wk < 7)) return '';
         const lack = coordEnds.filter((x) => W.slotsFreeFor(W.player, x) < 1), planned = (W.player.plans || []).find((x) => x.route === r.id);
@@ -1428,7 +1427,6 @@ function viewPlanner() {
       <label class="f"><span>Produkt</span><select id="pl-svc">${Object.keys(P.SERVICE).map((s) => `<option value="${s}" ${s === p.service ? 'selected' : ''}>${svcLabel(s)}</option>`).join('')}</select></label>
       <label class="f"><span>Puffer</span><select id="pl-buf">${Object.keys(P.BUFFER_POLICY).map((b) => `<option value="${b}" ${b === p.buffer ? 'selected' : ''}>${bufLabel(b)} (${pct(P.BUFFER_POLICY[b].otp)} pünktlich)</option>`).join('')}</select></label>
     </div>
-    ${mixFieldsHtml(p, base, 'pl-mix', 'pl-mixn')}
     <div class="grid2">
       <label class="f"><span>Tarif ${base} → ${p.dest} (€ netto)</span><input type="number" id="pl-fo" min="10" max="900" step="5" value="${p.fo}"></label>
       <label class="f"><span>Tarif ${p.dest} → ${base} (€ netto)</span><input type="number" id="pl-fi" min="10" max="900" step="5" value="${p.fi}"></label>
@@ -1451,23 +1449,11 @@ function readPlanner() {
   p.term = v('#pl-term') || p.term;
   { const acq = document.querySelector('input[name="pl-acq"]:checked'); if (acq) p.acq = acq.value; const hb = $('#pl-hire'); if (hb) p.hire = hb.checked; }
   p.fo = Math.max(10, Number(v('#pl-fo')) || p.fo); p.fi = Math.max(10, Number(v('#pl-fi')) || p.fi);
-  { const mt = v('#pl-mix'), mn = Number(v('#pl-mixn')) || 1; p.mix = mt && mt !== p.type && p.freq >= 2 && !(p.wk && p.wk < 7) ? { type: mt, n: Math.min(mn, p.freq - 1) } : null; }
   return false;
-}
-/** 0.21.42: Auswahl „zweites Muster“ (Planung und Strecke bearbeiten). */
-function mixFieldsHtml(x, base, idMix, idN, alwaysN = false) {
-  const pl = W.player, main = x.type || x.type_id, freq = x.freq || 0, daily = !(x.wk > 0 && x.wk < 7), cur = x.mix ? (x.mix.type || x.mix.type_id) : '', curN = x.mix ? (x.mix.n || x.mix.freq) : 1;
-  if (!daily || freq < 2) return `<p class="small muted" style="margin:0">Zweites Flugzeugmuster: ab 2 Flügen täglich möglich.</p>`;
-  const types = [...new Set(pl.fleet.filter((a) => a.base === base).map((a) => a.type_id))].filter((t) => t !== main && !P.AIRCRAFT_TYPES[t].supersonic && !P.AIRCRAFT_TYPES[t].role && SM.rangeOk(base, x.dest, t));
-  if (!types.length && !cur) return `<p class="small muted" style="margin:0">Zweites Flugzeugmuster: In ${base} steht kein anderes Muster, das ${x.dest} erreicht.</p>`;
-  return `<div class="grid2">
-    <label class="f"><span>Zweites Muster (optional)</span><select id="${idMix}"><option value="">– nur ${esc(P.AIRCRAFT_TYPES[main].label)}</option>${types.concat(cur && !types.includes(cur) ? [cur] : []).map((t) => `<option value="${t}" ${t === cur ? 'selected' : ''}>${t} · ${esc(P.AIRCRAFT_TYPES[t].label)} · ${P.AIRCRAFT_TYPES[t].seats.standard} Sitze</option>`).join('')}</select></label>
-    <label class="f"><span>davon Flüge mit dem zweiten Muster</span><select id="${idN}" ${cur || alwaysN ? '' : 'disabled'}>${Array.from({ length: freq - 1 }, (_, i) => i + 1).map((n) => `<option value="${n}" ${n === Math.min(curN, freq - 1) ? 'selected' : ''}>${n} von ${freq} täglich</option>`).join('')}</select></label></div>`;
 }
 function plannerSpec(p, fo = p.fo, fi = p.fi) {
   const wk = p.wk && p.wk < 7 ? p.wk : undefined;
-  const mix = !wk && p.mix && p.mix.type && p.mix.type !== p.type && p.freq >= 2 ? { type_id: p.mix.type, freq: Math.min(p.mix.n || 1, p.freq - 1) } : undefined;
-  return { airline: W.playerId, base: p.base, dest: p.dest, type_id: p.type, freq: wk ? 1 : p.freq, wk, fare_out: fo, fare_in: fi, service: p.service, buffer: p.buffer, role: p.role || 'mixed', mix };
+  return { airline: W.playerId, base: p.base, dest: p.dest, type_id: p.type, freq: wk ? 1 : p.freq, wk, fare_out: fo, fare_in: fi, service: p.service, buffer: p.buffer, role: p.role || 'mixed' };
 }
 /** Frequenz: unter täglich als „x pro Woche“, sonst „x täglich“. */
 const ROLE_TXT = {
@@ -1807,7 +1793,7 @@ function openNewRoute() {
     }
   }
   // 2. Strecke eröffnen
-  const sp0 = plannerSpec(p), res = doAction({ type: 'openRoute', base, dest: p.dest, typeId: p.type, freq: p.wk && p.wk < 7 ? 1 : p.freq, wk: p.wk && p.wk < 7 ? p.wk : undefined, role: p.role && p.role !== 'mixed' ? p.role : undefined, mix: sp0.mix ? { typeId: sp0.mix.type_id, freq: sp0.mix.freq } : undefined, fo: p.fo, fi: p.fi, service: p.service, buffer: p.buffer, term: p.term });
+  const res = doAction({ type: 'openRoute', base, dest: p.dest, typeId: p.type, freq: p.wk && p.wk < 7 ? 1 : p.freq, wk: p.wk && p.wk < 7 ? p.wk : undefined, role: p.role && p.role !== 'mixed' ? p.role : undefined, fo: p.fo, fi: p.fi, service: p.service, buffer: p.buffer, term: p.term });
   if (!res.ok) { refreshAll(); return; }
   // 3. Personal
   if (kit.staffShort && p.hire) { const late = res.start > W.day + 1, h = doAction({ type: 'fillStaff', start: late ? res.start : null }); if (h.ok && h.n) done.push(`${h.n} Personen eingestellt${late ? ` (Antritt zum ersten Flug am ${dateShort(res.start)})` : ''}`); }
@@ -1819,7 +1805,7 @@ function applyRoute(id) {
   const g = (k) => $(`#ef-${k}-${id}`);
   const fq = parseFreq(g('f').value);
   const res = doAction({ type: 'editRoute', id, fo: Number(g('o').value), fi: Number(g('i').value), freq: fq.freq, wk: fq.wk, role: g('r') ? g('r').value : undefined, service: g('s').value, buffer: g('b').value, typeId: g('ty') ? g('ty').value : undefined,
-    mix: g('mix') ? (g('mix').value ? { typeId: g('mix').value, freq: Number(g('mixn') ? g('mixn').value : 1) } : null) : undefined });
+ });
   if (res.ok) toast(res.msg || 'Änderungen gespeichert.');
   refreshAll();
 }
@@ -2275,7 +2261,7 @@ function aptCardHtml(c) {
   let body = isBase ? '' : baseSwitch(base, 'data-apcbase');
   if (!isBase && SM.routeKmOk(base, c)) {
     const p = potOf(base, c), km = SM.gcDistanceKm(base, c), rail = SM.railShare(base, c);
-    const comp = W.competitorOffers(W.playerId, base, c), mine = pl.activeRoutes().find((r) => SM.pairKey(r.base, r.dest) === SM.pairKey(base, c));
+    const comp = W.competitorOffers(W.playerId, base, c), mineAll = pl.activeRoutes().filter((r) => SM.pairKey(r.base, r.dest) === SM.pairKey(base, c)), mine = mineAll[0];
     const months = Array.from({ length: 12 }, (_, m) => W.knownPot(pl, base, c, m).sum);
     const mx = Math.max(...months);
     body += `<div class="ac-pot"><span>Reisepotenzial ${base} ⇄ ${c} ${kbar(p.lv)}</span><b>${p.lv >= 2 ? '≈ ' : ''}${potTxt(p)}</b><em>Menschen pro Tag, beide Richtungen · Ihre Schätzung (Marktwissen ${P.MARKET_INFO.labels[Math.min(4, p.lv)] || 'Ist-Daten'})</em></div>
@@ -2284,7 +2270,7 @@ function aptCardHtml(c) {
       <div class="ac-season" title="Saison: Potenzial je Monat">${months.map((v, m) => `<i style="height:${(v / mx * 100).toFixed(0)}%" title="${MONTHS[m]}: ${n0(v)} pro Tag"></i>`).join('')}</div>
       <div class="small muted" style="display:flex;justify-content:space-between"><span>Jan</span><span>Saison</span><span>Dez</span></div>
       <div class="small">${n0(km)} km · ${n1(SM.blockHours(base, c, 'A20N'))} h mit A320neo${rail > 0.05 ? ` · Bahn nimmt ${pct(rail)}` : ''}</div>
-      <div class="small">${mine ? `<span class="chip me">Sie fliegen ${mine.freq}x</span> ` : ''}${comp.length ? comp.map((o) => `<span class="sw" style="background:${colorOf(W.airlines[o.airline])}"></span> ${esc(W.airlines[o.airline].name)} ${o.freq}x ${eur(o.fare)}`).join(' · ') : 'Noch keine Konkurrenz auf dieser Strecke.'}</div>`;
+      <div class="small">${mineAll.length ? `<span class="chip me">Sie fliegen ${mineAll.map((r) => `${r.freq}x ${r.type_id}`).join(' + ')}</span> ` : ''}${comp.length ? comp.map((o) => `<span class="sw" style="background:${colorOf(W.airlines[o.airline])}"></span> ${esc(W.airlines[o.airline].name)} ${o.freq}x ${eur(o.fare)}`).join(' · ') : 'Noch keine Konkurrenz auf dieser Strecke.'}</div>`;
   }
   const top = SM.AP_CODES.filter((d) => d !== c && SM.routeKmOk(c, d)).map((d) => ({ d, p: potOf(c, d) })).sort((x, y) => y.p.sum - x.p.sum).slice(0, 5);
   body += aptUpHtml(c);
@@ -3521,7 +3507,7 @@ VIEWS.exchange = function viewExchange() {
   const pl = W.player, C = P.CAPITAL, c = SM.capState(pl), cap = SM.mktCap(W, pl), fl = SM.floatOf(W, pl), hs = SM.holdersOf(W, pl), bs = SM.balanceSheet(pl);
   const chg = capChg(pl), ann = SM.annualResult(pl), opE = SM.earnRecent(pl);
   let html = `<h2 class="sec">Börse <small>Aktien, Beteiligungen, Kapital</small></h2>
-    <p class="small ink2">Jede Airline hat einen Börsenwert: Eigenkapital plus das Fünffache des operativen Jahresergebnisses (Mittel aus dem Schnitt der letzten zwölf und der letzten sechs Monate, ohne Sondereffekte und Beteiligungserträge; Verluste zählen doppelt), dazu 80 % der stillen Reserven in Beteiligungen (Börsenwert über Buchwert), mindestens 60 % des Eigenkapitals und nie unter dem Vierfachen des operativen Jahresergebnisses (KGV 4), dazu die Stimmung am Markt. Der Kurs wird zum Monatswechsel festgestellt und bewegt sich höchstens +40 % oder −20 % je Monat; Kapitalerhöhungen, Rückkäufe und Dividenden verschieben ihn sofort um das bewegte Geld. Sie können Anteile anderer Airlines kaufen und bekommen dann Ihren Anteil am Gewinn (und Verlust) und an den Dividenden. Ab 25 % greift eine KI-Airline Ihre Strecken nicht mehr an, ab 50 % wird sie Konzernpartnerin und Sie können den Rest übernehmen. Eigene Aktien verkaufen bringt frisches Geld.</p>`;
+    <p class="small ink2">Jede Airline hat einen Börsenwert: Eigenkapital plus das Fünffache des operativen Jahresergebnisses (Mittel aus dem Schnitt der letzten zwölf und der letzten sechs Monate, ohne Sondereffekte und Beteiligungserträge; Verluste zählen doppelt), dazu 80 % der stillen Reserven in Beteiligungen (Börsenwert über Buchwert), mindestens 60 % des Eigenkapitals und nie unter dem Vierfachen des operativen Jahresergebnisses (KGV 4), dazu die Stimmung am Markt. Der Kurs wird zum Monatswechsel festgestellt und geht dabei den halben Weg zum neuen Wert – ohne Obergrenze nach oben oder unten; Kapitalerhöhungen, Rückkäufe und Dividenden verschieben ihn sofort um das bewegte Geld. Sie können Anteile anderer Airlines kaufen und bekommen dann Ihren Anteil am Gewinn (und Verlust) und an den Dividenden. Ab 25 % greift eine KI-Airline Ihre Strecken nicht mehr an, ab 50 % wird sie Konzernpartnerin und Sie können den Rest übernehmen. Eigene Aktien verkaufen bringt frisches Geld.</p>`;
   html += `<div class="tiles">
     <div class="tile"><span>Ihr Börsenwert</span><b>${mio(cap)}</b><em>${chg === null ? 'Verlauf ab dem ersten Monat' : `${chg >= 0 ? '+' : ''}${pct(chg)} zum Vormonat`}</em></div>
     <div class="tile"><span>Ihnen gehören</span><b>${pct(1 - c.ext)}</b><em>${c.ext > 0 ? `Streubesitz ${pct(fl)}${hs.length ? ' · ' + hs.map((h) => `${esc(h.al.name)} ${pct(h.f)}`).join(', ') : ''}` : 'alle Aktien'}</em></div>
@@ -3551,7 +3537,7 @@ VIEWS.exchange = function viewExchange() {
       return `<div class="card pad stack stk"><div class="spread"><b>${logoSvg(T, 20)} ${esc(T.name)}</b><span>${st.f >= C.majority ? '<span class="chip good">Mehrheit</span>' : st.f >= C.blocking ? '<span class="chip">Sperrminorität</span>' : ''} <b>${pct(st.f, 1)}</b></span></div>
         <div class="stk-kv"><span><em>Buchwert</em>${mio(st.book)}</span><span><em>Marktwert</em>${mio(mv)}</span><span><em>anteiliger Gewinn</em><b class="${sgn(st.inc || 0)}">${mio(st.inc || 0)}</b></span><span><em>Dividenden</em>${mio(st.div || 0)}<small class="muted"> · Quote ${pct(SM.divRate(T, 1))}${T.isPlayer && SM.divRate(T, 1) > (SM.capState(T).div ?? 0) ? ' (Mindestquote)' : ''}</small></span></div>
         ${groupHtml(pl, T, st)}
-        <div class="row" style="gap:6px;flex-wrap:wrap">${SM.floatOf(W, T) > 0.009 ? `<button class="btn small" data-act="capbuy" data-t="${id}" data-q="0.05">+5 % für ${mio(SM.stakeBuyPrice(W, pl, T, Math.min(0.05, SM.floatOf(W, T))))}</button>` : ''}<button class="btn small" data-act="capsell" data-t="${id}" data-q="${Math.min(0.05, st.f)}">−5 %</button><button class="btn small" data-act="capsell" data-t="${id}" data-q="${st.f}">alles verkaufen</button>
+        <div class="row" style="gap:6px;flex-wrap:wrap">${SM.floatOf(W, T) > 0.0009 ? [0.01, 0.05].map((q) => `<button class="btn small" data-act="capbuy" data-t="${id}" data-q="${q}">+${pct(q)} für ${mio(SM.stakeBuyPrice(W, pl, T, Math.min(q, SM.floatOf(W, T))))}</button>`).join('') : ''}${[0.01, 0.05].filter((q) => q < st.f - 1e-9).map((q) => `<button class="btn small" data-act="capsell" data-t="${id}" data-q="${q}">−${pct(q)}</button>`).join('')}<button class="btn small" data-act="capsell" data-t="${id}" data-q="${st.f}">alles verkaufen</button>${capQtyHtml(id, true)}
         ${ma ? (conf ? `<button class="btn small danger" data-act="takeover" data-id="${id}">Ja, ${mio(ma.price)} bieten</button><button class="btn small" data-act="cancelconfirm">Nein</button>` : `<button class="btn small ${st.f >= C.majority ? 'primary' : ''}" data-act="askma" data-id="${id}" title="Angebot für die restlichen ${pct(ma.rest)}">Rest (${pct(ma.rest)}) übernehmen: ${mio(ma.price)}</button>`) : ''}</div></div>`; }).join('')}
     <p class="small muted">Anteiliger Gewinn: Ihr Anteil am Monatsergebnis wird Ihnen jeden Monat gutgeschrieben (Buchwert steigt oder fällt), Dividenden kommen als Geld. Übernahmeangebot für den Rest: mit Mehrheit Börsenwert × ${NF1.format(C.tender)}, ohne Mehrheit × ${NF1.format(C.hostile)}. Große Airlines haben Ankeraktionäre (Staat, Gründerfamilie, Fonds): Deren Anteil ist nicht an der Börse zu haben – sie verkaufen nur bei einer Komplettübernahme, nur an eine vergleichbar große Airline (mindestens ${pct(C.anchor.buyerSize)} der Flotte) und mit ${pct(C.anchor.prem)} Aufschlag.</p></div>`;
   // Markt
@@ -3560,10 +3546,14 @@ VIEWS.exchange = function viewExchange() {
     ${rows.map(({ a, cap: cp, fl: f, ann: an }) => { const mine = SM.stakeOf(pl, a), hs2 = SM.holdersOf(W, a).filter((h) => h.al.id !== pl.id), ch = capChg(a);
       return `<div class="stk-row"><div class="stk-name">${logoSvg(a, 18)} <b>${esc(a.name)}</b>${a.isPlayer ? ' <span class="chip">Mitspieler</span>' : ''}${mine ? ` <span class="chip me">Sie ${pct(mine, 1)}</span>` : ''}<div class="small muted"><span title="Börsenwert ÷ operatives Jahresergebnis (letzte sechs Monate hochgerechnet, ohne Sondereffekte und Beteiligungserträge)">KGV ${an > 0 ? NF1.format(cp / an) : '–'}</span> · frei ${pct(f)}${a.archetype && SM.capState(a).ext < 0.999 ? ` · <span title="Staat, Gründerfamilie oder Fonds – verkaufen nicht an der Börse">Ankeraktionäre ${pct(1 - SM.capState(a).ext)}</span>` : ''}${hs2.length ? ' · ' + hs2.map((h) => `${esc(h.al.name)} ${pct(h.f)}`).join(', ') : ''}</div></div>
         <div class="stk-val">${miniSpark(a.cap && a.cap.hist)}<span><b>${mio(cp)}</b>${ch !== null ? `<em class="${ch >= 0 ? 'pos' : 'neg'}">${ch >= 0 ? '+' : ''}${pct(ch)}</em>` : ''}</span></div>
-        <div class="stk-act">${f >= 0.01 ? [0.05, 0.1].filter((q) => q <= f + 1e-9).map((q) => `<button class="btn small" data-act="capbuy" data-t="${a.id}" data-q="${q}">${pct(q)}: ${mio(SM.stakeBuyPrice(W, pl, a, q))}</button>`).join('') : '<span class="small muted">nichts frei</span>'}</div></div>`; }).join('')}
+        <div class="stk-act">${f >= 0.001 ? [0.01, 0.05, 0.1].filter((q) => q <= f + 1e-9).map((q) => `<button class="btn small" data-act="capbuy" data-t="${a.id}" data-q="${q}">${pct(q)}: ${mio(SM.stakeBuyPrice(W, pl, a, q))}</button>`).join('') + capQtyHtml(a.id, false) : '<span class="small muted">nichts frei</span>'}</div></div>`; }).join('')}
     </div><p class="small muted">Große Pakete auf einmal treiben den Kurs (je 10 % rund ${pct(C.impact * 0.1)} Aufschlag); für die Anteile, mit denen Sie die Mehrheit überschreiten, kommt einmalig eine Kontrollprämie von ${pct(C.control)} dazu. Verkäufe großer Pakete drücken den Preis. Gebühr ${pct(C.fee)} je Kauf und Verkauf. Mitspielende haben nur so viele Aktien frei, wie sie selbst an die Börse gebracht haben.</p></div>`;
   return html;
 };
+/** 0.21.44: Börse – beliebiger Anteil in 0,1-%-Schritten. */
+function capQtyHtml(id, sell) {
+  return `<span class="capq"><input type="number" id="capq-${id}" min="0.1" max="100" step="0.1" value="${(ui.capQ && ui.capQ[id]) || 2.5}" aria-label="Anteil in Prozent"><span class="small muted">%</span><button class="btn small" data-act="capbuyx" data-t="${id}">kaufen</button>${sell ? `<button class="btn small" data-act="capsellx" data-t="${id}">verkaufen</button>` : ''}</span>`;
+}
 /** Konzernvorteile einer Beteiligung: Stufen 25 % (Sperrminorität) und 50 % (Mehrheit), bis zur Übernahme. */
 function groupHtml(pl, T, st) {
   if (!T.archetype) return '';
@@ -3595,7 +3585,9 @@ function onCapClick(act, b) {
   if (act === 'grpspec') { const r = doAction({ type: 'groupSpecial', t: b.dataset.t }); if (r.ok) toast(`Sonderausschüttung: ${mio(r.mine)} an Sie.`); refreshAll(); return true; }
   if (act === 'grpdeal') { startDeal(b.dataset.t); return true; }
   if (!act.startsWith('cap')) return false;
-  const pl = W.player, q = Number(b.dataset.q);
+  const pl = W.player;
+  let q = Number(b.dataset.q);
+  if (act === 'capbuyx' || act === 'capsellx') { const inp = $(`#capq-${b.dataset.t}`), v = Math.round(Number(inp && inp.value) * 10) / 10; if (!(v >= 0.1)) { toast('Bitte einen Anteil ab 0,1 % angeben.'); return true; } (ui.capQ = ui.capQ || {})[b.dataset.t] = v; q = v / 100; act = act === 'capbuyx' ? 'capbuy' : 'capsell'; }
   let r = null;
   if (act === 'capbuy') { r = doAction({ type: 'buyStake', target: b.dataset.t, q }); if (r.ok) toast(`${pct(r.q, 1)} für ${mio(r.cost)} gekauft – Sie halten jetzt ${pct(r.f, 1)}.`); }
   else if (act === 'capsell') { r = doAction({ type: 'sellStake', target: b.dataset.t, q }); if (r.ok) toast(`Verkauft für ${mio(r.proceeds)} (${r.gain >= 0 ? 'Gewinn' : 'Verlust'} ${mio(Math.abs(r.gain))}).`); }
@@ -4447,7 +4439,7 @@ function mktItemOpts() {
   if (k === 'ac') {
     if (sell) { const list = me.fleet.filter((a) => a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day) && !M.items.some((x) => x.k === 'ac' && x.id === a.id));
       f = list.length ? `<select id="mk-ac">${list.map((a) => `<option value="${a.id}">${acName(a.id)} · ${tl(a.type_id)} · ${a.owned ? 'Eigentum' : 'Leasing'} · ${n0(me.acAge(a, W.day))} J.</option>`).join('')}</select>` : '<span class="small muted">Keine Flugzeuge verfügbar.</span>'; }
-    else f = `<select id="mk-type">${Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => !t.launch && !t.role).map(([id, t]) => `<option value="${id}">${esc(t.label)}</option>`).join('')}</select>
+    else f = `<select id="mk-type">${[['', 'Passagierflugzeuge'], ['cargo', 'Frachter'], ['biz', 'Privatjets']].map(([role, lbl]) => { const L = Object.entries(P.AIRCRAFT_TYPES).filter(([, t]) => (t.role || '') === role && !(t.launch && W.day < t.launch)).sort((x, y) => x[1].label.localeCompare(y[1].label, 'de')); return L.length ? `<optgroup label="${lbl}">${L.map(([id, t]) => `<option value="${id}">${esc(t.label)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select>
       <select id="mk-age" style="width:auto"><option value="">jedes Alter</option>${[5, 10, 15, 20].map((y) => `<option value="${y}">bis ${y} Jahre</option>`).join('')}</select>
       <input type="number" id="mk-n" min="1" max="4" value="1" style="width:64px" aria-label="Anzahl">
       <label class="chk small"><input type="checkbox" id="mk-fam"> auch andere Muster der Familie</label>`;
@@ -5667,7 +5659,7 @@ function onPaneChange(e) {
 function onPaneInput(e) {
   if (!ui.planner || !e.target.id || !e.target.id.startsWith('pl-')) return;
   const changed = readPlanner();
-  if (changed || e.target.id === 'pl-type' || e.target.id === 'pl-term' || e.target.id === 'pl-mix' || e.target.id === 'pl-freq') { renderPane(true); renderDraft(); renderMapRoutes(true); return; }
+  if (changed || e.target.id === 'pl-type' || e.target.id === 'pl-term' || e.target.id === 'pl-freq') { renderPane(true); renderDraft(); renderMapRoutes(true); return; }
   clearTimeout(fcTimer); fcTimer = setTimeout(updateForecast, 180);
 }
 
@@ -6731,9 +6723,10 @@ function colorOfId(id) { const al = W && W.airlines[id]; return al ? colorOf(al)
 /** Kennzahlen einer menschlichen Airline aus den letzten 30 Tagen (Tagesreihe) und der Bilanz. */
 function humanKpis(al) {
   const h = (al.dayHist || []).slice(-30), sum = (k) => h.reduce((a, x) => a + (x[k] || 0), 0);
-  const eq = SM.balanceSheet(al).equity, start = SM.ownersCapital(al);
+  // 0.21.44: Steigerung gegen das Startkapital der Gründung (vorher gegen die Einlagen nach Rückkäufen – nach großen Rückkäufen viel zu hoch)
+  const eq = SM.balanceSheet(al).equity, start = (SM.DIFFICULTY[al.difficulty] || SM.DIFFICULTY.normal).equity, ec = al.ledger.equityContrib / 100, profit = eq - ec, capNet = ec + (al.divOut || 0) - start;
   const rev = sum('rev'), net = sum('net'), seats = sum('seats'), fl = sum('fl'), pax = sum('pax');
-  return { eq, start, growth: start > 0 ? eq / start - 1 : null, net, rev, margin: rev > 0 ? net / rev : null, lf: seats > 0 ? pax / seats : null,
+  return { eq, start, profit, capNet, divOut: al.divOut || 0, growth: start > 0 ? eq / start - 1 : null, net, rev, margin: rev > 0 ? net / rev : null, lf: seats > 0 ? pax / seats : null,
     paxDay: h.length ? pax / h.length : 0, otp: fl > 0 ? Math.max(0, 1 - sum('late') / fl) : null, days: h.length, fleet: al.fleet.length, routes: al.activeRoutes().length };
 }
 const seenTxt = (p) => { if (p.online) return 'online'; if (!p.seen) return 'noch nicht online'; const m = Math.round((Date.now() + (mpState.skew || 0) - p.seen) / 60000);
@@ -6762,7 +6755,7 @@ VIEWS.players = function viewPlayers() {
           <span class="small"><i class="pc-dot ${p.online ? 'on' : ''}"></i>${esc(p.name || '–')} · <span class="muted">${esc(seenTxt(p))}</span></span></div>
         <span class="pc-chips">${me ? '<span class="chip me">Sie</span>' : ''}${p.host ? '<span class="chip">Leitung</span>' : ''}${al.auto && !dead ? `<span class="chip warn" title="Seit ${P.AUTOPILOT.hours} Stunden nicht selbst gesteuert – die KI führt die Airline auf mittlerem Niveau weiter">KI-Vertretung</span>` : ''}${al.removed ? '<span class="chip crit">entfernt</span>' : dead ? '<span class="chip crit">insolvent</span>' : al.status === 'restructuring' ? '<span class="chip warn">Restrukturierung</span>' : ''}</span></div>
       <div class="pc-kpis">
-        <div><span>Eigenkapital</span><b>${eur(k.eq)}</b><em>${k.growth === null ? '–' : `${k.growth >= 0 ? '+' : ''}${pct(k.growth)} seit Start`}</em></div>
+        <div title="Startkapital ${eur(k.start)} · Gewinne seit Start ${eur(k.profit, { plus: true })} · Kapitalmaßnahmen netto ${eur(k.capNet, { plus: true })} (Kapitalerhöhungen minus Rückkäufe)${k.divOut ? ` · Dividenden ${eur(-k.divOut)}` : ''}"><span>Eigenkapital</span><b>${eur(k.eq)}</b><em>${k.growth === null ? '–' : `${k.growth >= 0 ? '+' : ''}${pct(k.growth)} seit Start (${eurB(k.start)})`}</em></div>
         <div><span>Ergebnis 30 Tage</span><b>${k.days ? sg(k.net) : '–'}</b><em>${k.margin === null ? 'noch kein Umsatz' : `Marge ${pct(k.margin)}`}</em></div>
         <div><span>Auslastung</span><b>${k.lf === null ? '–' : pct(k.lf)}</b><em>${k.paxDay ? `${n0(k.paxDay)} Pax/Tag` : 'noch keine Flüge'}</em></div>
       </div>

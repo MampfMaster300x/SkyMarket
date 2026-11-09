@@ -278,6 +278,13 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.ok(a2.auto, 'nach 72 Stunden vertritt die KI'); assert.ok(a2.events.some((e) => /vertritt Ihre Airline/.test(e.msg)), 'Hinweis im Logbuch');
   ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'resume' } }), 'zurück übernehmen');
   ({ m, w } = await load()); assert.ok(!w.airlines[al.id].auto && w.airlines[al.id].lastAct > Date.now() - 60000, 'eigene Aktion beendet die Vertretung');
+  // 0.21.43: rückwirkend – ohne erfasste Aktion zählt die letzte Spielzeit
+  for (const [hAgo, want] of [[80, true], [10, false]]) {
+    ({ m, w } = await load()); delete w.airlines[al.id].lastAct; w.airlines[al.id].auto = 0; w.autoAt = 0; await store.setJSON('play/anna', { last: Date.now() - hAgo * 3600e3 });
+    await save(m, w, 3 * 1800000 * (_clock.isWeekend(Date.now()) ? 2 : 1) + 1000); await tickMain(store);
+    ({ m, w } = await load()); assert.equal(!!w.airlines[al.id].auto, want, `zuletzt gespielt vor ${hAgo} h → Vertretung ${want ? 'an' : 'aus'}`);
+  }
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'resume' } }), 'zurück übernehmen');
   // Engine: Vertretung handelt maßvoll (Preisautomatik, Personal, freie Flugzeuge) und hält die Bilanz
   const v = SMx.newWorld({ seed: 55 }), p = SMx.addHuman(v, { id: 'P1', name: 'Abwesend', code: 'AW', base: 'HAJ' }); v.playerId = 'P1'; p.ledger.equityFlow(60e6, 't');
   SMx.applyAction(v, 'P1', { type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAJ' }); SMx.applyAction(v, 'P1', { type: 'openRoute', base: 'HAJ', dest: 'PMI', typeId: 'A20N', freq: 1, fo: 400, fi: 400 });
@@ -287,7 +294,7 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const acts = p.events.slice(e0).filter((e) => /^Vertretung \(KI\)/.test(e.msg)).map((e) => e.msg);
   assert.ok(acts.some((x) => /Preisautomatik/.test(x)) && acts.some((x) => /Neue Strecke/.test(x)), 'Vertretung: ' + acts.join(' | '));
   assert.ok(p.activeRoutes().every((r) => r.ap > 0), 'alle Strecken mit Preisautomatik'); assert.ok(Math.abs(SMx.balanceSheet(p).check) < 1, 'Bilanz ausgeglichen');
-  console.log('0.21.39 ok: KI-Vertretung nach 72 h, Ende durch eigene Aktion; ' + acts.length + ' Vertretungsschritte in 70 Tagen');
+  console.log('0.21.39/43 ok: KI-Vertretung nach 72 h (auch rückwirkend nach letzter Spielzeit), Ende durch eigene Aktion; ' + acts.length + ' Vertretungsschritte in 70 Tagen');
 }
 // 0.21.34: Fehlerprotokoll der Geräte – senden darf jedes Konto, lesen nur Admins; Flut je Konto begrenzt
 { ok(await call('anna', 'POST', '/diag', { kind: 'load', msg: 'Zeitüberschreitung', status: 0, ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari/604.1', extra: { attempt: 2, game: 'main' } }), 'Diag senden');
@@ -1141,7 +1148,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const e6 = SMx.earnRecent(a), cap = SMx.mktCap(w, a);
   assert.ok(e6 > 250e6 && cap >= 4 * Math.min(e6, Math.max(SMx.opResult(a), 0) * 2.5) - 1, `KGV nicht unter 4: Börsenwert ${Math.round(cap / 1e6)} Mio., Ergebnis ${Math.round(e6 / 1e6)} Mio.`);
   assert.ok(cap / e6 >= 3.99, 'KGV ' + (cap / e6).toFixed(1));
-  const before = SMx.capState(a).mc; SMx.updateCap(w, a); assert.ok(SMx.capState(a).mc >= before && SMx.capState(a).mc <= Math.max(before, cap) * 1.41, 'Nachziehen höchstens +40 %');
+  const before = SMx.capState(a).mc; SMx.updateCap(w, a); assert.ok(SMx.capState(a).mc >= before && SMx.capState(a).mc <= Math.max(before, cap) * 1.41, 'Nachziehen: halber Weg zum Zielwert');
   const B = w.list.find((x) => !x.isPlayer && x.status !== 'insolvent'); const p0 = SMx.stakeBuyPrice(w, B.isPlayer ? B : a, a, 0.05);
   assert.ok(p0 >= 0.05 * 4 * Math.min(e6, SMx.opResult(a) * 2.5) * 0.99, 'Aktienkauf zum Mindestwert');
   // Mindestdividende: mehr als 5 % der Aktien bei anderen → mindestens 25 % des Gewinns, auch wenn 0 % gewählt
@@ -1379,33 +1386,40 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const A = (x) => SMx.applyAction(w, 'P1', x);
   for (const t of ['A20N', 'A20N', 'A21N']) assert.ok(A({ type: 'acquire', typeId: t, mode: 'buy', base: 'HAM' }).ok);
   for (const x of a.fleet) x.delivery_day = w.day;
-  assert.ok(A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 3, mix: { typeId: 'A21N', freq: 1 } }).ok);
-  const r = a.activeRoutes()[0]; assert.deepEqual(r.mix, { type_id: 'A21N', freq: 1 }, 'zweites Muster beim Eröffnen');
-  assert.ok(!A({ type: 'editRoute', id: r.id, mix: { typeId: 'A21N', freq: 3 } }).msg === false || r.mix.freq === 1, 'nicht alle Flüge mit dem zweiten Muster');
+  // 0.21.46: weiteres Muster = eigene Strecke auf demselben Paar (eigene Preise und Auswertung); 0.21.42–45-Stände mit „mix“ werden aufgeteilt
+  assert.ok(A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 2, fo: 120, fi: 120 }).ok);
+  assert.ok(!A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 1 }).ok, 'gleiches Muster nicht doppelt');
+  const sp = { airline: 'P1', base: 'HAM', dest: 'PMI', type_id: 'A21N', freq: 1, fare_out: 180, fare_in: 180, service: 'premium', buffer: 'normal' };
+  const fAlone = (() => { const keep = a.routes; a.routes = []; const f = w.forecastFor(a, sp, { exact: true }); a.routes = keep; return f; })(), fWith = w.forecastFor(a, sp, { exact: true });
+  assert.ok(fWith.pax < fAlone.pax, 'Prognose rechnet die eigene Strecke mit dem anderen Muster als Konkurrenz: ' + Math.round(fWith.pax) + ' < ' + Math.round(fAlone.pax));
+  assert.ok(A({ type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A21N', freq: 1, fo: 180, fi: 180, service: 'premium' }).ok, 'anderes Muster als eigene Strecke');
+  const [r1, r2] = a.activeRoutes(); assert.ok(r1.type_id === 'A20N' && r2.type_id === 'A21N' && r2.fare_out === 180 && r1.fare_out === 120, 'getrennte Tarife');
   for (let i = 0; i < 12; i++) w.step();
-  const a21 = a.fleet.find((x) => x.type_id === 'A21N'), a20 = a.fleet.filter((x) => x.type_id === 'A20N');
-  assert.ok(a21.assigned.includes(r.id) && a20.some((x) => x.assigned.includes(r.id)), 'beide Muster eingeplant');
-  assert.deepEqual(r._fq, { main: 2, mix: 1 }, 'heute 2× A320neo + 1× A321neo');
-  const h = r.hist.at(-1), sA = SMx.P.AIRCRAFT_TYPES.A20N.seats.standard, sB = SMx.P.AIRCRAFT_TYPES.A21N.seats.standard;
-  assert.equal(h.seats_out, 2 * sA + sB, 'Sitze je Richtung = Summe beider Muster');
-  assert.ok(Math.abs(r.seats() - (2 * sA + sB) / 3) < 1e-9, 'Sitze je Flug im Mittel');
-  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.deepEqual(w2.airlines.P1.routes[0].mix, r.mix, 'gespeichert');
-  // Prognose liegt zwischen den reinen Varianten
-  const sp = { airline: 'P1', base: 'HAM', dest: 'PMI', type_id: 'A20N', freq: 3, fare_out: 150, fare_in: 150, service: 'standard', buffer: 'normal' };
-  const f1 = w.forecastFor(a, sp, { exact: true }), f2 = w.forecastFor(a, { ...sp, mix: { type_id: 'A21N', freq: 1 } }, { exact: true }), f3 = w.forecastFor(a, { ...sp, type_id: 'A21N' }, { exact: true });
-  assert.ok(f1.seats < f2.seats && f2.seats < f3.seats && f1.direct < f2.direct && f2.direct < f3.direct, 'gemischte Prognose dazwischen');
-  assert.ok(f2.dirs.out.fuelKg > 0 && f2.dirs.out.bh > 0 && f2.dirs.out.fare === 150, 'Prognose im Detail: Verbrauch, Blockzeit, Tarif je Richtung');
-  // Prüfungen beim Bearbeiten
-  assert.ok(/Höchstens 2/.test(A({ type: 'editRoute', id: r.id, mix: { typeId: 'A21N', freq: 3 } }).msg || ''), 'zu viele Flüge mit dem zweiten Muster');
-  assert.ok(/stationiert/.test(A({ type: 'editRoute', id: r.id, mix: { typeId: 'B789', freq: 1 } }).msg || ''), 'Muster muss an der Basis stehen');
-  assert.ok(A({ type: 'editRoute', id: r.id, freq: 1 }).ok && !r.mix, 'eine Frequenz: kein zweites Muster mehr');
+  assert.ok(r1.hist.at(-1).pax_out > 0 && r2.hist.at(-1).pax_out > 0 && r2.hist.at(-1).seats_out === SMx.P.AIRCRAFT_TYPES.A21N.seats.premium, 'getrennte Auslastung');
+  // Altbestand: Strecke mit zweitem Muster wird zu zwei Strecken
+  const sv = SMx.serialize(w), pr = sv.airlines.find((x) => x.id === 'P1'); const sr = pr.routes.find((x) => x.id === r1.id); sr.freq = 3; sr.mix = { type_id: 'A21N', freq: 1 };
+  pr.routes = pr.routes.filter((x) => x.id !== r2.id);
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(sv))), rs = w2.airlines.P1.activeRoutes();
+  assert.ok(rs.length === 2 && rs.some((x) => x.type_id === 'A20N' && x.freq === 2 && !x.mix) && rs.some((x) => x.type_id === 'A21N' && x.freq === 1), 'Altbestand aufgeteilt: ' + rs.map((x) => x.type_id + ':' + x.freq).join(', '));
   assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt');
-  console.log('0.21.42 ok: HAM–PMI 2× A320neo + 1× A321neo (', h.seats_out, 'Sitze je Richtung), Prognose', Math.round(f1.seats), '<', Math.round(f2.seats), '<', Math.round(f3.seats), 'Sitze am Tag');
+  console.log('0.21.46 ok: HAM–PMI mit A320neo und A321neo als zwei Strecken (eigene Tarife und Auslastung), Prognose mit Kannibalisierung, Altbestand aufgeteilt');
   // Flugzeugkredite ablösen
   const own = a.fleet.filter((x) => x.owned && x.loan > 0), bal = own.reduce((s2, x) => s2 + x.loan, 0); assert.ok(own.length === 3 && bal > 0);
   const one = A({ type: 'repayAc', id: own[0].id }); assert.ok(one.ok && own[0].loan === 0 && own[1].loan > 0, 'einzeln: ' + one.msg);
   const q2 = w.acLoanQuote(a); a.ledger.equityFlow(-(a.ledger.cash / 100 - (q2.cost - Math.min(1e6, q2.free / 2))), 't'); const all = A({ type: 'repayAc' }); assert.ok(all.ok && all.n === 2 && all.fromCredit > 0 && own.every((x) => x.loan === 0), 'alle, Rest aus dem Dispo: ' + all.msg);
   assert.ok(!A({ type: 'repayAc' }).ok, 'nichts mehr offen'); assert.ok(Math.abs(SMx.balanceSheet(a).check) < 0.01, 'Bilanz stimmt nach Ablösen');
   console.log('0.21.42 ok: Flugzeugkredite abgelöst (einzeln und alle, fehlender Betrag aus dem Dispo)');
+}
+// 0.21.44: Börse ohne Bewegungsgrenze, Handel ab 0,1 %
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 81 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }); w.playerId = 'P1'; a.ledger.equityFlow(5e8, 't');
+  for (let i = 0; i < 40; i++) w.step();
+  const T = w.list.filter((x) => !x.isPlayer && x.status !== 'insolvent' && SMx.floatOf(w, x) > 0.05).sort((x, y) => SMx.mktCap(w, y) - SMx.mktCap(w, x))[0];
+  const r = SMx.applyAction(w, 'P1', { type: 'buyStake', target: T.id, q: 0.004 }); assert.ok(r.ok && Math.abs(SMx.stakeOf(a, T) - 0.004) < 1e-9, '0,4 % gekauft: ' + r.msg);
+  assert.ok(!SMx.applyAction(w, 'P1', { type: 'buyStake', target: T.id, q: 0.0004 }).ok, 'unter 0,1 % nicht');
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'sellStake', target: T.id, q: 0.0015 }).ok && Math.abs(SMx.stakeOf(a, T) - 0.0025) < 1e-9, 'Teilverkauf 0,15 %');
+  const c = SMx.capState(T), cur = SMx.mktCap(w, T); c.mc = cur * 0.2; SMx.updateCap(w, T); assert.ok(SMx.capState(T).mc > cur * 0.2 * 1.4 + 1, 'Kurs darf mehr als +40 % im Monat steigen');
+  c.mc = cur * 6; SMx.updateCap(w, T); assert.ok(SMx.capState(T).mc < cur * 6 * 0.8 - 1 || SMx.capState(T).mc <= Math.max(cur, 1) * 3.6, 'und mehr als −20 % fallen');
+  console.log('0.21.44 ok: Handel ab 0,1 %, Kurse ohne Monatsgrenze');
 }
 console.log('Alle Prüfungen bestanden.');

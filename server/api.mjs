@@ -211,7 +211,8 @@ async function autoFlags(store, w, now) {
   const hs = w.humans.filter((h) => h.status !== 'insolvent' && !h.removed), lim = SM.P.AUTOPILOT.hours * 3600e3;
   const plays = await Promise.all(hs.map((h) => (h.owner ? store.get(K.play(h.owner), { type: 'json' }).catch(() => null) : null)));
   hs.forEach((h, i) => {
-    if (!h.lastAct) h.lastAct = now;
+    // 0.21.43: rückwirkend – ohne erfasste Aktion zählt die letzte Spielzeit (Lebenszeichen), erst ohne beides der Zeitpunkt des Updates
+    if (!h.lastAct) h.lastAct = (plays[i] && plays[i].last) || now;
     const last = Math.max(h.lastAct || 0, (plays[i] && plays[i].last) || 0), on = now - last > lim;
     if (on && !h.auto) { h.auto = now; h.log(w.day, `Seit ${SM.P.AUTOPILOT.hours} Stunden keine eigene Steuerung: Die KI vertritt Ihre Airline (Preise, Personal, Entscheidungen, freie Flugzeuge). Sobald Sie wieder spielen, übernehmen Sie selbst.`, 'warn'); }
     else if (!on && h.auto) { h.auto = 0; h.log(w.day, 'Willkommen zurück: Die Vertretung durch die KI ist beendet, Sie steuern wieder selbst.', 'good'); }

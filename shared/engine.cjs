@@ -467,7 +467,7 @@ const SM = (() => {
     POACH: { maxN: 60, maxBonus: 80000, wait: 21, corp: { u: 0.3, loss: -0.15, days: 180, wait: 60, budgets: [100e3, 250e3, 600e3] } },
     // Kapitalmarkt: Börsenwert = Eigenkapital + peX × Jahresergebnis (mind. floorEq × Eigenkapital) × Stimmung.
     // control: Aufschlag je Anteil, den die Käuferin schon hält (Kontrolle wird teuer); tender/hostile: Übernahmeangebot für den Rest mit/ohne Mehrheit.
-    CAPITAL: { peX: 5, peNeg: 2, peFloor: 4, stakeUp: 0.8, minDiv: 0.25, minDivExt: 0.05, floorEq: 0.6, minCap: 2e6, control: 0.25, impact: 0.3, fee: 0.01, sellImpact: 0.15, smooth: 0.5, maxUp: 0.4, maxDown: 0.2, lockDays: 180, buybackMax: 0.1, buybackGap: 90, buybackHist: 6, tender: 1.3, hostile: 1.5, blocking: 0.25, majority: 0.5,
+    CAPITAL: { peX: 5, peNeg: 2, peFloor: 4, stakeUp: 0.8, minDiv: 0.25, minDivExt: 0.05, floorEq: 0.6, minCap: 2e6, control: 0.25, impact: 0.3, fee: 0.01, sellImpact: 0.15, smooth: 0.5, maxUp: Infinity, maxDown: Infinity, lockDays: 180, buybackMax: 0.1, buybackGap: 90, buybackHist: 6, tender: 1.3, hostile: 1.5, blocking: 0.25, majority: 0.5,
       group: { divOpts: [0, 0.3, 0.5], specShare: 0.15, specGap: 90, reserveDays: 120 },
       anchor: { top: [0.35, 0.49], mid: [0.55, 0.8], buyerSize: 0.5, prem: 0.3 },
       issueDisc: [0.35, 0.25, 0.15, 0.1, 0.1], issueFee: 0.03, issueMax: 0.2, extMax: 0.49, issueGap: 90, divAI: 0.3, divOpts: [0, 0.25, 0.5], buybackX: 1.05,
@@ -3135,6 +3135,14 @@ const SM = (() => {
       if (spec.cab === undefined) spec = { ...spec, cab: cabClone(al.cabinCfg()) };
       if (spec.wk > 0 && spec.wk < 7) spec = { ...spec, freq: spec.wk / 7 };   // seltener als täglich: im Mittel wk/7 Flüge am Tag
       const co = this.competitorOffers(al.id, spec.base, spec.dest), ci = this.competitorOffers(al.id, spec.dest, spec.base);
+      // 0.21.46: eigene Strecken mit anderem Muster auf demselben Paar (z. B. Boeing und Concorde London–New York) teilen sich den Markt
+      for (const q of al.activeRoutes()) {
+        if (q.type_id === spec.type_id || q.opened_day > this.day + 30 || pairKey(q.base, q.dest) !== pairKey(spec.base, spec.dest)) continue;
+        const fq = q.wk > 0 && q.wk < 7 ? q.wk / 7 : q.freq, ex = (o, d) => withCabin(withSst(this.offerExtra(al, o, d), o, d, q.type_id), q.type_id, q.service, q.cab);
+        const [fo, fi] = q.base === spec.base ? [q.fare_out, q.fare_in] : [q.fare_in, q.fare_out];
+        co.push(offer(al.id, fo, fq, q.seats(), q.service, al.otp(q.buffer), 1, q.id, ex(spec.base, spec.dest)));
+        ci.push(offer(al.id, fi, fq, q.seats(), q.service, al.otp(q.buffer), 1, q.id, ex(spec.dest, spec.base)));
+      }
       const trend = this.knownTrend(al, spec.base, spec.dest);
       const kn = opts.exact || !al.isPlayer ? null : (opts.know || this.knowOf(al, spec.base, spec.dest));
       const bias = kn ? this.knowBias(al, spec.base, spec.dest, kn) : 1;
@@ -6114,7 +6122,7 @@ const SM = (() => {
   }
   /** Untergrenze: Eine profitable Airline ist mindestens das Vierfache ihres operativen Jahresergebnisses wert (KGV ≥ 4). */
   const capFloor = (w, al) => P.CAPITAL.peFloor * Math.max(0, Math.min(earnRecent(al), Math.max(opResult(al), 0) * 2.5));
-  /** Börsenwert: wird zum Monatswechsel neu festgestellt (geglättet, höchstens +40 %/−20 % je Monat), nie unter KGV 4. Kapitalmaßnahmen verschieben ihn sofort um das bewegte Geld. */
+  /** Börsenwert: wird zum Monatswechsel neu festgestellt (halber Weg zum Zielwert, seit 0.21.44 ohne Ober- und Untergrenze der Bewegung), nie unter KGV 4. Kapitalmaßnahmen verschieben ihn sofort um das bewegte Geld. */
   function mktCap(w, al) {
     const c = capState(al), base = typeof c.mc === 'number' && c.mc > 0 ? c.mc : Math.max(P.CAPITAL.minCap * (w.macro ? w.macro.cpi : 1), fundCap(w, al) * (c.sent || 1));
     return Math.max(base, capFloor(w, al));
@@ -6123,7 +6131,7 @@ const SM = (() => {
     const C = P.CAPITAL, c = capState(al), target = Math.max(C.minCap * w.macro.cpi, fundCap(w, al) * (c.sent || 1), capFloor(w, al));
     if (!(typeof c.mc === 'number' && c.mc > 0)) { c.mc = target; return; }
     const cur = Math.max(c.mc, capFloor(w, al)), nx = cur + C.smooth * (target - cur);
-    c.mc = Math.max(C.minCap * w.macro.cpi, capFloor(w, al), clamp(nx, cur * (1 - C.maxDown), cur * (1 + C.maxUp)));
+    c.mc = Math.max(C.minCap * w.macro.cpi, capFloor(w, al), Number.isFinite(C.maxUp) || Number.isFinite(C.maxDown) ? clamp(nx, cur * (1 - (C.maxDown ?? 1)), cur * (1 + (C.maxUp ?? 1e9))) : nx);
   }
   const capShift = (w, al, d) => { const c = capState(al); c.mc = Math.max(P.CAPITAL.minCap * w.macro.cpi, mktCap(w, al) + d); };
   /** Preis für q (Anteil 0–1) der Airline T, gekauft von B: Kursaufschlag durch die eigene Nachfrage (je größer das Paket, desto teurer),
@@ -6154,8 +6162,8 @@ const SM = (() => {
   function buyStake(w, B, tid, q) {
     const T = w.airlines[tid], bad = capBlock(w, B, T); if (bad) return { ok: false, msg: bad };
     q = clamp(Math.round(Number(q) * 1000) / 1000, 0, 1); const fl = floatOf(w, T);
-    if (!(q >= 0.01)) return { ok: false, msg: 'Mindestens 1 % kaufen.' };
-    if (fl < 0.01) return { ok: false, msg: T.isPlayer ? `${T.name} hat keine frei handelbaren Aktien.` : `Von ${T.name} sind keine Aktien mehr frei.` };
+    if (!(q >= 0.001)) return { ok: false, msg: 'Mindestens 0,1 % kaufen.' };
+    if (fl < 0.001) return { ok: false, msg: T.isPlayer ? `${T.name} hat keine frei handelbaren Aktien.` : `Von ${T.name} sind keine Aktien mehr frei.` };
     q = Math.min(q, fl);
     const cost = stakeBuyPrice(w, B, T, q);
     if (B.spendable(w.macro.bank ?? 1) < cost) return { ok: false, msg: `${Math.round(q * 100)} % an ${T.name} kosten ${Math.round(cost / 1e5) / 10} Mio. EUR – dafür reicht auch der Dispo nicht.` };
@@ -6471,7 +6479,7 @@ const SM = (() => {
       if (!it || typeof it !== 'object') continue;
       if (it.k === 'cash') { const amount = Math.round(num(it.amount)); if (amount > 0 && amount <= 5e8) out.push({ k: 'cash', amount }); }
       else if (it.k === 'ac' && typeof it.id === 'string' && it.id.length < 30) { if (!out.some((x) => x.k === 'ac' && x.id === it.id)) out.push({ k: 'ac', id: it.id }); }
-      else if (it.k === 'acAny' && P.AIRCRAFT_TYPES[it.type] && !P.AIRCRAFT_TYPES[it.type].launch) out.push({ k: 'acAny', type: it.type, fam: !!it.fam, n: clamp(Math.round(num(it.n, 1)), 1, 4), maxAge: it.maxAge ? clamp(Math.round(num(it.maxAge)), 1, 30) : null });
+      else if (it.k === 'acAny' && P.AIRCRAFT_TYPES[it.type]) out.push({ k: 'acAny', type: it.type, fam: !!it.fam, n: clamp(Math.round(num(it.n, 1)), 1, 4), maxAge: it.maxAge ? clamp(Math.round(num(it.maxAge)), 1, 30) : null });
       else if (it.k === 'staff' && ['pilot', 'cabin', 'tech'].includes(it.role)) {
         const group = it.role === 'pilot' ? (STAFF_GROUPS.includes(it.group) ? it.group : null) : null, n = clamp(Math.round(num(it.n)), 0, 60);
         if (n > 0 && (it.role !== 'pilot' || group)) out.push({ k: 'staff', role: it.role, group, n });
@@ -7406,7 +7414,7 @@ const SM = (() => {
         if (!routeKmOk(base, dest)) return { ok: false, msg: `Unter ${P.MIN_ROUTE_KM} km gibt es keine Linienflüge.` };
         if (!aptOk(base, dest, type)) return { ok: false, msg: aptWhy(base, dest, type) };
         if (!rangeOk(base, dest, type)) return { ok: false, msg: 'Reichweite zu kurz.' };
-        if (al.activeRoutes().some((r) => pairKey(r.base, r.dest) === pairKey(base, dest))) return { ok: false, msg: `${base}–${dest} fliegen Sie schon. Ändern Sie die Frequenz in der Streckenliste.` };
+        if (al.activeRoutes().some((r) => pairKey(r.base, r.dest) === pairKey(base, dest) && r.type_id === type)) return { ok: false, msg: `${base}–${dest} fliegen Sie schon mit ${P.AIRCRAFT_TYPES[type].label}. Ändern Sie die Frequenz in der Streckenliste – oder planen Sie die Strecke mit einem anderen Muster als eigene Strecke.` };   // 0.21.46: weiteres Muster = eigene Strecke
         if (barred(w, al.id, base, dest)) { const g = w.agreements.find((x) => x.airline === al.id && x.pair === pairKey(base, dest) && x.until > day); return { ok: false, msg: `Sie haben vertraglich zugesagt, ${base}–${dest} bis Tag ${g.until + 1} nicht zu fliegen.` }; }
         if (!w.slotsOkFor(al, base, dest, freq)) { const bad = [base, dest].filter((x) => w.slotsFreeFor(al, x) < freq).map((x) => `${x}: ${Math.max(0, w.slotsFreeFor(al, x))} frei${al.heldAt(x, day) ? ` (davon ${al.heldAt(x, day)} aus Ihrer Reserve)` : ''}`); return { ok: false, msg: `Nicht genug Slots für ${freq} Flüge täglich – ${bad.join(', ')}.` }; }
         const service = P.SERVICE[a.service] ? a.service : 'standard', buffer = P.BUFFER_POLICY[a.buffer] ? a.buffer : 'normal';
@@ -7424,7 +7432,6 @@ const SM = (() => {
         const r = al.openRoute(start, base, dest, type, freq, fo, fi, service, buffer, 0.85, false);
         if (wk < 7) r.wk = wk;
         if (['feeder', 'local'].includes(a.role)) r.role = a.role;
-        if (a.mix) { const m = mixCheck(w, al, r, a.mix); if (m.mix) r.mix = m.mix; }   // 0.21.42: zweites Muster gleich beim Eröffnen
         w.takeSlots(al, base, dest, freq);
         if (w.humans.length > 1) w.pushNews(day, `${al.name} kündigt ${ap(base).name}–${ap(dest).name} an: ${freq}x täglich, ab ${Math.round(Math.min(fo, fi))} EUR`, 'ai', al.id);
         w.operableFreq(al);
@@ -7462,20 +7469,7 @@ const SM = (() => {
           if (unplaced[r.id]) out.msg = `Nicht genug Flugzeugzeit: ${unplaced[r.id]} Umlauf/Umläufe fliegen erst mit einem weiteren Flugzeug vom Typ ${P.AIRCRAFT_TYPES[r.type_id].label}.`;
           al.log(day, `${r.base}–${r.dest}: ${old[0]}x ${P.SERVICE[old[1]].label} ${P.BUFFER_POLICY[old[2]].label} → ${nf}x ${P.SERVICE[ns].label} ${P.BUFFER_POLICY[nb].label}`, 'route');
         }
-        // 0.21.42: zweites Muster (z. B. 2× A320neo + 1× A350) – a.mix = { typeId, freq } setzt, a.mix = null entfernt
-        if (a.mix !== undefined) {
-          const m = mixCheck(w, al, r, a.mix);
-          if (m.err) out.msg = (out.msg ? out.msg + ' ' : '') + m.err;
-          else if (m.mix) { const was = r.mix ? `${r.mix.freq}× ${P.AIRCRAFT_TYPES[r.mix.type_id].label}` : null; r.mix = m.mix;
-            const now = `${r.mix.freq} von ${r.freq} Flügen mit ${P.AIRCRAFT_TYPES[r.mix.type_id].label}`;
-            if (was !== `${r.mix.freq}× ${P.AIRCRAFT_TYPES[r.mix.type_id].label}`) al.log(day, `${r.base}–${r.dest}: ${now}`, 'route');
-            const { unplaced } = al.plan(day, null, P.LEASE_DELIVERY_DAYS);
-            out.msg = unplaced[r.id + '~'] ? `${now} – ${unplaced[r.id + '~']} Umlauf/Umläufe fliegen erst mit einer weiteren ${P.AIRCRAFT_TYPES[r.mix.type_id].label} in ${r.base}.` : `${r.base}–${r.dest}: ${now}.`; }
-          else if (r.mix) { al.log(day, `${r.base}–${r.dest}: wieder nur mit ${P.AIRCRAFT_TYPES[r.type_id].label}`, 'route'); delete r.mix; out.msg = `${r.base}–${r.dest} fliegt wieder nur mit ${P.AIRCRAFT_TYPES[r.type_id].label}.`; }
-        }
-        if (r.mix && !mixOk(r)) delete r.mix;
-        if (r.mix && r.mix.freq >= r.freq) r.mix.freq = r.freq - 1;
-        if (r.mix && r.mix.freq < 1) delete r.mix;
+        if (r.mix && (!mixOk(r) || r.mix.freq >= r.freq)) delete r.mix;   // Altbestand (0.21.42–45); neue gibt es nicht mehr
         r.autoPrice = false;
         w.operableFreq(al);
         return out;
@@ -7838,6 +7832,17 @@ const SM = (() => {
         if (!rt.cab) { delete rt.cab; if (a.archetype === 'premium' && !rt.closed) rt.cab = cabClone(P.CABIN.ai); }   // ältere Welten: Premium-KI bekommt Business
         return rt;
       });
+      // 0.21.46: Strecken mit zweitem Muster (0.21.42–45) werden zu zwei eigenen Strecken – eigene Preise, Auslastung und Auswertung
+      for (const r of al.routes.slice()) {
+        if (!r.mix) continue;
+        const m = r.mix, n = Math.min(m.freq, r.freq - 1); delete r.mix;
+        if (r.closed || !(n >= 1) || !P.AIRCRAFT_TYPES[m.type_id] || m.type_id === r.type_id || al.routes.some((q) => !q.closed && q !== r && pairKey(q.base, q.dest) === pairKey(r.base, r.dest) && q.type_id === m.type_id)) continue;
+        al.routeCounter = (al.routeCounter || 0) + 1;
+        const { trDem, trCar, _fq, ...base } = r;
+        const nr = new Route({ ...base, id: `${al.id}-R${al.routeCounter}`, type_id: m.type_id, freq: n, hist: [], pending: (r.pending || []).map((x) => x.slice()) });
+        r.freq -= n; al.routes.push(nr);
+        for (const x of al.fleet) if (x.type_id === m.type_id && x.pins) for (const pn of x.pins) if (pn.route === r.id) pn.route = nr.id;
+      }
       w.add(al);
     }
     w.order = s.order;

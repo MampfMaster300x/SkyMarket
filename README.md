@@ -183,6 +183,30 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.46: Weiteres Flugzeugmuster als eigene Strecke
+
+- **Das „zweite Muster“ innerhalb einer Strecke (0.21.42) ist zurückgenommen.** Es ließ sich nicht getrennt steuern: Tarife, Auslastung und Ergebnis liefen für beide Muster gemeinsam.
+- **Stattdessen:** Dieselbe Strecke lässt sich mit einem anderen Muster ganz normal neu planen. Beispiel: London–New York mit Boeing und zusätzlich mit Concorde. Jede dieser Strecken hat eigene Tarife, Preisautomatik, Frequenz, Produkt, Slots, Auslastung, Historie und Ergebnis. Nur dasselbe Muster zweimal auf derselben Strecke geht nicht.
+- **Prognose:** Die eigene Strecke mit dem anderen Muster zählt als Wettbewerber im selben Markt. Beide teilen sich die Reisenden je nach Preis, Produkt und Frequenz; die Prognose zeigt also, was die zusätzliche Strecke wirklich dazubringt.
+- **Flughafenfenster:** zeigt alle eigenen Flüge auf dem Paar, z. B. „Sie fliegen 2x B77W + 1x CONC“.
+- **Spielstände:** Strecken mit zweitem Muster aus 0.21.42–0.21.45 werden beim Laden automatisch in zwei Strecken aufgeteilt (gleiche Tarife und Einstellungen; feste Zuweisungen der Flugzeuge wandern mit).
+
+## Neu in 0.21.45: Alle Muster im Marktplatz
+
+- Im Marktplatz (Gesuch „Flugzeug gesucht“) stehen jetzt alle Muster zur Auswahl, gruppiert nach Passagierflugzeugen, Frachtern und Privatjets. Neu dabei sind die A321XLR und die 777-9 ab ihrem Marktstart, die Frachter (ATR 72-600F, A321P2F, 767-300F, 777F) und die Privatjets. Vorher fehlten sie in der Liste, und die Engine nahm Gesuche dafür nicht an.
+
+## Neu in 0.21.44: Kurse ohne Bewegungsgrenze
+
+- Der Börsenwert bewegt sich zum Monatswechsel nicht mehr höchstens +40 % / −20 %. Er geht jeweils den halben Weg zum neuen Wert, ohne Obergrenze nach oben oder unten. Steigt oder bricht das Ergebnis stark ein, folgt der Kurs entsprechend stark.
+- Bleibt: Untergrenze KGV 4 für profitable Airlines und Mindestbörsenwert 2 Mio. € × Preisniveau. Kapitalmaßnahmen wirken weiter sofort.
+- **Handel in kleinen Schritten:** Aktien lassen sich ab 0,1 % kaufen und verkaufen. Knöpfe 1 % / 5 % / 10 %, dazu ein Feld für einen beliebigen Anteil in 0,1-%-Schritten (in den eigenen Beteiligungen auch zum Verkaufen). Die Handelsknöpfe stehen jetzt in einer eigenen Zeile, damit Kurs und Wert nicht verdeckt werden.
+- **Eigenkapital „seit Start“ (Mitspielende) korrigiert:** Die Steigerung bezieht sich jetzt auf das Startkapital der Gründung (z. B. 16 Mio. € bei „Realistisch“). Vorher war die Basis die Einlage nach Kapitalerhöhungen und Rückkäufen; nach großen Rückkäufen schrumpfte sie auf wenige Millionen, daher z. B. „+17.748 %“. Der Tooltip zeigt Startkapital, Gewinne seit Start, Kapitalmaßnahmen netto und Dividenden.
+
+## Neu in 0.21.43: KI-Vertretung rückwirkend
+
+- Die 72 Stunden der KI-Vertretung zählen jetzt auch rückwirkend. Wer seit dem Update noch keine Aktion gemacht hat, wird nach seiner letzten Spielzeit (Lebenszeichen des offenen Spiels) beurteilt. Vorher begann der Zähler für alle mit dem Update.
+- Wer z. B. zuletzt vor 80 Stunden gespielt hat, wird bei der nächsten stündlichen Prüfung vertreten. Gibt es weder Aktion noch Spielzeit, zählt weiter der Zeitpunkt des Updates.
+
 ## Neu in 0.21.42: Zwei Flugzeugmuster je Strecke, Flugzeugkredite ablösen, Prognose im Detail
 
 - **Zwei Muster auf einer Strecke**, z. B. 2× A320neo + 1× A350 an starken Tagen oder für Umsteigerwellen:
