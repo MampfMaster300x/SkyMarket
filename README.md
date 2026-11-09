@@ -183,6 +183,11 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.47: KI-Vertretung durch die Spielleitung, stimmige Streckenhinweise
+
+- **Spielleitung kann die KI-Vertretung starten:** In der Verwaltung gibt es je Airline „KI vertreten lassen“. Die KI führt die Airline dann wie bei der automatischen Vertretung (Preisautomatik, Personal, Entscheidungen, freie Flugzeuge) – so lange, bis die Person wieder spielt (Spielzeit nach der Anordnung, eine eigene Aktion oder „Selbst steuern“). Die stündliche 72-Stunden-Prüfung schaltet eine angeordnete Vertretung nicht vorzeitig ab. „KI-Vertretung beenden“ hebt sie von Hand auf. Die Liste zeigt, wer vertreten wird und ob die Leitung das angeordnet hat; die Airline bekommt eine Meldung im Logbuch.
+- **Streckenhinweise widersprechen sich nicht mehr:** Auslastungs- und Ergebnis-Warnungen richten sich nach den letzten 7 Tagen – wie die Auslastungsbalken. Vorher meldete eine fast ausgebuchte Strecke gleichzeitig „Nur 51 % Auslastung“ aus dem 30-Tage-Schnitt. Weichen 7 und 30 Tage voneinander ab, erklärt ein Hinweis den Unterschied. Die Kopfzeile zeigt den DB2 der letzten 7 Tage („· 7 T“), die Kennzahlen darunter sind als 30-Tage-Schnitt beschriftet. Ein günstigerer Konkurrent bei gut gefüllten Flügen ist nur noch ein Hinweis statt einer Warnung.
+
 ## Neu in 0.21.46: Weiteres Flugzeugmuster als eigene Strecke
 
 - **Das „zweite Muster“ innerhalb einer Strecke (0.21.42) ist zurückgenommen.** Es ließ sich nicht getrennt steuern: Tarife, Auslastung und Ergebnis liefen für beide Muster gemeinsam.

@@ -213,6 +213,11 @@ async function autoFlags(store, w, now) {
   hs.forEach((h, i) => {
     // 0.21.43: rückwirkend – ohne erfasste Aktion zählt die letzte Spielzeit (Lebenszeichen), erst ohne beides der Zeitpunkt des Updates
     if (!h.lastAct) h.lastAct = (plays[i] && plays[i].last) || now;
+    if (h.autoForced) {   // 0.21.47: von der Spielleitung angeordnet – gilt, bis die Person wieder spielt oder selbst etwas tut
+      if ((h.lastAct || 0) > h.autoForced || ((plays[i] && plays[i].last) || 0) > h.autoForced + 60e3) { delete h.autoForced; h.auto = 0; h.log(w.day, 'Willkommen zurück: Die Vertretung durch die KI ist beendet, Sie steuern wieder selbst.', 'good'); }
+      else if (!h.auto) h.auto = h.autoForced;
+      return;
+    }
     const last = Math.max(h.lastAct || 0, (plays[i] && plays[i].last) || 0), on = now - last > lim;
     if (on && !h.auto) { h.auto = now; h.log(w.day, `Seit ${SM.P.AUTOPILOT.hours} Stunden keine eigene Steuerung: Die KI vertritt Ihre Airline (Preise, Personal, Entscheidungen, freie Flugzeuge). Sobald Sie wieder spielen, übernehmen Sie selbst.`, 'warn'); }
     else if (!on && h.auto) { h.auto = 0; h.log(w.day, 'Willkommen zurück: Die Vertretung durch die KI ist beendet, Sie steuern wieder selbst.', 'good'); }
@@ -550,7 +555,7 @@ export async function handle(req, { store }) {
         return json({ id, name: meta.name, main: !!meta.main, day: w.day, speed: SM.speedKey(r.md.speed), canSpeed: canControl(meta, user), admin: isAdmin(user), startAt: waiting(r.md, now) ? r.md.startAt : null,
           players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
             return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
-              status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null }; }),
+              status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null, auto: al && al.auto ? al.auto : 0, autoForced: !!(al && al.autoForced) }; }),
           banned: meta.banned || [], events: SM.adminEvents(w), audit: SM.adminAudit(w) });
       }
       if (op === 'admin' && method === 'POST') {
@@ -574,6 +579,15 @@ export async function handle(req, { store }) {
           await indexUpsert(store, next);
           console.log(`${user.key} hat ${p.airlineName} (${p.u}) aus ${meta.id} entfernt${body.ban ? ' und gesperrt' : ''}.`);
           return json({ ok: true, msg: `${p.airlineName} wurde entfernt${body.ban ? ', ' + p.name + ' ist gesperrt' : ''}.`, kicked: res && res.ok });
+        }
+        if (cmd === 'autopilot') {   // 0.21.47: Spielleitung startet/beendet die KI-Vertretung für eine Airline (bis die Person wieder spielt)
+          const p = meta.players.find((x) => x.airlineId === body.airlineId);
+          if (!p) return fail(404, 'Diese Airline spielt hier nicht (mehr).');
+          const r = await mutateState(store, id, (w) => SM.adminAutopilot(w, p.airlineId, !!body.on, Date.now()));
+          const res = r.result || { ok: false };
+          if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
+          console.log(`${user.key} hat in ${id} die KI-Vertretung für ${p.airlineName} ${body.on ? 'gestartet' : 'beendet'}.`);
+          return json({ ok: true, msg: res.msg, ver: r.etag });
         }
         if (cmd === 'unban') {
           await updateJson(store, K.meta(id), (m) => { if (!m) return undefined; m.banned = (m.banned || []).filter((b) => b.u !== body.u); return m; });
@@ -690,7 +704,7 @@ export async function handle(req, { store }) {
           if (st && waiting(st.metadata)) return json({ ok: false, waiting: true, msg: `Das Spiel startet erst am ${fmtStart(st.metadata.startAt)}. Bis dahin können Sie Logo, Name und Heimatbasis festlegen, Pläne vorbereiten und Mitspielende einladen.` });
         }
         const r = await mutateState(store, id, (w, md2, now2) => {   // jede eigene Aktion zählt als Steuerung und beendet die KI-Vertretung
-          const own = w.airlines[me.airlineId]; if (own) { own.lastAct = now2; if (own.auto && action.type !== 'resume') { own.auto = 0; own.log(w.day, 'Sie steuern wieder selbst – die Vertretung durch die KI ist beendet.', 'good'); } }
+          const own = w.airlines[me.airlineId]; if (own) { own.lastAct = now2; if (own.auto && action.type !== 'resume') { own.auto = 0; delete own.autoForced; own.log(w.day, 'Sie steuern wieder selbst – die Vertretung durch die KI ist beendet.', 'good'); } }
           return SM.applyAction(w, me.airlineId, action);
         });
         const res = r.result || { ok: false };

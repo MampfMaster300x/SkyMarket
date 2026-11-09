@@ -285,6 +285,22 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
     ({ m, w } = await load()); assert.equal(!!w.airlines[al.id].auto, want, `zuletzt gespielt vor ${hAgo} h → Vertretung ${want ? 'an' : 'aus'}`);
   }
   ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'resume' } }), 'zurück übernehmen');
+  // 0.21.47: Spielleitung startet die Vertretung für eine Person – sie bleibt über die stündliche Prüfung, bis die Person wieder spielt
+  assert.equal((await call('anna', 'POST', '/games/main/admin', { cmd: 'autopilot', airlineId: al.id, on: true })).status, 403, 'nur die Spielleitung');
+  const fa = ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'autopilot', airlineId: al.id, on: true }), 'Vertretung anordnen'); assert.ok(/vertritt jetzt/.test(fa.msg), fa.msg);
+  const adl = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung'); const ap = adl.players.find((x) => x.airlineId === al.id); assert.ok(ap.auto && ap.autoForced, 'Liste zeigt die Vertretung');
+  await store.setJSON('play/anna', { last: Date.now() - 3600e3 });
+  ({ m, w } = await load()); w.autoAt = 0; await save(m, w, 3 * 1800000 * (_clock.isWeekend(Date.now()) ? 2 : 1) + 1000); await tickMain(store);
+  ({ m, w } = await load()); assert.ok(w.airlines[al.id].auto && w.airlines[al.id].autoForced, 'bleibt trotz kurzer Abwesenheit an'); assert.ok(w.airlines[al.id].events.some((e) => /Spielleitung hat die KI-Vertretung gestartet/.test(e.msg)), 'Hinweis im Logbuch');
+  // Person spielt wieder (Spielzeit nach der Anordnung) → Vertretung endet bei der nächsten Prüfung
+  ({ m, w } = await load()); w.autoAt = 0; await store.setJSON('play/anna', { last: w.airlines[al.id].autoForced + 120e3 }); await save(m, w, 3 * 1800000 * (_clock.isWeekend(Date.now()) ? 2 : 1) + 1000); await tickMain(store);
+  ({ m, w } = await load()); assert.ok(!w.airlines[al.id].auto && !w.airlines[al.id].autoForced, 'endet, wenn die Person wieder spielt');
+  // erneut anordnen und von Hand beenden; eigene Aktion beendet sie ebenso
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'autopilot', airlineId: al.id, on: true }), 'erneut');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'autopilot', airlineId: al.id, on: false }), 'beenden'); ({ m, w } = await load()); assert.ok(!w.airlines[al.id].auto && !w.airlines[al.id].autoForced, 'von Hand beendet');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'autopilot', airlineId: al.id, on: true }), 'nochmal');
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'resume' } }), 'Person übernimmt selbst'); ({ m, w } = await load()); assert.ok(!w.airlines[al.id].auto && !w.airlines[al.id].autoForced, 'eigene Aktion beendet');
+  console.log('0.21.47 ok: Spielleitung startet/beendet die KI-Vertretung je Person; sie hält, bis die Person wieder spielt');
   // Engine: Vertretung handelt maßvoll (Preisautomatik, Personal, freie Flugzeuge) und hält die Bilanz
   const v = SMx.newWorld({ seed: 55 }), p = SMx.addHuman(v, { id: 'P1', name: 'Abwesend', code: 'AW', base: 'HAJ' }); v.playerId = 'P1'; p.ledger.equityFlow(60e6, 't');
   SMx.applyAction(v, 'P1', { type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAJ' }); SMx.applyAction(v, 'P1', { type: 'openRoute', base: 'HAJ', dest: 'PMI', typeId: 'A20N', freq: 1, fo: 400, fi: 400 });

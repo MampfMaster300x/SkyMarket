@@ -1253,7 +1253,7 @@ function routeItem(r) {
   const lfo = SM.routeLf(r, 7, 'out'), lfi = SM.routeLf(r, 7, 'in');
   let html = `<div class="ritem${open ? ' open' : ''}"><button class="rhead" data-act="toggle" data-id="${r.id}" aria-expanded="${open}">
     <div><div class="rcode">${r.base}<span class="arr">⇄</span>${r.dest}</div><div class="rmeta">${apName(r.dest)} · ${n0(SM.gcDistanceKm(r.base, r.dest))} km · ${n1(SM.blockHours(r.base, r.dest, r.type_id))} h · ${freqTxt(r)}${r.role === 'feeder' ? ' · Zubringer' : r.role === 'local' ? ' · Endziel' : ''} · ${tlx(r.type_id)} · ${svcLabel(r.service)}${r.ap ? ` · <span class="chip" title="Preisautomatik: ${esc(apSummary(SM.apCfgOf(r), r.ap))}">Auto ${pct(r.ap)}</span>${r.pm && r.pm !== 1 ? ` <span class="chip" title="Premiumaufschlag">Premium ${pct(r.pm)}</span>` : ''}` : ''}${(() => { const c = SM.cabinSeats(r.type_id, r.service, r.cab); return c.f || c.b ? ` · <span title="Sitze je Flug: First / Business / Economy">${c.f ? c.f + ' F · ' : ''}${c.b} B · ${c.e} Y</span>` : ''; })()} ${waiting ? `· <span class="warnc">${waiting}</span>` : ''}${cxTxt ? ` · <span class="neg">${esc(cxTxt)}</span>` : ''}</div></div>
-    <div class="rdb ${s30.db2 < 0 ? 'neg' : 'pos'}">${s30.n ? eur(s30.db2 / s30.n, { plus: true }) : '–'}<small>DB2 pro Tag</small></div>
+    ${(() => { const h = s7.n >= 5 ? s7 : s30; return `<div class="rdb ${h.db2 < 0 ? 'neg' : 'pos'}">${h.n ? eur(h.db2 / h.n, { plus: true }) : '–'}<small>DB2 pro Tag${h === s7 ? ' · 7 T' : ''}</small></div>`; })()}
     <div class="lfrow"><span>hin</span><div class="bar"><i class="me" style="width:${(lfo * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfo) : '–'}</span></div>
     <div class="lfrow"><span>zurück</span><div class="bar"><i class="me" style="width:${(lfi * 100).toFixed(0)}%"></i></div><span class="num">${s7.n ? pct(lfi) : '–'}</span></div>
   </button>`;
@@ -1276,13 +1276,17 @@ function insights(r, s7, s30) {
   const ramp = r.ramp(W.day, pl.rampT());
   if (ramp < 0.9 && W.day >= r.opened_day) out.push(['info', `Markthochlauf: Die Strecke ist erst zu ${pct(ramp)} bekannt. Marketing und eine Marketingfachkraft beschleunigen das.`]);
   { const fa = s7.n >= 3 ? fullAdvice(r, s30) : null; if (fa) out.push(fa); }
-  if (s30.n >= 14 && s30.lf < 0.6) out.push(['warn', `Nur ${pct(s30.lf)} Auslastung. Preis senken, kleineres Flugzeug oder weniger Frequenz prüfen.`]);
-  if (s30.n >= 14 && s30.db1 > 0 && s30.db2 < 0) out.push(['warn', 'Deckt die direkten Flugkosten, aber nicht die Flugzeugzeit. Lohnt nur, wenn das Flugzeug sonst leer stünde.']);
-  if (s30.n >= 14 && s30.db1 < 0) out.push(['crit', 'Deckt nicht einmal die direkten Flugkosten. Jeder Flug verbrennt Geld.']);
+  // Bewertung nach den letzten 7 Tagen (wie Auslastungsbalken und Kopfzeile) – sonst widersprechen sich alte 30-Tage-Werte und die aktuelle Lage
+  const rec = s7.n >= 5 ? s7 : s30.n >= 14 ? s30 : null, span = rec === s7 ? 'in den letzten 7 Tagen' : 'in den letzten 30 Tagen';
+  if (rec && rec.lf < 0.6) out.push(['warn', `Nur ${pct(rec.lf)} Auslastung ${span}. Preis senken, kleineres Flugzeug oder weniger Frequenz prüfen.`]);
+  if (rec && rec.db1 > 0 && rec.db2 < 0) out.push(['warn', `Deckt ${span} die direkten Flugkosten, aber nicht die Flugzeugzeit. Lohnt nur, wenn das Flugzeug sonst leer stünde.`]);
+  if (rec && rec.db1 < 0) out.push(['crit', `Deckt ${span} nicht einmal die direkten Flugkosten. Jeder Flug verbrennt Geld.`]);
+  if (rec === s7 && s30.n >= 14 && s30.n > s7.n && (s30.db2 < 0) !== (s7.db2 < 0)) out.push(['info', `Über 30 Tage liegt die Strecke bei ${eur(s30.db2 / s30.n, { plus: true })} DB2 pro Tag, in den letzten 7 Tagen bei ${eur(s7.db2 / s7.n, { plus: true })}. ${s7.db2 >= 0 ? 'Die schwächeren Wochen davor ziehen den Monatsschnitt noch nach unten – die Strecke hat sich gefangen.' : 'Die letzten Tage sind schwächer als der Monat – Preis, Konkurrenz und Ereignisse prüfen.'}`]);
   if (s30.tr > 0) { const n = Math.max(s30.n, 1); out.push(['info', `Ø ${n0(s30.tr / n)} Umsteiger pro Tag über ${r.base}${s30.trrN ? `, Erlösanteil Ø ${eur(s30.trr / s30.trrN)} pro Tag` : ''}. Der Erlös einer Umsteigerreise wird nach den Einzeltarifen der Teilstrecken aufgeteilt. Mehr unter Strecken → Drehkreuze.`]); }
   const comp = W.competitorOffers(W.playerId, r.base, r.dest);
   const cheap = comp.filter((c) => c.fare < r.fare_out * 0.9);
-  if (cheap.length) { const c = cheap.sort((a, b) => a.fare - b.fare)[0]; out.push(['warn', `${W.airlines[c.airline].name} fliegt dieselbe Strecke ${pct(1 - c.fare / r.fare_out)} günstiger (${eur(c.fare)}).`]); }
+  if (cheap.length) { const c = cheap.sort((a, b) => a.fare - b.fare)[0], full = s7.n >= 3 && Math.min(SM.routeLf(r, 7, 'out'), SM.routeLf(r, 7, 'in')) >= 0.85;
+    out.push([full ? 'info' : 'warn', `${W.airlines[c.airline].name} fliegt dieselbe Strecke ${pct(1 - c.fare / r.fare_out)} günstiger (${eur(c.fare)})${full ? '. Ihre Flüge sind trotzdem gut gefüllt – kein Grund, nachzuziehen.' : '.'}`]); }
   if (s30.flights && s30.cancelled) out.push(['info', `${s30.cancelled} Flugausfälle in 30 Tagen (Technik, Wetter, Streik oder Personal). Betreuung und Entschädigung sind gebucht.`]);
   return out;
 }
@@ -1291,7 +1295,7 @@ function routeDayHtml(r) {
   if (W.day < r.opened_day) return '';
   const t = todayOps(r), last = r.hist.at(-1), y = W.day - 1;
   const today = !t.n ? `<b>Heute kein Flug</b> – ${esc(noAcWhy(r))}.` : t.canc > 0 ? `<b>Heute ${t.all ? 'fallen alle Flüge aus' : `fallen ${n0(t.canc)} von ${t.n} Umläufen aus`}</b>: ${esc(t.why.join(', '))}. Gebuchte Gäste werden betreut und entschädigt, Erlös gibt es für diese Flüge nicht.`
-    : `<b>Heute</b> ${t.n === 1 && t.f < 1 ? 'fliegt die Strecke' : `${t.n} Umlauf${t.n > 1 ? 'e' : ''} (${t.n * 2} Flüge)`} planmäßig.`;
+    : `<b>Heute</b> ${t.n === 1 && t.f < 1 ? 'fliegt die Strecke' : `${t.n} ${t.n > 1 ? 'Umläufe' : 'Umlauf'} (${t.n * 2} Flüge)`} planmäßig.`;
   const nf = (x) => (Math.abs(x - Math.round(x)) < 0.05 ? n0(x) : n1(x));
   const yd = !last ? 'noch keine Flüge' : last.d === y ? `gestern ${nf(last.flights)} Flüge${last.cancelled ? `, davon ${nf(last.cancelled)} ausgefallen` : ''} · ${n0(last.pax)} Passagiere · ${eur(last.rev - last.cost, { plus: true })} DB1`
     : `zuletzt geflogen am ${dateShort(last.d)}`;
@@ -1307,6 +1311,7 @@ function routeBody(r, s7, s30) {
     ${routeDayHtml(r)}
     ${geoNotes(W.player, r.base, r.dest)}
     ${ins.map(([k, t]) => `<div class="callout ${k}">${esc(t)}</div>`).join('')}
+    <p class="small muted" style="margin:6px 0 2px">Durchschnitt der letzten ${s30.n} Tage</p>
     <div class="fc">
       <div><span>Erlös pro Tag</span><b>${eur(s30.rev / n)}</b><em>Tickets, Zusatzleistungen, Fracht</em></div>
       <div><span>Direkte Kosten</span><b>${eur(-s30.cost / n)}</b><em>Treibstoff, Gebühren, Spesen …</em></div>
@@ -6319,9 +6324,10 @@ async function showAdmin(id, onBack) {
   let d;
   try { d = await api(`/games/${id}/admin`); } catch (e) { toast(e.message); onBack(); return; }
   const day = d.day, alName = (aid) => { const p = d.players.find((x) => x.airlineId === aid); return p ? p.airlineName : aid; };
-  const pRow = (p) => `<div class="adm-p"><div style="min-width:0"><b>${esc(p.airlineName)}</b> <span class="small muted mono">${esc(p.code || '')}</span>${p.me ? ' <span class="chip me">Sie</span>' : ''}${p.host ? ' <span class="chip">Leitung</span>' : ''}${p.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}
+  const pRow = (p) => `<div class="adm-p"><div style="min-width:0"><b>${esc(p.airlineName)}</b> <span class="small muted mono">${esc(p.code || '')}</span>${p.me ? ' <span class="chip me">Sie</span>' : ''}${p.host ? ' <span class="chip">Leitung</span>' : ''}${p.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}${p.auto ? ` <span class="chip warn" title="${p.autoForced ? 'Von der Spielleitung gestartet – endet, sobald die Person wieder spielt.' : 'Automatisch nach längerer Abwesenheit.'}">KI-Vertretung${p.autoForced ? ' (Leitung)' : ''}</span>` : ''}
       <div class="small muted"><i class="pc-dot ${p.online ? 'on' : ''}"></i>${esc(p.name)} · Basis ${esc(p.base || '–')} · ${p.equity === null ? '–' : 'EK ' + eur(p.equity)} · ${p.fleet} Flugzeuge · ${p.routes} Strecken · seit ${new Date(p.joined).toLocaleDateString('de-DE')}</div></div>
     ${p.me ? '' : `<div class="row adm-act"><span class="row" style="gap:4px"><input type="number" class="adm-amt" data-for="${esc(p.airlineId)}" step="1" min="-999" max="999" placeholder="± Mio. € (bis 999)" aria-label="Kapitalkorrektur in Mio. Euro"><button class="btn small" data-adm="grant" data-al="${esc(p.airlineId)}">Kapital buchen</button></span>
+      ${p.status !== 'insolvent' && p.status !== 'fehlt' ? `<button class="btn small" data-adm="auto" data-al="${esc(p.airlineId)}" data-on="${p.auto ? '' : '1'}" title="${p.auto ? 'Die KI vertritt diese Airline gerade.' : 'Die KI führt die Airline auf mittlerem Niveau weiter, bis die Person wieder spielt.'}">${p.auto ? 'KI-Vertretung beenden' : 'KI vertreten lassen'}</button>` : ''}
       ${d.admin ? `<button class="btn small" data-adm="pw" data-u="${esc(p.u)}" data-n="${esc(p.name)}">Passwort zurücksetzen</button>` : ''}<button class="btn small danger" data-adm="kick" data-al="${esc(p.airlineId)}">Entfernen</button><button class="btn small danger" data-adm="kick" data-ban="1" data-al="${esc(p.airlineId)}">Entfernen + sperren</button></div>`}</div>`;
   const when = (e) => (e.cancelled ? 'annulliert' : e.start > day ? `ab ${dateShort(e.start)}` : e.end > day ? `bis ${dateShort(e.end)}` : 'wirkt nach');
   const eRow = (e) => `<div class="adm-e${e.cancelled ? ' off' : ''}"><span class="chip ${e.severity === 'crit' ? 'crit' : e.severity === 'good' ? 'good' : 'warn'}">${esc(EV_TYPE[e.type] || e.type)}</span><div style="min-width:0"><span class="small">${esc(e.text)}</span><div class="small muted">${when(e)}${e.airline ? ' · betrifft ' + esc(alName(e.airline)) : ''}</div></div>
@@ -6388,7 +6394,7 @@ async function showAdmin(id, onBack) {
       showAdmin(id, onBack); return;
     }
     if ((cmd === 'kick' || cmd === 'cancel') && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = cmd === 'kick' ? (b.dataset.ban ? 'Wirklich entfernen und sperren?' : 'Wirklich entfernen?') : 'Wirklich annullieren?'; b.classList.add('danger'); return; }
-    const body = cmd === 'kick' ? { cmd: 'kick', airlineId: b.dataset.al, ban: !!b.dataset.ban } : cmd === 'unban' ? { cmd: 'unban', u: b.dataset.u } : cmd === 'cancel' ? { cmd: 'cancelEvent', eventId: b.dataset.ev }
+    const body = cmd === 'auto' ? { cmd: 'autopilot', airlineId: b.dataset.al, on: !!b.dataset.on } : cmd === 'kick' ? { cmd: 'kick', airlineId: b.dataset.al, ban: !!b.dataset.ban } : cmd === 'unban' ? { cmd: 'unban', u: b.dataset.u } : cmd === 'cancel' ? { cmd: 'cancelEvent', eventId: b.dataset.ev }
       : { cmd: 'grant', airlineId: b.dataset.al, amount: Number((m.querySelector(`.adm-amt[data-for="${b.dataset.al}"]`) || {}).value || 0) * 1e6 };
     if (cmd === 'grant' && !body.amount) { toast('Bitte einen Betrag in Mio. € eingeben, z. B. 5 oder -5.'); return; }
     if (cmd === 'grant' && Math.abs(body.amount) > 999e6) { toast('Höchstens ±999 Mio. € auf einmal.'); return; }
