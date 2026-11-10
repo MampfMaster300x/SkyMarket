@@ -6,10 +6,17 @@ fs.writeFileSync('server/version.mjs', `// automatisch von scripts/build.mjs erz
 const shell = fs.readFileSync('src/shell.html', 'utf8');
 const engine = fs.readFileSync('shared/engine.cjs', 'utf8').replace("if (typeof module !== 'undefined') module.exports = SM;", '');
 const map = fs.readFileSync('src/world.json', 'utf8');
-const app = fs.readFileSync('src/app.js', 'utf8');
+// Aircraft Collection: Katalog (shared/skins.cjs) und Oberfläche (src/collection.js) – Letztere läuft im selben Gültigkeitsbereich wie die App
+const skins = fs.readFileSync('shared/skins.cjs', 'utf8');
+const app = fs.readFileSync('src/app.js', 'utf8').replace('/*COLLECTION*/', () => fs.readFileSync('src/collection.js', 'utf8'));
+// Artworks: PNG-Dateien aus assets/skins/<skinId>.png werden nach public/skins kopiert, die Liste steht in public/skins/manifest.json
+{ const src = 'assets/skins', dst = 'public/skins'; fs.mkdirSync(dst, { recursive: true });
+  const files = fs.existsSync(src) ? fs.readdirSync(src).filter((f) => /^[a-z0-9_]+__[a-z0-9_]+\.png$/.test(f)) : [];
+  for (const f of files) fs.copyFileSync(`${src}/${f}`, `${dst}/${f}`);
+  fs.writeFileSync(`${dst}/manifest.json`, JSON.stringify({ skins: files.map((f) => f.replace(/\.png$/, '')) })); }
 const cut = shell.indexOf('</style>') + '</style>'.length;
 const head = shell.slice(0, cut), body = shell.slice(cut)
-  .replace('/*ENGINE*/', () => engine).replace('/*MAP*/', () => 'window.SKYMAP = ' + map + ';').replace('/*APP*/', () => app);
+  .replace('/*ENGINE*/', () => engine).replace('/*SKINS*/', () => skins).replace('/*MAP*/', () => 'window.SKYMAP = ' + map + ';').replace('/*APP*/', () => app);
 const html = `<!doctype html>
 <html lang="de">
 <head>

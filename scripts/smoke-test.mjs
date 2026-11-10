@@ -252,6 +252,19 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const rep = ann.reports.find((x) => x.kind === 'routes');
   assert.equal(rep.status, 'done', 'Bericht fertig'); assert.ok(rep.res.rows.length > 0, 'Bericht hat Vorschläge');
   console.log('Marktstudie ok:', rep.res.title, '·', rep.res.rec ? rep.res.rec.text.slice(0, 80) : '–'); }
+// 0.21.49: Abruf liefert die schlanke Ansicht (ohne Einzelposten), die eigenen Einzelposten kommen über /ledger
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const sv = await call('anna', 'GET', '/games/main/state?v=y'), vs = JSON.parse(gunzipSync(Buffer.from(sv.data)).toString());
+  const fu = await call('anna', 'GET', '/games/main/state?v=y&full=1'), fs2 = JSON.parse(gunzipSync(Buffer.from(fu.data)).toString());
+  assert.equal(sv.headers.get('x-ver'), fu.headers.get('x-ver'), 'gleiche Version');
+  assert.ok(vs.view === 1 && vs.airlines.every((a) => !a.ledger.det && !a.ledger.fx && a.ledger.months.every((m) => !m.det && !m.fx)), 'Ansicht ohne Einzelposten');
+  const annF = fs2.airlines.find((a) => a.owner === 'anna' && a.status !== 'insolvent'); assert.ok(annF.ledger.det, 'voller Stand hat Einzelposten');
+  assert.ok(sv.data.byteLength < fu.data.byteLength, `Ansicht kleiner (${sv.data.byteLength} < ${fu.data.byteLength})`);
+  const ld = ok(await call('anna', 'GET', '/games/main/ledger'), 'Einzelposten'); assert.equal(ld.ver, sv.headers.get('x-ver')); assert.deepStrictEqual(ld.det, annF.ledger.det); assert.equal(ld.months.length, annF.ledger.months.length);
+  const wv = SMx.deserialize(vs), av = wv.airlines[annF.id]; assert.ok(!av.ledger.det && !av.ledger.fx, 'Ansicht legt keine leeren Einzelposten an');
+  const wf = SMx.deserialize(fs2); assert.deepStrictEqual(SMx.balanceSheet(av), SMx.balanceSheet(wf.airlines[annF.id]), 'Bilanz gleich');
+  const v2 = await call('anna', 'GET', '/games/main/state?v=y'); assert.equal(v2.data.byteLength, sv.data.byteLength, 'Ansicht aus dem Speicher');
+  console.log(`0.21.49 ok: schlanke Ansicht ${Math.round(sv.data.byteLength / 1024)} KB statt ${Math.round(fu.data.byteLength / 1024)} KB, Einzelposten über /ledger`); }
 // Manipulierte Aktionen dürfen den Spielstand nicht beschädigen (sonst stürzt die Welt für alle ab)
 { const evil = [{ type: 'terminal', apt: 'HAM', v: 'constructor' }, { type: 'terminal', apt: 'HAM', v: '__proto__' }, { type: 'hire', role: 'xyz', count: 5 },
     { type: 'hire', role: 'pilot', group: 'toString', count: 3 }, { type: 'train', from: 'A32F', to: 'hasOwnProperty', count: 1 }, { type: 'insurance', v: 'valueOf' },
@@ -310,6 +323,20 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   const acts = p.events.slice(e0).filter((e) => /^Vertretung \(KI\)/.test(e.msg)).map((e) => e.msg);
   assert.ok(acts.some((x) => /Preisautomatik/.test(x)) && acts.some((x) => /Neue Strecke/.test(x)), 'Vertretung: ' + acts.join(' | '));
   assert.ok(p.activeRoutes().every((r) => r.ap > 0), 'alle Strecken mit Preisautomatik'); assert.ok(Math.abs(SMx.balanceSheet(p).check) < 1, 'Bilanz ausgeglichen');
+  // 0.21.48: Vertretung baut langsam aus – leere Airline least ihr erstes Flugzeug und fliegt damit, Strecke ohne Flugzeug bekommt eins
+  { const v2 = SMx.newWorld({ seed: 3 }), q = SMx.addHuman(v2, { id: 'P1', name: 'Leer', code: 'LE', base: 'HAM' }); v2.playerId = 'P1'; q.auto = 1;
+    for (let i = 0; i < 130; i++) v2.step();
+    const ev = q.events.filter((e) => /^Vertretung \(KI\)/.test(e.msg)).map((e) => e.msg);
+    assert.ok(ev.some((x) => /geleast als erstes Flugzeug/.test(x)) && ev.some((x) => /Neue Strecke/.test(x)) && q.fleet.length >= 1 && q.fleet.length <= 3, 'Ausbau: ' + q.fleet.length + ' · ' + ev.join(' | '));
+    assert.ok(q.activeRoutes().length >= 1 && Math.abs(SMx.balanceSheet(q).check) < 1, 'fliegt, Bilanz stimmt');
+    assert.ok(q.activeRoutes().every((r) => !v2.routeBan(q, r.base, r.dest)), 'keine Strecke unter Flugverbot');
+    const v3 = SMx.newWorld({ seed: 5 }), o = SMx.addHuman(v3, { id: 'P1', name: 'Ohne', code: 'OH', base: 'HAM' }); v3.playerId = 'P1';
+    SMx.applyAction(v3, 'P1', { type: 'acquire', typeId: 'A20N', mode: 'lease', base: 'HAM' }); for (let i = 0; i < 16; i++) v3.step();
+    SMx.applyAction(v3, 'P1', { type: 'openRoute', base: 'HAM', dest: 'PMI', typeId: 'A20N', freq: 1 }); for (const x of [...o.fleet]) SMx.applyAction(v3, 'P1', { type: 'dispose', acId: x.id });
+    o.auto = 1; for (let i = 0; i < 31; i++) v3.step();
+    assert.ok(o.events.some((e) => /geleast für die Strecke HAM–PMI/.test(e.msg)) && o.fleet.some((x) => x.type_id === 'A20N'), 'Strecke ohne Flugzeug bekommt eins');
+  }
+  console.log('0.21.48 ok: Vertretung least langsam (erstes Flugzeug, fehlendes Muster, nur bei Gewinn) und setzt es ein');
   console.log('0.21.39/43 ok: KI-Vertretung nach 72 h (auch rückwirkend nach letzter Spielzeit), Ende durch eigene Aktion; ' + acts.length + ' Vertretungsschritte in 70 Tagen');
 }
 // 0.21.34: Fehlerprotokoll der Geräte – senden darf jedes Konto, lesen nur Admins; Flut je Konto begrenzt
@@ -839,7 +866,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.ok(!w2.list.some((x) => x.archetype && x.ledger.det), 'KI-Airlines ohne Einzelposten (Speicher)');
   console.log('0.21.11 ok: P&L-Einzelposten stimmen mit allen Konten überein,', Object.values(L.det.p).reduce((a, o) => a + Object.keys(o).length, 0), 'Posten'); }
 // 0.21.13: Jeder Knopf (data-act) in der Seitenleiste muss einen Empfänger haben, den der zentrale Klickverteiler auch erreicht
-{ const fs = await import('node:fs'); const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+{ const fs = await import('node:fs'); const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8').replace('/*COLLECTION*/', () => fs.readFileSync(new URL('../src/collection.js', import.meta.url), 'utf8'));
   const names = new Set([...src.matchAll(/data-act="([a-z][a-z0-9]*)"/gi)].map((m) => m[1]));
   const body = (name) => { const i = src.indexOf(`function ${name}(`); if (i < 0) return ''; let j = src.indexOf('{', i), d = 0, k = j; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) break; } } return src.slice(j, k + 1); };
   const pane = body('onPaneClick'), gates = [...pane.matchAll(/\n  if \((?:(.*?) && )?(on[A-Z]\w*Click)\(act, b\)\) return;/g)].map((m) => ({ cond: m[1] || 'true', fn: m[2] }));
@@ -1437,5 +1464,69 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const c = SMx.capState(T), cur = SMx.mktCap(w, T); c.mc = cur * 0.2; SMx.updateCap(w, T); assert.ok(SMx.capState(T).mc > cur * 0.2 * 1.4 + 1, 'Kurs darf mehr als +40 % im Monat steigen');
   c.mc = cur * 6; SMx.updateCap(w, T); assert.ok(SMx.capState(T).mc < cur * 6 * 0.8 - 1 || SMx.capState(T).mc <= Math.max(cur, 1) * 3.6, 'und mehr als −20 % fallen');
   console.log('0.21.44 ok: Handel ab 0,1 %, Kurse ohne Monatsgrenze');
+}
+// 0.21.52: AIRCRAFT COLLECTION – Katalog, Ziehung, Packs, Aktivierung, Tausch, Kaufanfragen, Admin
+{ const SK = (await import('../shared/skins.cjs')).default, { randomInt } = await import('node:crypto');
+  const SM0 = (await import('../shared/engine.cjs')).default, load = async () => { const m = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' }); return { m, w: SM0.deserialize(JSON.parse(gunzipSync(Buffer.from(m.data)).toString())) }; };
+  const fleetSig = async (id) => (await load()).w.airlines[id].fleet.map((a) => [a.id, a.type_id, a.base, a.mode || '', (a.assigned || []).length].join(':')).join('|');
+  assert.equal(SK.SKINS.length, 280); assert.equal(new Set(SK.SKINS.map((x) => x.id)).size, 280); assert.equal(SK.MODELS.length, 28);
+  for (const m of SK.MODELS) { const l = SK.SKINS.filter((x) => x.model === m.id); assert.deepStrictEqual(['u', 'r', 'e', 'l'].map((k) => l.filter((x) => x.rarity === k).length), [4, 3, 2, 1], m.id); assert.ok(SM0.P.AIRCRAFT_TYPES[m.type], m.type); }
+  // Wahrscheinlichkeiten: 200.000 Packs mit dem Zufall des Servers
+  const N = 200000, cnt = { 1: 0, 2: 0, 3: 0 }, rar = { u: 0, r: 0, e: 0, l: 0 }, mod = {}; let tot = 0;
+  for (let i = 0; i < N; i++) { const r = SK.drawPack((n) => randomInt(n)); cnt[r.length]++; for (const id of r) { const k = SK.SKIN_BY_ID[id]; rar[k.rarity]++; mod[k.model] = (mod[k.model] || 0) + 1; tot++; } }
+  const near = (x, p, tol, what) => assert.ok(Math.abs(x - p) < tol, `${what}: ${(x * 100).toFixed(2)} % statt ${(p * 100).toFixed(0)} %`);
+  near(cnt[1] / N, 0.80, 0.006, '1 Skin'); near(cnt[2] / N, 0.17, 0.006, '2 Skins'); near(cnt[3] / N, 0.03, 0.003, '3 Skins');
+  near(rar.u / tot, 0.55, 0.006, 'grün'); near(rar.r / tot, 0.27, 0.006, 'blau'); near(rar.e / tot, 0.14, 0.005, 'lila'); near(rar.l / tot, 0.04, 0.003, 'gold');
+  for (const m of SK.MODELS) near(mod[m.id] / tot, 1 / 28, 0.004, m.id);
+  // Admin vergibt Packs; normale Spieler dürfen das nicht
+  assert.equal((await call('anna', 'POST', '/coll/admin/grant', { user: 'ben', count: 5 })).status, 403, 'Vergabe nur für Admins');
+  assert.equal((await call('anna', 'GET', '/coll/admin')).status, 403);
+  ok(await call('tim', 'POST', '/coll/admin/grant', { user: 'anna', count: 60, reason: 'Test' }), 'Vergabe');
+  ok(await call('tim', 'POST', '/coll/admin/grant', { user: 'ben', count: 40, reason: 'Test' }), 'Vergabe Ben');
+  let me = ok(await call('anna', 'GET', '/coll'), 'Sammlung').me; assert.equal(me.packs.length, 60); assert.ok(me.notes.some((n) => /kostenlose Aircraft Mystery Packs/.test(n.msg)), 'Benachrichtigung');
+  // Öffnen: genau einmal, Ergebnis bleibt
+  const pid = me.packs[0].id, o1 = ok(await call('anna', 'POST', '/coll/open', { packId: pid }), 'öffnen'), o2 = ok(await call('anna', 'POST', '/coll/open', { packId: pid }), 'noch einmal');
+  assert.deepStrictEqual(o2.pack.res, o1.pack.res, 'gleiches Ergebnis, keine neue Ziehung'); assert.ok(o2.again); assert.equal(o2.me.packs.length, 59);
+  const par = await Promise.all([1, 2, 3].map(() => call('anna', 'POST', '/coll/open', { packId: o1.me.packs[0].id }))); assert.ok(par.every((r) => r.status === 200) && new Set(par.map((r) => JSON.stringify(r.data.pack.res))).size === 1, 'parallel: ein Ergebnis');
+  for (let i = 0; i < 58; i++) me = ok(await call('anna', 'POST', '/coll/open', {}), 'öffnen').me;
+  assert.equal(me.packs.length, 0); assert.equal((await call('anna', 'POST', '/coll/open', {})).status, 404, 'kein Pack mehr');
+  const held = Object.values(me.inv).reduce((a, b) => a + b, 0); assert.ok(held >= 60 && me.uniq <= held && me.openedTotal === 60, 'Inventar');
+  for (let i = 0; i < 40; i++) await call('ben', 'POST', '/coll/open', {});
+  // Aktivieren: nur passendes Modell, nur eigenes Flugzeug, ein Exemplar je Flugzeug
+  const { w: wc } = await load(), annaAl = wc.humans.find((h) => h.owner === 'anna' && h.status !== 'insolvent'), ac = annaAl.fleet[0];
+  if (ac) { const fit = SK.SKINS.find((x) => x.type === ac.type_id && me.inv[x.id]), wrong = SK.SKINS.find((x) => x.type !== ac.type_id && me.inv[x.id]);
+    if (wrong) assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'main', acId: ac.id, skinId: wrong.id })).status, 400, 'falsches Modell');
+    assert.equal((await call('ben', 'POST', '/coll/activate', { game: 'main', acId: ac.id, skinId: (fit || SK.SKINS[0]).id })).status >= 400, true, 'fremdes Flugzeug');
+    if (fit) { me = ok(await call('anna', 'POST', '/coll/activate', { game: 'main', acId: ac.id, skinId: fit.id }), 'aktivieren').me; assert.equal(me.active['main|' + ac.id], fit.id);
+      const info = ok(await call('ben', 'GET', '/games/main/info'), 'Info'); assert.equal(info.skins[annaAl.id][ac.id], fit.id, 'andere sehen den Skin');
+      const before = await fleetSig(annaAl.id); me = ok(await call('anna', 'POST', '/coll/activate', { game: 'main', acId: ac.id, skinId: null }), 'abnehmen').me; assert.ok(!me.active['main|' + ac.id]);
+      assert.equal(await fleetSig(annaAl.id), before, 'Spielstand unberührt'); } }
+  // Tausch: beide stimmen zu, atomar, nur einmal
+  const benMe = ok(await call('ben', 'GET', '/coll'), 'Ben').me, gA = Object.keys(me.inv)[0], gB = Object.keys(benMe.inv).find((x) => x !== gA) || Object.keys(benMe.inv)[0];
+  assert.equal((await call('anna', 'POST', '/coll/trade', { to: 'ben', give: ['nix'], want: [] })).status, 400, 'unbekannter Skin');
+  const tr = ok(await call('anna', 'POST', '/coll/trade', { to: 'ben', give: [gA], want: [gB] }), 'Angebot').trade;
+  assert.equal((await call('anna', 'POST', `/coll/trade/${tr.id}/accept`, {})).status, 403, 'eigene Angebote nicht selbst annehmen');
+  assert.equal((await call('cleo', 'POST', `/coll/trade/${tr.id}/accept`, {})).status, 403, 'Dritte nicht');
+  const a0 = me.inv[gA], b0 = benMe.inv[gB], acc = await Promise.all([call('ben', 'POST', `/coll/trade/${tr.id}/accept`, {}), call('ben', 'POST', `/coll/trade/${tr.id}/accept`, {})]);
+  assert.deepStrictEqual(acc.map((r) => r.status).sort(), [200, 409], 'nur einmal übertragen');
+  me = ok(await call('anna', 'GET', '/coll'), 'A').me; const bm = ok(await call('ben', 'GET', '/coll'), 'B').me;
+  assert.equal((me.inv[gA] || 0), a0 - 1 + (gA === gB ? 1 : 0)); assert.equal(bm.inv[gB] || 0, b0 - 1 + (gA === gB ? 1 : 0)); assert.ok(bm.inv[gA] >= 1 && me.inv[gB] >= 1, 'getauscht');
+  const tr2 = ok(await call('anna', 'POST', '/coll/trade', { to: 'ben', give: [gB], want: [] }), 'Angebot 2').trade; ok(await call('anna', 'POST', `/coll/trade/${tr2.id}/cancel`, {}), 'zurückziehen');
+  assert.equal((await call('ben', 'POST', `/coll/trade/${tr2.id}/accept`, {})).status, 409, 'zurückgezogen');
+  // Kaufanfrage: ohne Freischaltung gesperrt; Packs erst nach Freigabe durch einen Admin, genau einmal
+  delete process.env.SHOP_ENABLED; assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'starter', withdrawalConsent: true, ageConfirm: true })).status, 503, 'Shop aus');
+  process.env.SHOP_ENABLED = '1';
+  assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'x', withdrawalConsent: true, ageConfirm: true })).status, 400);
+  const rq = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter', withdrawalConsent: true, ageConfirm: true }), 'Anfrage').request;
+  assert.equal(rq.packs, 10); assert.equal(rq.amount, '5'); assert.equal(rq.currency, 'TOKEN'); assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 0, 'noch keine Packs');
+  assert.equal((await call('cleo', 'POST', `/shop/request/${rq.id}/approve`, {})).status, 403, 'nicht selbst freigeben');
+  const ap = await Promise.all([call('tim', 'POST', `/shop/request/${rq.id}/approve`, {}), call('tim', 'POST', `/shop/request/${rq.id}/approve`, {})]);
+  assert.deepStrictEqual(ap.map((r) => r.status).sort(), [200, 409], 'Freigabe nur einmal'); assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 10, 'genau 10 Packs');
+  const rq2 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'collector', withdrawalConsent: true, ageConfirm: true }), 'Anfrage 2').request;
+  ok(await call('tim', 'POST', `/shop/request/${rq2.id}/decline`, { note: 'kein Geldeingang' }), 'ablehnen'); assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 10, 'abgelehnt: nichts');
+  const rq3 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter', withdrawalConsent: true, ageConfirm: true }), 'Anfrage 3').request; ok(await call('cleo', 'POST', `/shop/request/${rq3.id}/cancel`, {}), 'zurückziehen');
+  assert.equal((await call('tim', 'POST', `/shop/request/${rq3.id}/approve`, {})).status, 409, 'zurückgezogene nicht freigeben');
+  const ad = ok(await call('tim', 'GET', '/coll/admin'), 'Admin'); assert.equal(ad.stats.paidPacks, 10); assert.equal(ad.stats.adminPacks, 100); assert.equal(ad.stats.revenueCents, 500); assert.equal(ad.stats.opened, 100); assert.ok(ad.stats.trades === 1 && ad.grants.length === 2 && ad.grants[0].source === 'admin_grant');
+  console.log(`0.21.52 ok: Aircraft Collection – 280 Skins, Ziehung (${(rar.l / tot * 100).toFixed(2)} % gold), Öffnen einmalig, Aktivieren, Tausch, Kaufanfrage mit Freigabe, Admin`);
 }
 console.log('Alle Prüfungen bestanden.');

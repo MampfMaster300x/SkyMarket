@@ -4,6 +4,7 @@ import { scryptSync, randomBytes, createHmac, timingSafeEqual } from 'node:crypt
 import { gzipSync, gunzipSync } from 'node:zlib';
 import SM from '../shared/engine.cjs';
 import { APP_VERSION } from './version.mjs';
+import { handleCollection, collForGame } from './collection.mjs';
 
 const MAX_PLAYERS = 4;
 // Hauptwelt: eine dauerhafte Welt für alle Angemeldeten, 1 Spieltag = 20 Minuten, Tempo nur durch Admins
@@ -92,7 +93,7 @@ const ADMINS = new Set(String(process.env.ADMIN_USERS ?? 'tim').split(',').map((
 const isAdmin = (user) => !!user && ADMINS.has(user.key);
 
 const K = {
-  user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, presence: (id) => `games/${id}/presence`, chat: (id) => `games/${id}/chat`,
+  user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, view: (id) => `games/${id}/view`, presence: (id) => `games/${id}/presence`, chat: (id) => `games/${id}/chat`,
   code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`, diag: 'diag/client',
 };
 async function updateJson(store, key, fn, init = null, tries = 6) {
@@ -110,7 +111,7 @@ const summary = (meta, extra = {}) => ({ main: !!meta.main, id: meta.id, name: m
   names: meta.players.map((p) => p.airlineName), ...extra });
 async function deleteGame(store, meta) {
   const id = meta.id;
-  await store.delete(K.state(id)); await store.delete(K.meta(id)); await store.delete(K.code(meta.code)); await store.delete(K.presence(id)); await store.delete(K.chat(id));
+  await store.delete(K.state(id)); try { await store.delete(K.view(id)); } catch (e) { /* gab es evtl. nicht */ } await store.delete(K.meta(id)); await store.delete(K.code(meta.code)); await store.delete(K.presence(id)); await store.delete(K.chat(id));
   await updateJson(store, K.index, (list) => (list || []).filter((g) => g.id !== id), []);
   for (const p of meta.players) await updateJson(store, K.user(p.u), (u) => { if (!u) return undefined; u.games = (u.games || []).filter((g) => g !== id); return u; });
 }
@@ -127,6 +128,23 @@ function unpackWorld(buf) {
   let w = SM.deserialize(s);
   // Notfall: sehr große Stände kompakter ablegen
   return w;
+}
+// 0.21.49: Schlanke Ansicht für die Abrufe – ohne Einzelposten der Buchhaltung (Ergebnis nach Herkunft, Finanzbericht).
+// Die braucht nur der Finanz-Reiter der eigenen Airline; er lädt sie bei Bedarf über /ledger nach. Wird je Version einmal gebaut und abgelegt.
+function stripView(o) {
+  for (const a of o.airlines || []) { const L = a.ledger; if (!L) continue; delete L.det; delete L.fx; for (const m of L.months || []) { delete m.det; delete m.fx; } }
+  o.view = 1; return o;
+}
+async function stateView(store, id, etag, buf) {
+  try { const v = await store.getWithMetadata(K.view(id), { type: 'arrayBuffer' }); if (v && v.data && v.metadata && v.metadata.src === etag) return v.data; } catch (e) { /* neu bauen */ }
+  const vb = toArrayBuffer(gzipSync(Buffer.from(JSON.stringify(stripView(JSON.parse(gunzipSync(Buffer.from(buf)).toString()))))));
+  try { await store.set(K.view(id), vb, { metadata: { src: etag } }); } catch (e) { /* nicht kritisch */ }
+  return vb;
+}
+/** Kontext für die Aircraft Collection (server/collection.mjs). */
+function collCtx(store, url, path, method, user) {
+  return { store, url, path, method, user, json, fail, readJson, isAdmin, loadMeta,
+    loadGameView: async (id) => { const r = await mutateState(store, id, null); const vb = await stateView(store, id, r.etag || String(r.md.ver), r.buf); return JSON.parse(gunzipSync(Buffer.from(vb)).toString()); } };
 }
 function packSized(w) {
   let buf = packWorld(w);
@@ -370,6 +388,7 @@ export async function handle(req, { store }) {
       return json(await withPatch(store, u, { name: user.name, key: user.key, admin: isAdmin(user), mustChange: !!(u && u.mustChange) }));
     }
     if (!user) return fail(401, 'Bitte zuerst anmelden.');
+    if (path.startsWith('/coll') || path.startsWith('/shop')) return await handleCollection(req, collCtx(store, url, path, method, user));
     // ---- Fehlerprotokoll der Geräte (Ladeprobleme, Abstürze): höchstens 30 Meldungen je Konto und Stunde, die letzten 400 bleiben ----
     if (path === '/diag' && method === 'POST') {
       const b = await readJson(req), str = (x, n) => (x === null || x === undefined ? null : String(x).slice(0, n));
@@ -653,9 +672,11 @@ export async function handle(req, { store }) {
       if (op === 'info' && method === 'GET') {
         const pres = (await store.get(K.presence(id), { type: 'json' })) || {};
         const now = Date.now(), st = await store.getMetadata(K.state(id));
+        let coll = { skins: {}, badges: {} }; try { coll = await collForGame(store, id, meta.players); } catch (e) { /* Sammlung ist nicht kritisch */ }
         return json({ id, name: meta.name, code: meta.code, invite: meta.invite, max: meta.max, locked: !!meta.pw, startAt: st && waiting(st.metadata, now) ? st.metadata.startAt : null,
           main: !!meta.main, me: { airlineId: me.airlineId, host: canControl(meta, user), admin: isAdmin(user), manage: canManage(meta, user) },
-          players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null })) });
+          players: meta.players.map((p) => ({ name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, host: meta.host === p.u, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null, coll: coll.badges[p.u] || undefined })),
+          skins: coll.skins });
       }
       if (op === 'state' && method === 'GET') {
         if (url.searchParams.get('ping')) {
@@ -667,7 +688,16 @@ export async function handle(req, { store }) {
         const md = r.md, v = url.searchParams.get('v') || '';
         const headers = { 'x-ver': r.etag || String(md.ver), 'x-clock': clockHeader(md, !!meta.main), 'x-chat': String(meta.chatSeq || 0), 'cache-control': 'no-store', 'x-app': APP_VERSION, 'access-control-expose-headers': 'x-ver, x-clock, x-chat, x-app' };
         if (v && v === headers['x-ver']) return new Response(null, { status: 204, headers });
-        return new Response(r.buf, { status: 200, headers: { ...headers, 'content-type': 'application/octet-stream' } });
+        const body = url.searchParams.get('full') ? r.buf : await stateView(store, id, headers['x-ver'], r.buf);
+        return new Response(body, { status: 200, headers: { ...headers, 'content-type': 'application/octet-stream' } });
+      }
+      // 0.21.49: Einzelposten der eigenen Buchhaltung (Finanz-Reiter) – fehlen in der schlanken Ansicht
+      if (op === 'ledger' && method === 'GET') {
+        const r = await mutateState(store, id, null);
+        const o = JSON.parse(gunzipSync(Buffer.from(r.buf)).toString()), a = (o.airlines || []).find((x) => x.id === me.airlineId);
+        if (!a || !a.ledger) return fail(404, 'Ihre Airline wurde im Spielstand nicht gefunden.');
+        const L = a.ledger;
+        return json({ ver: r.etag || String(r.md.ver), det: L.det || null, fx: L.fx || null, months: (L.months || []).map((m) => ({ det: m.det || null, fx: m.fx || null })) });
       }
       // ---- Chat: eigener Speicher, damit der Spielstand klein bleibt; Zähler im Meta für billiges Abfragen ----
       if (op === 'chat' && method === 'GET') {

@@ -183,6 +183,77 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.53: Aircraft Collection ohne Kauf, Pack-Animation nach Konzept
+
+- **Kein Erwerb mehr:** Alle Kauf-, Zahlungs- und Euro-Angaben sind entfernt. Angebote sind in Token ausgezeichnet (10 Packs für 5 Token, 20 Packs für 10 Token). Spieler senden eine Anfrage, die Spielleitung gibt sie frei. Die Bestätigungen zu Widerruf und Alter, die freiwillige Unterstützung und die Rechtslinks entfallen. Hinweistext über `SHOP_REQUEST_INFO`.
+- **Pack-Opening in den zehn Schritten des Konzepts:** abdunkeln, Pack erscheint, schwebt, Lichtlinien, Vibrieren, Lichtstrahl, Öffnen, Partikel und Blitz, Seltenheitsfarbe, Flugzeug. Die Seltenheitsfarbe zeigt sich jetzt erst beim Öffnen. Blau bekommt eine Lichtwelle und einen leuchtenden Rahmen, Lila eine doppelte Energiewelle, Gold Strahlen, längere Dauer, Ton und animierten Rahmen.
+
+## Neu in 0.21.52: Aircraft Collection (Skins sammeln, öffnen, tauschen)
+
+Nur in Online-Spielen, rein kosmetisch. Einrichtung und Betrieb: siehe `ANLEITUNG_AIRCRAFT_COLLECTION.md`.
+
+- **280 Skins:** 28 Modelle × 10 Skins (4 grün, 3 blau, 2 lila, 1 gold). Katalog in `shared/skins.cjs`. Die Lackierungen werden auf die vorhandenen Seitenansichten gezeichnet; eigene PNG-Artworks lassen sich ohne Codeänderung nachliefern.
+- **Aircraft Mystery Pack:** 1 bis 3 Skins (80 / 17 / 3 %), Seltenheit 55 / 27 / 14 / 4 %, Modell gleichverteilt. Gezogen wird auf dem Server mit `crypto.randomInt`, das Ergebnis ist gespeichert, bevor die Animation läuft. Ein Pack lässt sich nur einmal öffnen.
+- **Neuer Bereich „Collection“** mit Collection (Fortschritt, Filter, Karten, Meilensteine), Shop und Trading.
+- **Shop ohne Zahlungsabwicklung:** Spieler stellen eine Kaufanfrage (10 Packs für 5 €, 20 Packs für 10 €). Die Bezahlung regelt die Spielleitung privat. Erst wenn ein Admin die Anfrage freigibt, werden die Packs gutgeschrieben – je Anfrage genau einmal.
+- **Flotte:** „Skin ändern“ je Flugzeug, nur passende Modelle, ein Exemplar je Flugzeug. Der Spielstand bleibt unberührt.
+- **Karte:** Flugzeuge mit Skin in ihrer Lackierfarbe; blau mit Glanz, lila mit Leuchten und Partikeln (nur herangezoomt), gold mit pulsierendem Ring und goldener Route.
+- **Trading:** Angebot senden, annehmen, ablehnen, zurückziehen, Verlauf. Die Übertragung läuft atomar auf dem Server.
+- **Admin:** Menü → „Aircraft Pack Management“: Kaufanfragen freigeben oder ablehnen, kostenlose Packs vergeben, Vergabehistorie, Statistik (bezahlte und kostenlose Packs getrennt).
+- **Meilensteine:** 25 Abzeichen, 75 Profilrahmen, 150 schimmernde Flugspuren, 280 Titel.
+
+## Neu in 0.21.51: Charter-Aufträge auf einen Blick, schnellere Reiter (Leistung, Teil 3)
+
+- **Gebuchte Charter-Aufträge:** Unter Flotte → Charter steht jetzt eine Liste aller gebuchten Aufträge, laufende zuerst, dann nach Beginn. Je Auftrag:
+  - Kunde, Status („läuft · noch X Tage“, „in X Tagen“ oder „ab Datum“) und Großereignis
+  - Art (Passagiere, Privatjet, Fracht), Flugzeug (auch „aus dem Linienbetrieb“) und Einsatzort
+  - Zeitraum, Tage, Tagesrate, Gesamterlös und bei laufenden Aufträgen das bisher Verdiente
+
+  Kopfzeile: Anzahl, laufende, Gesamterlös und davon noch offen. Neue Buchungen merken sich Art und Einsatzort.
+- **Drehkreuze:** Die Suche nach neuen Umsteigerzielen läuft erst nach dem Anzeigen des Reiters („Ziele werden berechnet …“). Die Nachfragetabelle wird im Leerlauf nach dem Start vorbereitet. Auf dem Handy (4× gedrosselt) dauert der erste Wechsel zu den Drehkreuzen jetzt 150 statt 690 ms.
+- **Lange Listen gekürzt:** „Airlines im Markt“ (Wettbewerb) und der Aktienmarkt zeigen zuerst 20 Einträge, dazu „Alle … zeigen“. Die eigene Airline und eigene Beteiligungen bleiben immer sichtbar. Wettbewerb 1.724 → 1.097 Elemente, Börse 1.441 → 556.
+- Messung vorher/nachher (Teststand 57 Airlines, Tag 420, rund 530 Flugzeuge in der Luft; Testbrowser ohne Grafikkarte):
+
+| | 1440 vorher → nachher | Handy 4× vorher → nachher |
+|---|---|---|
+| Karte im Leerlauf (Bilder/s) | 24 → 59 | 29 → 57 |
+| Karte ziehen / zoomen (Bilder/s) | 16 / 17 → 59 / 60 | 18 / 21 → 58 / 55 |
+| längste Blockade bei neuem Stand | 203 → 125 ms | 634 → 335 ms |
+| Spielstand aufbauen je Abruf | 101 → 20 ms | 324 → 55 ms |
+| Größe je Abruf (gepackt) | 1.109 → 898 KB | 1.109 → 898 KB |
+| Klick bis zum Bild | 260–400 → 145–275 ms | 324–637 → 218–500 ms |
+
+## Neu in 0.21.50: Schnellere Abrufe (Leistung, Teil 2)
+
+- **Spielstand schneller aufbauen:** Die Streckenhistorie wird mit festen Objektvorlagen entpackt statt Zeile für Zeile über `Object.fromEntries`. Gleiche Felder, gleiche Reihenfolge, gleiche Werte. Geprüft: Ein großer Stand ist nach dem Laden und nach 15 weiteren Spieltagen bitgleich zu vorher. Aufbauen inklusive JSON lesen: 183 → 64 ms in Node. Im Browser je neuem Stand: Handy (4× gedrosselt) 324 → 70 ms, Desktop 101 → 16 ms. Das hilft auch dem Server bei jeder Aktion und jedem Tageswechsel.
+- **Schlanke Abrufe:** Der Browser bekommt den Spielstand ohne die Einzelposten der Buchhaltung (Ergebnis nach Herkunft, Finanzbericht). Großer Stand: 1.109 → 886 KB gepackt, 4,2 → 3,3 MB entpackt. Die schlanke Ansicht baut der Server je Version einmal und legt sie ab (`games/<id>/view`). Der Finanz-Reiter lädt die eigenen Einzelposten über `/games/<id>/ledger` nach. Bis dahin zeigt er kurz „werden geladen“, danach bei neuen Ständen weiter die zuletzt geladenen, bis die neuen da sind. Mit `?full=1` liefert `/state` den vollständigen Stand.
+- Flughäfen auf der Karte: Die Seitenbreite wird einmal je Zeichnung gelesen statt für jeden Flughafen.
+- Messung Handy (4× gedrosselt), 30 s Leerlauf mit fremden Aktionen alle 4 s: längste Blockade 634 → 341 ms, blockierte Zeit insgesamt 2,7 → 1,2 s; Karte ziehen 58 Bilder/s.
+- Spielverhalten unverändert.
+
+## Neu in 0.21.49: Schnellere Karte (Leistung, Teil 1)
+
+- **Karte in Ebenen:** Flugzeuge und Flugspuren liegen auf einem eigenen Canvas über der Karte. Ihre Bewegung zeichnet Land, Strecken und Flughäfen nicht mehr neu. Vorher wurde das ganze SVG mit rund 1.600 Elementen 15-mal pro Sekunde neu gerastert.
+- **Ziehen und Zoomen:** Während der Geste wird die fertig gezeichnete Karte nur per Grafikkarte verschoben und skaliert. Die Ebene ist rundum ein Viertel größer als der Ausschnitt, damit beim Ziehen fertige Karte nachrückt. Neu gezeichnet wird erst, wenn der Überstand nicht mehr reicht, das Bild zu unscharf würde, oder am Ende der Geste. Die Flughäfen zeichnet die Karte dann im selben Bild mit.
+- Bedienung wie vorher: Flugzeuge anklicken oder antippen (Treffer über das Canvas), Mauszeiger als Hand über Flugzeugen, Mitspielende in ihrer Farbe, eigene Flugzeuge mit Leuchtring. Weit herausgezoomt werden Konkurrenzflugzeuge ohne Kontur gezeichnet.
+- **Abruf läuft gleich nach dem Betreten:** Der Browser fragt jetzt sofort regelmäßig beim Server nach. Vorher begann das erst mit der ersten eigenen Aktion; wer nur zuschaute, sah die Welt nicht weiterlaufen.
+- Messung (Teststand mit 57 Airlines, Tag 420, 537 Flugzeuge in der Luft; Testbrowser ohne Grafikkarte): Karte im Leerlauf 24 → 59 Bilder/s (1440 px), Handy mit 4× gedrosselter CPU beim Ziehen 18 → 46 Bilder/s, Klick bis zum Bild am Desktop 260–400 → 100–240 ms.
+- Spielverhalten und Engine sind unverändert.
+
+## Neu in 0.21.48: KI-Vertretung baut langsam aus
+
+- **Erstes Flugzeug:** Hat eine vertretene Airline keine Flugzeuge, least die KI ein Schmalrumpfflugzeug (A320neo, sonst 737 MAX 8, A320, 737-800, A220 …) an der ersten Basis und setzt es nach der Lieferung auf die beste Strecke.
+- **Strecken ohne Flugzeug:** Fehlt für eine Strecke das passende Muster an der Basis, least die KI genau dieses Muster.
+- **Ausbau:** Höchstens ein Leasingflugzeug im Monat, ab 8 Flugzeugen alle zwei Monate. Bedingungen: Das Streckennetz verdient Geld (DB2 über 30 Tage positiv, höchstens ein Drittel der Strecken mit negativem DB1), ab 3 Flugzeugen schrumpft das Eigenkapital nicht, kein Flugzeug steht frei oder ist noch in Lieferung, und nach dem Leasing bleiben mindestens 3 Mio. € × Preisniveau frei verfügbar. Das Muster richtet sich nach der am besten ausgelasteten profitablen Strecke.
+- **Frequenz:** Ein freies Flugzeug geht zuerst an eine volle Strecke desselben Musters und derselben Basis (über 92 % Auslastung in 30 Tagen, positiver DB2, bis 6x täglich) – sie bekommt einen Flug mehr. Sonst plant die KI eine neue Strecke. Freie Flugzeuge setzt sie jetzt wöchentlich ein statt monatlich.
+- **Slots:** Ohne freien Slot an der Basis trägt sich die KI auf die Warteliste ein (je Basis einmal) – für freie Flugzeuge oder für den weiteren Ausbau, wenn das Netz Geld verdient. Neue Strecken plant sie nur noch dorthin, wo an beiden Enden Slots frei sind.
+- **Neue Strecken übers Jahr bewertet:** Die KI prüft jedes Ziel für vier Jahreszeiten und nimmt nur Strecken, die im Schnitt mindestens 5 % Marge bringen und in keiner Jahreszeit mehr als 10 % verlieren. Vorher wählte sie im Sommer reine Saisonziele.
+- **Sperren und Krisen:** Strecken unter Flugverbot, Landeverbot oder mit gesperrtem Luftraum oder Flughafen stellt die KI ein, wenn die Sperre noch mindestens 10 Tage dauert. Vorher fiel jeder Flug aus, und die Betreuung der Fluggäste kostete im Test bis zu 4,8 Mio. € im Quartal. Krisenvorschläge übernimmt sie wöchentlich (Preisautomatik, Frequenz anteilig runter) und nimmt sie nach der Krise zurück.
+- **Strecken schließen** nur noch, wenn auch die letzten 60 Tage negativ waren und höchstens 20 % der Flüge ausfielen. Werftzeiten, Streiks oder Sperren führen nicht mehr zur Schließung einer guten Strecke.
+- Test über 18 Monate mit leeren Airlines (16 Mio. € Startkapital): Hamburg 14,7 Mio. € Eigenkapital und 5 Flugzeuge, München 18,4 Mio. € und 5, Barcelona 22,8 Mio. € und 3, Seoul 55,4 Mio. € und 9.
+- Weiterhin kein Kauf, keine Basen, keine Kredite, keine Aktiengeschäfte. Alles steht im Logbuch unter „Vertretung (KI)“.
+- Kleinigkeit: „1 Person eingestellt“ statt „1 Personen“.
+
 ## Neu in 0.21.47: KI-Vertretung durch die Spielleitung, stimmige Streckenhinweise
 
 - **Spielleitung kann die KI-Vertretung starten:** In der Verwaltung gibt es je Airline „KI vertreten lassen“. Die KI führt die Airline dann wie bei der automatischen Vertretung (Preisautomatik, Personal, Entscheidungen, freie Flugzeuge) – so lange, bis die Person wieder spielt (Spielzeit nach der Anordnung, eine eigene Aktion oder „Selbst steuern“). Die stündliche 72-Stunden-Prüfung schaltet eine angeordnete Vertretung nicht vorzeitig ab. „KI-Vertretung beenden“ hebt sie von Hand auf. Die Liste zeigt, wer vertreten wird und ob die Leitung das angeordnet hat; die Airline bekommt eine Meldung im Logbuch.

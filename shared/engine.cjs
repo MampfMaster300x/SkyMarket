@@ -400,7 +400,7 @@ const SM = (() => {
     // 0.21.22: höchstens vier Basen je Airline von Spielenden (bestehende bleiben)
     BASE_MAX: 4,
     /** 0.21.39: KI-Vertretung: nach 72 Stunden ohne eigene Steuerung (Aktion oder aktive Sitzung) führt die KI die Airline auf mittlerem Niveau weiter. */
-    AUTOPILOT: { hours: 72, targetLf: 0.85, closeAfter: 45, minMargin: 0.05, sigma: 0.25, reserve: 3e6 },
+    AUTOPILOT: { hours: 72, targetLf: 0.85, closeAfter: 45, minMargin: 0.05, sigma: 0.25, reserve: 3e6, growEvery: 30, growSlowFrom: 8, fullLf: 0.92, maxFreq: 6 },   // 0.21.48: langsamer Ausbau (1 Leasing je Monat, ab 8 Flugzeugen alle 2 Monate)
     /** Basen (0.21.33): höchstens 2 neue je Kalenderjahr; ab der 5. Basis (nur nach Komplettübernahme möglich) nur 2 Basis-Slots und eine Konzessionsabgabe von 100 Mio. € × 1,5 je weitere Basis (× Preisniveau). */
     BASE_RULE: { perYear: 2, extraFrom: 5, extraSlots: 2, extraFee: 100e6, extraX: 1.5 },
     // 0.21.32: Ungenutzte Slots (Reserve) gehen nach 6 Monaten an den Flughafen zurück – Erstattung wie bei „Reserve zurückgeben“ (Slotpreis × 0,5); Warnung 30 Tage vorher
@@ -4774,7 +4774,7 @@ const SM = (() => {
       if (clash) return { ok: false, msg: `${a.id} ist vom ${dayDE(clash.start)} bis ${dayDE(clash.end)} schon an ${clash.client} verchartert – der Zeitraum überschneidet sich.`, clash: { start: clash.start, end: clash.end, client: clash.client } };
       if (a.delivery_day > o.start) return { ok: false, msg: 'Das Flugzeug ist bis dahin noch nicht geliefert.' };
       if (o.start < this.day) return { ok: false, msg: 'Der Auftrag hat schon begonnen.' };
-      const rate = acmiRateFor(o, a.type_id), bk = { start: o.start, end: o.end, rate, client: o.client, ev: o.ev ? true : undefined };
+      const rate = acmiRateFor(o, a.type_id), bk = { start: o.start, end: o.end, rate, client: o.client, ev: o.ev ? true : undefined, kind: o.kind || undefined, apt: o.apt || undefined };   // 0.21.50: Art und Einsatzort für die Auftragsliste
       // Mehrere Aufträge je Flugzeug: a.acmi ist immer der laufende oder nächste, weitere warten in a.acmiQ
       const all = [...acmiList(a, this.day), bk].sort((x, y) => x.start - y.start);
       a.acmi = all[0]; if (all.length > 1) a.acmiQ = all.slice(1); else delete a.acmiQ;
@@ -5086,37 +5086,118 @@ const SM = (() => {
       const [ch, lab] = AUTO_CHOICE[d.type]; if (act({ type: 'decide', id: d.id, choice: ch }).ok) note(`${String(d.text || d.type).split(':')[0]} – entschieden: ${lab}.`);
     }
     const off = hashStr(al.id) % 30;
+    // 0.21.48: Gesperrte Strecken (Flugverbot, Landeverbot, Luftraum oder Flughafen zu) für länger als 10 Tage einstellen – sonst fällt jeder Flug aus und die Gäste müssen betreut und entschädigt werden
+    for (const r of al.activeRoutes()) {
+      if (r.opened_day > day) continue;
+      const oO = w.opsAt(r.base), oD = w.opsAt(r.dest), e = oO.hard || oD.hard || w.routeBan(al, r.base, r.dest);
+      if (e && e.end - day >= 10 && act({ type: 'closeRoute', id: r.id }).ok) note(`${r.base}–${r.dest} eingestellt – ${String(e.short || e.text || 'Sperre').replace(/^Angekündigt: /, '').split(':')[0].trim()} bis ${dayDate(e.end)}. Jeder Flug wäre ausgefallen, die Fluggäste hätten betreut und entschädigt werden müssen.`, 'warn');
+    }
     if ((day + off) % 7 === 0) {
+      // 0.21.48: Krisenvorschläge übernehmen (Preisautomatik, Frequenz anteilig runter) und nach der Krise zurücknehmen
+      for (const e of w.events) if (!e.cancelled && e.start <= day && e.end > day && !(al.crisisDone && al.crisisDone[e.id]) && w.crisisPlan(al, e).length) { const r = act({ type: 'crisisAdjust', event: e.id }); if (r.ok) note(r.msg); }
+      if (al.activeRoutes().some((r) => r.crisis && r.crisis.end <= day)) for (const r of al.activeRoutes().filter((x) => x.crisis && x.crisis.end <= day)) { const res = act({ type: 'crisisRestore', id: r.id }); if (res.ok) note(res.msg); }
       let n = 0; for (const r of al.activeRoutes()) if (!(r.ap > 0) && act({ type: 'autoPrice', id: r.id, on: true, lf: A.targetLf }).ok) n++;
       if (n) note(`Preisautomatik auf ${n} Strecke${n > 1 ? 'n' : ''} eingeschaltet (Ziel ${Math.round(A.targetLf * 100)} % Auslastung).`);
       const fs = act({ type: 'fillStaff' }); if (fs.ok && fs.n) note(fs.msg);
+      if (!autopilotMoreFreq(w, al, note)) autopilotNewRoute(w, al, note);   // 0.21.48: freie Flugzeuge wöchentlich einsetzen – zuerst auf volle Strecken
     }
     if ((day + off) % 30 === 0) {
       for (const r of al.activeRoutes()) {
         if (day - r.opened_day < A.closeAfter || r.hist.length < 30) continue;
         const h = r.hist.slice(-30), db1 = h.reduce((x, y) => x + (y.rev || 0) - (y.cost || 0), 0);
-        if (db1 < 0 && act({ type: 'closeRoute', id: r.id }).ok) note(`${r.base}–${r.dest} eingestellt – deckte seit 30 Tagen nicht einmal die direkten Kosten (${Math.round(db1 / 30)} EUR pro Tag).`, 'warn');
+        // 0.21.48: nicht wegen Ausfällen (Werft, Streik, Sperre) schließen – nur wenn auch die 60 Tage negativ sind und die Flüge größtenteils stattfanden
+        const fl = h.reduce((x, y) => x + (y.flights || 0), 0), cx = h.reduce((x, y) => x + (y.cancelled || 0), 0), db60 = r.hist.slice(-60).reduce((x, y) => x + (y.rev || 0) - (y.cost || 0), 0);
+        if (fl > 0 && cx / fl > 0.2) continue;
+        if (db1 < 0 && db60 < 0 && act({ type: 'closeRoute', id: r.id }).ok) note(`${r.base}–${r.dest} eingestellt – deckte seit 30 Tagen nicht einmal die direkten Kosten (${Math.round(db1 / 30)} EUR pro Tag).`, 'warn');
       }
-      if (autopilotNewRoute(w, al, note)) autopilotNewRoute(w, al, note);   // höchstens zwei neue Strecken je Monat
+      autopilotGrow(w, al, note);
     }
+  }
+  /** 30-Tage-Kennzahlen einer Strecke für die Vertretung (Auslastung der geflogenen Flüge, DB1, DB2 nach anteiliger Flugzeugzeit). */
+  function autoRouteStats(al, r) {
+    const h = r.hist.slice(-30); let pax = 0, seats = 0, db1 = 0;
+    for (const x of h) { pax += x.pax || 0; seats += opSeats(x, 'out') + opSeats(x, 'in'); db1 += (x.rev || 0) - (x.cost || 0); }
+    const db2 = db1 - aircraftDayFixedGeneric(r.type_id) * acShareOf(r.type_id, al.rotH(r), r.freq) * h.length;
+    return { n: h.length, lf: seats ? pax / seats : 0, db1, db2 };
+  }
+  const autoIdle = (w, al) => al.fleet.filter((a) => a.delivery_day <= w.day && !(a.assigned || []).length && (a.status === 'ok' || !a.status) && !(a.acmi && a.acmi.end > w.day) && al.bases.includes(a.base));
+  /** 0.21.48: Ein freies Flugzeug zuerst für eine volle, profitable Strecke desselben Musters an derselben Basis nutzen (+1 Flug täglich). */
+  function autopilotMoreFreq(w, al, note) {
+    const A = P.AUTOPILOT, day = w.day, idle = autoIdle(w, al); if (!idle.length) return false;
+    const cand = al.activeRoutes().filter((r) => !r.partial && !(r.wk && r.wk < 7) && r.freq < A.maxFreq && day - r.opened_day >= A.closeAfter && idle.some((a) => a.type_id === r.type_id && a.base === r.base))
+      .map((r) => [r, autoRouteStats(al, r)]).filter(([, st]) => st.n >= 21 && st.lf >= A.fullLf && st.db2 > 0).sort((x, y) => y[1].lf - x[1].lf);
+    for (const [r, st] of cand) {
+      if (!w.slotsOkFor(al, r.base, r.dest, 1) || w.slotCost(al, r.base, r.dest, 1).cost > Math.max(0, al.spendable(w.macro.bank ?? 1) - A.reserve * w.macro.cpi)) continue;
+      const was = r.freq, ap = r.ap, res = applyAction(w, al.id, { type: 'editRoute', id: r.id, freq: was + 1 });
+      if (!res.ok || r.freq !== was + 1) continue;
+      if (ap > 0 && !(r.ap > 0)) applyAction(w, al.id, { type: 'autoPrice', id: r.id, on: true, lf: A.targetLf });
+      note(`${r.base}–${r.dest} auf ${r.freq}x täglich erhöht – die Flüge waren zu ${Math.round(st.lf * 100)} % ausgelastet und verdienen Geld.`, 'good');
+      return true;
+    }
+    return false;
+  }
+  const AUTO_STARTER = ['A20N', 'B38M', 'A320', 'B738', 'BCS3', 'E295', 'AT76', 'DH8D'];
+  /** 0.21.48: Langsamer Ausbau – höchstens ein Leasingflugzeug je Monat (ab 8 Flugzeugen alle zwei Monate), nur wenn das Netz trägt, nichts frei herumsteht und genug Reserve bleibt. */
+  function autopilotGrow(w, al, note) {
+    const A = P.AUTOPILOT, day = w.day, cpi = w.macro.cpi, eq = balanceSheet(al).equity, prevEq = al.autoEq;
+    al.autoEq = Math.round(eq);   // Eigenkapital beim letzten Monatsblick: wer schrumpft, baut nicht aus
+    if (al.status === 'insolvent' || (al.autoGrow && day - al.autoGrow < (al.fleet.length >= A.growSlowFrom ? 2 : 1) * A.growEvery - 2)) return false;
+    if (al.fleet.some((a) => a.delivery_day > day) || autoIdle(w, al).length) return false;   // eins nach dem anderen
+    if (eq <= 0) return false;
+    const routes = al.activeRoutes();
+    let pick = null, why = '';
+    const orphan = routes.find((r) => !al.fleet.some((a) => a.type_id === r.type_id && a.base === r.base));
+    if (orphan) { pick = { type: orphan.type_id, base: orphan.base }; why = `für die Strecke ${orphan.base}–${orphan.dest}, die bisher kein Flugzeug hatte`; }
+    else if (!al.bases.some((b) => w.slotsFreeFor(al, b) >= 1)) {   // ohne freie Slots kein weiteres Flugzeug – aber auf die Warteliste, wenn das Netz trägt
+      const b = al.bases[0], st = routes.map((r) => autoRouteStats(al, r)).filter((x) => x.n >= 21);
+      if (apx(b).slots !== null && st.length && st.reduce((x, y) => x + y.db2, 0) > 0 && !(w.slotWait || []).some((e) => e.al === al.id && e.apt === b)) { const r = w.joinWait(al, b, 2); if (r.ok) note(`Für den weiteren Ausbau fehlen Slots in ${b} – Warteliste für 2 Slots (Platz ${r.pos}).`, 'info'); }
+      return false;
+    }
+    else if (!al.fleet.length) { pick = { type: null, base: al.bases[0] }; why = 'als erstes Flugzeug der Airline'; }
+    else {
+      const st = routes.filter((r) => day - r.opened_day >= A.closeAfter && r.hist.length >= 21).map((r) => [r, autoRouteStats(al, r)]);
+      if (!st.length) return false;
+      const db2 = st.reduce((x, [, y]) => x + y.db2, 0), weak = st.filter(([, y]) => y.db1 < 0).length;
+      if (db2 <= 0 || weak > st.length / 3) return false;   // Netz trägt sich noch nicht
+      if (al.fleet.length >= 3 && prevEq !== undefined && eq < prevEq * 0.98) return false;   // Airline verliert insgesamt Geld (Gemeinkosten, Zinsen …)
+      const best = st.filter(([, y]) => y.db2 > 0).sort((x, y) => y[1].lf - x[1].lf)[0];
+      if (!best) return false;
+      const bb = w.slotsFreeFor(al, best[0].base) >= 1 ? best[0].base : al.bases.find((b) => w.slotsFreeFor(al, b) >= 1);
+      pick = { type: best[0].type_id, base: bb }; why = `weil das Netz Geld verdient (${Math.round(db2 / 30)} EUR DB2 pro Tag)`;
+    }
+    const types = [...new Set([pick.type, ...al.fleet.filter((a) => a.base === pick.base).map((a) => a.type_id), ...AUTO_STARTER].filter((t) => t && P.AIRCRAFT_TYPES[t] && !['cargo', 'biz'].includes(P.AIRCRAFT_TYPES[t].role)))];
+    for (const t of types) {
+      if (al.spendable(w.macro.bank ?? 1) < A.reserve * cpi + acquireCost(al, t, 'lease', null, w.macro.eurusd, w)) continue;
+      const r = applyAction(w, al.id, { type: 'acquire', typeId: t, mode: 'lease', base: pick.base });
+      if (r.ok) { al.autoGrow = day; note(`${P.AIRCRAFT_TYPES[t].label} für ${pick.base} geleast ${why} – Lieferung in ${Math.max(0, r.delivery - day)} Tagen.`, 'good'); return true; }
+    }
+    return false;
   }
   function autopilotNewRoute(w, al, note) {
     const A = P.AUTOPILOT, day = w.day, cpi = w.macro.cpi;
     if (al.spendable(w.macro.bank ?? 1) < A.reserve * cpi) return;
-    const idle = al.fleet.filter((a) => a.delivery_day <= day && !(a.assigned || []).length && (a.status === 'ok' || !a.status) && !(a.acmi && a.acmi.end > day) && al.bases.includes(a.base));
+    const idle = autoIdle(w, al);
     if (!idle.length) return;
-    const a = idle[0], base = a.base, t = a.type_id, rng = new Rng(hashStr(`${w.seed}|auto|${al.id}|${day}`));
+    // 0.21.48: Ohne freien Slot an der Basis auf die Warteliste (einmal je Basis), statt das Flugzeug wochenlang stehen zu lassen
+    for (const b of [...new Set(idle.map((x) => x.base))]) if (w.slotsFreeFor(al, b) < 1 && apx(b).slots !== null && !(w.slotWait || []).some((e) => e.al === al.id && e.apt === b)) {
+      const n = idle.filter((x) => x.base === b).length * 2, r = w.joinWait(al, b, n);
+      if (r.ok) note(`In ${b} sind keine Slots frei – Warteliste für ${n} Slots, damit die freien Flugzeuge fliegen können (Platz ${r.pos}).`, 'info');
+    }
+    const usable = idle.filter((x) => w.slotsFreeFor(al, x.base) >= 1); if (!usable.length) return;
+    const a = usable[0], base = a.base, t = a.type_id, rng = new Rng(hashStr(`${w.seed}|auto|${al.id}|${day}`));
     const cfg = { ...P.AI_ARCHETYPES.regional, service: 'standard', buffer: 'normal', price_vs_ref: 1.0, undercut: 0.03 };
     const served = new Set(al.activeRoutes().flatMap((r) => [r.base + r.dest, r.dest + r.base]));
-    const cands = AP_CODES.filter((d) => d !== base && !served.has(base + d) && routeKmOk(base, d) && rangeOk(base, d, t) && !w.routeBan(al, base, d) && !w.opsAt(d).hard)
+    const cands = AP_CODES.filter((d) => d !== base && !served.has(base + d) && routeKmOk(base, d) && rangeOk(base, d, t) && !w.routeBan(al, base, d) && !w.opsAt(d).hard && w.slotsOkFor(al, base, d, 1))
       .sort((x, y) => potSum(base, y) - potSum(base, x)).slice(0, 14);
     const scored = [];
     for (const d of cands) {
       const co = w.competitorOffers(al.id, base, d), ci = w.competitorOffers(al.id, d, base);
       const spec = { airline: al.id, base, dest: d, type_id: t, freq: 1, fare_out: aiRulePrice(base, d, cfg, co.map((c) => c.fare), cpi), fare_in: aiRulePrice(d, base, cfg, ci.map((c) => c.fare), cpi), service: 'standard', buffer: 'normal', cab: cabClone(al.cabinCfg()) };
-      const res = evaluateRoute(spec, co, ci, { nDraws: 2, seed: day, fuelPrice: w.fuelPrice, demandScale: Math.exp(rng.gauss(0, A.sigma)), cpi,
-        segScale: { out: w.segScale(base, d), in: w.segScale(d, base) }, offerExtra: { out: w.offerExtra(al, base, d), in: w.offerExtra(al, d, base) } });
-      if (res.margin >= A.minMargin && res.db2 > 0) scored.push([res.db2, spec]);
+      // 0.21.48: übers Jahr bewerten (vier Jahreszeiten) – sonst wählt die Vertretung im Sommer reine Saisonstrecken, die im Winter Geld verbrennen
+      const ds = Math.exp(rng.gauss(0, A.sigma)), m0 = monthOf(day), rs = [0, 3, 6, 9].map((k) => evaluateRoute(spec, co, ci, { month: (m0 + k) % 12, nDraws: 2, seed: day, fuelPrice: w.fuelPrice, demandScale: ds, cpi,
+        segScale: { out: w.segScale(base, d), in: w.segScale(d, base) }, offerExtra: { out: w.offerExtra(al, base, d), in: w.offerExtra(al, d, base) } }));
+      const db2 = rs.reduce((x, y) => x + y.db2, 0) / 4, mg = rs.reduce((x, y) => x + y.margin, 0) / 4, worst = Math.min(...rs.map((y) => y.margin));
+      if (mg >= A.minMargin && db2 > 0 && worst > -0.1) scored.push([db2, spec]);
     }
     for (const [db2, spec] of scored.sort((x, y) => y[0] - x[0]).slice(0, 3)) {
       const r = applyAction(w, al.id, { type: 'openRoute', base, dest: spec.dest, typeId: t, freq: 1, fo: Math.round(spec.fare_out), fi: Math.round(spec.fare_in), service: 'standard', buffer: 'normal' });
@@ -7520,7 +7601,7 @@ const SM = (() => {
           const k = Math.min(want, P.STAFF.maxHire[r.role]), res = w.hire(al, r.role, r.group, k, start);
           if (res.ok) n += k; else msgs.push(res.msg);
         }
-        return { ok: true, n, msg: n ? `${n} Personen eingestellt.${msgs.length ? ' ' + msgs[0] : ''}` : (msgs[0] || 'Der Bedarf ist gedeckt.') };
+        return { ok: true, n, msg: n ? `${n} ${n === 1 ? 'Person' : 'Personen'} eingestellt.${msgs.length ? ' ' + msgs[0] : ''}` : (msgs[0] || 'Der Bedarf ist gedeckt.') };
       }
       case 'train': if (!STAFF_GROUPS.includes(a.from) || !STAFF_GROUPS.includes(a.to)) return { ok: false, msg: 'Ungültige Musterberechtigung.' }; return w.train(al, a.from, a.to, Math.floor(num(a.count)));
       case 'pay': {
@@ -7766,6 +7847,11 @@ const SM = (() => {
     return t;
   }
   const AI_HIST_KEYS = ['seats', 'pax', 'rev', 'cost', 'pax_out', 'pax_in', 'seats_out', 'seats_in'];
+  // 0.21.49: Historie schnell entpacken – feste Objektliterale statt Object.fromEntries je Zeile (gleiche Schlüssel, gleiche Reihenfolge, gleiche Werte).
+  // Bei neuen Spalten (HIST_KEYS hinten erweitert) greift automatisch wieder der allgemeine Weg, bis die Literale nachgezogen sind.
+  function histRowStd(a) { return { flights: a[0] ?? 0, seats: a[1] ?? 0, cancelled: a[2] ?? 0, cost: a[3] ?? 0, block_h: a[4] ?? 0, pax: a[5] ?? 0, rev: a[6] ?? 0, pax_out: a[7] ?? 0, pax_in: a[8] ?? 0, seats_out: a[9] ?? 0, seats_in: a[10] ?? 0, late: a[11] ?? 0, demand_out: a[12] ?? 0, demand_in: a[13] ?? 0, spill_out: a[14] ?? 0, spill_in: a[15] ?? 0, tr_out: a[16] ?? 0, tr_in: a[17] ?? 0, cargo: a[18] ?? 0, prem: a[19] ?? 0, d: a[20] ?? 0, trd: a[21] ?? 0, ps: a[22] ?? 0, so_out: a[23] ?? 0, so_in: a[24] ?? 0, trr: a[25] ?? 0 }; }
+  function histRowAi(a) { return { flights: 0, seats: a[0] ?? 0, cancelled: 0, cost: a[3] ?? 0, block_h: 0, pax: a[1] ?? 0, rev: a[2] ?? 0, pax_out: a[4] ?? 0, pax_in: a[5] ?? 0, seats_out: a[6] ?? 0, seats_in: a[7] ?? 0, late: 0, demand_out: 0, demand_in: 0, spill_out: 0, spill_in: 0, tr_out: 0, tr_in: 0, cargo: 0, prem: 0, d: 0, trd: 0, ps: 0, so_out: 0, so_in: 0, trr: 0 }; }
+  const HIST_FAST = (() => { const k1 = Object.keys(histRowStd([])), k2 = Object.keys(histRowAi([])); return k1.join() === HIST_KEYS.join() && k2.join() === HIST_KEYS.join() && AI_HIST_KEYS.every((k, i) => histRowAi(AI_HIST_KEYS.map((_, j) => j + 1))[k] === i + 1); })();
   const r1 = (x) => Math.round(x * 10) / 10;
   function serialize(w, opt = {}) {
     const aiH = opt.compact ? -8 : -30, plH = opt.compact ? -30 : -60;
@@ -7789,7 +7875,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, autoGrow: al.autoGrow || undefined, autoEq: al.autoEq ?? undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -7814,8 +7900,9 @@ const SM = (() => {
       al.runway = runway === null ? Infinity : runway;
       al.rngForecast.s = rngF;
       Object.assign(al.ledger, ledger);
-      if (al.isPlayer && !al.ledger.det) al.ledger.det = { m: {}, p: {} };   // 0.21.11: Einzelposten ab jetzt
-      if (al.isPlayer && !(ledger && ledger.fx)) al.ledger.startFx(s.day);   // 0.21.14: Finanzbericht ab jetzt (Stände von heute als Anfang)
+      if (s.view && al.isPlayer) { if (!(ledger && ledger.det)) al.ledger.det = null; if (!(ledger && ledger.fx)) al.ledger.fx = null; }   // 0.21.49: schlanke Ansicht – Einzelposten kommen nachgeladen
+      if (al.isPlayer && !al.ledger.det && !s.view) al.ledger.det = { m: {}, p: {} };   // 0.21.11: Einzelposten ab jetzt (0.21.49: nicht in der schlanken Ansicht, dort werden sie nachgeladen)
+      if (al.isPlayer && !(ledger && ledger.fx) && !s.view) al.ledger.startFx(s.day);   // 0.21.14: Finanzbericht ab jetzt (Stände von heute als Anfang)
       if (!al.isPlayer) al.ledger.fx = null;
       al._day = s.day;
       if (!al.poachLog) delete al.poachLog;
@@ -7833,7 +7920,7 @@ const SM = (() => {
         const { hist, hk, ...rr } = r;
         const rt = new Route({ ...rr, hist: [] });
         if (!a.archetype) rt.autoPrice = false;
-        rt.hist = hist.map((arr) => {
+        rt.hist = HIST_FAST && (keys || s.hv >= 2) ? hist.map(keys ? histRowAi : histRowStd) : hist.map((arr) => {
           const ks = keys || (s.hv >= 2 ? HIST_KEYS : arr.length <= HIST_KEYS_OLD.length ? HIST_KEYS_OLD : HIST_KEYS_BROKEN);
           const o = Object.fromEntries(HIST_KEYS.map((k) => [k, 0])); ks.forEach((k, i) => { o[k] = arr[i] ?? 0; });
           if (!keys && ks === HIST_KEYS_OLD) { delete o.so_out; delete o.so_in; }   // alte Einträge kennen keine geflogenen Sitze
