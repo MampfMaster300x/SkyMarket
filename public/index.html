@@ -6,7 +6,7 @@
 <meta name="description" content="SKYMARKET – Airline-Wirtschaftssimulation: Hauptwelt für alle und private Runden">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b400'/%3E%3Cpath d='M26 16 L20 14.5 L13 6 L10.5 6 L14 14.5 L8 14.5 L6 11.5 L4.5 11.5 L5.5 16 L4.5 20.5 L6 20.5 L8 17.5 L14 17.5 L10.5 26 L13 26 L20 17.5 L26 16Z' fill='%231a1400'/%3E%3C/svg%3E">
 <style>[hidden]{display:none!important}</style>
-<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.53";</script>
+<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.54";</script>
 <title>Skymarket</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -155,7 +155,9 @@ main.body { display: grid; grid-template-columns: 300px minmax(0, 1fr) var(--rw,
 .resizer:hover::after, .resizer.drag::after, .resizer:focus-visible::after { opacity: 1; background: var(--accent); }
 body.resizing { cursor: col-resize; user-select: none; }
 body.resizing #map { pointer-events: none; }
-@container (max-width: 600px) { nav.main button span.lbl { display: none; } nav.main button[aria-selected="true"] span.lbl { display: inline; } }
+/* Passen nicht alle Bereiche mit Beschriftung in die Leiste, zeigt sie nur noch die Symbole – alle bleiben sichtbar (Klasse setzt fitNav) */
+nav.main.ico button span.lbl, nav.main.ico button[aria-selected="true"] span.lbl { display: none; }
+nav.main.ico button { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 .card2 { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
 #sidebar { display: grid; gap: 12px; align-content: start; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
 .alcard { padding: 14px; display: flex; gap: 12px; align-items: center; }
@@ -10263,12 +10265,12 @@ function renderPlanes() {
     const [i, f] = hit, line = s.lines[i];
     const [mx, my, ang] = lineAt(line, f);
     const x0 = wrapX(mx);
-    if (s.me || sel) { const sk0 = ui.mp && s.me ? skinFor(s.al, s.ac.id) : null; trails.push([line, f, sel, sk0 && sk0.rarity === 'l' ? 'gold' : null]); }
+    if (s.me || sel) { const sk0 = collOn() && s.me ? skinFor(s.al, s.ac.id) : null; trails.push([line, f, sel, sk0 && sk0.rarity === 'l' ? 'gold' : null]); }
     for (const dx of [0, -MAP.W, MAP.W]) {
       const [x, y] = toScreen(x0 + dx, my);
       if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
       const hu = !s.me && !s.al.archetype;
-      const sk = ui.mp ? skinMapStyle(skinFor(s.al, s.ac.id)) : null;
+      const sk = collOn() ? skinMapStyle(skinFor(s.al, s.ac.id)) : null;
       const p = { x, y, a: ang, sc: (sel ? 1.35 : s.me || hu || sk ? 1.0 : 0.78) * sc0, me: s.me, sel, icon: s.icon, ac: s.ac.id, fill: hu ? cvColor(colorOf(s.al)) : null, sk };
       if (sk && sk.fx === 'l' && !s.me && !sel && k >= 0.8) trails.push([line, f, false, 'gold']);
       if (sel) selPlane = p; else planes.push(p);
@@ -10278,7 +10280,7 @@ function renderPlanes() {
   }
   // Spuren (eigene und ausgewählte Flüge), in Bildschirmpunkten wie vorher mit non-scaling-stroke
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  const msTrail = ui.mp && hasMs('trail');   // Meilenstein 150: schimmernde Spuren
+  const msTrail = collOn() && hasMs('trail');   // Meilenstein 150: schimmernde Spuren
   let msGrad = null; if (msTrail) { msGrad = ctx.createLinearGradient(0, 0, view.w, view.h); msGrad.addColorStop(0, '#22d3ee'); msGrad.addColorStop(1, '#a855f7'); }
   for (const [line, f, sel, gold] of trails) {
     ctx.beginPath(); trailPath(ctx, line, f);
@@ -10429,7 +10431,7 @@ const SECTIONS = [
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung'], ['plans', 'Pläne'], ['hubs', 'Drehkreuze'], ['slots', 'Slots']] },
   { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['rescue', 'Sanierung'], ['cfo', 'CFO-Beratung']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['exchange', 'Börse'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
-  { key: 'sammlung', label: 'Collection', short: 'Sammlung', sub: 'Skins sammeln, öffnen, tauschen', icon: 'gem', mp: true, tabs: [['collection', 'Collection', 'mp'], ['shop', 'Shop', 'mp'], ['trading', 'Trading', 'mp']] },
+  { key: 'sammlung', label: 'Collection', short: 'Sammlung', sub: 'Skins sammeln, öffnen, tauschen', icon: 'gem', mp: true, tabs: [['collection', 'Collection'], ['shop', 'Shop'], ['trading', 'Trading']] },
   { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Ansehen & Ziele'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
 ];
 const TAB_ALIAS = { fleet: 'fleetOwn' };
@@ -10448,8 +10450,19 @@ function tabDots() {
 }
 function renderNav() {
   const dots = tabDots(), cur = sectionOf(ui.tab);
-  setHtml($('#nav'), SECTIONS.filter((s) => !s.mp || ui.mp).map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" title="${s.label}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span><span class="lbs">${s.short || s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join(''));
+  setHtml($('#nav'), SECTIONS.filter((s) => !s.mp || (s.key === 'sammlung' ? collOn() : ui.mp)).map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" title="${s.label}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span><span class="lbs">${s.short || s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join(''));
   const bell = $('#bell .dot'); if (bell) bell.hidden = !dots.news;
+  fitNav();
+}
+/** Bereichsleiste: Beschriftungen ausblenden, sobald nicht alle Bereiche hineinpassen (Symbole bleiben alle sichtbar). */
+function fitNav() {
+  const nav = $('#nav'); if (!nav) return;
+  const w = nav.clientWidth, key = w + '|' + nav.childElementCount;
+  if (!fitNav.ro && typeof ResizeObserver !== 'undefined') { fitNav.ro = new ResizeObserver(() => fitNav()); fitNav.ro.observe(nav); }
+  if (fitNav.key === key && nav.classList.contains('ico') === fitNav.ico) return;
+  nav.classList.remove('ico');
+  fitNav.ico = nav.scrollWidth > nav.clientWidth + 1;
+  nav.classList.toggle('ico', fitNav.ico); fitNav.key = key;
 }
 /** Scrollpositionen eines Bereichs (und seiner Eltern/Kinder) über ein Neuzeichnen hinweg halten. */
 function keepScroll(el, fn) {
@@ -11677,7 +11690,7 @@ VIEWS.fleetOwn = function viewFleetOwn() {
       <div class="small muted">${toC > 0 ? `Nächster C-Check in ${n0(toC)} Flugstunden` : 'C-Check fällig – wartet, bis das andere Flugzeug gleichen Musters aus der Werft zurück ist'} (dauert ${Math.max(4, P.CCHECK_DAYS - (pl.hangars.includes(a.base) ? P.HANGAR_CHECK_DAYS : 0) - Math.round(pl.skill('tech')))} Tage)</div>
       </div></div><div class="bar" style="margin-top:6px" title="Auslastung des 17-Stunden-Betriebsfensters"><i class="me" style="width:${Math.min(100, a.used_hours / P.OPERATING_WINDOW_H * 100).toFixed(0)}%"></i></div>${a.delivery_day <= W.day ? `<div class="small muted">Einsatz ${n1(a.used_hours || 0)} h pro Tag${(() => { const x = acLf(a); return x === null ? '' : ` · Auslastung der Flüge ${pct(x)}`; })()}</div>` : ''}</div>
       <div class="stack" style="justify-items:end">${move}${c ? `<div class="stack small" style="justify-items:end"><span>${a.owned ? `Verkauf: ${eur(dc.cash)} Zufluss nach Kredittilgung` : a.flex ? 'Rückgabe ohne Kosten' : `Rückgabe kostet ${eur(-dc.pnl)}`}</span><div class="row"><button class="btn danger small" data-act="dispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button><button class="btn small" data-act="cancelconfirm">Abbrechen</button></div></div>`
-      : `<button class="btn small" data-act="askdispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button>`}${leaseBuyHtml(pl, a)}<button class="btn small" data-act="asgopen" data-id="${a.id}">Einsatz planen</button>${ui.mp ? `<button class="btn small" data-act="skinpick" data-id="${a.id}" title="${sk ? 'Aktueller Skin: ' + esc(sk.name) : 'Standardlackierung'}">Skin ändern</button>` : ''}${a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day) ? `<button class="btn small" data-act="dealac" data-id="${a.id}">An Airline abgeben</button>` : ''}</div></div>${leaseBuyDetail(pl, a)}`;
+      : `<button class="btn small" data-act="askdispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button>`}${leaseBuyHtml(pl, a)}<button class="btn small" data-act="asgopen" data-id="${a.id}">Einsatz planen</button>${collOn() ? `<button class="btn small" data-act="skinpick" data-id="${a.id}" title="${sk ? 'Aktueller Skin: ' + esc(sk.name) : 'Standardlackierung'}">Skin ändern</button>` : ''}${a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day) ? `<button class="btn small" data-act="dealac" data-id="${a.id}">An Airline abgeben</button>` : ''}</div></div>${leaseBuyDetail(pl, a)}`;
   }).join('');
   if (pl.fleet.length) html += `<p class="small muted">Ältere Flugzeuge verbrauchen mehr Kerosin, kosten mehr Wartung und fallen öfter aus. Alle ${n0(P.CCHECK_FH)} Flugstunden steht ein C-Check an; ein eigener Hangar an der Basis verkürzt ihn.</p>`;
   return html;
@@ -16076,12 +16089,13 @@ async function showLobby(tab = null) {
   loadMainCard();
   try {
     const mine = await api('/games/mine');
+    if (!$('#lbMine')) return;
     $('#lbMine').innerHTML = mine.games.length ? mine.games.map(gameCard).join('') : '<p class="small muted">Noch keine Spiele. Legen Sie eines an oder treten Sie einem bei.</p>';
-  } catch (e) { if (e.status === 401) return showAuth(); $('#lbMine').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
+  } catch (e) { if (e.status === 401) return showAuth(); if ($('#lbMine')) $('#lbMine').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
   lobbySearch('');
   if (mpState.user.admin) {
-    try { const a = await api('/admin/games'); $('#lbAdmin').innerHTML = a.games.length ? a.games.map(adminCard).join('') : '<p class="small muted">Keine Spiele vorhanden.</p>'; }
-    catch (e) { $('#lbAdmin').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
+    try { const a = await api('/admin/games'); if (!$('#lbAdmin')) return; /* Lobby inzwischen geschlossen */ $('#lbAdmin').innerHTML = a.games.length ? a.games.map(adminCard).join('') : '<p class="small muted">Keine Spiele vorhanden.</p>'; }
+    catch (e) { if ($('#lbAdmin')) $('#lbAdmin').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
   }
 }
 // ---------- Hauptwelt: dauerhafte gemeinsame Welt ----------
@@ -16803,6 +16817,7 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 function startWorld() {
+  loadColl();   // Aircraft Collection gilt in jedem Spiel des Kontos, auch offline
   // 0.21.50: Die Nachfragetabelle (einmal je Seitenaufruf, auf dem Handy rund 0,4 s) im Leerlauf vorbereiten – nicht erst beim ersten Klick auf Planung oder Drehkreuze
   if (!startWorld.warm) { startWorld.warm = true; const go = () => { try { const b = W && W.player && W.player.bases[0]; if (b) SM.qBase(b, b === 'FRA' ? 'MUC' : 'FRA'); } catch (e) { /* egal */ } }; if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 1500); }
   for (const al of W.list) W.operableFreq(al);
@@ -16823,6 +16838,9 @@ const coll = { me: null, shop: null, admin: false, at: 0, busy: false, art: null
 const RAR = SK.RARITIES;
 const rarChip = (rk) => `<span class="chip rar rar-${rk}">${RAR[rk].label}</span>`;
 const modelOf = (s) => SK.MODEL_BY_ID[s.model];
+/** Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele (dort unter dem Schlüssel „solo“). */
+const collOn = () => ONLINE && !!mpState.user;
+const collGame = () => (ui.mp ? ui.mp.id : 'solo');
 /** Daten der Sammlung laden (beim Betreten eines Spiels, nach Aktionen und alle 60 s); Benachrichtigungen als Hinweis zeigen. */
 async function loadColl(force = false) {
   if (!ONLINE || !mpState.user || coll.busy) return;
@@ -16849,10 +16867,10 @@ function collChrome() { const b = $('#userBtn'); if (b) b.classList.toggle('coll
 const hasMs = (k) => !!(coll.me && coll.me.ms && coll.me.ms.includes(k));
 /** Aktiver Skin eines Flugzeugs (eigene aus der Sammlung, fremde aus den Spielinfos). */
 function skinFor(al, acId) {
-  if (!ui.mp || !W || !al) return null;
+  if (!collOn() || !W || !al) return null;
   let id = null;
-  if (al.id === W.playerId) id = coll.me && coll.me.active[`${ui.mp.id}|${acId}`];
-  else { const sk = mpState.info && mpState.info.skins; id = sk && sk[al.id] && sk[al.id][acId]; }
+  if (al.id === W.playerId) id = coll.me && coll.me.active[`${collGame()}|${acId}`];
+  else if (ui.mp) { const sk = mpState.info && mpState.info.skins; id = sk && sk[al.id] && sk[al.id][acId]; }
   return id ? SK.SKIN_BY_ID[id] || null : null;
 }
 const freeCopies = (id) => { const m = coll.me; if (!m) return 0; const act = Object.values(m.active).filter((x) => x === id).length; return (m.inv[id] || 0) - act - ((m.reserved || {})[id] || 0); };
@@ -16975,7 +16993,7 @@ function showSkinDetail(id) {
   const s = SK.SKIN_BY_ID[id]; if (!s || !coll.me) return;
   const m = coll.me, n = m.inv[s.id] || 0, free = freeCopies(s.id), pl = W && W.player;
   const acts = Object.entries(m.active).filter(([, x]) => x === s.id).map(([k]) => k.split('|'));
-  const here = acts.filter(([g]) => ui.mp && g === ui.mp.id), fits = pl ? pl.fleet.filter((a) => a.type_id === s.type) : [];
+  const here = acts.filter(([g]) => g === collGame()), fits = pl ? pl.fleet.filter((a) => a.type_id === s.type) : [];
   const md = modal(`<div class="ac-detail rar-${s.rarity}"><div class="spread"><span class="ac-kicker">${esc(modelOf(s).name)}</span><button class="btn small" data-sd="close">Schließen</button></div>
     <div class="ac-big${n ? '' : ' miss'}"><img src="${skinArt(s, !n)}" alt="${esc(s.name)}"></div>
     <h2>${n ? esc(s.name) : 'Noch nicht gesammelt'} ${rarChip(s.rarity)}</h2>
@@ -16996,7 +17014,8 @@ function showSkinDetail(id) {
   };
 }
 async function activateSkin(acId, skinId) {
-  const r = await api('/coll/activate', { body: { game: ui.mp.id, acId, skinId } });
+  const pl = W.player, a = pl.fleet.find((x) => x.id === acId);
+  const r = await api('/coll/activate', { body: ui.mp ? { game: ui.mp.id, acId, skinId } : { game: 'solo', acId, skinId, type: a && a.type_id, fleet: pl.fleet.map((x) => x.id) } });
   coll.me = r.me; ui.planesNow = true; skinUrlCache.size > 2000 && skinUrlCache.clear();
   if (['fleetOwn', 'collection'].includes(ui.tab)) renderPane(true);
   toast(skinId ? `${SK.SKIN_BY_ID[skinId].name} ist auf ${acName(acId)} aktiv.` : `${acName(acId)} fliegt wieder in Ihrer Standardlackierung.`);
@@ -17097,7 +17116,7 @@ VIEWS.shop = function viewShop() {
   let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
     <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus 280 Lackierungen für 28 Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip">${n0(m.packs.length)} ungeöffnete Packs</span>${m.packs.length ? '<button class="btn primary small" data-act="accopen">Pack öffnen</button>' : ''}</div></div></div>`;
-  if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten mit SHOP_ENABLED=1 (siehe Anleitung). Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
+  if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten im Menü oben rechts → Aircraft Pack Management. Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
   html += `<div class="sh-offers">${S.offers.map((o) => `<div class="sh-offer ${o.key}"><span class="chip">Startangebot</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
       <span class="sh-price">${tokS(o.price)}</span><span class="small">${String(Number(o.price) / o.packs).replace('.', ',')} Token pro Pack</span>
       <button class="btn ${o.key === 'collector' ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${o.packs} Packs anfragen</button></div>`).join('')}</div>
@@ -17210,8 +17229,10 @@ async function showPackAdmin() {
     ['Seltenheiten', SK.RARITY_ORDER.map((k) => `${S.rarity[k] || 0}`).join(' / '), 'grün / blau / lila / gold']];
   m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Aircraft Pack Management</h1><button class="btn small" data-pa="close">Schließen</button></div>
     <div class="tiles">${tiles.map(([k, v, s]) => `<div class="tile"><span>${esc(k)}</span><b>${v}</b><em>${esc(s)}</em></div>`).join('')}</div>
-    ${d.shop.enabled ? '<p class="small pos">Shop aktiv: Spieler können Packs anfragen.</p>' : '<div class="callout warn small">Shop nicht freigeschaltet (SHOP_ENABLED=1 fehlt). Kostenlose Vergabe geht trotzdem.</div>'}
-    ${d.shop.legalMissing && d.shop.legalMissing.length ? `<p class="small muted">Noch nicht hinterlegt: ${esc(d.shop.legalMissing.join(', '))}.</p>` : ''}
+    <section class="card pad stack"><h3>Pack-Anfragen für alle Spieler</h3>
+      <p class="small ${d.shop.enabled ? 'pos' : 'muted'}">${d.shop.enabled ? 'Freigeschaltet: Spieler können im Shop Packs anfragen.' : 'Gesperrt: Der Shop zeigt die Angebote, Anfragen sind aber nicht möglich. Kostenlose Vergabe geht trotzdem.'}</p>
+      <label class="f"><span>Hinweistext im Shop (optional)</span><input id="pa-info" maxlength="600" value="${esc(d.shop.payInfo || '')}" placeholder="z. B. wie man Token bekommt"></label>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ${d.shop.enabled ? '' : 'primary'}" data-pa="shop" data-on="${d.shop.enabled ? '' : '1'}">${d.shop.enabled ? 'Anfragen sperren' : 'Anfragen freischalten'}</button><button class="btn" data-pa="shop" data-on="${d.shop.enabled ? '1' : ''}">Nur Text speichern</button></div></section>
     <section class="card pad stack"><h3>Pack-Anfragen <small class="muted">${d.requests.filter((q) => q.status === 'open').length} offen</small></h3>
       <p class="small muted">Die Freigabe schreibt die Packs sofort gut und lässt sich nicht zurücknehmen.</p>
       ${d.requests.length ? d.requests.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${tf(q.created)} · <b>${esc(q.userName)}</b> · ${q.packs} Packs · ${Number(q.amount).toLocaleString('de-DE')} Token</span>
@@ -17227,6 +17248,7 @@ async function showPackAdmin() {
     const b = e.target.closest('[data-pa]'); if (!b) return;
     const k = b.dataset.pa;
     if (k === 'close') { m.hidden = true; return; }
+    if (k === 'shop') { b.disabled = true; try { await api('/coll/admin/shop', { body: { enabled: !!b.dataset.on, info: $('#pa-info').value } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Pack-Anfragen sind freigeschaltet.' : 'Pack-Anfragen sind gesperrt.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'find') { try { const r = await api('/coll/players?q=' + encodeURIComponent($('#pa-q').value)); $('#pa-res').innerHTML = r.players.map((p) => `<button class="btn small" data-pa="pick" data-v="${esc(p.key)}">${esc(p.name)}</button>`).join('') || '<span class="small muted">Niemand gefunden.</span>'; } catch (err) { toast(err.message); } return; }
     if (k === 'pick') { $('#pa-user').value = b.dataset.v; return; }
     if (k === 'rq') {

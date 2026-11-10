@@ -607,12 +607,12 @@ function renderPlanes() {
     const [i, f] = hit, line = s.lines[i];
     const [mx, my, ang] = lineAt(line, f);
     const x0 = wrapX(mx);
-    if (s.me || sel) { const sk0 = ui.mp && s.me ? skinFor(s.al, s.ac.id) : null; trails.push([line, f, sel, sk0 && sk0.rarity === 'l' ? 'gold' : null]); }
+    if (s.me || sel) { const sk0 = collOn() && s.me ? skinFor(s.al, s.ac.id) : null; trails.push([line, f, sel, sk0 && sk0.rarity === 'l' ? 'gold' : null]); }
     for (const dx of [0, -MAP.W, MAP.W]) {
       const [x, y] = toScreen(x0 + dx, my);
       if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
       const hu = !s.me && !s.al.archetype;
-      const sk = ui.mp ? skinMapStyle(skinFor(s.al, s.ac.id)) : null;
+      const sk = collOn() ? skinMapStyle(skinFor(s.al, s.ac.id)) : null;
       const p = { x, y, a: ang, sc: (sel ? 1.35 : s.me || hu || sk ? 1.0 : 0.78) * sc0, me: s.me, sel, icon: s.icon, ac: s.ac.id, fill: hu ? cvColor(colorOf(s.al)) : null, sk };
       if (sk && sk.fx === 'l' && !s.me && !sel && k >= 0.8) trails.push([line, f, false, 'gold']);
       if (sel) selPlane = p; else planes.push(p);
@@ -622,7 +622,7 @@ function renderPlanes() {
   }
   // Spuren (eigene und ausgewählte Flüge), in Bildschirmpunkten wie vorher mit non-scaling-stroke
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  const msTrail = ui.mp && hasMs('trail');   // Meilenstein 150: schimmernde Spuren
+  const msTrail = collOn() && hasMs('trail');   // Meilenstein 150: schimmernde Spuren
   let msGrad = null; if (msTrail) { msGrad = ctx.createLinearGradient(0, 0, view.w, view.h); msGrad.addColorStop(0, '#22d3ee'); msGrad.addColorStop(1, '#a855f7'); }
   for (const [line, f, sel, gold] of trails) {
     ctx.beginPath(); trailPath(ctx, line, f);
@@ -773,7 +773,7 @@ const SECTIONS = [
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung'], ['plans', 'Pläne'], ['hubs', 'Drehkreuze'], ['slots', 'Slots']] },
   { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['rescue', 'Sanierung'], ['cfo', 'CFO-Beratung']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['exchange', 'Börse'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
-  { key: 'sammlung', label: 'Collection', short: 'Sammlung', sub: 'Skins sammeln, öffnen, tauschen', icon: 'gem', mp: true, tabs: [['collection', 'Collection', 'mp'], ['shop', 'Shop', 'mp'], ['trading', 'Trading', 'mp']] },
+  { key: 'sammlung', label: 'Collection', short: 'Sammlung', sub: 'Skins sammeln, öffnen, tauschen', icon: 'gem', mp: true, tabs: [['collection', 'Collection'], ['shop', 'Shop'], ['trading', 'Trading']] },
   { key: 'unternehmen', label: 'Unternehmen', short: 'Firma', sub: 'Menschen, Standorte, Einkauf', icon: 'building', tabs: [['profile', 'Profil & Logo'], ['milestones', 'Ansehen & Ziele'], ['staff', 'Personal'], ['stations', 'Stationen'], ['supply', 'Einkauf'], ['assistant', 'Assistenz']] },
 ];
 const TAB_ALIAS = { fleet: 'fleetOwn' };
@@ -792,8 +792,19 @@ function tabDots() {
 }
 function renderNav() {
   const dots = tabDots(), cur = sectionOf(ui.tab);
-  setHtml($('#nav'), SECTIONS.filter((s) => !s.mp || ui.mp).map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" title="${s.label}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span><span class="lbs">${s.short || s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join(''));
+  setHtml($('#nav'), SECTIONS.filter((s) => !s.mp || (s.key === 'sammlung' ? collOn() : ui.mp)).map((s) => `<button role="tab" data-sec="${s.key}" aria-selected="${s === cur}" title="${s.label}" style="--sc:var(--c-${s.key})">${icon(s.icon)}<span class="lbl">${s.label}</span><span class="lbs">${s.short || s.label}</span>${s.tabs.some(([k]) => dots[k] && k !== 'news') ? '<span class="dot"></span>' : ''}</button>`).join(''));
   const bell = $('#bell .dot'); if (bell) bell.hidden = !dots.news;
+  fitNav();
+}
+/** Bereichsleiste: Beschriftungen ausblenden, sobald nicht alle Bereiche hineinpassen (Symbole bleiben alle sichtbar). */
+function fitNav() {
+  const nav = $('#nav'); if (!nav) return;
+  const w = nav.clientWidth, key = w + '|' + nav.childElementCount;
+  if (!fitNav.ro && typeof ResizeObserver !== 'undefined') { fitNav.ro = new ResizeObserver(() => fitNav()); fitNav.ro.observe(nav); }
+  if (fitNav.key === key && nav.classList.contains('ico') === fitNav.ico) return;
+  nav.classList.remove('ico');
+  fitNav.ico = nav.scrollWidth > nav.clientWidth + 1;
+  nav.classList.toggle('ico', fitNav.ico); fitNav.key = key;
 }
 /** Scrollpositionen eines Bereichs (und seiner Eltern/Kinder) über ein Neuzeichnen hinweg halten. */
 function keepScroll(el, fn) {
@@ -2021,7 +2032,7 @@ VIEWS.fleetOwn = function viewFleetOwn() {
       <div class="small muted">${toC > 0 ? `Nächster C-Check in ${n0(toC)} Flugstunden` : 'C-Check fällig – wartet, bis das andere Flugzeug gleichen Musters aus der Werft zurück ist'} (dauert ${Math.max(4, P.CCHECK_DAYS - (pl.hangars.includes(a.base) ? P.HANGAR_CHECK_DAYS : 0) - Math.round(pl.skill('tech')))} Tage)</div>
       </div></div><div class="bar" style="margin-top:6px" title="Auslastung des 17-Stunden-Betriebsfensters"><i class="me" style="width:${Math.min(100, a.used_hours / P.OPERATING_WINDOW_H * 100).toFixed(0)}%"></i></div>${a.delivery_day <= W.day ? `<div class="small muted">Einsatz ${n1(a.used_hours || 0)} h pro Tag${(() => { const x = acLf(a); return x === null ? '' : ` · Auslastung der Flüge ${pct(x)}`; })()}</div>` : ''}</div>
       <div class="stack" style="justify-items:end">${move}${c ? `<div class="stack small" style="justify-items:end"><span>${a.owned ? `Verkauf: ${eur(dc.cash)} Zufluss nach Kredittilgung` : a.flex ? 'Rückgabe ohne Kosten' : `Rückgabe kostet ${eur(-dc.pnl)}`}</span><div class="row"><button class="btn danger small" data-act="dispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button><button class="btn small" data-act="cancelconfirm">Abbrechen</button></div></div>`
-      : `<button class="btn small" data-act="askdispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button>`}${leaseBuyHtml(pl, a)}<button class="btn small" data-act="asgopen" data-id="${a.id}">Einsatz planen</button>${ui.mp ? `<button class="btn small" data-act="skinpick" data-id="${a.id}" title="${sk ? 'Aktueller Skin: ' + esc(sk.name) : 'Standardlackierung'}">Skin ändern</button>` : ''}${a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day) ? `<button class="btn small" data-act="dealac" data-id="${a.id}">An Airline abgeben</button>` : ''}</div></div>${leaseBuyDetail(pl, a)}`;
+      : `<button class="btn small" data-act="askdispose" data-id="${a.id}">${a.owned ? 'Verkaufen' : 'Zurückgeben'}</button>`}${leaseBuyHtml(pl, a)}<button class="btn small" data-act="asgopen" data-id="${a.id}">Einsatz planen</button>${collOn() ? `<button class="btn small" data-act="skinpick" data-id="${a.id}" title="${sk ? 'Aktueller Skin: ' + esc(sk.name) : 'Standardlackierung'}">Skin ändern</button>` : ''}${a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day) ? `<button class="btn small" data-act="dealac" data-id="${a.id}">An Airline abgeben</button>` : ''}</div></div>${leaseBuyDetail(pl, a)}`;
   }).join('');
   if (pl.fleet.length) html += `<p class="small muted">Ältere Flugzeuge verbrauchen mehr Kerosin, kosten mehr Wartung und fallen öfter aus. Alle ${n0(P.CCHECK_FH)} Flugstunden steht ein C-Check an; ein eigener Hangar an der Basis verkürzt ihn.</p>`;
   return html;
@@ -6420,12 +6431,13 @@ async function showLobby(tab = null) {
   loadMainCard();
   try {
     const mine = await api('/games/mine');
+    if (!$('#lbMine')) return;
     $('#lbMine').innerHTML = mine.games.length ? mine.games.map(gameCard).join('') : '<p class="small muted">Noch keine Spiele. Legen Sie eines an oder treten Sie einem bei.</p>';
-  } catch (e) { if (e.status === 401) return showAuth(); $('#lbMine').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
+  } catch (e) { if (e.status === 401) return showAuth(); if ($('#lbMine')) $('#lbMine').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
   lobbySearch('');
   if (mpState.user.admin) {
-    try { const a = await api('/admin/games'); $('#lbAdmin').innerHTML = a.games.length ? a.games.map(adminCard).join('') : '<p class="small muted">Keine Spiele vorhanden.</p>'; }
-    catch (e) { $('#lbAdmin').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
+    try { const a = await api('/admin/games'); if (!$('#lbAdmin')) return; /* Lobby inzwischen geschlossen */ $('#lbAdmin').innerHTML = a.games.length ? a.games.map(adminCard).join('') : '<p class="small muted">Keine Spiele vorhanden.</p>'; }
+    catch (e) { if ($('#lbAdmin')) $('#lbAdmin').innerHTML = `<p class="small neg">${esc(e.message)}</p>`; }
   }
 }
 // ---------- Hauptwelt: dauerhafte gemeinsame Welt ----------
@@ -7147,6 +7159,7 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 function startWorld() {
+  loadColl();   // Aircraft Collection gilt in jedem Spiel des Kontos, auch offline
   // 0.21.50: Die Nachfragetabelle (einmal je Seitenaufruf, auf dem Handy rund 0,4 s) im Leerlauf vorbereiten – nicht erst beim ersten Klick auf Planung oder Drehkreuze
   if (!startWorld.warm) { startWorld.warm = true; const go = () => { try { const b = W && W.player && W.player.bases[0]; if (b) SM.qBase(b, b === 'FRA' ? 'MUC' : 'FRA'); } catch (e) { /* egal */ } }; if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 1500); }
   for (const al of W.list) W.operableFreq(al);

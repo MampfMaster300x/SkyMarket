@@ -1,6 +1,6 @@
 # Aircraft Collection – Anleitung zur Einrichtung und zum Betrieb
 
-Stand: Version 0.21.53. Das Feature ist fest in SKYMARKET Online eingebaut. Es läuft nur in Online-Spielen und ist rein kosmetisch.
+Stand: Version 0.21.54. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
 
 ## 1. Bestandsaufnahme: So ist es eingebaut
 
@@ -37,7 +37,7 @@ Speicherorte in Netlify Blobs:
 
 1. Die Zip-Datei wie bei jedem Update hochladen (Netlify-Deploy). Es gibt keine neuen Abhängigkeiten.
 2. Prüfen, dass du als Admin eingetragen bist: Umgebungsvariable `ADMIN_USERS` (Benutzernamen in Kleinbuchstaben, mit Komma getrennt).
-3. Fertig. Der Bereich „Collection“ erscheint in jedem Online-Spiel. Anfragen sind zunächst gesperrt, kostenlose Packs kannst du sofort vergeben.
+3. Fertig. Der Bereich „Collection“ erscheint in jedem Spiel angemeldeter Spieler. Anfragen sind zunächst gesperrt, kostenlose Packs kannst du sofort vergeben.
 
 ## 3. Pack-Anfragen freischalten
 
@@ -47,12 +47,7 @@ Das Spiel kennt kein Geld und keine Bezahlung. Die Angebote sind in Token ausgez
 2. Du öffnest oben rechts das Menü → „Aircraft Pack Management“ und klickst bei der Anfrage auf „Freigeben“ (zweiter Klick bestätigt). Erst dann liegen die Packs im Inventar.
 3. Du kannst Anfragen ablehnen. Der Spieler kann offene Anfragen selbst zurückziehen.
 
-Einstellungen (Netlify → Site configuration → Environment variables, danach neu deployen):
-
-| Variable | Bedeutung | Pflicht |
-|---|---|---|
-| `SHOP_ENABLED` | `1` schaltet Anfragen frei | ja |
-| `SHOP_REQUEST_INFO` | Freier Hinweistext im Shop und in der Anfrage, z. B. wie man Token bekommt | nein |
+Freischalten: Menü oben rechts → „Aircraft Pack Management“ → „Anfragen freischalten“. Das gilt sofort für alle Spieler und lässt sich dort jederzeit wieder sperren. Im selben Feld kannst du einen Hinweistext für den Shop eintragen, zum Beispiel wie man Token bekommt. Ein Deploy ist dafür nicht nötig.
 
 Regeln im Code: höchstens 3 offene Anfragen je Konto; eine Anfrage kann nur einmal freigegeben werden; Packs aus Anfragen und kostenlose Packs werden getrennt gezählt.
 

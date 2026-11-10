@@ -183,6 +183,13 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.54: Sammlung in jedem Spiel, Freischaltung im Spiel, Bereichsleiste
+
+- **Sammlung in jedem Spiel:** Die Aircraft Collection hängt am Konto und gilt in der Hauptwelt, in privaten Online-Spielen und in Offline-Spielen (wenn man angemeldet ist). In Offline-Spielen liegen aktive Skins unter dem Schlüssel `solo`; geprüft werden Modell und freie Exemplare.
+- **Freischaltung durch Admins im Spiel:** Menü → „Aircraft Pack Management“ → „Anfragen freischalten“ oder „Anfragen sperren“, dazu ein Hinweistext für den Shop. Gilt sofort für alle Spieler. Die Umgebungsvariablen `SHOP_ENABLED` und `SHOP_REQUEST_INFO` gelten nur noch, solange im Spiel nichts gespeichert wurde.
+- **Bereichsleiste:** Passen nicht alle Bereiche mit Beschriftung hinein, zeigt die Leiste nur noch die Symbole. Alle Bereiche bleiben sichtbar, nichts wird abgeschnitten.
+- Behoben: Skins verkaufter Flugzeuge wurden beim Abnehmen eines Skins nicht immer freigegeben.
+
 ## Neu in 0.21.53: Aircraft Collection ohne Kauf, Pack-Animation nach Konzept
 
 - **Kein Erwerb mehr:** Alle Kauf-, Zahlungs- und Euro-Angaben sind entfernt. Angebote sind in Token ausgezeichnet (10 Packs für 5 Token, 20 Packs für 10 Token). Spieler senden eine Anfrage, die Spielleitung gibt sie frei. Die Bestätigungen zu Widerruf und Alter, die freiwillige Unterstützung und die Rechtslinks entfallen. Hinweistext über `SHOP_REQUEST_INFO`.

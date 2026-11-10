@@ -7,7 +7,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import SKINS from '../shared/skins.cjs';
 
-const KEY = { reg: 'coll/registry', hist: (u) => `coll/hist/${u}`, grants: 'coll/grants', reqs: 'shop/requests', log: 'shop/log' };
+const KEY = { reg: 'coll/registry', hist: (u) => `coll/hist/${u}`, grants: 'coll/grants', reqs: 'shop/requests', log: 'shop/log', cfg: 'shop/config' };
 const HIST_KEEP = 40, NOTES_KEEP = 30, TRADES_KEEP = 300, MAX_PACKS_GRANT = 100, MAX_OPEN_REQ = 3;
 const env = (k) => (typeof process !== 'undefined' && process.env ? process.env[k] : undefined) || '';
 
@@ -37,12 +37,10 @@ const count = (arr) => arr.reduce((o, x) => ((o[x] = (o[x] || 0) + 1), o), {});
 async function logPay(store, e) { try { await updateJson(store, KEY.log, (l) => { l = l || []; l.push({ t: Date.now(), ...e }); return l.slice(-5000); }, [], 4); } catch (x) { console.error('Zahlungsprotokoll', x); } }
 
 /** Shop-Einstellungen. Spieler fragen Packs an (Angebote in Token), die Spielleitung gibt sie von Hand frei. */
-export function shopConfig() {
-  const legal = { imprint: env('SHOP_IMPRINT_URL'), terms: env('SHOP_TERMS_URL'), privacy: env('SHOP_PRIVACY_URL'), withdrawal: env('SHOP_WITHDRAWAL_URL') };
-  const hint = [];
-  if (!legal.imprint) hint.push('Impressum'); if (!legal.terms) hint.push('AGB'); if (!legal.privacy) hint.push('Datenschutzerklärung');
-  return { enabled: env('SHOP_ENABLED') === '1', legalMissing: hint, offers: Object.values(SKINS.OFFERS), minAge: Number(env('SHOP_MIN_AGE') || 18), priceNote: env('SHOP_PRICE_NOTE') || 'Endpreise.', seller: env('SHOP_SELLER_NAME') || '', legal,
-    payInfo: env('SHOP_REQUEST_INFO') || '',
+export async function shopConfig(store) {
+  // Freischaltung und Hinweistext pflegen Admins im Spiel (Blob shop/config); die Umgebungsvariablen gelten nur, solange dort nichts gespeichert ist
+  const c = (await store.get(KEY.cfg, { type: 'json' })) || null;
+  return { enabled: c ? !!c.enabled : env('SHOP_ENABLED') === '1', offers: Object.values(SKINS.OFFERS), payInfo: c ? c.info || '' : env('SHOP_REQUEST_INFO') || '',
     odds: { count: SKINS.PACK_COUNT_ODDS, rarity: SKINS.RARITY_ORDER.map((k) => [k, SKINS.RARITIES[k].odds]), models: SKINS.MODELS.length } };
 }
 function meView(reg, key) {
@@ -89,7 +87,7 @@ export async function handleCollection(req, ctx) {
   // ---- Übersicht ----
   if (path === '/coll' && method === 'GET') {
     const reg = (await store.get(KEY.reg, { type: 'json' })) || emptyReg();
-    return json({ me: meView(reg, me), shop: shopConfig(), admin: isAdmin(user) });
+    return json({ me: meView(reg, me), shop: await shopConfig(store), admin: isAdmin(user) });
   }
   if (path === '/coll/notes/read' && method === 'POST') {
     const b = await readJson(req), ids = new Set(Array.isArray(b.ids) ? b.ids.map(String) : []);
@@ -122,11 +120,17 @@ export async function handleCollection(req, ctx) {
   // ---- Skin auf einem eigenen Flugzeug aktivieren (Darstellung; Spielwerte bleiben unberührt) ----
   if ((path === '/coll/activate' || path === '/coll/prune') && method === 'POST') {
     const b = await readJson(req), game = String(b.game || '').slice(0, 40);
-    const meta = game ? await loadMeta(store, game) : null, pm = meta && meta.players.find((p) => p.u === me);
-    if (!pm || !pm.airlineId) return fail(403, 'Sie spielen in diesem Spiel nicht mit.');
-    const view = await loadGameView(game), al = view && (view.airlines || []).find((a) => a.id === pm.airlineId);
-    if (!al) return fail(404, 'Ihre Airline wurde im Spielstand nicht gefunden.');
-    const fleet = new Map((al.fleet || []).map((a) => [a.id, a.type_id]));
+    let fleet;
+    if (game === 'solo') {   // Offline-Spiel: Der Spielstand liegt nur im Browser. Flugzeug und Muster meldet der Browser; geprüft werden Skin, Modell und freie Exemplare.
+      const ids = (Array.isArray(b.fleet) ? b.fleet : []).map(String).slice(0, 2000), t = String(b.type || '');
+      fleet = new Map(ids.map((x) => [x, null])); if (b.acId) fleet.set(String(b.acId), t);
+    } else {
+      const meta = game ? await loadMeta(store, game) : null, pm = meta && meta.players.find((p) => p.u === me);
+      if (!pm || !pm.airlineId) return fail(403, 'Sie spielen in diesem Spiel nicht mit.');
+      const view = await loadGameView(game), al = view && (view.airlines || []).find((a) => a.id === pm.airlineId);
+      if (!al) return fail(404, 'Ihre Airline wurde im Spielstand nicht gefunden.');
+      fleet = new Map((al.fleet || []).map((a) => [a.id, a.type_id]));
+    }
     if (path === '/coll/prune') {
       const r = await updateJson(store, KEY.reg, (reg) => { if (!reg || !reg.users[me]) return undefined; const u = reg.users[me]; let ch = false; for (const k of Object.keys(u.active)) { const [g, ac] = k.split('|'); if (g === game && !fleet.has(ac)) { delete u.active[k]; ch = true; } } return ch ? reg : undefined; }, null);
       return json({ ok: true, me: meView(r.value || emptyReg(), me) });
@@ -137,9 +141,10 @@ export async function handleCollection(req, ctx) {
     let err = null;
     const r = await updateJson(store, KEY.reg, (reg) => {
       reg = reg || emptyReg(); const u = userOf(reg, me, user.name), k = `${game}|${acId}`;
-      for (const kk of Object.keys(u.active)) { const [g, ac] = kk.split('|'); if (g === game && !fleet.has(ac)) delete u.active[kk]; }   // verkaufte Flugzeuge geben ihre Skins frei
-      if (!skinId) { if (!u.active[k]) return undefined; delete u.active[k]; return reg; }
-      if (u.active[k] === skinId) return undefined;
+      let pruned = false;
+      for (const kk of Object.keys(u.active)) { const [g, ac] = kk.split('|'); if (g === game && !fleet.has(ac)) { delete u.active[kk]; pruned = true; } }   // verkaufte Flugzeuge geben ihre Skins frei
+      if (!skinId) { if (!u.active[k]) return pruned ? reg : undefined; delete u.active[k]; return reg; }
+      if (u.active[k] === skinId) return pruned ? reg : undefined;
       const prev = u.active[k]; delete u.active[k];
       if (freeOf(reg, me, skinId) < 1) { err = 'Alle Exemplare dieses Skins sind schon auf anderen Flugzeugen aktiv oder in einem Tauschangebot.'; if (prev) u.active[k] = prev; return undefined; }
       u.active[k] = skinId; return reg;
@@ -228,8 +233,14 @@ export async function handleCollection(req, ctx) {
     const R = reg || emptyReg(), owners = Object.values(R.users);
     const uniqAll = new Set(owners.flatMap((u) => Object.keys(u.inv).filter((s) => u.inv[s] > 0))).size;
     return json({ stats: { ...R.stats, collectors: owners.filter((u) => uniqOf(u) > 0).length, uniqAll, skinsHeld: owners.reduce((s, u) => s + Object.values(u.inv).reduce((a, b) => a + b, 0), 0), unopened: owners.reduce((s, u) => s + u.packs.length, 0) },
-      grants: (grants || []).slice(-200).reverse(), payments: (log || []).slice(-200).reverse(), shop: shopConfig(),
+      grants: (grants || []).slice(-200).reverse(), payments: (log || []).slice(-200).reverse(), shop: await shopConfig(store),
       requests: (reqs || []).filter((x) => x.status === 'open').concat((reqs || []).filter((x) => x.status !== 'open').slice(-60).reverse()) });
+  }
+  if (path === '/coll/admin/shop' && method === 'POST') {   // Anfragen für alle freischalten oder sperren, Hinweistext setzen
+    if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+    const b = await readJson(req);
+    await store.setJSON(KEY.cfg, { enabled: !!b.enabled, info: String(b.info || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600), by: user.key, at: Date.now() });
+    return json({ ok: true, shop: await shopConfig(store) });
   }
   if (path === '/coll/admin/grant' && method === 'POST') {
     if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
@@ -248,9 +259,9 @@ export async function handleCollection(req, ctx) {
     return json({ ok: true, grant: g });
   }
   // ---- Shop: Pack-Anfragen (Freigabe durch die Spielleitung) ----
-  if (path === '/shop/config' && method === 'GET') return json(shopConfig());
+  if (path === '/shop/config' && method === 'GET') return json(await shopConfig(store));
   if (path === '/shop/request' && method === 'POST') {
-    const sc = shopConfig(); if (!sc.enabled) return fail(503, 'Anfragen sind noch nicht freigeschaltet.');
+    const sc = await shopConfig(store); if (!sc.enabled) return fail(503, 'Anfragen sind noch nicht freigeschaltet.');
     const b = await readJson(req), of = SKINS.OFFERS[String(b.offer || '')];
     if (!of) return fail(400, 'Unbekanntes Angebot.');
     let made = null, err = null;
@@ -266,7 +277,7 @@ export async function handleCollection(req, ctx) {
   }
   if (path === '/shop/requests' && method === 'GET') {
     const list = (await store.get(KEY.reqs, { type: 'json' })) || [];
-    return json({ requests: list.filter((x) => x.user === me).slice(-20).reverse(), payInfo: shopConfig().payInfo });
+    return json({ requests: list.filter((x) => x.user === me).slice(-20).reverse(), payInfo: (await shopConfig(store)).payInfo });
   }
   { const p = parts(path);
     if (p[0] === 'shop' && p[1] === 'request' && p[2] && ['cancel', 'approve', 'decline'].includes(p[3]) && method === 'POST') {

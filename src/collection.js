@@ -7,6 +7,9 @@ const coll = { me: null, shop: null, admin: false, at: 0, busy: false, art: null
 const RAR = SK.RARITIES;
 const rarChip = (rk) => `<span class="chip rar rar-${rk}">${RAR[rk].label}</span>`;
 const modelOf = (s) => SK.MODEL_BY_ID[s.model];
+/** Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele (dort unter dem Schlüssel „solo“). */
+const collOn = () => ONLINE && !!mpState.user;
+const collGame = () => (ui.mp ? ui.mp.id : 'solo');
 /** Daten der Sammlung laden (beim Betreten eines Spiels, nach Aktionen und alle 60 s); Benachrichtigungen als Hinweis zeigen. */
 async function loadColl(force = false) {
   if (!ONLINE || !mpState.user || coll.busy) return;
@@ -33,10 +36,10 @@ function collChrome() { const b = $('#userBtn'); if (b) b.classList.toggle('coll
 const hasMs = (k) => !!(coll.me && coll.me.ms && coll.me.ms.includes(k));
 /** Aktiver Skin eines Flugzeugs (eigene aus der Sammlung, fremde aus den Spielinfos). */
 function skinFor(al, acId) {
-  if (!ui.mp || !W || !al) return null;
+  if (!collOn() || !W || !al) return null;
   let id = null;
-  if (al.id === W.playerId) id = coll.me && coll.me.active[`${ui.mp.id}|${acId}`];
-  else { const sk = mpState.info && mpState.info.skins; id = sk && sk[al.id] && sk[al.id][acId]; }
+  if (al.id === W.playerId) id = coll.me && coll.me.active[`${collGame()}|${acId}`];
+  else if (ui.mp) { const sk = mpState.info && mpState.info.skins; id = sk && sk[al.id] && sk[al.id][acId]; }
   return id ? SK.SKIN_BY_ID[id] || null : null;
 }
 const freeCopies = (id) => { const m = coll.me; if (!m) return 0; const act = Object.values(m.active).filter((x) => x === id).length; return (m.inv[id] || 0) - act - ((m.reserved || {})[id] || 0); };
@@ -159,7 +162,7 @@ function showSkinDetail(id) {
   const s = SK.SKIN_BY_ID[id]; if (!s || !coll.me) return;
   const m = coll.me, n = m.inv[s.id] || 0, free = freeCopies(s.id), pl = W && W.player;
   const acts = Object.entries(m.active).filter(([, x]) => x === s.id).map(([k]) => k.split('|'));
-  const here = acts.filter(([g]) => ui.mp && g === ui.mp.id), fits = pl ? pl.fleet.filter((a) => a.type_id === s.type) : [];
+  const here = acts.filter(([g]) => g === collGame()), fits = pl ? pl.fleet.filter((a) => a.type_id === s.type) : [];
   const md = modal(`<div class="ac-detail rar-${s.rarity}"><div class="spread"><span class="ac-kicker">${esc(modelOf(s).name)}</span><button class="btn small" data-sd="close">Schließen</button></div>
     <div class="ac-big${n ? '' : ' miss'}"><img src="${skinArt(s, !n)}" alt="${esc(s.name)}"></div>
     <h2>${n ? esc(s.name) : 'Noch nicht gesammelt'} ${rarChip(s.rarity)}</h2>
@@ -180,7 +183,8 @@ function showSkinDetail(id) {
   };
 }
 async function activateSkin(acId, skinId) {
-  const r = await api('/coll/activate', { body: { game: ui.mp.id, acId, skinId } });
+  const pl = W.player, a = pl.fleet.find((x) => x.id === acId);
+  const r = await api('/coll/activate', { body: ui.mp ? { game: ui.mp.id, acId, skinId } : { game: 'solo', acId, skinId, type: a && a.type_id, fleet: pl.fleet.map((x) => x.id) } });
   coll.me = r.me; ui.planesNow = true; skinUrlCache.size > 2000 && skinUrlCache.clear();
   if (['fleetOwn', 'collection'].includes(ui.tab)) renderPane(true);
   toast(skinId ? `${SK.SKIN_BY_ID[skinId].name} ist auf ${acName(acId)} aktiv.` : `${acName(acId)} fliegt wieder in Ihrer Standardlackierung.`);
@@ -281,7 +285,7 @@ VIEWS.shop = function viewShop() {
   let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
     <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus 280 Lackierungen für 28 Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip">${n0(m.packs.length)} ungeöffnete Packs</span>${m.packs.length ? '<button class="btn primary small" data-act="accopen">Pack öffnen</button>' : ''}</div></div></div>`;
-  if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten mit SHOP_ENABLED=1 (siehe Anleitung). Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
+  if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten im Menü oben rechts → Aircraft Pack Management. Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
   html += `<div class="sh-offers">${S.offers.map((o) => `<div class="sh-offer ${o.key}"><span class="chip">Startangebot</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
       <span class="sh-price">${tokS(o.price)}</span><span class="small">${String(Number(o.price) / o.packs).replace('.', ',')} Token pro Pack</span>
       <button class="btn ${o.key === 'collector' ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${o.packs} Packs anfragen</button></div>`).join('')}</div>
@@ -394,8 +398,10 @@ async function showPackAdmin() {
     ['Seltenheiten', SK.RARITY_ORDER.map((k) => `${S.rarity[k] || 0}`).join(' / '), 'grün / blau / lila / gold']];
   m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Aircraft Pack Management</h1><button class="btn small" data-pa="close">Schließen</button></div>
     <div class="tiles">${tiles.map(([k, v, s]) => `<div class="tile"><span>${esc(k)}</span><b>${v}</b><em>${esc(s)}</em></div>`).join('')}</div>
-    ${d.shop.enabled ? '<p class="small pos">Shop aktiv: Spieler können Packs anfragen.</p>' : '<div class="callout warn small">Shop nicht freigeschaltet (SHOP_ENABLED=1 fehlt). Kostenlose Vergabe geht trotzdem.</div>'}
-    ${d.shop.legalMissing && d.shop.legalMissing.length ? `<p class="small muted">Noch nicht hinterlegt: ${esc(d.shop.legalMissing.join(', '))}.</p>` : ''}
+    <section class="card pad stack"><h3>Pack-Anfragen für alle Spieler</h3>
+      <p class="small ${d.shop.enabled ? 'pos' : 'muted'}">${d.shop.enabled ? 'Freigeschaltet: Spieler können im Shop Packs anfragen.' : 'Gesperrt: Der Shop zeigt die Angebote, Anfragen sind aber nicht möglich. Kostenlose Vergabe geht trotzdem.'}</p>
+      <label class="f"><span>Hinweistext im Shop (optional)</span><input id="pa-info" maxlength="600" value="${esc(d.shop.payInfo || '')}" placeholder="z. B. wie man Token bekommt"></label>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ${d.shop.enabled ? '' : 'primary'}" data-pa="shop" data-on="${d.shop.enabled ? '' : '1'}">${d.shop.enabled ? 'Anfragen sperren' : 'Anfragen freischalten'}</button><button class="btn" data-pa="shop" data-on="${d.shop.enabled ? '1' : ''}">Nur Text speichern</button></div></section>
     <section class="card pad stack"><h3>Pack-Anfragen <small class="muted">${d.requests.filter((q) => q.status === 'open').length} offen</small></h3>
       <p class="small muted">Die Freigabe schreibt die Packs sofort gut und lässt sich nicht zurücknehmen.</p>
       ${d.requests.length ? d.requests.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${tf(q.created)} · <b>${esc(q.userName)}</b> · ${q.packs} Packs · ${Number(q.amount).toLocaleString('de-DE')} Token</span>
@@ -411,6 +417,7 @@ async function showPackAdmin() {
     const b = e.target.closest('[data-pa]'); if (!b) return;
     const k = b.dataset.pa;
     if (k === 'close') { m.hidden = true; return; }
+    if (k === 'shop') { b.disabled = true; try { await api('/coll/admin/shop', { body: { enabled: !!b.dataset.on, info: $('#pa-info').value } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Pack-Anfragen sind freigeschaltet.' : 'Pack-Anfragen sind gesperrt.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'find') { try { const r = await api('/coll/players?q=' + encodeURIComponent($('#pa-q').value)); $('#pa-res').innerHTML = r.players.map((p) => `<button class="btn small" data-pa="pick" data-v="${esc(p.key)}">${esc(p.name)}</button>`).join('') || '<span class="small muted">Niemand gefunden.</span>'; } catch (err) { toast(err.message); } return; }
     if (k === 'pick') { $('#pa-user').value = b.dataset.v; return; }
     if (k === 'rq') {

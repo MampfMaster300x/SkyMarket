@@ -1514,17 +1514,25 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const tr2 = ok(await call('anna', 'POST', '/coll/trade', { to: 'ben', give: [gB], want: [] }), 'Angebot 2').trade; ok(await call('anna', 'POST', `/coll/trade/${tr2.id}/cancel`, {}), 'zurückziehen');
   assert.equal((await call('ben', 'POST', `/coll/trade/${tr2.id}/accept`, {})).status, 409, 'zurückgezogen');
   // Kaufanfrage: ohne Freischaltung gesperrt; Packs erst nach Freigabe durch einen Admin, genau einmal
-  delete process.env.SHOP_ENABLED; assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'starter', withdrawalConsent: true, ageConfirm: true })).status, 503, 'Shop aus');
-  process.env.SHOP_ENABLED = '1';
-  assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'x', withdrawalConsent: true, ageConfirm: true })).status, 400);
-  const rq = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter', withdrawalConsent: true, ageConfirm: true }), 'Anfrage').request;
+  delete process.env.SHOP_ENABLED; assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'starter' })).status, 503, 'Anfragen gesperrt');
+  assert.equal((await call('anna', 'POST', '/coll/admin/shop', { enabled: true })).status, 403, 'Freischalten nur für Admins');
+  assert.equal(ok(await call('tim', 'POST', '/coll/admin/shop', { enabled: true, info: 'Token gibt es bei Aktionen.' }), 'freischalten').shop.enabled, true);
+  assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').shop.payInfo, 'Token gibt es bei Aktionen.');
+  // Offline-Spiel (solo): Skin am Konto, Modell und freie Exemplare werden geprüft
+  { const sid = Object.keys(me.inv).find((x) => me.inv[x] === 1 && !Object.values(me.active).includes(x)), sk = SK.SKIN_BY_ID[sid];
+    assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-001', skinId: sid, type: 'XXXX', fleet: ['P1-001', 'P1-002'] })).status, 400, 'solo: falsches Modell');
+    let m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-001', skinId: sid, type: sk.type, fleet: ['P1-001', 'P1-002'] }), 'solo aktivieren').me; assert.equal(m2.active['solo|P1-001'], sid);
+    assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-002', skinId: sid, type: sk.type, fleet: ['P1-001', 'P1-002'] })).status, 409, 'solo: nur ein Exemplar');
+    m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-002', skinId: null, type: sk.type, fleet: ['P1-002'] }), 'solo aufräumen').me; assert.ok(!m2.active['solo|P1-001'], 'verkauftes Flugzeug gibt den Skin frei'); }
+  assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'x' })).status, 400);
+  const rq = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter' }), 'Anfrage').request;
   assert.equal(rq.packs, 10); assert.equal(rq.amount, '5'); assert.equal(rq.currency, 'TOKEN'); assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 0, 'noch keine Packs');
   assert.equal((await call('cleo', 'POST', `/shop/request/${rq.id}/approve`, {})).status, 403, 'nicht selbst freigeben');
   const ap = await Promise.all([call('tim', 'POST', `/shop/request/${rq.id}/approve`, {}), call('tim', 'POST', `/shop/request/${rq.id}/approve`, {})]);
   assert.deepStrictEqual(ap.map((r) => r.status).sort(), [200, 409], 'Freigabe nur einmal'); assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 10, 'genau 10 Packs');
-  const rq2 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'collector', withdrawalConsent: true, ageConfirm: true }), 'Anfrage 2').request;
+  const rq2 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'collector' }), 'Anfrage 2').request;
   ok(await call('tim', 'POST', `/shop/request/${rq2.id}/decline`, { note: 'kein Geldeingang' }), 'ablehnen'); assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 10, 'abgelehnt: nichts');
-  const rq3 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter', withdrawalConsent: true, ageConfirm: true }), 'Anfrage 3').request; ok(await call('cleo', 'POST', `/shop/request/${rq3.id}/cancel`, {}), 'zurückziehen');
+  const rq3 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter' }), 'Anfrage 3').request; ok(await call('cleo', 'POST', `/shop/request/${rq3.id}/cancel`, {}), 'zurückziehen');
   assert.equal((await call('tim', 'POST', `/shop/request/${rq3.id}/approve`, {})).status, 409, 'zurückgezogene nicht freigeben');
   const ad = ok(await call('tim', 'GET', '/coll/admin'), 'Admin'); assert.equal(ad.stats.paidPacks, 10); assert.equal(ad.stats.adminPacks, 100); assert.equal(ad.stats.revenueCents, 500); assert.equal(ad.stats.opened, 100); assert.ok(ad.stats.trades === 1 && ad.grants.length === 2 && ad.grants[0].source === 'admin_grant');
   console.log(`0.21.52 ok: Aircraft Collection – 280 Skins, Ziehung (${(rar.l / tot * 100).toFixed(2)} % gold), Öffnen einmalig, Aktivieren, Tausch, Kaufanfrage mit Freigabe, Admin`);

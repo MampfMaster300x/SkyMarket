@@ -146,7 +146,9 @@ main.body { display: grid; grid-template-columns: 300px minmax(0, 1fr) var(--rw,
 .resizer:hover::after, .resizer.drag::after, .resizer:focus-visible::after { opacity: 1; background: var(--accent); }
 body.resizing { cursor: col-resize; user-select: none; }
 body.resizing #map { pointer-events: none; }
-@container (max-width: 600px) { nav.main button span.lbl { display: none; } nav.main button[aria-selected="true"] span.lbl { display: inline; } }
+/* Passen nicht alle Bereiche mit Beschriftung in die Leiste, zeigt sie nur noch die Symbole – alle bleiben sichtbar (Klasse setzt fitNav) */
+nav.main.ico button span.lbl, nav.main.ico button[aria-selected="true"] span.lbl { display: none; }
+nav.main.ico button { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 .card2 { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
 #sidebar { display: grid; gap: 12px; align-content: start; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
 .alcard { padding: 14px; display: flex; gap: 12px; align-items: center; }
