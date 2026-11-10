@@ -1,6 +1,6 @@
 # Aircraft Collection – Anleitung zur Einrichtung und zum Betrieb
 
-Stand: Version 0.21.55. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
+Stand: Version 0.21.57. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
 
 ## 1. Bestandsaufnahme: So ist es eingebaut
 
@@ -69,7 +69,7 @@ Der Build kopiert die Dateien nach `public/skins/` und schreibt eine Liste. Für
 
 - Ziehung nur auf dem Server mit `crypto.randomInt`, nie mit `Math.random`. Der Browser kann kein Ergebnis vorgeben.
 - Das Ergebnis ist gespeichert, bevor die Animation startet. Ein zweiter Aufruf für dasselbe Pack liefert das gespeicherte Ergebnis.
-- Skins lassen sich nur auf dem exakt passenden Modell und nur auf eigenen Flugzeugen aktivieren. Ein Exemplar deckt ein Flugzeug.
+- Skins lassen sich nur auf dem exakt passenden Modell und nur auf eigenen Flugzeugen aktivieren. Ein Exemplar deckt bis zu 5 Flugzeuge (ab 0.21.57); für den Tausch zählt ein Exemplar als belegt, sobald es auf mindestens einem Flugzeug aktiv ist.
 - Aktive Skins und Skins in offenen Tauschangeboten sind gesperrt und können nicht doppelt verwendet werden.
 - Ein Tausch überträgt beide Seiten in einem Schritt. Bei gleichzeitigen Klicks gewinnt genau einer.
 - Admin-Funktionen werden auf dem Server geprüft.
@@ -84,7 +84,7 @@ Getestet in `npm test` (Abschnitt 0.21.52 der Tests): 200.000 Ziehungen gegen di
 | Pack-Verteilung und Wahrscheinlichkeiten, im Shop sichtbar | umgesetzt |
 | Pack-Inventar, Öffnen mit Animation, Seltenheitseffekte, Ton | umgesetzt; ab 0.21.55 Pack aufreißen (ziehen oder antippen), längere Inszenierung mit Bildschirmblitz, verdeckter Karte und Fanfare je Seltenheit |
 | Sammlung mit Fortschritt, Filtern, Silhouetten, Duplikaten | umgesetzt |
-| Skins in der Flotte und auf der Karte | umgesetzt |
+| Skins in der Flotte und auf der Karte | umgesetzt; ab 0.21.56 direkt nach dem Ziehen per Knopf ausrüstbar |
 | Trading | umgesetzt |
 | Admin-Vergabe, Protokoll, Statistik | umgesetzt |
 | Meilensteine | umgesetzt |

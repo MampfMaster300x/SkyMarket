@@ -155,7 +155,9 @@
     starter: { key: 'starter', label: 'Starter Pack', packs: 10, price: '5', currency: 'TOKEN' },
     collector: { key: 'collector', label: 'Collector Pack', packs: 20, price: '10', currency: 'TOKEN' },
   };
-  const api = { RARITIES, RARITY_ORDER, PACK_COUNT_ODDS, CATEGORIES, MODELS, MODEL_BY_ID, MODEL_BY_TYPE, DESIGNS, SKINS, SKIN_BY_ID, SKINS_BY_MODEL_RARITY, MILESTONES, OFFERS, drawPack, TOTAL: SKINS.length };
+  /** 0.21.57: ein Exemplar eines Skins darf auf bis zu so vielen Flugzeugen gleichzeitig aktiv sein. */
+  const PER_COPY = 5;
+  const api = { PER_COPY, RARITIES, RARITY_ORDER, PACK_COUNT_ODDS, CATEGORIES, MODELS, MODEL_BY_ID, MODEL_BY_TYPE, DESIGNS, SKINS, SKIN_BY_ID, SKINS_BY_MODEL_RARITY, MILESTONES, OFFERS, drawPack, TOTAL: SKINS.length };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.SKINS = api;
 })();

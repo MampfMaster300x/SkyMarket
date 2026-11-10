@@ -6,7 +6,7 @@
 <meta name="description" content="SKYMARKET – Airline-Wirtschaftssimulation: Hauptwelt für alle und private Runden">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b400'/%3E%3Cpath d='M26 16 L20 14.5 L13 6 L10.5 6 L14 14.5 L8 14.5 L6 11.5 L4.5 11.5 L5.5 16 L4.5 20.5 L6 20.5 L8 17.5 L14 17.5 L10.5 26 L13 26 L20 17.5 L26 16Z' fill='%231a1400'/%3E%3C/svg%3E">
 <style>[hidden]{display:none!important}</style>
-<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.55";</script>
+<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.57";</script>
 <title>Skymarket</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,7 +16,7 @@
 /* SKYMARKET Corporate Design: Nachtblau, leuchtende Strecken, farbcodierte Bereiche (Karte blau, Flotte grün,
    Strecken violett, Finanzen orange, Markt pink, Unternehmen türkis). */
 :root {
-  --c-karte: #2f7cf6; --c-flotte: #1fa463; --c-strecken: #7c4dff; --c-finanzen: #ef8a17; --c-markt: #e23d7f; --c-unternehmen: #0fa39a;
+  --c-karte: #2f7cf6; --c-flotte: #1fa463; --c-strecken: #7c4dff; --c-finanzen: #ef8a17; --c-markt: #e23d7f; --c-unternehmen: #0fa39a; --c-cargo: #c2410c;
   --bar: #0b1a33; --bar-2: #10234a; --bar-ink: #e9f0ff; --bar-ink-2: #9db0d6;
   --sea: #d7e4f2; --land: #f4f7fb; --coast: #b8c7da; --border: #c9d6e6; --glow: rgba(47,124,246,.0);
   --bg: #e8eef6; --panel: #ffffff; --panel-glass: rgba(255,255,255,.96); --panel-2: #f1f5fa; --line: #dfe6ef; --line-2: #c9d3e0;
@@ -43,7 +43,7 @@
   --good: #34d399; --good-soft: rgba(52,211,153,.13); --warn: #fbbf24; --warn-soft: rgba(251,191,36,.13); --crit: #fb7185; --crit-soft: rgba(251,113,133,.14);
   --ai1: #4fb3cc; --ai2: #e58f55; --ai3: #a3bf4a; --ai4: #e2bb55; --ai5: #8597f0; --ai6: #c48ad6; --ai7: #ec7a8f; --ai8: #4fc2b0; --ai9: #e889bf; --ai10: #a99cf2; --ai11: #74c874; --ai12: #f0a640; --ai13: #8fb4d4; --ai14: #d4885e; --ai15: #e09a63; --ai16: #6fc1d1; --ai17: #f08a8a; --ai18: #d6c75a; --ai19: #a897ef; --ai20: #f08a6e; --ai21: #6fd19a; --ai22: #e8c15a; --ai23: #8fb0ea; --ai24: #e48ab5; --ai25: #5fb8d8; --ai26: #b8cc5a; --ai27: #f07a7a; --ai28: #5fcfa5; --ai29: #a990e8; --ai30: #e8b060; --ai31: #6fcfb2; --ai32: #de9f72; --ai33: #8072de; --ai34: #84de72; --ai35: #de72a3; --ai36: #72c2de; --ai37: #ded972; --ai38: #ba72de; --ai39: #72de9a; --ai40: #de7b72; --ai41: #7288de; --ai42: #a8de72; --ai43: #de72c7; --ai44: #72ded5;
   --hum1: #b08cff; --hum2: #38bdf8; --hum3: #ff7a8f; --hum4: #4ade80; --hum5: #fbbf24; --hum6: #f472b6; --hum7: #2dd4bf; --hum8: #818cf8;
-  --c-karte: #4c8dff; --c-flotte: #2fcf7f; --c-strecken: #9a6bff; --c-finanzen: #ffa23a; --c-markt: #ff5c9a; --c-unternehmen: #22c7bb;
+  --c-karte: #4c8dff; --c-flotte: #2fcf7f; --c-strecken: #9a6bff; --c-finanzen: #ffa23a; --c-markt: #ff5c9a; --c-unternehmen: #22c7bb; --c-cargo: #fb923c;
   --shadow: 0 1px 2px rgba(0,0,0,.45), 0 12px 34px rgba(0,0,0,.45); color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bar: #081428; --bar-2: #0d1d3a; --bar-ink: #eaf1ff; --bar-ink-2: #93a6cc;
@@ -56,7 +56,7 @@
   --good: #34d399; --good-soft: rgba(52,211,153,.13); --warn: #fbbf24; --warn-soft: rgba(251,191,36,.13); --crit: #fb7185; --crit-soft: rgba(251,113,133,.14);
   --ai1: #4fb3cc; --ai2: #e58f55; --ai3: #a3bf4a; --ai4: #e2bb55; --ai5: #8597f0; --ai6: #c48ad6; --ai7: #ec7a8f; --ai8: #4fc2b0; --ai9: #e889bf; --ai10: #a99cf2; --ai11: #74c874; --ai12: #f0a640; --ai13: #8fb4d4; --ai14: #d4885e; --ai15: #e09a63; --ai16: #6fc1d1; --ai17: #f08a8a; --ai18: #d6c75a; --ai19: #a897ef; --ai20: #f08a6e; --ai21: #6fd19a; --ai22: #e8c15a; --ai23: #8fb0ea; --ai24: #e48ab5; --ai25: #5fb8d8; --ai26: #b8cc5a; --ai27: #f07a7a; --ai28: #5fcfa5; --ai29: #a990e8; --ai30: #e8b060; --ai31: #6fcfb2; --ai32: #de9f72; --ai33: #8072de; --ai34: #84de72; --ai35: #de72a3; --ai36: #72c2de; --ai37: #ded972; --ai38: #ba72de; --ai39: #72de9a; --ai40: #de7b72; --ai41: #7288de; --ai42: #a8de72; --ai43: #de72c7; --ai44: #72ded5;
   --hum1: #b08cff; --hum2: #38bdf8; --hum3: #ff7a8f; --hum4: #4ade80; --hum5: #fbbf24; --hum6: #f472b6; --hum7: #2dd4bf; --hum8: #818cf8;
-  --c-karte: #4c8dff; --c-flotte: #2fcf7f; --c-strecken: #9a6bff; --c-finanzen: #ffa23a; --c-markt: #ff5c9a; --c-unternehmen: #22c7bb;
+  --c-karte: #4c8dff; --c-flotte: #2fcf7f; --c-strecken: #9a6bff; --c-finanzen: #ffa23a; --c-markt: #ff5c9a; --c-unternehmen: #22c7bb; --c-cargo: #fb923c;
   --shadow: 0 1px 2px rgba(0,0,0,.45), 0 12px 34px rgba(0,0,0,.45); color-scheme: dark; }
 
 html, body { height: 100%; }
@@ -187,7 +187,9 @@ nav.main.ico button { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 .mapwrap canvas#mapPlanes { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 .side { --sec: var(--c-karte); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); display: grid; grid-template-rows: auto auto 1fr; min-height: 0; overflow: hidden; }
 .side[data-sec="flotte"] { --sec: var(--c-flotte); } .side[data-sec="strecken"] { --sec: var(--c-strecken); } .side[data-sec="finanzen"] { --sec: var(--c-finanzen); }
-.side[data-sec="markt"] { --sec: var(--c-markt); } .side[data-sec="unternehmen"] { --sec: var(--c-unternehmen); }
+.side[data-sec="markt"] { --sec: var(--c-markt); } .side[data-sec="unternehmen"] { --sec: var(--c-unternehmen); } .side[data-sec="cargo"] { --sec: var(--c-cargo); }
+.chip.cgc { background: color-mix(in srgb, var(--c-cargo) 16%, transparent); color: var(--c-cargo); }
+.rt.cg { stroke: var(--c-cargo); stroke-dasharray: 5 4; fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; } .rt.cgai { stroke-dasharray: 3 4; opacity: .4; fill: none; stroke-width: .7; vector-effect: non-scaling-stroke; }
 .sechead { display: flex; align-items: center; gap: 12px; padding: 14px 16px 12px; background: linear-gradient(120deg, color-mix(in srgb, var(--sec) 26%, transparent), transparent 75%); border-bottom: 1px solid var(--line); }
 .sechead .secic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--sec); color: #fff; flex: none; box-shadow: 0 6px 18px color-mix(in srgb, var(--sec) 40%, transparent); }
 .sechead .secic svg.ic { width: 21px; height: 21px; }
@@ -242,12 +244,12 @@ nav.tabs .dot { position: absolute; top: 1px; right: 1px; width: 7px; height: 7p
 .borders { fill: none; stroke: var(--border); stroke-width: .6; opacity: .9; vector-effect: non-scaling-stroke; }
 #map { touch-action: none; cursor: grab; } #map:active { cursor: grabbing; }
 .rt, .trail { vector-effect: non-scaling-stroke; fill: none; stroke-linecap: round; }
-.rt.ai { stroke-width: 1; opacity: .3; }
-.rt.meglow { stroke: var(--accent); stroke-width: 6; opacity: .14; }
-.rt.me { stroke: var(--accent); stroke-width: 1.6; opacity: .85; }
+.rt.ai { stroke-width: .7; opacity: .2; }
+.rt.meglow { stroke: var(--accent); stroke-width: 3.5; opacity: .1; }
+.rt.me { stroke: var(--accent); stroke-width: 1.1; opacity: .8; }
 .rt.me.wait { stroke-dasharray: 4 5; opacity: .55; }
-.rt.huglow { stroke-width: 6; opacity: .12; }
-.rt.hu { stroke-width: 1.5; opacity: .8; }
+.rt.huglow { display: none; }
+.rt.hu { stroke-width: .8; opacity: .3; }
 .rt.draft { stroke: var(--c-strecken); stroke-width: 2.2; stroke-dasharray: 6 5; opacity: .95; }
 .rt.hl { stroke-width: 3; opacity: 1; }
 .trail { stroke: var(--trail); stroke-width: 2.2; opacity: .85; }
@@ -819,7 +821,7 @@ select.picked { display: none !important; }
 .mw-stats b { font: 600 15px var(--f-mono); } .mw-stats span { font-size: 11px; color: var(--ink-3); }
 .gcard { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: var(--r); padding: 9px 11px; background: var(--panel-2); }
 input[type="password"] { border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--r); padding: 7px 9px; width: 100%; min-width: 0; }
-.rt.hu { stroke-width: 1.4; opacity: .7; }
+.rt.hu { stroke-width: .8; opacity: .3; }
 .acmi-ev { border-color: var(--good, #1fa463); }
 .grp { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
 .grp-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
@@ -1369,7 +1371,7 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .pk-box { width: min(320px, 72vw, 54vh); position: relative; z-index: 3; filter: drop-shadow(0 0 16px rgba(34,211,238,.5)) drop-shadow(0 18px 40px rgba(0,0,0,.55)); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .pk-box:active { cursor: grabbing; }
 .pk-strip { transform-box: view-box; transform-origin: 210px 40px; transform: rotate(calc(var(--tear, 0) * -9deg)) translateY(calc(var(--tear, 0) * -4px)); }
-.pk-rip { stroke-dasharray: 190; stroke-dashoffset: calc((1 - var(--tear, 0)) * 190); filter: drop-shadow(0 0 3px #fff); }
+.pk-rip { stroke-dasharray: 204; stroke-dashoffset: calc((1 - var(--tear, 0)) * 204); filter: drop-shadow(0 0 3px #fff); }
 .pk-box.snap .pk-strip { transition: transform .25s ease; } .pk-box.snap .pk-rip { transition: stroke-dashoffset .25s ease; }
 .pk-box.torn .pk-strip { animation: pkTear .6s cubic-bezier(.3, .6, .4, 1) forwards; }
 @keyframes pkTear { from { transform: rotate(-9deg) translateY(-4px); } to { transform: translate(110px, -190px) rotate(-50deg); opacity: 0; } }
@@ -1437,6 +1439,8 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .pk-card h2 { margin: 0; font-size: 28px; } .pk-model { color: #a5b4d0; font-size: 13px; } .pk-card p { margin: 0; color: #c3cde0; font-size: 13.5px; }
 .pk-rar { justify-self: center; font: 800 13px var(--f-body); letter-spacing: .24em; color: var(--rc); text-transform: uppercase; text-shadow: 0 0 12px var(--rc); }
 .pk-btns { z-index: 3; gap: 8px; justify-content: center; }
+.pk-equip { z-index: 3; display: grid; gap: 6px; justify-items: center; text-align: center; } .pk-stage.reveal .pk-equip { opacity: 0; transition: opacity .4s .6s; } .pk-stage.reveal.flipped .pk-equip { opacity: 1; }
+.pk-ov .btn.gold { color: #1a1204; background: linear-gradient(120deg, #f5b301, #ffe08a); border-color: #f5b301; font-weight: 700; } .pk-eqok { color: #86efac; font-weight: 700; text-shadow: 0 0 10px rgba(34,197,94,.5); }
 .pk-stage.reveal .pk-btns { opacity: 0; transition: opacity .4s .6s; } .pk-stage.reveal.flipped .pk-btns { opacity: 1; }
 .pk-ov .btn { color: #e6edf7; border-color: #2b3c6a; } .pk-ov .btn.primary { color: #04122a; background: #22d3ee; border-color: #22d3ee; }
 .pk-stage.sum { align-content: center; } .pk-stage.sum h2 { margin: 0; font-size: 26px; text-shadow: 0 0 18px var(--rc); }
@@ -1789,26 +1793,26 @@ const SM = (() => {
         turn_min: 40, value_eur: 78e6, lease_month: 580e3, dispatch_rel: 0.995, delay_cost_min: 40, acmi_day: 48500, age: 0, stock: 3, marketWeight: 0.3, maxAge: 6,
         engines: '2 × GE Passport', note: 'Die größte Kabine am Privatjet-Markt, vier Bereiche, Schlafzimmer. Fliegt nur Charter',
         ill: { kind: 'jet', len: 0.28, fin: 'airbus' } },
-      // 0.19: Frachter – fliegen nur Fracht-Charter (Paketdienste, Spediteure, Hilfsorganisationen)
+      // 0.19: Frachter – Fracht-Charter (Paketdienste, Spediteure, Hilfsorganisationen); ab 0.21.56 auch eigene Frachtstrecken (Cargo)
       AT7F: { label: 'ATR 72-600F', maker: 'ATR', cls: 'Frachter, Turboprop', group: 'ATR', role: 'cargo', lvl: 1, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 1500, speed_kmh: 510, mtow_t: 23,
         fuel_cycle_kg: 100, fuel_bh_kg: 640, crew_bh: 300, maint_bh: 320, maint_cycle: 160, handling: 500, cargo_kg: 9000,
         turn_min: 35, value_eur: 24e6, lease_month: 170e3, dispatch_rel: 0.995, delay_cost_min: 15, acmi_day: 11500, age: 0, stock: 4, marketWeight: 0.3,
-        engines: '2 × Pratt & Whitney PW127M', note: 'Expressfracht auf kurzen Strecken, Paketdienste in der Nacht. Selbe Musterberechtigung wie die ATR 72. Fliegt nur Fracht-Charter',
+        engines: '2 × Pratt & Whitney PW127M', note: 'Expressfracht auf kurzen Strecken, Paketdienste in der Nacht. Selbe Musterberechtigung wie die ATR 72. Fliegt Fracht-Charter und eigene Frachtstrecken (Cargo)',
         ill: { kind: 'prop', len: 0.68, tt: true, fin: 'atr', cargo: true } },
       A21F: { label: 'Airbus A321P2F', maker: 'Airbus', cls: 'Frachter, Schmalrumpf (umgebaut)', group: 'A32F', role: 'cargo', lvl: 2, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 3700, speed_kmh: 820, mtow_t: 93.5,
         fuel_cycle_kg: 480, fuel_bh_kg: 2500, crew_bh: 520, maint_bh: 760, maint_cycle: 290, handling: 1300, cargo_kg: 28000,
         turn_min: 50, value_eur: 34e6, lease_month: 290e3, dispatch_rel: 0.994, delay_cost_min: 30, acmi_day: 21000, age: 14, stock: 4, marketWeight: 0.4,
-        engines: '2 × CFM56-5B', note: 'Umgebauter A321 für Onlinehandel und Expressfracht. Piloten der A320-Familie fliegen ihn ohne Umschulung. Fliegt nur Fracht-Charter',
+        engines: '2 × CFM56-5B', note: 'Umgebauter A321 für Onlinehandel und Expressfracht. Piloten der A320-Familie fliegen ihn ohne Umschulung. Fliegt Fracht-Charter und eigene Frachtstrecken (Cargo)',
         ill: { kind: 'jet', len: 0.98, fin: 'airbus', cargo: true } },
       B76F: { label: 'Boeing 767-300F', maker: 'Boeing', cls: 'Frachter, Großraum', group: 'B767', role: 'cargo', lvl: 3, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 6000, speed_kmh: 850, mtow_t: 187,
         fuel_cycle_kg: 1100, fuel_bh_kg: 5000, crew_bh: 700, maint_bh: 1150, maint_cycle: 520, handling: 2600, cargo_kg: 52000,
         turn_min: 70, value_eur: 95e6, lease_month: 640e3, dispatch_rel: 0.993, delay_cost_min: 70, acmi_day: 41000, age: 4, stock: 3, marketWeight: 0.3,
-        engines: '2 × GE CF6-80C2', note: 'Arbeitspferd der Paketdienste zwischen Kontinenten. Fliegt nur Fracht-Charter',
+        engines: '2 × GE CF6-80C2', note: 'Arbeitspferd der Paketdienste zwischen Kontinenten. Fliegt Fracht-Charter und eigene Frachtstrecken (Cargo)',
         ill: { kind: 'wide', len: 0.85, fin: 'boeing', cargo: true } },
       B77F: { label: 'Boeing 777F', maker: 'Boeing', cls: 'Frachter, Großraum, Langstrecke', group: 'B777', role: 'cargo', lvl: 3, cabin: 0, seats: { basic: 0, standard: 0, premium: 0 }, range_km: 9000, speed_kmh: 870, mtow_t: 347,
         fuel_cycle_kg: 2100, fuel_bh_kg: 7400, crew_bh: 850, maint_bh: 1600, maint_cycle: 1000, handling: 4300, cargo_kg: 102000,
         turn_min: 90, value_eur: 190e6, lease_month: 1300e3, dispatch_rel: 0.993, delay_cost_min: 120, acmi_day: 82000, age: 0, stock: 2, marketWeight: 0.2,
-        engines: '2 × GE90-110B1', note: 'Der größte Zweistrahl-Frachter: 102 t über 9.000 km. Piloten der 777 fliegen ihn ohne Umschulung. Fliegt nur Fracht-Charter',
+        engines: '2 × GE90-110B1', note: 'Der größte Zweistrahl-Frachter: 102 t über 9.000 km. Piloten der 777 fliegen ihn ohne Umschulung. Fliegt Fracht-Charter und eigene Frachtstrecken (Cargo)',
         ill: { kind: 'wide', len: 1.0, fin: 'boeing', cargo: true } },
     },
     TYPE_GROUPS: { BIZ: 'Privatjets', B767: 'Boeing 767', ATR: 'ATR 72', DH8: 'Dash 8', EJET: 'Embraer E2', A220: 'Airbus A220', A32F: 'Airbus A320-Familie', B737: 'Boeing 737', A330: 'Airbus A330', A350: 'Airbus A350', B787: 'Boeing 787', B777: 'Boeing 777', A380: 'Airbus A380', B747: 'Boeing 747', CONC: 'Concorde' },
@@ -2020,6 +2024,10 @@ const SM = (() => {
     FUEL_HEDGE: { premium: 0.030, contango: 0.006, maxShare: 0.8 },
     CCHECK_FH: 4500, CCHECK_DAYS: 10, AOG_MONTHLY: 0.008, AOG_DAYS: [4, 12], AOG_COST: [250e3, 900e3],
     CARGO: { k: 120, yield: 1.2, handling: 0.20, commission: 0.15, gsaMonth: 8000, loadMax: 0.8 },
+    // 0.21.56: Frachtsparte mit eigenen Frachtern (getrennt von der Beiladefracht): Bedarf je Strecke und Richtung in kg/Tag = Beiladebedarf × k × Distanzfaktor,
+    // Rate = Beilade-Ertrag × rateX (Spielende wählen 60–160 %), Aufteilung nach Kapazität und Rate (Rate hoch −compete), Gesamtnachfrage elastisch zum Mittelpreis.
+    FREIGHT: { k: 25, rateX: 0.8, loadMax: 0.88, handling: 0.10, sales: 0.06, elast: 1.1, compete: 3, sigma: 0.15, maxWeek: 28, lead: 3, minRate: 0.6, maxRate: 1.6,
+      ai: { p: 0.12, minDay: 45, maxRoutes: { premium: 4, regional: 1, leisure: 1, lcc: 0 }, types: { premium: ['B77F', 'B76F', 'A21F'], regional: ['AT7F'], leisure: ['A21F'], lcc: [] }, margin: 0.1 } },
     MARKETING_K: 0.04, BRAND_DECAY: 0.015,
     // Marketing als Anteil am Umsatz mit Sättigung: Wirkung ~ 1 − e^(−Anteil/MKT_SAT)
     MKT_PCT_MAX: 0.08, MKT_SAT: 0.03, MKT_K2: 0.06,
@@ -2571,6 +2579,23 @@ const SM = (() => {
   }
   function cargoDemand(o, d, econ = 1) { const A = ap(o), B = ap(d); return P.CARGO.k * Math.sqrt(A.pop * B.pop) * A.biz * B.biz * econ; }
   const cargoYield = (o, d) => P.CARGO.yield * (gcDistanceKm(o, d) / 1000) ** 0.4;
+  // 0.21.56: Frachtsparte – Hauptdeckfracht mit Frachtern. Auf kurzen Strecken fährt die Fracht meist Lkw (Distanzfaktor).
+  const hashU = (k) => ((hashStr(k) >>> 0) + 0.5) / 4294967296;
+  const hashGauss = (k) => Math.sqrt(-2 * Math.log(hashU(k + '#a'))) * Math.cos(2 * Math.PI * hashU(k + '#b'));
+  const freightDistF = (km) => clamp((km - 250) / 1250, 0.08, 1);
+  /** Frachtbedarf je Richtung in kg pro Tag (ohne Zufall, ohne Preiswirkung). */
+  function freightDemand(o, d, econ = 1) { return cargoDemand(o, d, econ) * P.FREIGHT.k * freightDistF(gcDistanceKm(o, d)); }
+  /** Marktrate in € je kg (vor Preisindex). */
+  const freightRef = (o, d) => cargoYield(o, d) * P.FREIGHT.rateX;
+  const isFreighter = (typeId) => !!(P.AIRCRAFT_TYPES[typeId] && P.AIRCRAFT_TYPES[typeId].role === 'cargo');
+  /** Umläufe pro Tag, die ein Frachter auf dieser Strecke schafft (unter 1: ein Umlauf braucht mehrere Flugzeuge). */
+  function cgPerAc(base, dest, typeId) { const h = rotationHours(base, dest, typeId, 'standard', 'normal'), w = winOf(typeId); return h <= w ? Math.max(1, Math.floor(w / h)) : 1 / Math.max(1, kOf(typeId, h)); }
+  /** Frachter für eine Frequenz (Umläufe pro Woche). */
+  const cgNeedAc = (base, dest, typeId, freq) => Math.max(1, Math.ceil(freq / 7 / cgPerAc(base, dest, typeId) - 1e-9));
+  /** Slots je Flughafen für eine Frachtstrecke: Umläufe pro Tag, aufgerundet. */
+  const cgSlotN = (freq) => Math.ceil(freq / 7 - 1e-9);
+  /** Pseudo-Strecke für die Kostenrechnung je Flug. */
+  const cgUnit = (q) => ({ id: q.id, cg: true, type_id: q.type_id, service: 'standard', buffer: 'normal', base: q.base, dest: q.dest, opened_day: q.opened_day });
 
   // ===========================================================================
   // Streckenrechner
@@ -2838,6 +2863,9 @@ const SM = (() => {
     }
     pushOtp(v) { this.otpHist.push(v); if (this.otpHist.length > 60) this.otpHist.shift(); }
     activeRoutes() { return this.routes.filter((r) => !r.closed); }
+    /** 0.21.56: offene Frachtstrecken (eigene Sparte, nicht in activeRoutes). */
+    cgRoutes() { return this.cg ? this.cg.routes.filter((q) => !q.closed) : []; }
+    cgSlotsAt(apt) { let n = 0; for (const q of this.cgRoutes()) if (q.base === apt || q.dest === apt) n += cgSlotN(q.freq); return n; }
     log(day, msg, kind = 'info') { this.events.push({ day, msg, kind }); if (this.events.length > 300) this.events.shift(); }
     station(apt) { if (!this.stations[apt]) this.stations[apt] = { handling: 'contract', terminal: 'std' }; return this.stations[apt]; }
     terminalAt(apt) { return this.isPlayer && this.stations[apt] ? this.stations[apt].terminal : 'std'; }
@@ -3079,6 +3107,7 @@ const SM = (() => {
         let bh = 0, seats = 0;
         for (const [r, , share] of assign[a.id] || []) { const leg = blockHours(r.base, r.dest, r.type_id); bh += leg * 2 * (share ?? 1); seats = Math.max(seats, pilotsFor(leg), P.AIRCRAFT_TYPES[a.type_id].cockpit || 2); }
         if (a.acmi && a.acmi.start <= day + horizon && a.acmi.end > day) { bh = Math.max(bh, 8); seats = Math.max(seats, 2); }
+        if (a.cg) { const q = this.cg && this.cg.routes.find((x) => x.id === a.cg && !x.closed); if (q && q.opened_day <= day + horizon) { const leg = blockHours(q.base, q.dest, a.type_id), nAc = Math.max(1, this.fleet.filter((x) => x.cg === q.id).length); bh += leg * 2 * Math.min(q.freq / 7, nAc * cgPerAc(q.base, q.dest, a.type_id)) / nAc; seats = Math.max(seats, pilotsFor(leg), P.AIRCRAFT_TYPES[a.type_id].cockpit || 2); } }
         if (bh <= 0) continue;
         const t = P.AIRCRAFT_TYPES[a.type_id], c = crewFor(seats, t.cabin, bh);
         need.pil[t.group] += c.pil; need.cab += c.cab;
@@ -4370,13 +4399,13 @@ const SM = (() => {
     // Slots
     slotUse(apt) {
       let n = 0;
-      for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) n += r.freq; n += al.heldAt(apt, this.day); }
+      for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) n += r.freq; n += al.heldAt(apt, this.day); if (al.cg) n += al.cgSlotsAt(apt); }
       return n;
     }
     /** 0.21.41: Wer hält die Slots an einem Flughafen? Je Airline: genutzt (Flüge pro Tag), Reserve, Warteliste. */
     slotHolders(apt) {
       const out = [];
-      for (const al of this.list) { if (al.status === 'insolvent') continue; let used = 0; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) used += r.freq; const held = al.heldAt(apt, this.day); if (used || held) out.push({ id: al.id, used, held, n: used + held }); }
+      for (const al of this.list) { if (al.status === 'insolvent') continue; let used = al.cg ? al.cgSlotsAt(apt) : 0; for (const r of al.activeRoutes()) if (r.base === apt || r.dest === apt) used += r.freq; const held = al.heldAt(apt, this.day); if (used || held) out.push({ id: al.id, used, held, n: used + held }); }
       return out.sort((a, b) => b.n - a.n);
     }
     slotsFreeFor(al, apt) { if (this.lockedFor(al, apt)) return 0; const f = this.slotsFree(apt); return f === Infinity ? f : Math.max(0, f - this.waitBlock(apt, al)) + al.heldAt(apt, this.day); }
@@ -4588,12 +4617,12 @@ const SM = (() => {
     }
     /** Anteil der Flugzeuge einer Strecke, die noch unter Garantie stehen (jung und seit weniger als zwei Jahren im Einsatz). */
     warrantyOf(al, r) {
-      const W = P.WARRANTY, acs = al.fleet.filter((a) => a.assigned && a.assigned.includes(r._pid || r.id) && a.type_id === r.type_id);
+      const W = P.WARRANTY, acs = al.fleet.filter((a) => ((a.assigned && a.assigned.includes(r._pid || r.id)) || (r.cg && a.cg === r.id)) && a.type_id === r.type_id);
       if (!acs.length) return 0;
       return acs.filter((a) => (a.age0 ?? 99) <= W.maxAge && this.day - (a.delivery_day ?? 0) < W.days).length / acs.length;
     }
     ageOf(al, r) {
-      const acs = al.fleet.filter((a) => a.assigned && a.assigned.includes(r._pid || r.id) && a.type_id === r.type_id);
+      const acs = al.fleet.filter((a) => ((a.assigned && a.assigned.includes(r._pid || r.id)) || (r.cg && a.cg === r.id)) && a.type_id === r.type_id);
       if (!acs.length) return P.AIRCRAFT_TYPES[r.type_id].age;
       return acs.reduce((s, a) => s + al.acAge(a, this.day) * (a.cond || 1), 0) / acs.length;
     }
@@ -4802,6 +4831,8 @@ const SM = (() => {
         a.fhDay = lst.reduce((s, [r, , share]) => s + 2 * blockHours(r.base, r.dest, r.type_id) * (share ?? 1), 0);
         for (const [r, , share] of lst) sum[r.id] = (sum[r.id] || 0) + (share ?? 1);
       }
+      // 0.21.56: Frachter auf Frachtstrecken gelten als eingesetzt (Stunden aus dem Frachtplan)
+      if (al.cg) for (const q of al.cgRoutes()) { const acs = al.fleet.filter((a) => a.cg === q.id); if (!acs.length) continue; const h = rotationHours(q.base, q.dest, q.type_id, 'standard', 'normal') * Math.min(q.freq / 7, acs.length * cgPerAc(q.base, q.dest, q.type_id)) / acs.length; for (const a of acs) a.used_hours = q.opened_day <= this.day + P.LEASE_DELIVERY_DAYS ? h : 0; }
       // Umläufe je Tag: ganze Umläufe täglich, Teilbetrieb (z. B. Langstrecke mit einem Flugzeug) nur an jedem k-ten Tag
       const cnt = {}, d = this.day;
       const today = (x) => { const whole = Math.floor(x + 1e-9), frac = x - whole; return whole + (frac > 1e-6 && Math.floor((d + 1) * frac + 1e-9) > Math.floor(d * frac + 1e-9) ? 1 : 0); };
@@ -4979,6 +5010,7 @@ const SM = (() => {
         }
       }
       for (const al of this.humans) if (al.status !== 'insolvent') hubFlowsDaily(al, flows);
+      this.freightDay();   // 0.21.56: Frachtsparte (nur wenn es Frachtstrecken gibt – sonst unverändert)
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.staffCoverage(al);
       for (const al of this.list) {
         if (al.status === 'insolvent') continue;
@@ -5135,6 +5167,156 @@ const SM = (() => {
       }
       return tot ? own / tot : 0;
     }
+    // ---------- 0.21.56: Frachtsparte ----------
+    /** Alle offenen Frachtstrecken aller Airlines auf einem Flughafenpaar. */
+    cgOnPair(o, d, exceptId = null) { const out = []; for (const x of this.list) { if (x.status === 'insolvent' || !x.cg) continue; for (const q of x.cgRoutes()) if (q.id !== exceptId && pairKey(q.base, q.dest) === pairKey(o, d)) out.push([x, q]); } return out; }
+    /** Kapazität einer Frachtstrecke in kg pro Tag und Richtung (Plan, ohne Ausfälle). */
+    cgCapDay(al, q) { const t = P.AIRCRAFT_TYPES[q.type_id], n = al.fleet.filter((a) => a.cg === q.id).length; return Math.min(q.freq / 7, n * cgPerAc(q.base, q.dest, q.type_id)) * t.cargo_kg * P.FREIGHT.loadMax; }
+    /** Aufteilung eines Richtungsmarkts: offers = [{ cap, rate }] → kg je Angebot. */
+    cgSplit(D, offers) {
+      const F = P.FREIGHT, capT = offers.reduce((s2, x) => s2 + x.cap, 0); if (!(capT > 0)) return offers.map(() => 0);
+      const avg = offers.reduce((s2, x) => s2 + x.cap * x.rate, 0) / capT, De = D * Math.pow(Math.max(0.3, avg), -F.elast);
+      const wt = offers.map((x) => x.cap * Math.pow(Math.max(0.3, x.rate), -F.compete)), wT = wt.reduce((a2, b2) => a2 + b2, 0);
+      const kg = offers.map((x, i) => Math.min(x.cap, De * wt[i] / wT));
+      let left = De - kg.reduce((a2, b2) => a2 + b2, 0);
+      if (left > 1e-6) { const sp = offers.map((x, i) => (x.cap - kg[i] > 1e-6 ? wt[i] : 0)), sT = sp.reduce((a2, b2) => a2 + b2, 0); if (sT > 0) offers.forEach((x, i) => { if (sp[i]) kg[i] = Math.min(x.cap, kg[i] + left * sp[i] / sT); }); }
+      return kg;
+    }
+    /**
+     * Vorschau für eine Frachtstrecke (ohne Zufall): Bedarf, Konkurrenz, erwartete Fracht, Erlös, Kosten, Ergebnis pro Tag.
+     * exceptId: eigene bestehende Strecke nicht doppelt zählen (beim Ändern).
+     */
+    freightQuote(al, base, dest, typeId, freq, rate = 1, exceptId = null) {
+      const F = P.FREIGHT, t = P.AIRCRAFT_TYPES[typeId], cpi = this.macro.cpi, econ = this.econFactor(base, dest, 'business');
+      const per = cgPerAc(base, dest, typeId), need = cgNeedAc(base, dest, typeId, freq), fl = freq / 7, cap = fl * t.cargo_kg * F.loadMax;
+      const comp = this.cgOnPair(base, dest, exceptId).map(([x, q]) => ({ cap: this.cgCapDay(x, q), rate: q.rate || 1, al: x.id }));
+      const D = freightDemand(base, dest, econ), offers = comp.concat([{ cap, rate }]), kg = this.cgSplit(D, offers)[offers.length - 1];
+      const unit = { ...cgUnit({ id: '_q', type_id: typeId, base, dest, opened_day: this.day }), age: t.age };
+      const cO = this.costsFor(al, unit, base, dest, 0, 0, true), cI = this.costsFor(al, unit, dest, base, 0, 0, true);
+      const flightCost = (sumCosts(cO) + sumCosts(cI)) * fl;
+      const rev = 2 * kg * freightRef(base, dest) * rate * cpi, cargoCost = 2 * kg * F.handling * cpi + rev * F.sales;
+      const fixed = aircraftDayFixedGeneric(typeId) * need * cpi;
+      const db1 = rev - flightCost - cargoCost;
+      return { base, dest, typeId, freq, rate, per, need, dem: D, comp: comp.reduce((s2, x) => s2 + x.cap, 0), rivals: comp.length, cap, kg, lf: fl ? kg / (fl * t.cargo_kg) : 0, rateKg: freightRef(base, dest) * rate * cpi,
+        rev, flightCost, cargoCost, fixed, db1, res: db1 - fixed, margin: rev ? (db1 - fixed) / rev : 0, km: gcDistanceKm(base, dest), bh: blockHours(base, dest, typeId) };
+    }
+    /** Ein Tag Frachtsparte: Flüge je Strecke, Nachfrage je Richtung aufteilen, Erlöse und Kosten buchen, Flugstunden. */
+    freightDay() {
+      // Nachfrage fällt jeden Tag an und wird nach geplanter Tageskapazität verteilt; sie wartet beim Anbieter bis zum nächsten Flug
+      // (höchstens drei Tage Zuteilung; was darüber hinaus liegen bleibt, geht an die Konkurrenz verloren).
+      const F = P.FREIGHT, day = this.day, cpi = this.macro.cpi, pairs = new Map();
+      let any = false;
+      for (const al of this.list) {
+        if (al.status === 'insolvent' || !al.cg) continue;
+        for (const q of al.cgRoutes()) {
+          any = true; q._fl = 0;
+          if (q.opened_day > day) continue;
+          const acs = al.fleet.filter((a) => a.cg === q.id && a.base === q.base && a.delivery_day <= day && a.status === 'ok' && !(a.acmi && a.acmi.start <= day && a.acmi.end > day));
+          const plan = Math.min(q.freq / 7, acs.length * cgPerAc(q.base, q.dest, q.type_id));
+          q.acc = (q.acc || 0) + plan; let n = Math.floor(q.acc + 1e-9); q.acc = Math.round((q.acc - n) * 1e6) / 1e6;
+          const ban = this.opsAt(q.base).hard || this.opsAt(q.dest).hard || this.routeBan(al, q.base, q.dest);
+          q._cx = ban ? n : 0; if (ban) n = 0;
+          q._fl = n; q._acs = acs; q._plan = plan; q._dem = 0;
+          if (plan > 0) { const k = pairKey(q.base, q.dest); if (!pairs.has(k)) pairs.set(k, []); pairs.get(k).push(q); }
+        }
+      }
+      if (!any) return;
+      for (const [, list] of pairs) {
+        const o = list[0].base, d = list[0].dest;
+        for (const [a0, b0] of [[o, d], [d, o]]) {
+          const eps = Math.exp(hashGauss(`${this.seed}|${day}|${a0}|${b0}`) * F.sigma - F.sigma * F.sigma / 2);   // eigener Zufall: der Weltzufall bleibt unberührt
+          const D = freightDemand(a0, b0, this.econFactor(a0, b0, 'business')) * eps;
+          const kg = this.cgSplit(D, list.map((q) => ({ cap: q._plan * P.AIRCRAFT_TYPES[q.type_id].cargo_kg * F.loadMax, rate: q.rate || 1 })));
+          list.forEach((q, i) => { const dir = q.base === a0 ? 'out' : 'in', bl = q.bl || (q.bl = { out: 0, in: 0 }); bl[dir] = Math.min(bl[dir] + kg[i], 3 * kg[i] + 1); q._dem += D; });
+        }
+      }
+      for (const al of this.list) {
+        if (al.status === 'insolvent' || !al.cg) continue;
+        const L = al.ledger;
+        for (const q of al.cgRoutes()) {
+          if (q.opened_day > day) continue;
+          const t = P.AIRCRAFT_TYPES[q.type_id], n = q._fl || 0, rt = L.det ? `Fracht ${rTag(q)}` : null, bl = q.bl || (q.bl = { out: 0, in: 0 }), kgDir = { out: 0, in: 0 };
+          let rev = 0, cost = 0;
+          if (n > 0) {
+            const u = cgUnit(q);
+            for (const [o, d, dir] of [[q.base, q.dest, 'out'], [q.dest, q.base, 'in']]) {
+              const c = this.costsFor(al, u, o, d, 0, 0);
+              for (const k of COST_KEYS) { if (!c[k]) continue; L.post(k, -c[k] * n, true, rt); cost += c[k] * n; }
+              const kg = Math.min(bl[dir], n * t.cargo_kg * F.loadMax); bl[dir] -= kg; kgDir[dir] = kg;
+              const rv = kg * freightRef(o, d) * (q.rate || 1) * cpi, cc = kg * F.handling * cpi + rv * F.sales;
+              if (rv > 0) L.post('rev_cargo', rv, true, rt);
+              if (cc > 0) L.post('cargo_cost', -cc, true, rt);
+              rev += rv; cost += cc;
+            }
+            const bh = 2 * blockHours(q.base, q.dest, q.type_id) * n;
+            for (const a of q._acs) a.fh += bh / q._acs.length;
+          }
+          q.hist = q.hist || []; q.hist.push([day, n, Math.round(kgDir.out), Math.round(kgDir.in), Math.round(n * t.cargo_kg), Math.round(rev), Math.round(cost), Math.round(q._dem || 0), q._cx || 0]);
+          if (q.hist.length > 60) q.hist.shift();
+          delete q._dem; delete q._acs; delete q._plan;
+          if (al.isPlayer && (rev || cost)) { const tt = al._today || (al._today = { pax: 0, seats: 0, rev: 0, cost: 0, flights: 0, late: 0, canc: 0 }); tt.rev += rev; tt.cost += cost; tt.flights += 2 * n; }
+        }
+      }
+    }
+    /** Frachtstrecke eröffnen (Spielende und KI). */
+    cgOpen(al, base, dest, typeId, freq, rate = 1, ai = false) {
+      const F = P.FREIGHT, t = P.AIRCRAFT_TYPES[typeId], day = this.day;
+      if (!isFreighter(typeId)) return { ok: false, msg: 'Frachtstrecken fliegen nur Frachter (ATR 72-600F, A321P2F, 767-300F, 777F).' };
+      if (!P.AIRPORTS[base] || !P.AIRPORTS[dest] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
+      if (!al.bases.includes(base)) return { ok: false, msg: `${base} ist keine Ihrer Basen – Frachtstrecken starten an einer Basis.` };
+      if (!rangeOk(base, dest, typeId)) return { ok: false, msg: aptOk(base, dest, typeId) ? `Die ${t.label} schafft ${base}–${dest} nicht (Reichweite ${Math.round(t.range_km).toLocaleString('de-DE')} km).` : aptWhy(base, dest, typeId) };
+      freq = clamp(Math.round(num(freq, 7)), 1, F.maxWeek); rate = clamp(Math.round(num(rate, 1) * 100) / 100, F.minRate, F.maxRate);
+      if (al.cgRoutes().some((q) => pairKey(q.base, q.dest) === pairKey(base, dest) && q.type_id === typeId)) return { ok: false, msg: `${base}–${dest} mit ${t.label} fliegen Sie schon – ändern Sie dort die Frequenz.` };
+      const need = cgNeedAc(base, dest, typeId, freq), free = this.cgFree(al, base, typeId);
+      if (free.length < need) return { ok: false, msg: `Für ${freq} Umläufe pro Woche brauchen Sie ${need} ${t.label} in ${base}${free.length ? ` – frei sind ${free.length}` : ' – dort ist keiner frei'}. Frachter gibt es unter Flotte → Beschaffung.`, need, free: free.length };
+      const sn = cgSlotN(freq);
+      if (!this.slotsOkFor(al, base, dest, sn)) return { ok: false, msg: `Keine freien Slots für ${sn} Flug${sn > 1 ? 'e' : ''} am Tag in ${[base, dest].filter((x) => this.slotsFreeFor(al, x) < sn).join(' und ')}.` };
+      if (al.isPlayer) { const sc = this.slotCost(al, base, dest, sn); if (sc.cost > al.spendable(this.macro.bank ?? 1)) return { ok: false, msg: `Die Slots kosten ${Math.round(sc.cost / 1000)} Tsd. EUR – dafür reicht das Geld nicht.` };
+        if (sc.cost > 0) { for (const x of sc.parts) al.slotInvest(x.apt, x.cost, x.n); al.log(day, `Slots für Fracht ${base}–${dest} gekauft: ${sc.parts.map((x) => `${x.n} in ${x.apt}`).join(', ')} (${Math.round(sc.cost / 1000)} Tsd. EUR)`, 'route'); } }
+      al.cg = al.cg || { n: 0, routes: [] };
+      al.cg.n = (al.cg.n || 0) + 1;
+      const q = { id: `${al.id}-C${al.cg.n}`, base, dest, type_id: typeId, freq, rate, opened_day: day + F.lead, acc: 0, hist: [] };
+      al.cg.routes.push(q);
+      for (const a of free.slice(0, need)) a.cg = q.id;
+      this.takeSlots(al, base, dest, sn);
+      const msg = `Frachtstrecke ${base}–${dest} eröffnet: ${t.label}, ${freq} Umläufe pro Woche, ${need} Frachter, erster Flug am ${dayDE(q.opened_day)}.`;
+      al.log(day, msg, 'route');
+      if (ai) this.pushNews(day, `${al.name} ${al.cg.routes.length === 1 ? 'startet eine Frachtsparte' : 'baut die Fracht aus'}: ${ap(base).name}–${ap(dest).name} mit ${t.label}`, 'ai', al.id);
+      return { ok: true, msg, route: q };
+    }
+    /** Freie Frachter eines Musters an einer Basis (nicht auf einer Frachtstrecke, kein laufender oder künftiger Charter). */
+    cgFree(al, base, typeId) { return al.fleet.filter((a) => a.type_id === typeId && a.base === base && !a.cg && !acmiList(a, this.day).length && a.status !== 'sold'); }
+    cgEdit(al, id, freq, rate) {
+      const F = P.FREIGHT, q = al.cgRoutes().find((x) => x.id === id); if (!q) return { ok: false, msg: 'Frachtstrecke nicht gefunden.' };
+      const notes = [];
+      if (rate !== undefined && rate !== null) { const r2 = clamp(Math.round(num(rate, q.rate) * 100) / 100, F.minRate, F.maxRate); if (r2 !== q.rate) { q.rate = r2; notes.push(`Rate ${Math.round(r2 * 100)} % vom Markt`); } }
+      if (freq !== undefined && freq !== null) {
+        const nf = clamp(Math.round(num(freq, q.freq)), 1, F.maxWeek);
+        if (nf !== q.freq) {
+          const mine = al.fleet.filter((a) => a.cg === q.id), need = cgNeedAc(q.base, q.dest, q.type_id, nf), dS = cgSlotN(nf) - cgSlotN(q.freq);
+          if (need > mine.length) { const free = this.cgFree(al, q.base, q.type_id); if (free.length < need - mine.length) return { ok: false, msg: `Für ${nf} Umläufe pro Woche brauchen Sie ${need} Frachter – ${mine.length} fliegen schon, frei sind ${free.length} weitere in ${q.base}.` };
+            if (dS > 0 && !this.slotsOkFor(al, q.base, q.dest, dS)) return { ok: false, msg: `Keine freien Slots für ${dS} weitere Flüge am Tag.` };
+            for (const a of free.slice(0, need - mine.length)) a.cg = q.id; }
+          else if (dS > 0 && !this.slotsOkFor(al, q.base, q.dest, dS)) return { ok: false, msg: `Keine freien Slots für ${dS} weitere Flüge am Tag.` };
+          if (dS > 0) { if (al.isPlayer) { const sc = this.slotCost(al, q.base, q.dest, dS); if (sc.cost > al.spendable(this.macro.bank ?? 1)) return { ok: false, msg: `Die zusätzlichen Slots kosten ${Math.round(sc.cost / 1000)} Tsd. EUR – dafür reicht das Geld nicht.` }; if (sc.cost > 0) for (const x of sc.parts) al.slotInvest(x.apt, x.cost, x.n); } this.takeSlots(al, q.base, q.dest, dS); }
+          else if (dS < 0) for (const x of [q.base, q.dest]) al.release(x, -dS, this.day);
+          if (need < mine.length) for (const a of mine.slice(need)) delete a.cg;
+          notes.push(`${q.freq} → ${nf} Umläufe pro Woche (${need} Frachter)`); q.freq = nf;
+        }
+      }
+      if (!notes.length) return { ok: true, msg: 'Keine Änderung.' };
+      const msg = `Fracht ${q.base}–${q.dest}: ${notes.join(', ')}.`; al.log(this.day, msg, 'route'); return { ok: true, msg };
+    }
+    cgClose(al, id, why = 'von Ihnen eingestellt') {
+      const q = al.cgRoutes().find((x) => x.id === id); if (!q) return { ok: false, msg: 'Frachtstrecke nicht gefunden.' };
+      q.closed = true; q.closedDay = this.day;
+      for (const a of al.fleet) if (a.cg === q.id) delete a.cg;
+      for (const x of [q.base, q.dest]) al.release(x, cgSlotN(q.freq), this.day);
+      const msg = `Frachtstrecke ${q.base}–${q.dest} ${why}. Die Frachter stehen wieder frei (Charter oder neue Frachtstrecke).`;
+      al.log(this.day, msg, 'route');
+      al.cg.routes = al.cg.routes.filter((x) => !x.closed || this.day - (x.closedDay || 0) < 90);
+      return { ok: true, msg };
+    }
     maintenanceDaily() {
       for (const al of this.list) {
         if (al.status === 'insolvent') continue;
@@ -5230,6 +5412,7 @@ const SM = (() => {
         for (const r of al.activeRoutes()) if (r.opened_day <= this.day) for (const x of [r.base, r.dest]) slotFee += apx(x).slotFee * r.freq;
         L.post('slots', -slotFee * cpi);
       }
+      if (al.cg) { let f = 0; for (const q of al.cgRoutes()) if (q.opened_day <= this.day) for (const x of [q.base, q.dest]) f += apx(x).slotFee * cgSlotN(q.freq); if (f) L.post('slots', -f * cpi, true, 'Slotgebühr Frachtstrecken'); }
       if (al.creditUsed > 0) L.post('interest', -al.creditUsed * al.creditRate(this.macro.rate, this.macro.bank ?? 1) / 365, true, 'Dispositionskredit');
       for (const ln of al.loans) L.post('interest', -ln.balance * ln.rate / 365, true, `Bankkredit${ln.id ? ' ' + ln.id : ''}`);
       if (al.isPlayer) this.playerDailyFixed(al);
@@ -6327,6 +6510,7 @@ const SM = (() => {
     acceptAcmi(al, offerId, acId) {
       const o = this.acmiOffers.find((x) => x.id === offerId), a = al.fleet.find((x) => x.id === acId);
       if (!o || !a) return { ok: false, msg: 'Angebot oder Flugzeug nicht gefunden.' };
+      if (a.cg) return { ok: false, msg: `${a.id} fliegt auf einer Ihrer Frachtstrecken. Nehmen Sie es dort zuerst heraus (Cargo → Frachtnetz).` };
       if (a.type_id !== o.type && (P.AIRCRAFT_TYPES[a.type_id].group !== P.AIRCRAFT_TYPES[o.type].group || (P.AIRCRAFT_TYPES[a.type_id].role || '') !== (P.AIRCRAFT_TYPES[o.type].role || ''))) return { ok: false, msg: `Der Kunde will eine ${P.AIRCRAFT_TYPES[o.type].label} oder ein Muster derselben Familie${P.AIRCRAFT_TYPES[o.type].role === 'cargo' ? ' als Frachter' : P.AIRCRAFT_TYPES[o.type].role === 'biz' ? '' : ' mit Passagierkabine'}.` };
       const clash = acmiList(a, this.day).find((b) => o.start < b.end && o.end > b.start);
       if (clash) return { ok: false, msg: `${a.id} ist vom ${dayDE(clash.start)} bis ${dayDE(clash.end)} schon an ${clash.client} verchartert – der Zeitraum überschneidet sich.`, clash: { start: clash.start, end: clash.end, client: clash.client } };
@@ -6494,6 +6678,7 @@ const SM = (() => {
       if (routes.length && !force) return { ok: false, msg: `Ab ${apt} laufen noch ${routes.map((r) => r.base + '–' + r.dest).join(', ')}.`, routes: routes.map((r) => r.id) };
       const rest = al.bases.filter((b) => b !== apt), target = rest.includes(to) ? to : rest[0];
       for (const r of routes) al.closeRoute(this.day, r, `Basis ${apt} geschlossen`);
+      for (const q of al.cgRoutes().filter((x) => x.base === apt)) this.cgClose(al, q.id, `eingestellt – Basis ${apt} geschlossen`);
       let moved = 0;
       for (const a of al.fleet) if (a.base === apt) { a.base = target; a.pins = []; if (a.mode === 'manual') a.mode = 'auto'; moved++; }
       al.bases = rest; al.hangars = al.hangars.filter((x) => x !== apt);
@@ -6505,6 +6690,7 @@ const SM = (() => {
     }
     moveAircraft(al, acId, base) {
       const a = al.fleet.find((x) => x.id === acId); if (!a || !al.bases.includes(base)) return { ok: false };
+      if (a.cg && a.base !== base) return { ok: false, msg: `${a.id} fliegt auf einer Frachtstrecke ab ${a.base}. Senken Sie dort zuerst die Frequenz oder schließen Sie die Strecke.` };
       a.base = base; al.ledger.post('one_off', -12000 * this.macro.cpi, true, `Flugzeug verlegt › ${acTag(al, a)}`);
       if (a.pins && a.pins.length) { a.pins = []; if (a.mode === 'manual') a.mode = 'auto'; }
       al.log(this.day, `${a.id} nach ${ap(base).name} umstationiert`, 'fleet');
@@ -7256,8 +7442,47 @@ const SM = (() => {
     w.pushNews(day, `Neue Airline am Markt: ${name} (${P.AI_ARCHETYPES[arch].label}) startet in ${ap(base).name}`, 'info', al.id);
     for (const h of w.humans) if (h.bases.includes(base) || h.activeRoutes().some((rt) => rt.base === base || rt.dest === base)) h.log(day, `Neue Konkurrenz: ${name} startet in ${ap(base).name}.`, 'warn');
   }
+  /** 0.21.56: KI-Frachtsparte – bestehende Frachtstrecken prüfen, gelegentlich eine neue eröffnen (mit geleasten Frachtern). */
+  function aiCargoMonthly(w, al) {
+    const F = P.FREIGHT, A = F.ai, day = w.day, types = A.types[al.archetype] || [];
+    for (const q of al.cgRoutes()) {
+      if (day - q.opened_day < 60) continue;
+      const h = (q.hist || []).slice(-30), res = h.reduce((s2, x) => s2 + x[5] - x[6], 0) - aircraftDayFixedGeneric(q.type_id) * al.fleet.filter((a) => a.cg === q.id).length * w.macro.cpi * h.length;
+      const cap = h.reduce((s2, x) => s2 + x[4], 0), kg = h.reduce((s2, x) => s2 + x[2] + x[3], 0), lf = cap ? kg / (2 * cap) : 0;
+      q.neg = res < 0 ? (q.neg || 0) + 1 : 0;
+      if (q.neg >= 2) {
+        if (q.freq > 2) { w.cgEdit(al, q.id, Math.max(1, Math.round(q.freq * 0.6))); q.neg = 0; }
+        else { w.cgClose(al, q.id, 'wegen Verlusten eingestellt'); w.pushNews(day, `${al.name} stellt die Fracht ${ap(q.base).name}–${ap(q.dest).name} ein`, 'ai', al.id); }
+      } else if (lf > 0.9 && res > 0 && q.freq < F.maxWeek) {
+        const nf = Math.min(F.maxWeek, q.freq + Math.max(1, Math.round(q.freq * 0.3))), need = cgNeedAc(q.base, q.dest, q.type_id, nf), have = al.fleet.filter((a) => a.cg === q.id).length;
+        for (let i = have + w.cgFree(al, q.base, q.type_id).length; i < need; i++) al.acquire(day, q.type_id, q.base, 'lease', null, w);
+        w.cgEdit(al, q.id, nf);
+      }
+    }
+    for (const a of al.fleet.slice()) if (isFreighter(a.type_id) && !a.cg && !acmiList(a, day).length && a.delivery_day < day - 30 && a.status === 'ok') { releaseFleet(w, [a]); al.dispose(day, a, 'Frachter ohne Einsatz'); }
+    if (!types.length || day < F.ai.minDay || al.cgRoutes().length >= (A.maxRoutes[al.archetype] || 0) || al.status !== 'active') return;
+    if (hashU(`${w.seed}|cg|${al.id}|${day}`) > A.p) return;
+    const reserve = 90 * (6000 + al.fleet.reduce((s2, a) => s2 + aircraftDayFixedGeneric(a.type_id), 0));
+    if (al.ledger.cash / 100 < reserve) return;
+    let best = null;
+    for (const base of al.bases) {
+      const cands = AP_CODES.filter((c) => c !== base && !al.cgRoutes().some((q) => pairKey(q.base, q.dest) === pairKey(base, c))).map((c) => [c, freightDemand(base, c) * freightRef(base, c)]).sort((x, y) => y[1] - x[1]).slice(0, 12);
+      for (const [dest] of cands) for (const typeId of types) {
+        if (!rangeOk(base, dest, typeId)) continue;
+        for (const fq of [3, 7]) {
+          if (!w.slotsOkFor(al, base, dest, cgSlotN(fq))) continue;
+          const qt = w.freightQuote(al, base, dest, typeId, fq, 1);
+          if (qt.margin >= A.margin && qt.res > 0 && (!best || qt.res > best.res)) best = qt;
+        }
+      }
+    }
+    if (!best) return;
+    for (let i = w.cgFree(al, best.base, best.typeId).length; i < best.need; i++) al.acquire(day, best.typeId, best.base, 'lease', null, w);
+    w.cgOpen(al, best.base, best.dest, best.typeId, best.freq, 1, true);
+  }
   function aiMonthly(w, al) {
     const cfg = al.cfg, day = w.day;
+    aiCargoMonthly(w, al);
     for (const r of al.activeRoutes()) {
       if (day - r.opened_day < 60 || day - r.lastChange < 60) continue;
       const db = routeDb(r, 30, al), lf = routeLf(r, 30);
@@ -9062,7 +9287,7 @@ const SM = (() => {
         const { base, dest } = a, type = a.typeId, wk = a.wk !== undefined && a.wk !== null ? clamp(Math.round(num(a.wk, 7)), 1, 7) : 7, freq = wk < 7 ? 1 : clamp(Math.round(num(a.freq, 1)), 1, 8);
         if (!al.bases.includes(base) || !P.AIRPORTS[dest] || !P.AIRCRAFT_TYPES[type] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
         { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %). ${w.antitrustPlan(al, at).adviceTxt}` }; }
-        if (P.AIRCRAFT_TYPES[type].role) return { ok: false, msg: `${P.AIRCRAFT_TYPES[type].label} fliegt keine Linie – ${P.AIRCRAFT_TYPES[type].role === 'cargo' ? 'Frachter' : 'Privatjets'} arbeiten im Charter-Pool (Flotte → Charter).` };
+        if (P.AIRCRAFT_TYPES[type].role) return { ok: false, msg: `${P.AIRCRAFT_TYPES[type].label} fliegt keine Linie – ${P.AIRCRAFT_TYPES[type].role === 'cargo' ? 'Frachter fliegen eigene Frachtstrecken (Cargo → Neue Frachtstrecke) oder Charter (Flotte → Charter).' : 'Privatjets arbeiten im Charter-Pool (Flotte → Charter).'}` };
         if (!routeKmOk(base, dest)) return { ok: false, msg: `Unter ${P.MIN_ROUTE_KM} km gibt es keine Linienflüge.` };
         if (!aptOk(base, dest, type)) return { ok: false, msg: aptWhy(base, dest, type) };
         if (!rangeOk(base, dest, type)) return { ok: false, msg: 'Reichweite zu kurz.' };
@@ -9233,6 +9458,9 @@ const SM = (() => {
         const msg = `Anpassung an „${String(e.short || e.text || '').split(':')[0]}“: ${nAp ? `Preisautomatik auf ${nAp} Strecke${nAp > 1 ? 'n' : ''}` : ''}${nAp && nF ? ', ' : ''}${nF ? `Frequenz gesenkt: ${notes.join(', ')}` : ''}.`;
         al.log(day, msg, 'route'); return { ok: true, msg };
       }
+      case 'cgOpen': return w.cgOpen(al, String(a.base || ''), String(a.dest || ''), String(a.typeId || ''), a.freq, a.rate);
+      case 'cgEdit': return w.cgEdit(al, String(a.id || ''), a.freq, a.rate);
+      case 'cgClose': return w.cgClose(al, String(a.id || ''));
       case 'antitrustAdjust': {   // 0.21.55: Vorschlag zur Wettbewerbsaufsicht übernehmen
         const c = String(a.apt || ''); if (!P.AIRPORTS[c]) return { ok: false, msg: 'Ungültig.' };
         const pa = w.antitrustPlan(al, c); if (pa.ok || !pa.cuts.length) return { ok: false, msg: 'Nichts anzupassen – Ihr Anteil liegt unter der Grenze.' };
@@ -9450,7 +9678,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, autoGrow: al.autoGrow || undefined, autoEq: al.autoEq ?? undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, autoGrow: al.autoGrow || undefined, autoEq: al.autoEq ?? undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, cg: al.cg && (al.cg.routes.length || al.cg.n) ? al.cg : undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -9598,6 +9826,7 @@ const SM = (() => {
   }
 
   return {
+    freightDemand, freightRef, cgPerAc, cgNeedAc, cgSlotN, isFreighter,
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, GEO_ZONES, homeCountry, zoneExtraKm, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, routeUnits, mixOk, mixCheck, transferPlan, hubFlowsDaily, offerText, perkOn, minApt, dayDate, aiDealValue, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
@@ -9769,7 +9998,9 @@ window.SKYMAP = {"W":2000,"H":1115,"S":318.3098861837907,"TY":717.0893724404151,
     starter: { key: 'starter', label: 'Starter Pack', packs: 10, price: '5', currency: 'TOKEN' },
     collector: { key: 'collector', label: 'Collector Pack', packs: 20, price: '10', currency: 'TOKEN' },
   };
-  const api = { RARITIES, RARITY_ORDER, PACK_COUNT_ODDS, CATEGORIES, MODELS, MODEL_BY_ID, MODEL_BY_TYPE, DESIGNS, SKINS, SKIN_BY_ID, SKINS_BY_MODEL_RARITY, MILESTONES, OFFERS, drawPack, TOTAL: SKINS.length };
+  /** 0.21.57: ein Exemplar eines Skins darf auf bis zu so vielen Flugzeugen gleichzeitig aktiv sein. */
+  const PER_COPY = 5;
+  const api = { PER_COPY, RARITIES, RARITY_ORDER, PACK_COUNT_ODDS, CATEGORIES, MODELS, MODEL_BY_ID, MODEL_BY_TYPE, DESIGNS, SKINS, SKIN_BY_ID, SKINS_BY_MODEL_RARITY, MILESTONES, OFFERS, drawPack, TOTAL: SKINS.length };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.SKINS = api;
 })();
@@ -10131,7 +10362,7 @@ function visibleAl(al) {
 }
 function renderMapRoutes(force = false) {
   const evs = SM.AP_CODES.map(aptEventState).join(','), dead = deadCountries();
-  const sig = dead.join('') + W.list.map((al) => al.activeRoutes().map((r) => r.id + r.freq + (r.flyingToday || 0)).join(',')).join('|') + ui.showAi + ui.flightFilter + ui.expanded + ui.selApt + evs + W.player.bases.join() + '|' + W.day + '|' + W.geoLists().fly.map((e) => e.id).join();
+  const sig = dead.join('') + W.list.map((al) => al.activeRoutes().map((r) => r.id + r.freq + (r.flyingToday || 0)).join(',') + (al.cg ? al.cgRoutes().map((q) => q.id + q.freq).join(',') : '')).join('|') + ui.showAi + ui.flightFilter + ui.expanded + ui.selApt + evs + W.player.bases.join() + '|' + W.day + '|' + W.geoLists().fly.map((e) => e.id).join();
   if (!force && sig === ui.routesSig) return;
   ui.routesSig = sig;
   let ai = '', hum = '', mine = '';
@@ -10148,7 +10379,10 @@ function renderMapRoutes(force = false) {
       else ai += `<path class="rt ai" d="${d}" stroke="${colorOf(al)}"/>`;
     }
   }
-  $('#gRoutes').innerHTML = ai + hum + mine;
+  // 0.21.56: Frachtstrecken gestrichelt (eigene kräftig, andere dünn)
+  let cg = '';
+  for (const al of W.list) { if (!al.cg || al.status === 'insolvent' || (al.id !== W.playerId && !visibleAl(al))) continue; for (const q of al.cgRoutes()) cg += `<path class="rt ${al.id === W.playerId ? 'cg' : 'cgai'}" d="${lineD(gcLine(q.base, q.dest))}"${al.id === W.playerId ? '' : ` stroke="${colorOf(al)}"`}/>`; }
+  $('#gRoutes').innerHTML = ai + hum + cg + mine;
   renderGrey(dead); ui.dead = new Set(dead);
   ui.viewDirty = true;
   renderLegend();
@@ -10391,7 +10625,8 @@ function renderPlanes() {
       if (x < -20 || y < -20 || x > view.w + 20 || y > view.h + 20) continue;
       const hu = !s.me && !s.al.archetype;
       const sk = collOn() ? skinMapStyle(skinFor(s.al, s.ac.id)) : null;
-      const p = { x, y, a: ang, sc: (sel ? 1.35 : s.me || hu || sk ? 1.0 : 0.78) * sc0, me: s.me, sel, icon: s.icon, ac: s.ac.id, fill: hu ? cvColor(colorOf(s.al)) : null, sk };
+      // 0.21.57: Übersicht – fremde Flugzeuge ohne Skin klein und grau, Skins groß (Gold am größten)
+      const p = { x, y, a: ang, sc: (sel ? 1.35 : sk ? (sk.fx === 'l' ? 1.5 : sk.fx === 'm' || sk.fx === 'disco' ? 1.35 : 1.2) : s.me ? 1.0 : 0.62) * sc0, me: s.me, sel, icon: s.icon, ac: s.ac.id, fill: null, grey: !s.me && !sk, sk };
       if (sk && sk.fx === 'l' && !s.me && !sel && k >= 0.8) trails.push([line, f, false, 'gold']);
       if (sel) selPlane = p; else planes.push(p);
       hits.push(p);
@@ -10404,10 +10639,10 @@ function renderPlanes() {
   let msGrad = null; if (msTrail) { msGrad = ctx.createLinearGradient(0, 0, view.w, view.h); msGrad.addColorStop(0, '#22d3ee'); msGrad.addColorStop(1, '#a855f7'); }
   for (const [line, f, sel, gold] of trails) {
     ctx.beginPath(); trailPath(ctx, line, f);
-    ctx.strokeStyle = sel ? '#22d3ee' : gold ? '#f5b301' : msGrad || C.trail;
-    ctx.globalAlpha = sel ? 1 : gold ? 0.7 : 0.85; ctx.lineWidth = sel ? 2.6 : gold ? 2 : 2.2; ctx.stroke();
+    ctx.strokeStyle = sel ? '#22d3ee' : gold ? '#fff1b8' : msGrad || C.trail; ctx.setLineDash(gold && !sel ? [6, 4] : []);
+    ctx.globalAlpha = sel ? 1 : gold ? 0.9 : 0.85; ctx.lineWidth = sel ? 2.6 : gold ? 2.2 : 2; ctx.stroke();
   }
-  ctx.globalAlpha = 1;
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
   const pathOf = (d) => { let p2 = planeCv.paths.get(d); if (!p2) { p2 = new Path2D(d); planeCv.paths.set(d, p2); } return p2; };
   const ring = new Path2D(); ring.arc(0, 0, 11, 0, Math.PI * 2);
   const nowT = performance.now();
@@ -10420,9 +10655,10 @@ function renderPlanes() {
       drawSkinFx(ctx, p, k, nowT);
       if (p.sk.fx === 'disco') { const dc = discoColor(nowT); ctx.shadowColor = dc; ctx.shadowBlur = 7 * dpr; ctx.fillStyle = dc; ctx.fill(ic); ctx.shadowBlur = 0; ctx.strokeStyle = '#1a0b24'; ctx.lineWidth = 0.6; ctx.stroke(ic); return; }
       if (p.sk.glow) { ctx.shadowColor = p.sk.glow; ctx.shadowBlur = (p.sk.fx === 'e' || p.sk.fx === 'm' ? 6 : 4) * dpr; }
-      if (p.sk.fx === 'l') { ctx.shadowColor = '#f5b301'; ctx.shadowBlur = 5 * dpr; }
+      if (p.sk.fx === 'l') { ctx.shadowColor = '#ffd34d'; ctx.shadowBlur = 10 * dpr; }
+      if (p.sk.fx === 'l') { const g = ctx.createLinearGradient(-9, -6, 9, 6), m = (Math.sin(nowT / 450) + 1) / 2; g.addColorStop(0, '#c98a00'); g.addColorStop(Math.max(0.05, Math.min(0.95, m)), '#ffffff'); g.addColorStop(1, '#ffd34d'); ctx.fillStyle = g; } else
       ctx.fillStyle = p.sk.fill; ctx.fill(ic); ctx.shadowBlur = 0; ctx.strokeStyle = p.sk.edge; ctx.lineWidth = 0.6; ctx.stroke(ic);
-      if (p.sk.fx === 'l') { ctx.fillStyle = '#fff6d6'; ctx.beginPath(); ctx.arc(0, 0, 1.6 + (k >= 0.9 ? Math.sin(nowT / 350) * 0.5 : 0), 0, Math.PI * 2); ctx.fill(); }
+      if (p.sk.fx === 'l') { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, 1.6 + Math.sin(nowT / 350) * 0.5, 0, Math.PI * 2); ctx.fill(); }
       return;
     }
     if (p.me) {
@@ -10431,8 +10667,7 @@ function renderPlanes() {
       ctx.shadowColor = C.me; ctx.shadowBlur = 3 * dpr; ctx.fillStyle = C.me; ctx.fill(ic); ctx.shadowBlur = 0;
       ctx.strokeStyle = C.edge; ctx.lineWidth = 0.6; ctx.stroke(ic); return;
     }
-    ctx.fillStyle = p.fill || C.ai; ctx.fill(ic);   // Mitspielende in ihrer Farbe
-    if (p.fill || k >= 0.6) { ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 0.5; ctx.stroke(ic); }   // weit herausgezoomt ohne Kontur
+    ctx.globalAlpha = 0.55; ctx.fillStyle = C.ai; ctx.fill(ic); ctx.globalAlpha = 1;   // 0.21.57: alle fremden Flugzeuge ohne Skin klein und grau
   };
   for (const p of planes) draw(p);
   if (selPlane) draw(selPlane);
@@ -10542,6 +10777,7 @@ const IC = {
   target: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
   layers: '<path d="M12 3 2 8l10 5 10-5z"/><path d="M2 13l10 5 10-5"/>',
   gem: '<path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M9 3l3 18 3-18"/>',
+  box: '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   pause: '<path d="M9 6v12M15 6v12"/>',
   play: '<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>',
 };
@@ -10550,6 +10786,7 @@ const SECTIONS = [
   { key: 'karte', label: 'Karte', sub: 'Live-Lage und Überblick', icon: 'globe', tabs: [['dashboard', 'Dashboard'], ['strategy', 'Strategie'], ['history', 'Verlauf'], ['cockpit', 'Übersicht'], ['departures', 'Abflüge'], ['news', 'Meldungen']] },
   { key: 'flotte', label: 'Flotte', sub: 'Jedes Flugzeug zählt', icon: 'plane', tabs: [['fleetOwn', 'Ihre Flotte'], ['fleetPlan', 'Einsatzplan'], ['fleetBuy', 'Beschaffung'], ['fleetAcmi', 'Charter']] },
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung'], ['plans', 'Pläne'], ['hubs', 'Drehkreuze'], ['slots', 'Slots']] },
+  { key: 'cargo', label: 'Cargo', sub: 'Fracht mit eigenen Frachtern', icon: 'box', tabs: [['cargo', 'Frachtnetz'], ['cargoNew', 'Neue Frachtstrecke'], ['cargoMarket', 'Frachtmarkt']] },
   { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['rescue', 'Sanierung'], ['cfo', 'CFO-Beratung']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['exchange', 'Börse'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
   { key: 'sammlung', label: 'Collection', short: 'Sammlung', sub: 'Skins sammeln, öffnen, tauschen', icon: 'gem', mp: true, tabs: [['collection', 'Collection'], ['shop', 'Shop'], ['trading', 'Trading']] },
@@ -11747,7 +11984,8 @@ function crewInfo(pl, a) {
 function acRoleChips(pl, a) {
   const out = [];
   const inService = a.delivery_day <= W.day && !((a.status === 'ccheck' || a.status === 'aog') && a.until > W.day) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day);
-  if (inService && a.used_hours > 0) { const c = crewInfo(pl, a); if (c) out.push(`<span class="chip ${c.cls}" title="${esc(c.tip)}">${c.txt}</span>`); }
+  if (a.cg) { const q = (pl.cgRoutes ? pl.cgRoutes() : []).find((x) => x.id === a.cg); out.push(`<span class="chip cgc" title="Fliegt auf einer Frachtstrecke (Cargo → Frachtnetz)">Fracht ${q ? `${q.base}–${q.dest}` : ''}</span>`); }
+  else if (inService && a.used_hours > 0) { const c = crewInfo(pl, a); if (c) out.push(`<span class="chip ${c.cls}" title="${esc(c.tip)}">${c.txt}</span>`); }
   else if (inService && acMode(a) === 'charter') out.push(`<span class="chip warn" title="Fliegt nur Charteraufträge">Charter-Pool${SM.acmiList(a, W.day).length ? ' · ' + SM.acmiList(a, W.day).length + ' Auftr.' : ' · ohne Auftrag'}</span>`);
   else if (inService && acMode(a) === 'reserve') out.push(`<span class="chip me" title="Springt ein, wenn ein anderes Flugzeug ausfällt">Reserve in ${a.base}</span>`);
   else if (inService) out.push(`<span class="chip" title="Einsatzbereit, aber ohne Strecke – kostet trotzdem jeden Tag">bereit in ${a.base}</span>`);
@@ -11825,7 +12063,7 @@ function acmiGain(pl, o, a) {
   return { rate, net: rate - maint - lost, lost, total: (rate - maint - lost) * (o.end - o.start) };
 }
 /** Kann Flugzeug a den Auftrag o fliegen (Familie, Lieferung, keine Überschneidung)? */
-function acmiFits(a, o) { return grpOf(a.type_id) === grpOf(o.type) && (P.AIRCRAFT_TYPES[a.type_id].role || '') === (P.AIRCRAFT_TYPES[o.type].role || '') && a.delivery_day <= o.start && !SM.acmiList(a, W.day).some((b) => o.start < b.end && o.end > b.start) && !((a.status === 'ccheck' || a.status === 'aog') && a.until > o.start); }
+function acmiFits(a, o) { return !a.cg && grpOf(a.type_id) === grpOf(o.type) && (P.AIRCRAFT_TYPES[a.type_id].role || '') === (P.AIRCRAFT_TYPES[o.type].role || '') && a.delivery_day <= o.start && !SM.acmiList(a, W.day).some((b) => o.start < b.end && o.end > b.start) && !((a.status === 'ccheck' || a.status === 'aog') && a.until > o.start); }
 function acmiCalendar(pl, rows, F) {
   const from = W.day, span = F.range, to = from + span, pc = (d) => ((Math.max(from, Math.min(to, d)) - from) / span * 100).toFixed(2);
   // Monatsköpfe
@@ -11847,7 +12085,7 @@ function acmiCalendar(pl, rows, F) {
 }
 VIEWS.fleetAcmi = function viewFleetAcmi() {
   const pl = W.player, F = ui.acf = ui.acf || { ac: '', fit: true, fam: '', kind: '', ev: false, sort: 'start', gap: null, range: 120 };
-  const pool = pl.fleet.filter((a) => acMode(a) === 'charter'), withBk = pl.fleet.filter((a) => acMode(a) !== 'charter' && SM.acmiList(a, W.day).length);
+  const pool = pl.fleet.filter((a) => acMode(a) === 'charter' && !a.cg), withBk = pl.fleet.filter((a) => acMode(a) !== 'charter' && SM.acmiList(a, W.day).length);
   const calRows = [...pool, ...withBk];
   if (F.gap && !pl.fleet.some((a) => a.id === F.gap.ac)) F.gap = null;
   let html = `<h2 class="sec">Charter (ACMI) <small>${W.acmiOffers.length} Anfragen${W.acmiOffers.some((o) => o.ev) ? ` · ${W.acmiOffers.filter((o) => o.ev).length} zu Großereignissen` : ''}</small></h2>
@@ -11932,7 +12170,7 @@ VIEWS.fleetBuy = function viewFleetBuy() {
       <td style="text-align:right">${(() => { const f = pl.oldAcFactor(o.age), v = o.kind === 'lease' ? o.lease_month : o.price; return `<b class="mono">${eur(v * f)}${o.kind === 'lease' ? '/Mon.' : ''}</b><div class="small muted">${o.kind === 'lease' ? 'Leasing 36 M.' : 'Kauf'}${f < 1 ? ` · <span class="pos" title="statt ${eur(v)}">Luis −10 %</span>` : ''}</div>`; })()}</td>
       <td class="r">${btn(o.type, o.kind === 'lease' ? 'lease' : 'buy', o.kind === 'lease' ? 'Leasen' : 'Kaufen', o)}</td></tr>`).join('')}
   </tbody></table></div><p class="small muted">Leasingraten sind in US-Dollar vereinbart: Fällt der Euro, wird das Leasing teurer. Der Zustand gebrauchter Flugzeuge ist verborgen: Verbrauchte Maschinen verhalten sich wie deutlich ältere. ${pl.oldAcExpert() ? 'Luis Perez begutachtet jedes Angebot ab 8 Jahren.' : 'Ein Gutachter wie Luis Perez (Unternehmen → Personal) sieht ihn genau, Ihre Technik ab Senior grob.'}</p></div>`;
-  const SEGS = [['reg', 'Regional', 'Turboprops und Regionaljets bis 120 Sitze – der Einstieg für junge Airlines'], ['nb', 'Kurz- und Mittelstrecke', 'Schmalrumpf: A220, A320-Familie, Boeing 737'], ['wb', 'Langstrecke und Großraum', 'Großraumjets, A321XLR und Concorde'], ['cargo', 'Frachter', 'Fliegen nur Fracht-Charter'], ['biz', 'Privatjets', 'Fliegen nur Privatjet-Charter']];
+  const SEGS = [['reg', 'Regional', 'Turboprops und Regionaljets bis 120 Sitze – der Einstieg für junge Airlines'], ['nb', 'Kurz- und Mittelstrecke', 'Schmalrumpf: A220, A320-Familie, Boeing 737'], ['wb', 'Langstrecke und Großraum', 'Großraumjets, A321XLR und Concorde'], ['cargo', 'Frachter', 'Fliegen eigene Frachtstrecken (Cargo) und Fracht-Charter'], ['biz', 'Privatjets', 'Fliegen nur Privatjet-Charter']];
   const segOf = (t) => t.role || (['ATR', 'DH8', 'EJET'].includes(t.group) ? 'reg' : ['A220', 'A32F', 'B737'].includes(t.group) && t.range_km < 8000 ? 'nb' : 'wb');
   const segF = ui.buySeg || '';
   html += `<h2 class="sec">Neu vom Leasinggeber oder ab Werk</h2><div class="seg wrap" role="group" aria-label="Segment"><button data-act="buyseg" data-v="" aria-pressed="${!segF}">Alle</button>${SEGS.map(([k, l]) => `<button data-act="buyseg" data-v="${k}" aria-pressed="${segF === k}">${l}</button>`).join('')}</div>`;
@@ -12056,6 +12294,89 @@ function expertContractHtml(e) {
     <button class="btn small" data-act="exc" data-k="raise" data-v="0.1" data-id="${e.id}" title="Gehalt über Markt macht Abwerbung schwerer (bis 30 % über Markt).">Gehalt +10 %</button></div>`;
 }
 // ---------- Stationen ----------
+// ---------- 0.21.56: Cargo – Frachtsparte mit eigenen Frachtern ----------
+const CG_TYPES = () => Object.keys(P.AIRCRAFT_TYPES).filter((t) => SM.isFreighter(t));
+const tKg = (kg) => `${NF1.format(kg / 1000)} t`;
+/** Kennzahlen einer Frachtstrecke aus den letzten Tagen. hist: [Tag, Umläufe, kg hin, kg zurück, Kapazität je Richtung, Erlös, Kosten, Bedarf, Ausfälle] */
+function cgStats(al, q, days = 30) {
+  const h = (q.hist || []).slice(-days), n = h.length || 1, nAc = al.fleet.filter((a) => a.cg === q.id).length;
+  const kg = h.reduce((x, e) => x + e[2] + e[3], 0), cap = h.reduce((x, e) => x + 2 * e[4], 0), rev = h.reduce((x, e) => x + e[5], 0), cost = h.reduce((x, e) => x + e[6], 0), fl = h.reduce((x, e) => x + e[1], 0), cx = h.reduce((x, e) => x + (e[8] || 0), 0);
+  const fixed = SM.aircraftDayFixedGeneric(q.type_id) * nAc * cpi();
+  return { days: h.length, nAc, kgDay: kg / n, lf: cap ? kg / cap : 0, revDay: rev / n, costDay: cost / n, fixed, resDay: (rev - cost) / n - fixed, fl, cx, rateKg: SM.freightRef(q.base, q.dest) * (q.rate || 1) * cpi() };
+}
+function cgFreeAt(pl, base, type) { return pl.fleet.filter((a) => a.type_id === type && a.base === base && !a.cg && !SM.acmiList(a, W.day).length); }
+const rateSeg = (act, cur, extra = '') => `<div class="seg wrap">${[0.7, 0.85, 1, 1.15, 1.3].map((v) => `<button data-act="${act}" data-v="${v}"${extra} aria-pressed="${Math.abs((cur || 1) - v) < 0.001}">${n0(v * 100)} %</button>`).join('')}</div>`;
+const freqStep = (act, f, extra = '') => `<div class="row" style="gap:8px;align-items:center"><button class="btn small" data-act="${act}" data-v="-1"${extra} ${f <= 1 ? 'disabled' : ''} aria-label="Weniger">−</button><b class="mono">${f}× pro Woche</b><button class="btn small" data-act="${act}" data-v="1"${extra} ${f >= P.FREIGHT.maxWeek ? 'disabled' : ''} aria-label="Mehr">+</button></div>`;
+VIEWS.cargo = function viewCargo() {
+  const pl = W.player, qs = pl.cgRoutes(), frs = pl.fleet.filter((a) => SM.isFreighter(a.type_id));
+  let html = '<div class="stack">';
+  if (!qs.length) html += `<div class="callout info stack"><b>Frachtsparte</b><span>Mit eigenen Frachtern fliegen Sie feste Frachtstrecken – getrennt von der Fracht, die in Ihren Passagierflügen mitfliegt. Jede Strecke hat ihren eigenen Frachtbedarf und eine Marktrate je Kilo. Andere Airlines (auch die KI) können ebenfalls Frachtsparten eröffnen und auf denselben Strecken konkurrieren.</span>
+    <span class="small">So geht es: 1. Frachter beschaffen (Flotte → Beschaffung: ATR 72-600F, A321P2F, 767-300F, 777F) · 2. Cargo → Neue Frachtstrecke: Ziel, Frequenz und Rate wählen · 3. Hier Auslastung und Ergebnis verfolgen.</span>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="tab" data-tab="cargoNew">Neue Frachtstrecke</button><button class="btn small" data-act="tab" data-tab="fleetBuy">Frachter beschaffen</button></div></div>`;
+  const st = qs.map((q) => [q, cgStats(pl, q)]), tot = st.reduce((a, [, x]) => ({ kg: a.kg + x.kgDay, rev: a.rev + x.revDay, res: a.res + (x.days ? x.resDay : 0), cap: a.cap + (x.lf ? x.kgDay / x.lf : 0) }), { kg: 0, rev: 0, res: 0, cap: 0 });
+  html += `<div class="tiles"><div class="tile"><span>Frachtstrecken</span><b>${qs.length}</b><em>${qs.filter((q) => q.opened_day > W.day).length ? `${qs.filter((q) => q.opened_day > W.day).length} starten bald` : 'in Betrieb'}</em></div>
+    <div class="tile"><span>Frachter</span><b>${frs.filter((a) => a.cg).length} / ${frs.length}</b><em>auf Frachtstrecken / gesamt</em></div>
+    <div class="tile"><span>Fracht</span><b>${tKg(tot.kg)}</b><em>pro Tag, beide Richtungen (30 Tage)</em></div>
+    <div class="tile"><span>Auslastung</span><b>${tot.cap ? pct(tot.kg / tot.cap) : '–'}</b><em>Nutzlast der geflogenen Frachter</em></div>
+    <div class="tile"><span>Umsatz</span><b>${eur(tot.rev)}</b><em>pro Tag</em></div>
+    <div class="tile"><span>Ergebnis</span><b class="${sgn(tot.res)}">${eur(tot.res, { plus: true })}</b><em>pro Tag, nach Frachterkosten</em></div></div>`;
+  if (qs.length) {
+    html += `<div class="tw"><table class="t"><thead><tr><th>Strecke</th><th>Frachter</th><th class="num">Umläufe</th><th class="num">Rate</th><th class="num">Fracht/Tag</th><th class="num">Auslastung</th><th class="num">Ergebnis/Tag</th><th></th></tr></thead><tbody>${st.map(([q, x]) => {
+      const t = P.AIRCRAFT_TYPES[q.type_id], ed = ui.cgEdit && ui.cgEdit.id === q.id;
+      let row = `<tr${ed ? ' class="sel"' : ''}><td style="white-space:nowrap"><b>${q.base}–${q.dest}</b> <span class="small muted">${n0(SM.gcDistanceKm(q.base, q.dest))} km</span></td><td style="white-space:nowrap">${x.nAc}× ${esc(t.label)}</td><td class="num" style="white-space:nowrap">${q.freq}× / Woche</td><td class="num" style="white-space:nowrap">${NF2.format(x.rateKg)} €/kg <span class="small muted">(${n0((q.rate || 1) * 100)} %)</span></td>
+        <td class="num">${q.opened_day > W.day ? `<span class="small muted">ab ${dateShort(q.opened_day)}</span>` : tKg(x.kgDay)}</td><td class="num">${x.days ? pct(x.lf) : '–'}</td><td class="num ${sgn(x.resDay)}">${x.days ? eur(x.resDay, { plus: true }) : '–'}</td>
+        <td><button class="btn small" data-act="cgedit" data-id="${q.id}">${ed ? 'Zuklappen' : 'Ändern'}</button></td></tr>`;
+      if (ed) {
+        const e = ui.cgEdit, qt = W.freightQuote(pl, q.base, q.dest, q.type_id, e.freq, e.rate, q.id), have = x.nAc, free = cgFreeAt(pl, q.base, q.type_id).length;
+        ui._cgEd = `<div class="card pad stack" style="gap:10px"><h3 style="margin:0">Fracht ${q.base}–${q.dest} ändern</h3>
+          <div class="grid2"><div class="stack" style="gap:6px"><span class="small muted">Umläufe pro Woche (je Umlauf hin und zurück)</span>${freqStep('cgefreq', e.freq)}<span class="small ${qt.need > have + free ? 'neg' : 'muted'}">braucht ${qt.need} Frachter – ${have} im Einsatz, ${free} frei in ${q.base}</span></div>
+          <div class="stack" style="gap:6px"><span class="small muted">Rate gegenüber Markt (${NF2.format(SM.freightRef(q.base, q.dest) * cpi())} €/kg)</span>${rateSeg('cgerate', e.rate)}</div></div>
+          <div class="small">Prognose: <b>${tKg(2 * qt.kg)}</b> Fracht pro Tag (Auslastung ${pct(qt.lf)}), Umsatz ${eur(qt.rev)}, Flug- und Frachtkosten ${eur(qt.flightCost + qt.cargoCost)}, Frachterkosten ${eur(qt.fixed)} → <b class="${sgn(qt.res)}">${eur(qt.res, { plus: true })} pro Tag</b>${qt.rivals ? ` · ${qt.rivals} Konkurrent${qt.rivals > 1 ? 'en' : ''} mit ${tKg(qt.comp)} pro Tag` : ' · keine Konkurrenz'}</div>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="cgsave" data-id="${q.id}">Übernehmen</button>${ui.confirm === 'cgclose:' + q.id ? `<button class="btn small danger" data-act="cgclose" data-id="${q.id}">Ja, Strecke schließen</button><button class="btn small" data-act="cancelconfirm">Abbrechen</button>` : `<button class="btn small danger" data-act="cgaskclose" data-id="${q.id}">Strecke schließen</button>`}</div></div>`;
+      }
+      return row; }).join('')}</tbody></table></div>${ui.cgEdit && ui._cgEd ? ui._cgEd : ''}`;
+    ui._cgEd = '';
+  }
+  const idle = frs.filter((a) => !a.cg && a.delivery_day <= W.day && !SM.acmiList(a, W.day).length);
+  if (idle.length) html += `<div class="callout warn"><span><b>${idle.length} Frachter ohne Einsatz:</b> ${idle.slice(0, 6).map((a) => `${acName(a.id)} (${a.type_id}, ${a.base})`).join(', ')}. Sie kosten jeden Tag Leasing oder Abschreibung – auf eine Frachtstrecke setzen oder Charteraufträge annehmen.</span></div>`;
+  html += `<p class="small muted">Beiladefracht in Passagierflügen läuft getrennt davon (${pl.cargo ? 'eingeschaltet' : 'ausgeschaltet'} – Karte → Strategie). Frachter auf Frachtstrecken nehmen keine Charteraufträge an.</p>`;
+  return html + '</div>';
+};
+VIEWS.cargoNew = function viewCargoNew() {
+  const pl = W.player, F = ui.cgNew = ui.cgNew || { base: pl.bases[0], type: null, freq: 5, rate: 1 };
+  if (!pl.bases.includes(F.base)) F.base = pl.bases[0];
+  const types = CG_TYPES();
+  if (!F.type) { const own = pl.fleet.find((a) => SM.isFreighter(a.type_id) && a.base === F.base && !a.cg); F.type = own ? own.type_id : 'A21F'; }
+  const t = P.AIRCRAFT_TYPES[F.type], free = cgFreeAt(pl, F.base, F.type).length;
+  let html = `<div class="stack"><div class="card pad stack"><div class="stack" style="gap:6px"><span class="small muted">Basis</span><div class="seg wrap">${pl.bases.map((b) => `<button data-act="cgnbase" data-v="${b}" aria-pressed="${b === F.base}">${b}</button>`).join('')}</div></div>
+    <div class="stack" style="gap:6px"><span class="small muted">Frachter</span><div class="seg wrap">${types.map((k) => { const n = cgFreeAt(pl, F.base, k).length; return `<button data-act="cgntype" data-v="${k}" aria-pressed="${k === F.type}">${esc(P.AIRCRAFT_TYPES[k].label)} <span class="small muted">${n0(P.AIRCRAFT_TYPES[k].cargo_kg / 1000)} t · ${n} frei</span></button>`; }).join('')}</div>
+      <span class="small muted">${esc(t.label)}: ${n0(t.cargo_kg / 1000)} t Nutzlast, ${n0(t.range_km)} km Reichweite · in ${F.base} frei: <b>${free}</b>${free ? '' : ' – <a href="#" data-act="tab" data-tab="fleetBuy">Frachter beschaffen</a>'}</span></div>
+    <div class="grid2"><div class="stack" style="gap:6px"><span class="small muted">Umläufe pro Woche</span>${freqStep('cgnfreq', F.freq)}</div><div class="stack" style="gap:6px"><span class="small muted">Rate gegenüber Markt</span>${rateSeg('cgnrate', F.rate)}</div></div></div>`;
+  // Ziele: nach Frachtpotenzial vorsortiert, dann mit voller Vorschau bewertet
+  const all = SM.AP_CODES.filter((c) => c !== F.base && SM.rangeOk(F.base, c, F.type)).map((c) => [c, SM.freightDemand(F.base, c) * SM.freightRef(F.base, c)]).sort((a, b) => b[1] - a[1]).slice(0, 40);
+  const quotes = all.map(([c]) => W.freightQuote(pl, F.base, c, F.type, F.freq, F.rate)).sort((a, b) => b.res - a.res);
+  const shown = ui.showAll && ui.showAll.cgdest ? quotes : quotes.slice(0, 12);
+  html += `<div class="card pad stack"><h3 style="margin:0">Ziele ab ${F.base} mit ${esc(t.label)}, ${F.freq}× pro Woche</h3>
+    <p class="small muted">Prognose ohne Zufall, mit der heutigen Konkurrenz. Fracht und Auslastung gelten für beide Richtungen; Ergebnis nach Flug-, Fracht- und Frachterkosten.</p>
+    <div class="tw"><table class="t"><thead><tr><th>Ziel</th><th class="num">km</th><th class="num">Bedarf/Tag</th><th class="num">Konkurrenz/Tag</th><th class="num">Rate</th><th class="num">Fracht/Tag</th><th class="num">Auslastung</th><th class="num">Ergebnis/Tag</th><th></th></tr></thead><tbody>${shown.map((q) => {
+      const own = pl.cgRoutes().some((x) => x.type_id === F.type && [x.base, x.dest].sort().join() === [q.base, q.dest].sort().join());
+      return `<tr><td style="white-space:nowrap"><b>${q.dest}</b> <span class="small muted">${esc(apName(q.dest))}</span></td><td class="num">${n0(q.km)}</td><td class="num">${tKg(q.dem)}</td><td class="num">${q.rivals ? tKg(q.comp / P.FREIGHT.loadMax) : '–'}</td><td class="num" style="white-space:nowrap">${NF2.format(q.rateKg)} €/kg</td><td class="num">${tKg(2 * q.kg)}</td><td class="num">${pct(q.lf)}</td><td class="num ${sgn(q.res)}">${eur(q.res, { plus: true })}</td>
+        <td>${own ? '<span class="chip">fliegen Sie</span>' : `<button class="btn small ${q.res > 0 ? 'primary' : ''}" data-act="cgopen" data-v="${q.dest}" title="braucht ${q.need} Frachter">Eröffnen</button>`}</td></tr>`; }).join('')}</tbody></table></div>
+    ${quotes.length > 12 ? listMore('cgdest', quotes.length, 12) : ''}
+    <p class="small muted">Je Umlauf braucht es Slots an beiden Flughäfen (aufgerundet auf Flüge pro Tag). Der erste Flug startet ${P.FREIGHT.lead} Tage nach der Eröffnung. Rate unter 100 % zieht Fracht von der Konkurrenz ab und vergrößert den Markt etwas, über 100 % bringt mehr je Kilo, aber weniger Fracht.</p></div>`;
+  return html + '</div>';
+};
+VIEWS.cargoMarket = function viewCargoMarket() {
+  const rows = [], pairs = new Map();
+  for (const al of W.list) { if (al.status === 'insolvent' || !al.cg) continue; const qs = al.cgRoutes(); if (!qs.length) continue;
+    let kg = 0; for (const q of qs) { const x = cgStats(al, q); kg += x.kgDay; const k = [q.base, q.dest].sort().join('–'); const e = pairs.get(k) || { k, cap: 0, kg: 0, al: [] }; e.cap += W.cgCapDay(al, q) * 2; e.kg += x.kgDay; e.al.push(al); pairs.set(k, e); }
+    rows.push({ al, n: qs.length, ac: al.fleet.filter((a) => a.cg).length, kg }); }
+  rows.sort((a, b) => b.kg - a.kg);
+  let html = `<div class="stack"><div class="card pad stack"><h3 style="margin:0">Frachtsparten im Markt</h3>${rows.length ? `<div class="tw"><table class="t"><thead><tr><th>Airline</th><th class="num">Strecken</th><th class="num">Frachter</th><th class="num">Fracht/Tag</th></tr></thead><tbody>${rows.map((x) => `<tr${x.al.id === W.playerId ? ' class="sel"' : ''}><td>${esc(x.al.name)}</td><td class="num">${x.n}</td><td class="num">${x.ac}</td><td class="num">${tKg(x.kg)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small muted">Noch hat keine Airline eine Frachtsparte. Wer zuerst kommt, hat die Strecken für sich.</p>'}</div>`;
+  if (pairs.size) html += `<div class="card pad stack"><h3 style="margin:0">Beflogene Frachtstrecken</h3><div class="tw"><table class="t"><thead><tr><th>Strecke</th><th>Airlines</th><th class="num">Bedarf/Tag</th><th class="num">Kapazität/Tag</th><th class="num">Fracht/Tag</th></tr></thead><tbody>${[...pairs.values()].sort((a, b) => b.cap - a.cap).slice(0, 20).map((e) => { const [o, d] = e.k.split('–'); return `<tr><td style="white-space:nowrap"><b>${e.k}</b></td><td>${[...new Set(e.al.map((x) => x.name))].map(esc).join(', ')}</td><td class="num">${tKg(2 * SM.freightDemand(o, d))}</td><td class="num">${tKg(e.cap)}</td><td class="num">${tKg(e.kg)}</td></tr>`; }).join('')}</tbody></table></div></div>`;
+  html += `<p class="small muted">Bedarf und Kapazität zählen beide Richtungen. Die Nachfrage schwankt von Tag zu Tag und folgt der Konjunktur; Zölle und Krisen treffen sie wie die Beiladefracht.</p>`;
+  return html + '</div>';
+};
 VIEWS.stations = function viewStations() {
   const pl = W.player, list = stationsOf(pl), proc = 1 - SM.lv3([0, 0.03, 0.06, 0.09], pl.skill('procurement'));
   let total = 0;
@@ -14734,7 +15055,7 @@ function assistantHints() {
   const miss = unplacedNow();
   if (miss.length) add('unpl', 'warn', 'ops', `Ohne Flugzeug: ${miss.map(([r, k]) => `${r.base}–${r.dest} (${k}×)`).join(', ')}. Diese Flüge fallen aus.`, 'fleetPlan');
   for (const a of pl.fleet) {
-    if (a.delivery_day <= W.day && !(a.used_hours > 0) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) && a.status !== 'ccheck' && a.status !== 'aog') { if (acMode(a) === 'charter') add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> ist im Charter-Pool, hat heute aber keinen Auftrag – kostet ${eur(acDayCost(a))} pro Tag. ${W.acmiOffers.filter((o) => acmiFits(a, o)).length} passende Anfragen.`, 'fleetAcmi'); else add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> (${tl(a.type_id)}) steht ungenutzt und kostet ${eur(acDayCost(a))} pro Tag.`, 'fleetOwn'); break; }
+    if (a.delivery_day <= W.day && !a.cg && !(a.used_hours > 0) && !(a.acmi && a.acmi.start <= W.day && a.acmi.end > W.day) && a.status !== 'ccheck' && a.status !== 'aog') { if (acMode(a) === 'charter') add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> ist im Charter-Pool, hat heute aber keinen Auftrag – kostet ${eur(acDayCost(a))} pro Tag. ${W.acmiOffers.filter((o) => acmiFits(a, o)).length} passende Anfragen.`, 'fleetAcmi'); else add('idle' + a.id, 'warn', 'ops', `<b>${acName(a.id)}</b> (${tl(a.type_id)}) steht ungenutzt und kostet ${eur(acDayCost(a))} pro Tag.`, 'fleetOwn'); break; }
   }
   for (const a of pl.fleet) {
     const toC = P.CCHECK_FH - (a.fh - a.lastC);
@@ -15065,6 +15386,17 @@ function onPaneClick(e) {
   switch (act) {
     case 'tab': setTab(b.dataset.tab); break;
     case 'hubsel': ui.hubSel = b.dataset.apt; renderPane(true); break;
+    case 'cgedit': { const q = W.player.cgRoutes().find((x) => x.id === b.dataset.id); ui.cgEdit = ui.cgEdit && ui.cgEdit.id === b.dataset.id ? null : q ? { id: q.id, freq: q.freq, rate: q.rate || 1 } : null; ui.confirm = null; renderPane(true); break; }
+    case 'cgefreq': if (ui.cgEdit) { ui.cgEdit.freq = Math.max(1, Math.min(P.FREIGHT.maxWeek, ui.cgEdit.freq + Number(b.dataset.v))); renderPane(true); } break;
+    case 'cgerate': if (ui.cgEdit) { ui.cgEdit.rate = Number(b.dataset.v); renderPane(true); } break;
+    case 'cgsave': { const e = ui.cgEdit; if (!e) break; const r = doAction({ type: 'cgEdit', id: e.id, freq: e.freq, rate: e.rate }); if (r.ok) { toast(r.msg); ui.cgEdit = null; } refreshAll(); break; }
+    case 'cgaskclose': ui.confirm = 'cgclose:' + b.dataset.id; renderPane(true); break;
+    case 'cgclose': { const r = doAction({ type: 'cgClose', id: b.dataset.id }); if (r.ok) toast(r.msg); ui.confirm = null; ui.cgEdit = null; refreshAll(); break; }
+    case 'cgnbase': ui.cgNew = { ...(ui.cgNew || {}), base: b.dataset.v, type: null }; renderPane(true); break;
+    case 'cgntype': ui.cgNew = { ...(ui.cgNew || {}), type: b.dataset.v }; renderPane(true); break;
+    case 'cgnfreq': if (ui.cgNew) { ui.cgNew.freq = Math.max(1, Math.min(P.FREIGHT.maxWeek, ui.cgNew.freq + Number(b.dataset.v))); renderPane(true); } break;
+    case 'cgnrate': if (ui.cgNew) { ui.cgNew.rate = Number(b.dataset.v); renderPane(true); } break;
+    case 'cgopen': { const F = ui.cgNew; if (!F) break; const r = doAction({ type: 'cgOpen', base: F.base, dest: b.dataset.v, typeId: F.type, freq: F.freq, rate: F.rate }); if (r.ok) { toast(r.msg); setTab('cargo'); } refreshAll(); break; }
     case 'antiadj': { const r = doAction({ type: 'antitrustAdjust', apt: b.dataset.apt }); toast(r.msg); refreshAll(); renderSidebar(); break; }
     case 'crisisadj': { const r = doAction({ type: 'crisisAdjust', event: b.dataset.ev }); if (r.ok) toast(r.msg); refreshAll(); renderSidebar(); break; }
     case 'crisisno': { doAction({ type: 'crisisSkip', event: b.dataset.ev }); refreshAll(); renderSidebar(); break; }
@@ -17030,7 +17362,11 @@ function skinFor(al, acId) {
   else if (ui.mp) { const sk = mpState.info && mpState.info.skins; id = sk && sk[al.id] && sk[al.id][acId]; }
   return id ? SK.SKIN_BY_ID[id] || null : null;
 }
-const freeCopies = (id) => { const m = coll.me; if (!m) return 0; const act = Object.values(m.active).filter((x) => x === id).length; return (m.inv[id] || 0) - act - ((m.reserved || {})[id] || 0); };
+const actCount = (id) => (coll.me ? Object.values(coll.me.active).filter((x) => x === id).length : 0);
+/** Exemplare frei für den Tausch (0.21.57: ein Exemplar deckt bis zu PER_COPY Flugzeuge). */
+const freeCopies = (id) => { const m = coll.me; if (!m) return 0; return (m.inv[id] || 0) - Math.ceil(actCount(id) / SK.PER_COPY) - ((m.reserved || {})[id] || 0); };
+/** Wie viele weitere Flugzeuge diesen Skin noch bekommen können. */
+const freeSlots = (id) => { const m = coll.me; if (!m) return 0; return ((m.inv[id] || 0) - ((m.reserved || {})[id] || 0)) * SK.PER_COPY - actCount(id); };
 
 // ---------- Lackierungen auf den vorhandenen Seitenansichten ----------
 let skinSeq = 0;
@@ -17168,7 +17504,7 @@ VIEWS.collection = function viewCollection() {
   if (more) html += `<div class="row"><button class="btn small" data-act="showall" data-k="acgrid">Weitere ${more} Modelle zeigen</button></div>`;
   if (!nModels) html += '<p class="small muted">Kein Skin passt zu den Filtern.</p>';
   if (m.opened.length) html += `<section class="ac-model"><h3>Zuletzt geöffnet</h3><div class="ac-hist">${m.opened.slice(0, 10).map((p) => `<div class="ac-hrow"><span class="small muted">${new Date(p.op).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${p.src === 'admin_grant' ? ' · Geschenk' : ''}</span>${p.res.map((id) => { const s = SK.SKIN_BY_ID[id]; return s ? `<button class="ac-mini rar-${s.rarity}" data-act="acdetail" data-id="${s.id}" title="${esc(s.name)} · ${esc(modelOf(s).name)}"><img src="${skinArt(s)}" alt=""><span>${esc(s.name)}</span></button>` : ''; }).join('')}</div>`).join('')}</div></section>`;
-  html += `<p class="small muted">Alle Skins sind rein kosmetisch: Sie ändern weder Reichweite noch Kosten, Einnahmen oder sonst etwas am Spiel. Ein Exemplar kann auf einem Flugzeug des passenden Modells aktiv sein; Duplikate lassen sich auf weiteren Flugzeugen zeigen oder tauschen.</p></div>`;
+  html += `<p class="small muted">Alle Skins sind rein kosmetisch: Sie ändern weder Reichweite noch Kosten, Einnahmen oder sonst etwas am Spiel. Ein Exemplar kann auf bis zu ${SK.PER_COPY} Flugzeugen des passenden Modells aktiv sein; Duplikate lassen sich auf weiteren Flugzeugen zeigen oder tauschen.</p></div>`;
   return html;
 };
 function skinCard(s) {
@@ -17188,10 +17524,9 @@ function showSkinDetail(id) {
     <div class="ac-big${n ? '' : ' miss'}"><img src="${skinArt(s, !n)}" alt="${esc(s.name)}"></div>
     <h2>${n ? esc(s.name) : 'Noch nicht gesammelt'} ${rarChip(s.rarity)}</h2>
     <p class="ink2">${n ? esc(s.desc) : 'Diesen Skin gibt es nur in Aircraft Mystery Packs oder im Tausch mit anderen Spielern.'}</p>
-    <div class="small muted">Im Besitz: ${n} · frei: ${Math.max(0, free)}${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
-    ${here.length ? `<div class="stack" style="gap:6px"><b class="small">Aktiv auf</b>${here.map(([, ac]) => `<div class="spread small"><span class="mono">${esc(acName(ac))}</span><button class="btn small" data-sd="off" data-ac="${esc(ac)}">Standardlackierung</button></div>`).join('')}</div>` : ''}
+    <div class="small muted">Im Besitz: ${n} · aktiv auf ${actCount(s.id)} von ${Math.max(0, (n - ((m.reserved || {})[s.id] || 0)) * SK.PER_COPY)} möglichen Flugzeugen (je Exemplar ${SK.PER_COPY})${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
     ${acts.length > here.length ? `<p class="small muted">Außerdem aktiv in ${acts.length - here.length} Flugzeug(en) anderer Spiele.</p>` : ''}
-    ${n && free > 0 && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Auf Flugzeug aktivieren</b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id); return `<button class="btn small" data-sd="on" data-ac="${a.id}" ${cur && cur.id === s.id ? 'disabled' : ''}>${esc(acName(a.id))}${cur ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
+    ${n && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Flugzeuge wählen <span class="muted">(antippen zum An- und Abwählen, noch ${Math.max(0, freeSlots(s.id))} frei)</span></b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id), on = cur && cur.id === s.id; return `<button class="btn small${on ? ' primary' : ''}" data-sd="${on ? 'off' : 'on'}" data-ac="${a.id}" aria-pressed="${!!on}" ${!on && freeSlots(s.id) < 1 ? 'disabled' : ''}>${on ? '✓ ' : ''}${esc(acName(a.id))}${cur && !on ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
       : n && !fits.length ? `<p class="small muted">Sie haben keine ${esc(modelOf(s).name)} in Ihrer Flotte.</p>` : ''}
     ${n && free > 0 ? '<div class="row"><button class="btn small" data-sd="trade">Zum Tausch anbieten</button></div>' : ''}</div>`);
   md.onclick = async (e) => {
@@ -17217,7 +17552,7 @@ function showSkinPicker(acId) {
   const md = modal(`<div class="spread"><h1 style="margin:0">Skin für ${esc(acName(a.id))}</h1><button class="btn small" data-sp="close">Schließen</button></div>
     <p class="small muted">${esc(tl(a.type_id))} · aktuell: ${cur ? `<b>${esc(cur.name)}</b>` : 'Standardlackierung Ihrer Airline'}. Skins ändern nur die Darstellung – Kennung, Wartung, Leasing, Crew, Flugstunden und Einsatz bleiben, wie sie sind.</p>
     <div class="ac-grid ac-pick">${cur ? `<button class="ac-card" data-sp="off"><span class="ac-art">${acSvg(a.type_id, { ...myAcColors(), code: pl.code })}</span><span class="ac-name">Standardlackierung</span></button>` : ''}
-      ${list.map((s) => { const free = freeCopies(s.id), on = cur && cur.id === s.id; return `<button class="ac-card rar-${s.rarity}" data-sp="on" data-id="${s.id}" ${on || free < 1 ? 'disabled' : ''}><span class="ac-art"><img src="${skinArt(s)}" alt=""></span><span class="ac-name">${esc(s.name)}</span><span class="ac-meta">${rarChip(s.rarity)}${on ? '<span class="chip good">aktiv</span>' : free < 1 ? '<span class="chip">kein Exemplar frei</span>' : `<span class="chip">${free} frei</span>`}</span></button>`; }).join('')}</div>
+      ${list.map((s) => { const free = freeSlots(s.id), on = cur && cur.id === s.id; return `<button class="ac-card rar-${s.rarity}" data-sp="on" data-id="${s.id}" ${on || freeSlots(s.id) < 1 ? 'disabled' : ''}><span class="ac-art"><img src="${skinArt(s)}" alt=""></span><span class="ac-name">${esc(s.name)}</span><span class="ac-meta">${rarChip(s.rarity)}${on ? '<span class="chip good">aktiv</span>' : free < 1 ? '<span class="chip">alle Plätze belegt</span>' : `<span class="chip">noch ${free} Flugzeuge</span>`}</span></button>`; }).join('')}</div>
     ${list.length ? '' : `<p class="small muted">Sie besitzen noch keinen Skin für die ${esc(tl(a.type_id))}. Skins gibt es in Aircraft Mystery Packs (Collection → Shop) oder im Tausch.</p>`}`);
   md.onclick = async (e) => {
     const b = e.target.closest('[data-sp]'); if (!b) { if (e.target === md) md.hidden = true; return; }
@@ -17229,20 +17564,20 @@ function showSkinPicker(acId) {
 
 // ---------- Pack öffnen (Ergebnis kommt vom Server, die Animation zeigt es nur) ----------
 /** 0.21.55: Pack mit Aufreißlasche oben (Perforation, Lasche kippt beim Ziehen), Titel passt immer (textLength), fünf Seltenheitsfarben. */
-const packSvg = () => `<svg viewBox="0 0 220 300" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a2b58"/><stop offset=".55" stop-color="#0f1a3c"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".35" stop-color="#d946ef"/><stop offset=".7" stop-color="#ef4444"/><stop offset="1" stop-color="#f5b301"/></linearGradient><linearGradient id="pks" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26407c"/><stop offset="1" stop-color="#16244a"/></linearGradient></defs>
-  <rect x="10" y="40" width="200" height="252" rx="16" fill="url(#pkg)" stroke="url(#pke)" stroke-width="3"/>
-  <rect x="22" y="52" width="176" height="228" rx="10" fill="none" stroke="#22d3ee" stroke-opacity=".28"/>
+const packSvg = () => `<svg viewBox="0 0 220 300" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a2b58"/><stop offset=".55" stop-color="#0f1a3c"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" gradientUnits="userSpaceOnUse" x1="10" y1="6" x2="210" y2="292"><stop offset="0" stop-color="#22d3ee"/><stop offset=".35" stop-color="#d946ef"/><stop offset=".7" stop-color="#ef4444"/><stop offset="1" stop-color="#f5b301"/></linearGradient><linearGradient id="pks" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26407c"/><stop offset="1" stop-color="#16244a"/></linearGradient></defs>
+  <path d="M10 40 H210 V276 Q210 292 194 292 H26 Q10 292 10 276 Z" fill="url(#pkg)"/><path d="M10 40 V276 Q10 292 26 292 H194 Q210 292 210 276 V40" fill="none" stroke="url(#pke)" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M22 52 H198 V270 Q198 280 188 280 H32 Q22 280 22 270 Z" fill="none" stroke="#22d3ee" stroke-opacity=".28"/>
   <text x="110" y="80" text-anchor="middle" fill="#e6f6ff" font-size="13" font-weight="800" textLength="164" lengthAdjust="spacingAndGlyphs">AIRCRAFT COLLECTION</text>
   <path d="M34 92 H186 M34 238 H186" stroke="#22d3ee" stroke-opacity=".45"/>
   <circle cx="110" cy="165" r="54" fill="#22d3ee" opacity=".08"/>
   <path transform="translate(110 165) scale(1.55) translate(-100 -126)" d="M100 96 l10 26 l34 12 v8 l-34 -4 l-4 22 l10 8 v6 l-16 -4 l-16 4 v-6 l10 -8 l-4 -22 l-34 4 v-8 l34 -12z" fill="#e6f6ff" opacity=".92"/>
   <text x="110" y="263" text-anchor="middle" fill="#a5f3fc" font-size="19" font-weight="800" letter-spacing="1.5">MYSTERY PACK</text>
   ${['#22c55e', '#3b82f6', '#d946ef', '#ef4444', '#f5b301'].map((c, i) => `<rect x="${43 + i * 28}" y="272" width="22" height="4" rx="2" fill="${c}"/>`).join('')}
-  <g class="pk-strip"><path d="M10 40 V18 Q10 6 22 6 H198 Q210 6 210 18 V40 Z" fill="url(#pks)" stroke="url(#pke)" stroke-width="3"/>
+  <g class="pk-strip"><path d="M10 41 V18 Q10 6 22 6 H198 Q210 6 210 18 V41 Z" fill="url(#pks)"/><path d="M10 40 V18 Q10 6 22 6 H198 Q210 6 210 18 V40" fill="none" stroke="url(#pke)" stroke-width="3" stroke-linejoin="round"/>
     ${Array.from({ length: 21 }, (_, i) => `<path d="M${20 + i * 9} 12 V34" stroke="#ffffff" stroke-opacity=".1" stroke-width="1.6"/>`).join('')}
     <path d="M196 23 l-8 -5 v10 z" fill="#22d3ee" opacity=".8"/></g>
-  <path d="M15 40 H205" stroke="#a5f3fc" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7"/>
-  <path class="pk-rip" d="M15 40 H205" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+  <path d="M8.5 40 H211.5" stroke="#a5f3fc" stroke-width="1.6" stroke-dasharray="4 3.5" opacity=".75"/>
+  <path class="pk-rip" d="M8.5 40 H211.5" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 let pkAudio = null;
 function goldChime() {
   try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); const t = pkAudio.currentTime;
@@ -17281,6 +17616,8 @@ function onPackOv(e) {
   else if (k === 'next') openPack();
   else if (k === 'skip' && ov._skip) ov._skip();
   else if (k === 'all' && ov._all) ov._all();
+  else if (k === 'eq' && ov._cur) { const s = ov._cur, box = ov.querySelector('.pk-equip'); b.disabled = true;
+    activateSkin(b.dataset.ac, s.id).then(() => { if (box) box.innerHTML = equipHtml(s, `${s.name} ist auf ${acName(b.dataset.ac)} aktiv.`); }).catch((err) => { toast(err.message); b.disabled = false; }); }
   else if (k === 'more' && ov._more) ov._more();
 }
 // ---------- Klang: Aufladen, Knall, Fanfare je Seltenheit ----------
@@ -17316,6 +17653,14 @@ function pkFanfare(rk) {
 const RT = { u: 1, r: 1.1, e: 1.25, m: 1.45, l: 1.8 };   // Dauer der Spannung je Seltenheit
 const FLIP = { u: 500, r: 800, e: 1100, m: 1400, l: 1800 };   // Kartenrückseite, bis sie sich dreht
 function pkBg(n = 40) { return `<div class="pk-bg" aria-hidden="true"><div class="pk-bgrays"></div>${Array.from({ length: n }, () => `<i style="left:${(Math.random() * 100).toFixed(1)}%;top:${(Math.random() * 100).toFixed(1)}%;--s:${(1 + Math.random() * 2.5).toFixed(1)}px;--d:${(1 + Math.random() * 2.5).toFixed(2)}s;--w:${(Math.random() * 2).toFixed(2)}s"></i>`).join('')}</div><div class="pk-white" aria-hidden="true"></div>`; }
+/** 0.21.56: Direkt nach dem Ziehen ausrüsten – passende eigene Flugzeuge dieses Spiels. */
+function equipHtml(s, msg = '') {
+  const pl = W && W.player, fits = pl ? pl.fleet.filter((a) => a.type_id === s.type) : [], head = msg ? `<span class="pk-eqok">${esc(msg)}</span>` : '';
+  if (!fits.length) return head || `<span class="small" style="color:#a5b4d0">Keine ${esc(modelOf(s).name)} in Ihrer Flotte – der Skin wartet in der Sammlung.</span>`;
+  const left = freeSlots(s.id), cur = (a) => { const k = skinFor(pl, a.id); return k ? k.name : 'Standard'; }, on = (a) => { const k = skinFor(pl, a.id); return !!(k && k.id === s.id); };
+  const btn = (a) => `<button class="btn small${on(a) ? '' : ' gold'}" data-pk="eq" data-ac="${a.id}" ${on(a) || left < 1 ? 'disabled' : ''}>${on(a) ? '✓ ' : ''}${esc(acName(a.id))}${on(a) ? '' : ` <span class="small" style="opacity:.75">(${esc(cur(a))})</span>`}</button>`;
+  return `${head}<span class="small" style="color:#c3cde0">${left > 0 ? `Jetzt ausrüsten – auf bis zu ${SK.PER_COPY} Flugzeugen je Exemplar (noch ${left} frei):` : `Alle ${SK.PER_COPY * Math.max(1, (coll.me && coll.me.inv[s.id]) || 1)} Plätze dieses Skins sind belegt.`}</span><div class="row" style="gap:6px;flex-wrap:wrap;justify-content:center">${fits.slice(0, 10).map(btn).join('')}</div>${fits.length > 10 ? `<span class="small" style="color:#a5b4d0">und ${fits.length - 10} weitere – in der Sammlung wählbar</span>` : ''}`;
+}
 function playReveal(ov, pack) {
   const items = pack.res.map((id, i) => ({ s: SK.SKIN_BY_ID[id], fresh: pack.fresh ? pack.fresh[i] : false })).filter((x) => x.s);
   const best = items.reduce((a, x) => (RAR[x.s.rarity].order > RAR[a].order ? x.s.rarity : a), 'u');
@@ -17364,7 +17709,9 @@ function playReveal(ov, pack) {
         <div class="pk-face pk-back rar-${rk}"><span class="pk-q">?</span><span class="pk-backt">AIRCRAFT COLLECTION</span></div>
         <div class="pk-face pk-front"><div class="pk-card rar-${rk}"><span class="pk-rar">${RAR[rk].label}${x.fresh ? ' · NEU' : ''}</span><img src="${skinArt(s)}" alt="${esc(s.name)}"><h2>${esc(s.name)}</h2><span class="pk-model">${esc(modelOf(s).name)}</span><p>${esc(s.desc)}</p>
           <span class="small">${items.length > 1 ? `Skin ${k + 1} von ${items.length}` : ''}</span></div></div></div></div>
+      <div class="pk-equip">${equipHtml(s)}</div>
       <div class="row pk-btns">${last ? `<button class="btn" data-pk="more">Zusammenfassung</button>` : `<button class="btn primary" data-pk="more">Nächster Skin</button>`}</div></div>`;
+    ov._cur = s;
     const st2 = ov.querySelector('.pk-stage');
     const flip = () => { st2.classList.add('flipped', 'burst'); ov.classList.add('boom'); pkFanfare(rk); if (rk === 'm' || rk === 'l') ov.classList.add('quake'); setTimeout(() => ov.classList.remove('quake', 'boom'), 900); };
     ov.classList.remove('quake', 'boom');
@@ -17556,25 +17903,38 @@ async function showPackAdmin() {
 
 // ---------- Karte: Skin-Effekte für das Flugzeug-Canvas ----------
 /** Farbe und Effekt eines Skins auf der Karte (nur Darstellung). */
-function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#f5b301' : s.pal.tail, edge: s.rarity === 'l' ? '#5a3d00' : s.pal.line, fx: s.blink ? 'disco' : s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? (s.pal.accent || '#d946ef') : s.rarity === 'm' ? '#ef4444' : null } : null; }
+function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#fff3c4' : s.pal.tail, edge: s.rarity === 'l' ? '#3a2600' : s.pal.line, fx: s.blink ? 'disco' : s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? '#e879f9' : s.rarity === 'm' ? '#ef4444' : s.rarity === 'l' ? '#ffd34d' : null } : null; }
 const DISCO = ['#ff2bd6', '#22e5ff', '#ffe14d', '#7cff4f', '#ff7a1a'];
 /** Disco Fever: Farbe wechselt im Takt (auf der Karte und in Listen). */
 const discoColor = (now) => DISCO[Math.floor(now / 260) % DISCO.length];
 function drawSkinFx(ctx, p, k, now) {
+  // 0.21.57: deutlich auffälliger als die eigenen (gelben) Flugzeuge – Effekte auch weit herausgezoomt
   const st = p.sk; if (!st) return;
-  if (st.fx === 'e' && k >= 1) {   // violette Partikel hinter dem Flugzeug (nur nah genug herangezoomt)
+  const lw = 1 / p.sc;
+  if (st.fx === 'r') {   // blauer Glanzring
+    ctx.strokeStyle = '#60a5fa'; ctx.globalAlpha = 0.45 + 0.25 * Math.sin(now / 500); ctx.lineWidth = 1.2 * lw; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  if (st.fx === 'e') {   // pinker Schweif aus Partikeln, leuchtender Ring
     ctx.fillStyle = st.glow;
-    for (let i = 1; i <= 3; i++) { const ph = ((now / 600) + i * 0.33) % 1; ctx.globalAlpha = 0.5 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 4 - ph * 4, Math.sin(now / 300 + i) * 1.5, 1.1, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
+    for (let i = 1; i <= 5; i++) { const ph = ((now / 600) + i * 0.2) % 1; ctx.globalAlpha = 0.6 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.5 - ph * 4, Math.sin(now / 300 + i) * 1.6, 1.3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 0.35 + 0.2 * Math.sin(now / 400); ctx.strokeStyle = st.glow; ctx.lineWidth = 1.4 * lw; ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
   }
-  if ((st.fx === 'm' || st.fx === 'disco') && k >= 0.9) {   // Funken (rot) bzw. bunte Lichtpunkte (Disco) hinter dem Flugzeug
-    for (let i = 1; i <= 4; i++) { const ph = ((now / 520) + i * 0.25) % 1; ctx.fillStyle = st.fx === 'disco' ? DISCO[(i + Math.floor(now / 260)) % DISCO.length] : (i % 2 ? '#ef4444' : '#ffb21f'); ctx.globalAlpha = 0.7 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.5 - ph * 5, Math.sin(now / 240 + i * 2) * 2, 1.1, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
+  if (st.fx === 'm' || st.fx === 'disco') {   // Funkenschweif (rot) bzw. bunte Lichtpunkte, pulsierender Ring
+    for (let i = 1; i <= 6; i++) { const ph = ((now / 520) + i / 6) % 1; ctx.fillStyle = st.fx === 'disco' ? DISCO[(i + Math.floor(now / 260)) % DISCO.length] : (i % 2 ? '#ef4444' : '#ffb21f'); ctx.globalAlpha = 0.8 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.2 - ph * 6, Math.sin(now / 240 + i * 2) * 2.4, 1.4, 0, Math.PI * 2); ctx.fill(); }
+    const c = st.fx === 'disco' ? discoColor(now) : '#ef4444';
+    ctx.globalAlpha = 0.5 + 0.3 * Math.sin(now / 220); ctx.strokeStyle = c; ctx.lineWidth = 1.6 * lw; ctx.beginPath(); ctx.arc(0, 0, 11.5 + Math.sin(now / 220), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
   }
-  if (st.fx === 'l') {   // pulsierender goldener Ring
-    const r = 12 + (k >= 0.9 ? Math.sin(now / 350) * 1.6 : 0);
-    ctx.strokeStyle = '#f5b301'; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.2 / p.sc; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 0.25; ctx.fillStyle = '#f5b301'; ctx.fill(); ctx.globalAlpha = 1;
+  if (st.fx === 'l') {   // Gold: rotierende Strahlen, doppelter pulsierender Ring, Glitzersterne
+    const r = 13 + Math.sin(now / 350) * 1.8, rot = now / 1600;
+    ctx.save(); ctx.rotate(rot); ctx.globalAlpha = 0.28; ctx.fillStyle = '#ffd34d';
+    for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r + 7, -1.6); ctx.lineTo(r + 7, 1.6); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    ctx.globalAlpha = 0.95; ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 1.6 * lw; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.6; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.8 * lw; ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.22; ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 4; i++) { const a = rot * 2 + i * Math.PI / 2, ph = (Math.sin(now / 260 + i * 1.7) + 1) / 2, x = Math.cos(a) * (r + 3), y = Math.sin(a) * (r + 3), z = 1 + ph * 1.6;
+      ctx.globalAlpha = 0.4 + 0.6 * ph; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x, y - z); ctx.lineTo(x + z * 0.3, y); ctx.lineTo(x, y + z); ctx.lineTo(x - z * 0.3, y); ctx.closePath(); ctx.fill(); }
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -17654,7 +18014,7 @@ function boot(hotData) {
   }
   applyOnlineChrome();
   requestAnimationFrame(frame);
-  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), reveal: (res, quick) => { const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
+  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), coll: () => coll, reveal: async (res, quick) => { await loadColl(true); const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
 }
 if (window.claude?.hot?.ready) window.claude.hot.ready(boot); else boot(window.claude?.hot?.data ?? {});
 })();

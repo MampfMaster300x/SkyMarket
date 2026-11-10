@@ -1527,8 +1527,13 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   { const sid = Object.keys(me.inv).find((x) => me.inv[x] === 1 && !Object.values(me.active).includes(x)), sk = SK.SKIN_BY_ID[sid];
     assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-001', skinId: sid, type: 'XXXX', fleet: ['P1-001', 'P1-002'] })).status, 400, 'solo: falsches Modell');
     let m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-001', skinId: sid, type: sk.type, fleet: ['P1-001', 'P1-002'] }), 'solo aktivieren').me; assert.equal(m2.active['solo|P1-001'], sid);
-    assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-002', skinId: sid, type: sk.type, fleet: ['P1-001', 'P1-002'] })).status, 409, 'solo: nur ein Exemplar');
-    m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-002', skinId: null, type: sk.type, fleet: ['P1-002'] }), 'solo aufräumen').me; assert.ok(!m2.active['solo|P1-001'], 'verkauftes Flugzeug gibt den Skin frei'); }
+    // 0.21.57: ein Exemplar deckt bis zu 5 Flugzeuge, das sechste nicht
+    const F6 = ['P1-001', 'P1-002', 'P1-003', 'P1-004', 'P1-005', 'P1-006'];
+    for (const ac of F6.slice(1, 5)) m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: ac, skinId: sid, type: sk.type, fleet: F6 }), 'solo: ' + ac).me;
+    assert.equal(Object.values(m2.active).filter((x) => x === sid).length, 5, 'fünf Flugzeuge mit einem Exemplar');
+    assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-006', skinId: sid, type: sk.type, fleet: F6 })).status, 409, 'solo: sechstes Flugzeug braucht ein zweites Exemplar');
+    m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-002', skinId: null, type: sk.type, fleet: ['P1-002'] }), 'solo aufräumen').me; assert.ok(!m2.active['solo|P1-001'], 'verkauftes Flugzeug gibt den Skin frei');
+    assert.ok(!Object.keys(m2.active).some((k) => k.startsWith('solo|') && k !== 'solo|P1-002'), 'alle verkauften Flugzeuge geben frei'); }
   assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'x' })).status, 400);
   const rq = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter' }), 'Anfrage').request;
   assert.equal(rq.packs, 10); assert.equal(rq.amount, '5'); assert.equal(rq.currency, 'TOKEN'); assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 0, 'noch keine Packs');
@@ -1567,5 +1572,39 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.equal(SMx.applyAction(w, 'P1', { type: 'antitrustAdjust', apt: 'HAJ' }).ok, false, 'nichts mehr anzupassen');
   Object.assign(P.ANTITRUST, A0);
   console.log('0.21.55 ok: Wettbewerbsaufsicht mit Grenze in Flügen, Streckenliste und Vorschlag zum Übernehmen');
+}
+// 0.21.56: Frachtsparte – eigene Frachtstrecken, Markt, Rate, Frachter, Slots, Speichern
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0); const P = SMx.P;
+  const w = SMx.newWorld({ seed: 5 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'FRA' }); w.playerId = 'P1'; a.ledger.equityFlow(2e9, 't');
+  assert.equal(SMx.applyAction(w, 'P1', { type: 'cgOpen', base: 'FRA', dest: 'MAD', typeId: 'A21F', freq: 5 }).ok, false, 'ohne Frachter keine Frachtstrecke');
+  assert.ok(/Passagier|fliegt keine Linie/.test(SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'FRA', dest: 'MAD', typeId: 'A21F', freq: 1 }).msg || ''), 'Frachter fliegen keine Passagierlinie');
+  for (const t of ['A21F', 'A21F']) assert.ok(SMx.applyAction(w, 'P1', { type: 'acquire', typeId: t, base: 'FRA', mode: 'lease' }).ok);
+  while (w.day <= Math.max(...a.fleet.map((x) => x.delivery_day))) w.step();
+  assert.equal(SMx.applyAction(w, 'P1', { type: 'cgOpen', base: 'FRA', dest: 'A320', typeId: 'A21F', freq: 5 }).ok, false);
+  const qt = w.freightQuote(a, 'FRA', 'MAD', 'A21F', 5, 1); assert.ok(qt.need === 1 && qt.kg > 0 && qt.dem > qt.kg, 'Vorschau');
+  const u0 = w.slotUse('MAD'), r = SMx.applyAction(w, 'P1', { type: 'cgOpen', base: 'FRA', dest: 'MAD', typeId: 'A21F', freq: 5, rate: 1 }); assert.ok(r.ok, r.msg);
+  const q = a.cgRoutes()[0]; assert.equal(a.fleet.filter((x) => x.cg === q.id).length, 1, 'ein Frachter zugeteilt'); assert.equal(w.slotUse('MAD'), u0 + 1, 'Slot belegt');
+  assert.equal(a.activeRoutes().length, 0, 'Fracht getrennt von den Passagierstrecken');
+  const fr = a.fleet.find((x) => x.cg === q.id);
+  for (let i = 0; i < 40; i++) w.step();
+  assert.ok(a.crewNeed(w.day).pil.A32F > 0, 'Crew für den Frachter');
+  const h = q.hist.slice(-30), kg = h.reduce((x, e) => x + e[2] + e[3], 0), fl = h.reduce((x, e) => x + e[1], 0), cap = h.reduce((x, e) => x + 2 * e[4], 0);
+  assert.ok(Math.abs(fl - 30 * 5 / 7) <= 1.5, 'Umläufe nach Plan: ' + fl); assert.ok(Math.abs(kg / 30 - 2 * qt.kg) / (2 * qt.kg) < 0.15, `Fracht wie vorhergesagt: ${Math.round(kg / 30)} vs ${Math.round(2 * qt.kg)}`); assert.ok(kg / cap <= P.FREIGHT.loadMax + 1e-9);
+  assert.ok(a.ledger.months.at(-1).acc.rev_cargo > 0 || a.ledger.today.rev_cargo > 0 || h.some((e) => e[5] > 0), 'Frachterlös gebucht'); assert.ok(fr.fh > 0, 'Flugstunden');
+  assert.equal(w.acceptAcmi(a, 'x', fr.id).ok, false);
+  // Rate: höher → weniger Fracht, mehr je Kilo
+  const lo = w.freightQuote(a, 'FRA', 'MAD', 'A21F', 5, 0.7, q.id), hi = w.freightQuote(a, 'FRA', 'MAD', 'A21F', 5, 1.3, q.id); assert.ok(lo.kg >= hi.kg && hi.rateKg > lo.rateKg, 'Rate wirkt');
+  const per = SMx.cgPerAc('FRA', 'MAD', 'A21F'), f2 = Math.floor(7 * per) + 2, f3 = Math.min(P.FREIGHT.maxWeek, Math.floor(14 * per) + 2);
+  assert.equal(SMx.applyAction(w, 'P1', { type: 'cgEdit', id: q.id, freq: f2 }).ok, true, 'zweiter Frachter frei'); assert.equal(a.fleet.filter((x) => x.cg === q.id).length, 2);
+  if (f3 > Math.floor(14 * per)) assert.equal(SMx.applyAction(w, 'P1', { type: 'cgEdit', id: q.id, freq: f3 }).ok, false, 'nicht genug Frachter');
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgEdit', id: q.id, freq: 4, rate: 1.15 }).ok); assert.equal(a.fleet.filter((x) => x.cg === q.id).length, 1, 'Frachter wieder frei'); assert.equal(q.rate, 1.15);
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))), a2 = w2.airlines.P1; assert.ok(a2.cgRoutes().length === 1 && a2.fleet.some((x) => x.cg === q.id) && a2.cgRoutes()[0].hist.length === q.hist.length, 'gespeichert');
+  for (let i = 0; i < 3; i++) { w.step(); w2.step(); } assert.equal(JSON.stringify(w.airlines.P1.cgRoutes()[0].hist.at(-1)), JSON.stringify(a2.cgRoutes()[0].hist.at(-1)), 'nach dem Laden gleich weiter');
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgClose', id: q.id }).ok); assert.ok(!a.fleet.some((x) => x.cg) && !a.cgRoutes().length, 'geschlossen, Frachter frei'); assert.ok(a.cgSlotsAt('MAD') === 0, 'keine Frachtslots mehr in Nutzung');
+  // KI eröffnet Frachtsparten
+  const w3 = SMx.newWorld({ seed: 9 }); SMx.addHuman(w3, { id: 'P1', name: 'B', code: 'BB', base: 'HAM' }); w3.playerId = 'P1';
+  for (let i = 0; i < 240; i++) w3.step();
+  const aiCg = w3.list.filter((x) => x.archetype && x.cg && x.cgRoutes().length); assert.ok(aiCg.length >= 1, 'KI mit Frachtsparte');
+  console.log(`0.21.56 ok: Frachtsparte – ${Math.round(kg / 30 / 1000)} t/Tag FRA–MAD (Vorschau ${Math.round(2 * qt.kg / 1000)} t), ${aiCg.length} KI-Frachtsparten nach 240 Tagen`);
 }
 console.log('Alle Prüfungen bestanden.');

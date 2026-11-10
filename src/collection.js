@@ -42,7 +42,11 @@ function skinFor(al, acId) {
   else if (ui.mp) { const sk = mpState.info && mpState.info.skins; id = sk && sk[al.id] && sk[al.id][acId]; }
   return id ? SK.SKIN_BY_ID[id] || null : null;
 }
-const freeCopies = (id) => { const m = coll.me; if (!m) return 0; const act = Object.values(m.active).filter((x) => x === id).length; return (m.inv[id] || 0) - act - ((m.reserved || {})[id] || 0); };
+const actCount = (id) => (coll.me ? Object.values(coll.me.active).filter((x) => x === id).length : 0);
+/** Exemplare frei für den Tausch (0.21.57: ein Exemplar deckt bis zu PER_COPY Flugzeuge). */
+const freeCopies = (id) => { const m = coll.me; if (!m) return 0; return (m.inv[id] || 0) - Math.ceil(actCount(id) / SK.PER_COPY) - ((m.reserved || {})[id] || 0); };
+/** Wie viele weitere Flugzeuge diesen Skin noch bekommen können. */
+const freeSlots = (id) => { const m = coll.me; if (!m) return 0; return ((m.inv[id] || 0) - ((m.reserved || {})[id] || 0)) * SK.PER_COPY - actCount(id); };
 
 // ---------- Lackierungen auf den vorhandenen Seitenansichten ----------
 let skinSeq = 0;
@@ -180,7 +184,7 @@ VIEWS.collection = function viewCollection() {
   if (more) html += `<div class="row"><button class="btn small" data-act="showall" data-k="acgrid">Weitere ${more} Modelle zeigen</button></div>`;
   if (!nModels) html += '<p class="small muted">Kein Skin passt zu den Filtern.</p>';
   if (m.opened.length) html += `<section class="ac-model"><h3>Zuletzt geöffnet</h3><div class="ac-hist">${m.opened.slice(0, 10).map((p) => `<div class="ac-hrow"><span class="small muted">${new Date(p.op).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${p.src === 'admin_grant' ? ' · Geschenk' : ''}</span>${p.res.map((id) => { const s = SK.SKIN_BY_ID[id]; return s ? `<button class="ac-mini rar-${s.rarity}" data-act="acdetail" data-id="${s.id}" title="${esc(s.name)} · ${esc(modelOf(s).name)}"><img src="${skinArt(s)}" alt=""><span>${esc(s.name)}</span></button>` : ''; }).join('')}</div>`).join('')}</div></section>`;
-  html += `<p class="small muted">Alle Skins sind rein kosmetisch: Sie ändern weder Reichweite noch Kosten, Einnahmen oder sonst etwas am Spiel. Ein Exemplar kann auf einem Flugzeug des passenden Modells aktiv sein; Duplikate lassen sich auf weiteren Flugzeugen zeigen oder tauschen.</p></div>`;
+  html += `<p class="small muted">Alle Skins sind rein kosmetisch: Sie ändern weder Reichweite noch Kosten, Einnahmen oder sonst etwas am Spiel. Ein Exemplar kann auf bis zu ${SK.PER_COPY} Flugzeugen des passenden Modells aktiv sein; Duplikate lassen sich auf weiteren Flugzeugen zeigen oder tauschen.</p></div>`;
   return html;
 };
 function skinCard(s) {
@@ -200,10 +204,9 @@ function showSkinDetail(id) {
     <div class="ac-big${n ? '' : ' miss'}"><img src="${skinArt(s, !n)}" alt="${esc(s.name)}"></div>
     <h2>${n ? esc(s.name) : 'Noch nicht gesammelt'} ${rarChip(s.rarity)}</h2>
     <p class="ink2">${n ? esc(s.desc) : 'Diesen Skin gibt es nur in Aircraft Mystery Packs oder im Tausch mit anderen Spielern.'}</p>
-    <div class="small muted">Im Besitz: ${n} · frei: ${Math.max(0, free)}${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
-    ${here.length ? `<div class="stack" style="gap:6px"><b class="small">Aktiv auf</b>${here.map(([, ac]) => `<div class="spread small"><span class="mono">${esc(acName(ac))}</span><button class="btn small" data-sd="off" data-ac="${esc(ac)}">Standardlackierung</button></div>`).join('')}</div>` : ''}
+    <div class="small muted">Im Besitz: ${n} · aktiv auf ${actCount(s.id)} von ${Math.max(0, (n - ((m.reserved || {})[s.id] || 0)) * SK.PER_COPY)} möglichen Flugzeugen (je Exemplar ${SK.PER_COPY})${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
     ${acts.length > here.length ? `<p class="small muted">Außerdem aktiv in ${acts.length - here.length} Flugzeug(en) anderer Spiele.</p>` : ''}
-    ${n && free > 0 && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Auf Flugzeug aktivieren</b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id); return `<button class="btn small" data-sd="on" data-ac="${a.id}" ${cur && cur.id === s.id ? 'disabled' : ''}>${esc(acName(a.id))}${cur ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
+    ${n && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Flugzeuge wählen <span class="muted">(antippen zum An- und Abwählen, noch ${Math.max(0, freeSlots(s.id))} frei)</span></b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id), on = cur && cur.id === s.id; return `<button class="btn small${on ? ' primary' : ''}" data-sd="${on ? 'off' : 'on'}" data-ac="${a.id}" aria-pressed="${!!on}" ${!on && freeSlots(s.id) < 1 ? 'disabled' : ''}>${on ? '✓ ' : ''}${esc(acName(a.id))}${cur && !on ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
       : n && !fits.length ? `<p class="small muted">Sie haben keine ${esc(modelOf(s).name)} in Ihrer Flotte.</p>` : ''}
     ${n && free > 0 ? '<div class="row"><button class="btn small" data-sd="trade">Zum Tausch anbieten</button></div>' : ''}</div>`);
   md.onclick = async (e) => {
@@ -229,7 +232,7 @@ function showSkinPicker(acId) {
   const md = modal(`<div class="spread"><h1 style="margin:0">Skin für ${esc(acName(a.id))}</h1><button class="btn small" data-sp="close">Schließen</button></div>
     <p class="small muted">${esc(tl(a.type_id))} · aktuell: ${cur ? `<b>${esc(cur.name)}</b>` : 'Standardlackierung Ihrer Airline'}. Skins ändern nur die Darstellung – Kennung, Wartung, Leasing, Crew, Flugstunden und Einsatz bleiben, wie sie sind.</p>
     <div class="ac-grid ac-pick">${cur ? `<button class="ac-card" data-sp="off"><span class="ac-art">${acSvg(a.type_id, { ...myAcColors(), code: pl.code })}</span><span class="ac-name">Standardlackierung</span></button>` : ''}
-      ${list.map((s) => { const free = freeCopies(s.id), on = cur && cur.id === s.id; return `<button class="ac-card rar-${s.rarity}" data-sp="on" data-id="${s.id}" ${on || free < 1 ? 'disabled' : ''}><span class="ac-art"><img src="${skinArt(s)}" alt=""></span><span class="ac-name">${esc(s.name)}</span><span class="ac-meta">${rarChip(s.rarity)}${on ? '<span class="chip good">aktiv</span>' : free < 1 ? '<span class="chip">kein Exemplar frei</span>' : `<span class="chip">${free} frei</span>`}</span></button>`; }).join('')}</div>
+      ${list.map((s) => { const free = freeSlots(s.id), on = cur && cur.id === s.id; return `<button class="ac-card rar-${s.rarity}" data-sp="on" data-id="${s.id}" ${on || freeSlots(s.id) < 1 ? 'disabled' : ''}><span class="ac-art"><img src="${skinArt(s)}" alt=""></span><span class="ac-name">${esc(s.name)}</span><span class="ac-meta">${rarChip(s.rarity)}${on ? '<span class="chip good">aktiv</span>' : free < 1 ? '<span class="chip">alle Plätze belegt</span>' : `<span class="chip">noch ${free} Flugzeuge</span>`}</span></button>`; }).join('')}</div>
     ${list.length ? '' : `<p class="small muted">Sie besitzen noch keinen Skin für die ${esc(tl(a.type_id))}. Skins gibt es in Aircraft Mystery Packs (Collection → Shop) oder im Tausch.</p>`}`);
   md.onclick = async (e) => {
     const b = e.target.closest('[data-sp]'); if (!b) { if (e.target === md) md.hidden = true; return; }
@@ -241,20 +244,20 @@ function showSkinPicker(acId) {
 
 // ---------- Pack öffnen (Ergebnis kommt vom Server, die Animation zeigt es nur) ----------
 /** 0.21.55: Pack mit Aufreißlasche oben (Perforation, Lasche kippt beim Ziehen), Titel passt immer (textLength), fünf Seltenheitsfarben. */
-const packSvg = () => `<svg viewBox="0 0 220 300" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a2b58"/><stop offset=".55" stop-color="#0f1a3c"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".35" stop-color="#d946ef"/><stop offset=".7" stop-color="#ef4444"/><stop offset="1" stop-color="#f5b301"/></linearGradient><linearGradient id="pks" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26407c"/><stop offset="1" stop-color="#16244a"/></linearGradient></defs>
-  <rect x="10" y="40" width="200" height="252" rx="16" fill="url(#pkg)" stroke="url(#pke)" stroke-width="3"/>
-  <rect x="22" y="52" width="176" height="228" rx="10" fill="none" stroke="#22d3ee" stroke-opacity=".28"/>
+const packSvg = () => `<svg viewBox="0 0 220 300" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a2b58"/><stop offset=".55" stop-color="#0f1a3c"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" gradientUnits="userSpaceOnUse" x1="10" y1="6" x2="210" y2="292"><stop offset="0" stop-color="#22d3ee"/><stop offset=".35" stop-color="#d946ef"/><stop offset=".7" stop-color="#ef4444"/><stop offset="1" stop-color="#f5b301"/></linearGradient><linearGradient id="pks" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26407c"/><stop offset="1" stop-color="#16244a"/></linearGradient></defs>
+  <path d="M10 40 H210 V276 Q210 292 194 292 H26 Q10 292 10 276 Z" fill="url(#pkg)"/><path d="M10 40 V276 Q10 292 26 292 H194 Q210 292 210 276 V40" fill="none" stroke="url(#pke)" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M22 52 H198 V270 Q198 280 188 280 H32 Q22 280 22 270 Z" fill="none" stroke="#22d3ee" stroke-opacity=".28"/>
   <text x="110" y="80" text-anchor="middle" fill="#e6f6ff" font-size="13" font-weight="800" textLength="164" lengthAdjust="spacingAndGlyphs">AIRCRAFT COLLECTION</text>
   <path d="M34 92 H186 M34 238 H186" stroke="#22d3ee" stroke-opacity=".45"/>
   <circle cx="110" cy="165" r="54" fill="#22d3ee" opacity=".08"/>
   <path transform="translate(110 165) scale(1.55) translate(-100 -126)" d="M100 96 l10 26 l34 12 v8 l-34 -4 l-4 22 l10 8 v6 l-16 -4 l-16 4 v-6 l10 -8 l-4 -22 l-34 4 v-8 l34 -12z" fill="#e6f6ff" opacity=".92"/>
   <text x="110" y="263" text-anchor="middle" fill="#a5f3fc" font-size="19" font-weight="800" letter-spacing="1.5">MYSTERY PACK</text>
   ${['#22c55e', '#3b82f6', '#d946ef', '#ef4444', '#f5b301'].map((c, i) => `<rect x="${43 + i * 28}" y="272" width="22" height="4" rx="2" fill="${c}"/>`).join('')}
-  <g class="pk-strip"><path d="M10 40 V18 Q10 6 22 6 H198 Q210 6 210 18 V40 Z" fill="url(#pks)" stroke="url(#pke)" stroke-width="3"/>
+  <g class="pk-strip"><path d="M10 41 V18 Q10 6 22 6 H198 Q210 6 210 18 V41 Z" fill="url(#pks)"/><path d="M10 40 V18 Q10 6 22 6 H198 Q210 6 210 18 V40" fill="none" stroke="url(#pke)" stroke-width="3" stroke-linejoin="round"/>
     ${Array.from({ length: 21 }, (_, i) => `<path d="M${20 + i * 9} 12 V34" stroke="#ffffff" stroke-opacity=".1" stroke-width="1.6"/>`).join('')}
     <path d="M196 23 l-8 -5 v10 z" fill="#22d3ee" opacity=".8"/></g>
-  <path d="M15 40 H205" stroke="#a5f3fc" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7"/>
-  <path class="pk-rip" d="M15 40 H205" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+  <path d="M8.5 40 H211.5" stroke="#a5f3fc" stroke-width="1.6" stroke-dasharray="4 3.5" opacity=".75"/>
+  <path class="pk-rip" d="M8.5 40 H211.5" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 let pkAudio = null;
 function goldChime() {
   try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); const t = pkAudio.currentTime;
@@ -293,6 +296,8 @@ function onPackOv(e) {
   else if (k === 'next') openPack();
   else if (k === 'skip' && ov._skip) ov._skip();
   else if (k === 'all' && ov._all) ov._all();
+  else if (k === 'eq' && ov._cur) { const s = ov._cur, box = ov.querySelector('.pk-equip'); b.disabled = true;
+    activateSkin(b.dataset.ac, s.id).then(() => { if (box) box.innerHTML = equipHtml(s, `${s.name} ist auf ${acName(b.dataset.ac)} aktiv.`); }).catch((err) => { toast(err.message); b.disabled = false; }); }
   else if (k === 'more' && ov._more) ov._more();
 }
 // ---------- Klang: Aufladen, Knall, Fanfare je Seltenheit ----------
@@ -328,6 +333,14 @@ function pkFanfare(rk) {
 const RT = { u: 1, r: 1.1, e: 1.25, m: 1.45, l: 1.8 };   // Dauer der Spannung je Seltenheit
 const FLIP = { u: 500, r: 800, e: 1100, m: 1400, l: 1800 };   // Kartenrückseite, bis sie sich dreht
 function pkBg(n = 40) { return `<div class="pk-bg" aria-hidden="true"><div class="pk-bgrays"></div>${Array.from({ length: n }, () => `<i style="left:${(Math.random() * 100).toFixed(1)}%;top:${(Math.random() * 100).toFixed(1)}%;--s:${(1 + Math.random() * 2.5).toFixed(1)}px;--d:${(1 + Math.random() * 2.5).toFixed(2)}s;--w:${(Math.random() * 2).toFixed(2)}s"></i>`).join('')}</div><div class="pk-white" aria-hidden="true"></div>`; }
+/** 0.21.56: Direkt nach dem Ziehen ausrüsten – passende eigene Flugzeuge dieses Spiels. */
+function equipHtml(s, msg = '') {
+  const pl = W && W.player, fits = pl ? pl.fleet.filter((a) => a.type_id === s.type) : [], head = msg ? `<span class="pk-eqok">${esc(msg)}</span>` : '';
+  if (!fits.length) return head || `<span class="small" style="color:#a5b4d0">Keine ${esc(modelOf(s).name)} in Ihrer Flotte – der Skin wartet in der Sammlung.</span>`;
+  const left = freeSlots(s.id), cur = (a) => { const k = skinFor(pl, a.id); return k ? k.name : 'Standard'; }, on = (a) => { const k = skinFor(pl, a.id); return !!(k && k.id === s.id); };
+  const btn = (a) => `<button class="btn small${on(a) ? '' : ' gold'}" data-pk="eq" data-ac="${a.id}" ${on(a) || left < 1 ? 'disabled' : ''}>${on(a) ? '✓ ' : ''}${esc(acName(a.id))}${on(a) ? '' : ` <span class="small" style="opacity:.75">(${esc(cur(a))})</span>`}</button>`;
+  return `${head}<span class="small" style="color:#c3cde0">${left > 0 ? `Jetzt ausrüsten – auf bis zu ${SK.PER_COPY} Flugzeugen je Exemplar (noch ${left} frei):` : `Alle ${SK.PER_COPY * Math.max(1, (coll.me && coll.me.inv[s.id]) || 1)} Plätze dieses Skins sind belegt.`}</span><div class="row" style="gap:6px;flex-wrap:wrap;justify-content:center">${fits.slice(0, 10).map(btn).join('')}</div>${fits.length > 10 ? `<span class="small" style="color:#a5b4d0">und ${fits.length - 10} weitere – in der Sammlung wählbar</span>` : ''}`;
+}
 function playReveal(ov, pack) {
   const items = pack.res.map((id, i) => ({ s: SK.SKIN_BY_ID[id], fresh: pack.fresh ? pack.fresh[i] : false })).filter((x) => x.s);
   const best = items.reduce((a, x) => (RAR[x.s.rarity].order > RAR[a].order ? x.s.rarity : a), 'u');
@@ -376,7 +389,9 @@ function playReveal(ov, pack) {
         <div class="pk-face pk-back rar-${rk}"><span class="pk-q">?</span><span class="pk-backt">AIRCRAFT COLLECTION</span></div>
         <div class="pk-face pk-front"><div class="pk-card rar-${rk}"><span class="pk-rar">${RAR[rk].label}${x.fresh ? ' · NEU' : ''}</span><img src="${skinArt(s)}" alt="${esc(s.name)}"><h2>${esc(s.name)}</h2><span class="pk-model">${esc(modelOf(s).name)}</span><p>${esc(s.desc)}</p>
           <span class="small">${items.length > 1 ? `Skin ${k + 1} von ${items.length}` : ''}</span></div></div></div></div>
+      <div class="pk-equip">${equipHtml(s)}</div>
       <div class="row pk-btns">${last ? `<button class="btn" data-pk="more">Zusammenfassung</button>` : `<button class="btn primary" data-pk="more">Nächster Skin</button>`}</div></div>`;
+    ov._cur = s;
     const st2 = ov.querySelector('.pk-stage');
     const flip = () => { st2.classList.add('flipped', 'burst'); ov.classList.add('boom'); pkFanfare(rk); if (rk === 'm' || rk === 'l') ov.classList.add('quake'); setTimeout(() => ov.classList.remove('quake', 'boom'), 900); };
     ov.classList.remove('quake', 'boom');
@@ -568,24 +583,37 @@ async function showPackAdmin() {
 
 // ---------- Karte: Skin-Effekte für das Flugzeug-Canvas ----------
 /** Farbe und Effekt eines Skins auf der Karte (nur Darstellung). */
-function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#f5b301' : s.pal.tail, edge: s.rarity === 'l' ? '#5a3d00' : s.pal.line, fx: s.blink ? 'disco' : s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? (s.pal.accent || '#d946ef') : s.rarity === 'm' ? '#ef4444' : null } : null; }
+function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#fff3c4' : s.pal.tail, edge: s.rarity === 'l' ? '#3a2600' : s.pal.line, fx: s.blink ? 'disco' : s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? '#e879f9' : s.rarity === 'm' ? '#ef4444' : s.rarity === 'l' ? '#ffd34d' : null } : null; }
 const DISCO = ['#ff2bd6', '#22e5ff', '#ffe14d', '#7cff4f', '#ff7a1a'];
 /** Disco Fever: Farbe wechselt im Takt (auf der Karte und in Listen). */
 const discoColor = (now) => DISCO[Math.floor(now / 260) % DISCO.length];
 function drawSkinFx(ctx, p, k, now) {
+  // 0.21.57: deutlich auffälliger als die eigenen (gelben) Flugzeuge – Effekte auch weit herausgezoomt
   const st = p.sk; if (!st) return;
-  if (st.fx === 'e' && k >= 1) {   // violette Partikel hinter dem Flugzeug (nur nah genug herangezoomt)
+  const lw = 1 / p.sc;
+  if (st.fx === 'r') {   // blauer Glanzring
+    ctx.strokeStyle = '#60a5fa'; ctx.globalAlpha = 0.45 + 0.25 * Math.sin(now / 500); ctx.lineWidth = 1.2 * lw; ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  if (st.fx === 'e') {   // pinker Schweif aus Partikeln, leuchtender Ring
     ctx.fillStyle = st.glow;
-    for (let i = 1; i <= 3; i++) { const ph = ((now / 600) + i * 0.33) % 1; ctx.globalAlpha = 0.5 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 4 - ph * 4, Math.sin(now / 300 + i) * 1.5, 1.1, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
+    for (let i = 1; i <= 5; i++) { const ph = ((now / 600) + i * 0.2) % 1; ctx.globalAlpha = 0.6 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.5 - ph * 4, Math.sin(now / 300 + i) * 1.6, 1.3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 0.35 + 0.2 * Math.sin(now / 400); ctx.strokeStyle = st.glow; ctx.lineWidth = 1.4 * lw; ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
   }
-  if ((st.fx === 'm' || st.fx === 'disco') && k >= 0.9) {   // Funken (rot) bzw. bunte Lichtpunkte (Disco) hinter dem Flugzeug
-    for (let i = 1; i <= 4; i++) { const ph = ((now / 520) + i * 0.25) % 1; ctx.fillStyle = st.fx === 'disco' ? DISCO[(i + Math.floor(now / 260)) % DISCO.length] : (i % 2 ? '#ef4444' : '#ffb21f'); ctx.globalAlpha = 0.7 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.5 - ph * 5, Math.sin(now / 240 + i * 2) * 2, 1.1, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
+  if (st.fx === 'm' || st.fx === 'disco') {   // Funkenschweif (rot) bzw. bunte Lichtpunkte, pulsierender Ring
+    for (let i = 1; i <= 6; i++) { const ph = ((now / 520) + i / 6) % 1; ctx.fillStyle = st.fx === 'disco' ? DISCO[(i + Math.floor(now / 260)) % DISCO.length] : (i % 2 ? '#ef4444' : '#ffb21f'); ctx.globalAlpha = 0.8 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.2 - ph * 6, Math.sin(now / 240 + i * 2) * 2.4, 1.4, 0, Math.PI * 2); ctx.fill(); }
+    const c = st.fx === 'disco' ? discoColor(now) : '#ef4444';
+    ctx.globalAlpha = 0.5 + 0.3 * Math.sin(now / 220); ctx.strokeStyle = c; ctx.lineWidth = 1.6 * lw; ctx.beginPath(); ctx.arc(0, 0, 11.5 + Math.sin(now / 220), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
   }
-  if (st.fx === 'l') {   // pulsierender goldener Ring
-    const r = 12 + (k >= 0.9 ? Math.sin(now / 350) * 1.6 : 0);
-    ctx.strokeStyle = '#f5b301'; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.2 / p.sc; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 0.25; ctx.fillStyle = '#f5b301'; ctx.fill(); ctx.globalAlpha = 1;
+  if (st.fx === 'l') {   // Gold: rotierende Strahlen, doppelter pulsierender Ring, Glitzersterne
+    const r = 13 + Math.sin(now / 350) * 1.8, rot = now / 1600;
+    ctx.save(); ctx.rotate(rot); ctx.globalAlpha = 0.28; ctx.fillStyle = '#ffd34d';
+    for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r + 7, -1.6); ctx.lineTo(r + 7, 1.6); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    ctx.globalAlpha = 0.95; ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 1.6 * lw; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.6; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.8 * lw; ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 0.22; ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 4; i++) { const a = rot * 2 + i * Math.PI / 2, ph = (Math.sin(now / 260 + i * 1.7) + 1) / 2, x = Math.cos(a) * (r + 3), y = Math.sin(a) * (r + 3), z = 1 + ph * 1.6;
+      ctx.globalAlpha = 0.4 + 0.6 * ph; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x, y - z); ctx.lineTo(x + z * 0.3, y); ctx.lineTo(x, y + z); ctx.lineTo(x - z * 0.3, y); ctx.closePath(); ctx.fill(); }
+    ctx.globalAlpha = 1;
   }
 }

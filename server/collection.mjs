@@ -27,7 +27,9 @@ const userOf = (reg, key, name) => { const u = reg.users[key] || (reg.users[key]
 const uniqOf = (u) => Object.values(u.inv).filter((n) => n > 0).length;
 const activeCount = (u, skinId) => Object.values(u.active).filter((s) => s === skinId).length;
 const reservedOf = (reg, key, skinId, except = null) => Object.values(reg.trades).filter((t) => t.status === 'open' && t.from === key && t.id !== except).reduce((s, t) => s + t.give.filter((x) => x === skinId).length, 0);
-const freeOf = (reg, key, skinId, except = null) => { const u = reg.users[key]; if (!u) return 0; return (u.inv[skinId] || 0) - activeCount(u, skinId) - reservedOf(reg, key, skinId, except); };
+// 0.21.57: ein Exemplar deckt bis zu SKINS.PER_COPY Flugzeuge. freeOf = frei für Tausch (Exemplare ohne aktives Flugzeug), slotsOf = weitere Flugzeuge, die noch gehen.
+const freeOf = (reg, key, skinId, except = null) => { const u = reg.users[key]; if (!u) return 0; return (u.inv[skinId] || 0) - Math.ceil(activeCount(u, skinId) / SKINS.PER_COPY) - reservedOf(reg, key, skinId, except); };
+const slotsOf = (reg, key, skinId) => { const u = reg.users[key]; if (!u) return 0; return ((u.inv[skinId] || 0) - reservedOf(reg, key, skinId)) * SKINS.PER_COPY - activeCount(u, skinId); };
 const note = (u, msg, kind = 'info') => { u.notes.push({ id: randomUUID().slice(0, 8), t: Date.now(), msg, kind }); if (u.notes.length > NOTES_KEEP) u.notes = u.notes.slice(-NOTES_KEEP); };
 function milestones(u) {
   const n = uniqOf(u);
@@ -146,7 +148,7 @@ export async function handleCollection(req, ctx) {
       if (!skinId) { if (!u.active[k]) return pruned ? reg : undefined; delete u.active[k]; return reg; }
       if (u.active[k] === skinId) return pruned ? reg : undefined;
       const prev = u.active[k]; delete u.active[k];
-      if (freeOf(reg, me, skinId) < 1) { err = 'Alle Exemplare dieses Skins sind schon auf anderen Flugzeugen aktiv oder in einem Tauschangebot.'; if (prev) u.active[k] = prev; return undefined; }
+      if (slotsOf(reg, me, skinId) < 1) { err = `Ein Exemplar reicht für ${SKINS.PER_COPY} Flugzeuge – alle Exemplare dieses Skins sind schon voll belegt oder in einem Tauschangebot.`; if (prev) u.active[k] = prev; return undefined; }
       u.active[k] = skinId; return reg;
     }, null);
     if (err) return fail(409, err);

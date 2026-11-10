@@ -183,6 +183,22 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.57: Skin auf bis zu 5 Flugzeugen, aufgeräumte Karte, Pack-Ecken
+
+- **Collection:** Ein Exemplar eines Skins deckt bis zu `SKINS.PER_COPY` = 5 Flugzeuge. Server: `slotsOf` (weitere Flugzeuge möglich) für das Aktivieren, `freeOf` (Exemplare ohne aktives Flugzeug) für den Tausch. Skin-Detail: Flugzeuge per Antippen an- und abwählen; nach dem Ziehen mehrere Flugzeuge direkt ausrüsten.
+- **Karte:** fremde Flugzeuge ohne Skin klein und grau, Flugzeuge mit Skin größer (Rot/Disco größer, Gold am größten). Effekte auch weit herausgezoomt: Glanzring (Blau), Partikelschweif und Ring (Pink), Funken und pulsierender Ring (Rot), bunte Lichtpunkte (Disco), rotierende Strahlen, Doppelring, Glitzersterne und weiß-goldener Verlauf (Gold, klar unterscheidbar vom eigenen Gelb). Goldene Spur hell und gestrichelt. Streckenlinien dünner, fremde Spielerstrecken blass.
+- **Pack:** Lasche und Packung schließen an der Perforation sauber ab (keine runden Ecken in der Fuge), Rahmenverlauf durchgehend über beide Teile.
+
+## Neu in 0.21.56: Frachtsparte (Cargo, Stufe 1), Skin direkt ausrüsten
+
+- **Cargo als eigener Geschäftszweig** (Bereich „Cargo“: Frachtnetz, Neue Frachtstrecke, Frachtmarkt). Frachtstrecken liegen getrennt von den Passagierstrecken in `al.cg.routes` (nicht in `activeRoutes`), mit eigenen Frachtern (`a.cg = <Strecken-Id>`), Frequenz in Umläufen pro Woche (1–28) und einer Rate von 60–160 % der Marktrate.
+- **Markt:** Bedarf je Richtung `freightDemand(o, d)` = Beiladebedarf × `FREIGHT.k` × Distanzfaktor (kurz fährt Lkw), Marktrate `freightRef` = Beilade-Ertrag × `rateX`. Verteilung nach geplanter Tageskapazität und Rate (Rate^−3), Gesamtnachfrage elastisch zum Mittelpreis. Fracht wartet beim Anbieter bis zum nächsten Flug (höchstens drei Tage). Tägliches Rauschen über einen eigenen Hash-Zufall – der Weltzufall bleibt unberührt.
+- **Betrieb:** Kosten je Flug über `costsFor` (Kerosin, Wartung, Gebühren, Abfertigung, Crew-Spesen), Frachtabfertigung und Vertrieb je Kilo, Slots und Slotgebühren (aufgerundet auf Flüge pro Tag), Crew-Bedarf, Flugstunden für Wartung, Sperren und Flughafenschließungen. Erlöse unter `rev_cargo`, Einzelposten „Fracht XXX–YYY“.
+- **Vorschau:** `w.freightQuote(al, base, dest, type, freq, rate)` – Bedarf, Konkurrenz, Fracht, Auslastung, Umsatz, Kosten, Ergebnis pro Tag, benötigte Frachter. Die Liste „Neue Frachtstrecke“ bewertet die 40 Ziele mit dem größten Potenzial.
+- **KI:** Premium-Airlines (777F, 767F, A321P2F), Regionale (ATR 72F) und Ferienflieger (A321P2F) eröffnen gelegentlich Frachtsparten, bauen volle Strecken aus und stellen Verlustbringer ein. Meldung im Nachrichtenticker.
+- Frachter auf Frachtstrecken nehmen keine Charter an, lassen sich nicht umstationieren; Basis schließen schließt deren Frachtstrecken. Karte: Frachtstrecken gestrichelt.
+- **Collection:** In der Enthüllung „Jetzt ausrüsten“ – direkt auf ein passendes eigenes Flugzeug dieses Spiels.
+
 ## Neu in 0.21.55: Konkrete Vorschläge, Stufe Rot, Pack-Opening neu, einzelne Packs
 
 - **Wettbewerbsaufsicht mit Zahlen:** `w.antitrustPlan(al, apt)` (nur lesend) nennt eigene und fremde Abflüge am Tag, die Grenze in Flügen (unter 60 % oder unter der Prüfschwelle), alle eigenen Strecken dort mit Ergebnis je Tag und welche Frequenzen sinken (schwächster Ertrag je Flug zuerst, 5 % Puffer; erst Frequenzen, dann Strecken schließen). Meldungen, Assistenz-Hinweis und Ablehnung neuer Strecken nennen den Vorschlag, die Stationen-Karte zeigt die Streckenliste (auch knapp unter der Grenze). Aktion `antitrustAdjust {apt}` übernimmt ihn; die KI-Vertretung tut das wöchentlich und baut an solchen Flughäfen keine Frequenzen mehr aus. Bußgeldformel unverändert (`antitrustFine`).
