@@ -1,18 +1,23 @@
 /*
  * AIRCRAFT COLLECTION – Katalog der Flugzeug-Skins (rein kosmetisch).
- * 28 Modelle × 10 Skins = 280 Skins in vier Seltenheitsstufen (4 grün, 3 blau, 2 lila, 1 gold je Modell).
+ * 28 Modelle × 15 Skins = 420 Skins in fünf Seltenheitsstufen (5 grün, 4 blau, 3 pink, 2 rot, 1 gold je Modell).
+ * 0.21.55: Stufe Rot (zwischen Pink und Gold) neu; je Modell ist einer der beiden roten Skins „Disco Fever“ (blinkt).
+ * Alle Skin-IDs aus 0.21.52–0.21.54 bleiben unverändert gültig.
  * Wird vom Server (Ziehung, Inventar, Handel) und vom Browser (Darstellung) gemeinsam genutzt.
  * Die Ziehung bekommt den Zufall von außen (Server: crypto.randomInt), damit hier kein Math.random für produktive Ziehungen steckt.
  */
 (function () {
   'use strict';
   const RARITIES = {
-    u: { key: 'u', label: 'Ungewöhnlich', color: '#22c55e', order: 0, perModel: 4, odds: 55 },
-    r: { key: 'r', label: 'Selten', color: '#3b82f6', order: 1, perModel: 3, odds: 27 },
-    e: { key: 'e', label: 'Episch', color: '#a855f7', order: 2, perModel: 2, odds: 14 },
-    l: { key: 'l', label: 'Legendär', color: '#f5b301', order: 3, perModel: 1, odds: 4 },
+    u: { key: 'u', label: 'Ungewöhnlich', color: '#22c55e', colorName: 'Grün', order: 0, perModel: 5, odds: 55 },
+    r: { key: 'r', label: 'Selten', color: '#3b82f6', colorName: 'Blau', order: 1, perModel: 4, odds: 27 },
+    e: { key: 'e', label: 'Episch', color: '#d946ef', colorName: 'Pink', order: 2, perModel: 3, odds: 13 },
+    m: { key: 'm', label: 'Mythisch', color: '#ef4444', colorName: 'Rot', order: 3, perModel: 2, odds: 4 },
+    l: { key: 'l', label: 'Legendär', color: '#f5b301', colorName: 'Gold', order: 4, perModel: 1, odds: 1 },
   };
-  const RARITY_ORDER = ['u', 'r', 'e', 'l'];
+  const RARITY_ORDER = ['u', 'r', 'e', 'm', 'l'];
+  /** Anzahl je Modell bis 0.21.54 – die ersten Skins jeder Stufe werden genauso gewählt wie damals (IDs bleiben gleich). */
+  const OLD_PER_MODEL = { u: 4, r: 3, e: 2, m: 0, l: 1 };
   /** Anzahl Skins je Pack: 1 (80 %), 2 (17 %), 3 (3 %) */
   const PACK_COUNT_ODDS = [[1, 80], [2, 17], [3, 3]];
   const CATEGORIES = { regional: 'Regionalflugzeuge', short: 'Kurz- und Mittelstrecke', long: 'Langstrecke', cargo: 'Frachtflugzeuge', biz: 'Businessjets' };
@@ -81,6 +86,13 @@
       { k: 'cosmic', name: 'Cosmic', pal: { body: '#120c2a', body2: '#2c1b5e', belly: '#070418', tail: '#ff6ad5', tail2: '#7b5cff', stripe: '#ffb86b', accent: '#ff6ad5', line: '#2f2457', glass: '#ffb86b', eng: '#120c2a' }, pat: 'nebula', glow: true, desc: 'Nebelwolken in Pink und Ultramarin, dazwischen ein glühender Planetenring.' },
       { k: 'electric_storm', name: 'Electric Storm', pal: { body: '#1f2433', body2: '#363d55', belly: '#0f121b', tail: '#7c3aed', tail2: '#c084fc', stripe: '#c084fc', accent: '#e9d5ff', line: '#3a4158', glass: '#c084fc', eng: '#1f2433' }, pat: 'storm', glow: true, desc: 'Gewittergrau mit violetten Entladungen, die über Rumpf und Leitwerk zucken.' },
     ],
+    m: [
+      { k: 'disco_fever', name: 'Disco Fever', pal: { body: '#1a0b24', body2: '#3a1450', belly: '#0b0410', tail: '#ff2bd6', tail2: '#22e5ff', stripe: '#ffe14d', accent: '#ffffff', line: '#3d1d52', glass: '#ffe14d', eng: '#1a0b24' }, pat: 'disco', glow: true, blink: true, desc: 'Spiegelkacheln in allen Farben, die im Takt blinken, und eine Discokugel am Leitwerk – die Party fliegt mit.' },
+      { k: 'inferno', name: 'Inferno', pal: { body: '#1c0a06', body2: '#3a120a', belly: '#0d0403', tail: '#ff3b1f', tail2: '#ffb21f', stripe: '#ff6a1f', accent: '#ffd36a', line: '#4a1a0e', glass: '#ffb21f', eng: '#1c0a06' }, pat: 'flames', glow: true, desc: 'Flammen lodern vom Bauch bis über die Fenster – glühendes Rot, Orange und Gelb.' },
+      { k: 'crimson_dragon', name: 'Crimson Dragon', pal: { body: '#8a0f1a', body2: '#c81e2c', belly: '#3a050b', tail: '#3a050b', tail2: '#e23a3a', stripe: '#ffcf5a', accent: '#ffcf5a', line: '#5a0a12', glass: '#ffcf5a', eng: '#3a050b' }, pat: 'scales', glow: true, desc: 'Karmesinrote Drachenschuppen mit goldenen Kanten, die im Licht schimmern.' },
+      { k: 'ruby_comet', name: 'Ruby Comet', pal: { body: '#f8f1f2', body2: '#ffffff', belly: '#b3122a', tail: '#b3122a', tail2: '#ff5a6e', stripe: '#ff2d48', accent: '#ffd1d8', line: '#c9a3aa', glass: '#3a0a14', eng: '#b3122a' }, pat: 'comet', glow: true, desc: 'Ein rubinroter Komet zieht seinen glühenden Schweif über den weißen Rumpf.' },
+      { k: 'volcano', name: 'Volcano', pal: { body: '#211c1c', body2: '#3a3232', belly: '#0f0b0b', tail: '#211c1c', tail2: '#ff4d1a', stripe: '#ff4d1a', accent: '#ffb347', line: '#3d3434', glass: '#ff7a33', eng: '#211c1c' }, pat: 'lava', glow: true, desc: 'Erstarrtes Basaltschwarz, durchzogen von glühenden Lavarissen.' },
+    ],
     l: [
       { k: 'royal_phoenix', name: 'Royal Phoenix', pal: { body: '#7a0f1f', body2: '#c0262f', belly: '#3d0610', tail: '#f5b301', tail2: '#ff6a00', stripe: '#f5b301', accent: '#ffe08a', line: '#5a0a16', glass: '#ffe08a', eng: '#3d0610' }, pat: 'phoenix', glow: true, gold: true, desc: 'Ein goldener Phönix breitet seine Flammenschwingen über Karmesinrot aus.' },
       { k: 'golden_emperor', name: 'Golden Emperor', pal: { body: '#c99a1e', body2: '#ffe07a', belly: '#141414', tail: '#141414', tail2: '#c99a1e', stripe: '#141414', accent: '#fff3c4', line: '#8a6810', glass: '#141414', eng: '#141414' }, pat: 'emperor', glow: true, gold: true, desc: 'Vollgold mit schwarzem Bauch und kaiserlichem Wappen am Seitenleitwerk.' },
@@ -90,18 +102,25 @@
       { k: 'black_diamond', name: 'Black Diamond', pal: { body: '#0b0b0f', body2: '#2a2a33', belly: '#000000', tail: '#0b0b0f', tail2: '#f5c542', stripe: '#f5c542', accent: '#ffffff', line: '#2c2c36', glass: '#f5c542', eng: '#0b0b0f' }, pat: 'diamond', glow: true, gold: true, desc: 'Hochglanzschwarz mit goldgefassten Diamantfacetten – das Kronjuwel jeder Flotte.' },
     ],
   };
-  const MAP_EFFECT = { u: 'paint', r: 'sheen', e: 'glow', l: 'gold' };
+  const MAP_EFFECT = { u: 'paint', r: 'sheen', e: 'glow', m: 'fire', l: 'gold' };
 
-  // 280 Skins: je Modell 4 aus 8 grünen, 3 aus 6 blauen, 2 aus 6 lila und 1 aus 6 goldenen Designs (reihum, damit sich die Modelle unterscheiden)
+  // 420 Skins: je Modell 5 aus 8 grünen, 4 aus 6 blauen, 3 aus 6 pinken, 2 roten (Disco Fever + 1 aus 4) und 1 aus 6 goldenen Designs.
+  // Die ersten Skins jeder Stufe wie bis 0.21.54 (reihum), die neuen danach: die nächsten im Kreis, die das Modell noch nicht hat.
+  const pickDesigns = (m, rk) => {
+    const pool = DESIGNS[rk], n = RARITIES[rk].perModel, on = OLD_PER_MODEL[rk], out = [];
+    if (rk === 'm') return [pool[0], pool[1 + (m.idx % (pool.length - 1))]];
+    for (let j = 0; j < on; j++) out.push(pool[(m.idx * on + j + (rk === 'l' ? 0 : Math.floor(m.idx / pool.length))) % pool.length]);
+    let k = pool.indexOf(out[out.length - 1]);
+    while (out.length < n) { k = (k + 1) % pool.length; if (!out.includes(pool[k])) out.push(pool[k]); }
+    return out;
+  };
   const SKINS = [];
   for (const m of MODELS) {
     for (const rk of RARITY_ORDER) {
-      const pool = DESIGNS[rk], n = RARITIES[rk].perModel;
-      for (let j = 0; j < n; j++) {
-        const d = pool[(m.idx * n + j + (rk === 'l' ? 0 : Math.floor(m.idx / pool.length))) % pool.length];
+      for (const d of pickDesigns(m, rk)) {
         const id = `${m.id}__${d.k}`;
-        SKINS.push({ id, model: m.id, type: m.type, name: d.name, rarity: rk, design: d.k, pal: d.pal, pat: d.pat, glow: !!d.glow, gold: !!d.gold,
-          desc: d.desc, mapEffect: MAP_EFFECT[rk], artworkPath: `skins/${id}.png`, isTradable: true });
+        SKINS.push({ id, model: m.id, type: m.type, name: d.name, rarity: rk, design: d.k, pal: d.pal, pat: d.pat, glow: !!d.glow, gold: !!d.gold, blink: !!d.blink,
+          desc: d.desc, mapEffect: d.blink ? 'disco' : MAP_EFFECT[rk], artworkPath: `skins/${id}.png`, isTradable: true });
       }
     }
   }
@@ -111,7 +130,7 @@
 
   /**
    * Ein Pack ziehen. rnd(n) muss eine gleichverteilte ganze Zahl in [0, n) liefern (Server: crypto.randomInt).
-   * 1. Anzahl Skins (80/17/3), dann je Skin unabhängig: 2. Seltenheit (55/27/14/4), 3. Modell gleichverteilt (1/28), 4. Skin dieser Seltenheit des Modells gleichverteilt.
+   * 1. Anzahl Skins (80/17/3), dann je Skin unabhängig: 2. Seltenheit (55/27/13/4/1), 3. Modell gleichverteilt (1/28), 4. Skin dieser Seltenheit des Modells gleichverteilt.
    */
   function drawPack(rnd) {
     const pick = (table) => { let r = rnd(100); for (const [v, w] of table) { if (r < w) return v; r -= w; } return table[table.length - 1][0]; };
@@ -128,9 +147,11 @@
     { n: 25, key: 'badge', label: 'Sammler-Abzeichen', desc: 'Abzeichen „Sammler“ in der Sammlung und bei den Mitspielenden.' },
     { n: 75, key: 'frame', label: 'Exklusiver Profilrahmen', desc: 'Leuchtender Cyan-Violett-Rahmen um Ihr Profilbild.' },
     { n: 150, key: 'trail', label: 'Besonderer Karteneffekt', desc: 'Ihre Flugspuren auf der Karte schimmern in Cyan und Violett.' },
-    { n: 280, key: 'title', label: 'Titel „Ultimate Aircraft Collector“', desc: 'Der Titel erscheint bei Ihrem Namen.' },
+    { n: 420, key: 'title', label: 'Titel „Ultimate Aircraft Collector“', desc: 'Der Titel erscheint bei Ihrem Namen.' },
   ];
+  // Reihenfolge = Anzeige im Shop: einzelne Packs (Anzahl frei wählbar), dann die Bündel
   const OFFERS = {
+    single: { key: 'single', label: 'Einzelne Packs', packs: 1, price: '0.5', currency: 'TOKEN', perPack: true, max: 50 },
     starter: { key: 'starter', label: 'Starter Pack', packs: 10, price: '5', currency: 'TOKEN' },
     collector: { key: 'collector', label: 'Collector Pack', packs: 20, price: '10', currency: 'TOKEN' },
   };

@@ -1469,14 +1469,19 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
 { const SK = (await import('../shared/skins.cjs')).default, { randomInt } = await import('node:crypto');
   const SM0 = (await import('../shared/engine.cjs')).default, load = async () => { const m = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' }); return { m, w: SM0.deserialize(JSON.parse(gunzipSync(Buffer.from(m.data)).toString())) }; };
   const fleetSig = async (id) => (await load()).w.airlines[id].fleet.map((a) => [a.id, a.type_id, a.base, a.mode || '', (a.assigned || []).length].join(':')).join('|');
-  assert.equal(SK.SKINS.length, 280); assert.equal(new Set(SK.SKINS.map((x) => x.id)).size, 280); assert.equal(SK.MODELS.length, 28);
-  for (const m of SK.MODELS) { const l = SK.SKINS.filter((x) => x.model === m.id); assert.deepStrictEqual(['u', 'r', 'e', 'l'].map((k) => l.filter((x) => x.rarity === k).length), [4, 3, 2, 1], m.id); assert.ok(SM0.P.AIRCRAFT_TYPES[m.type], m.type); }
+  assert.equal(SK.SKINS.length, 420); assert.equal(new Set(SK.SKINS.map((x) => x.id)).size, 420); assert.equal(SK.MODELS.length, 28); assert.equal(SK.TOTAL, 420);
+  for (const m of SK.MODELS) { const l = SK.SKINS.filter((x) => x.model === m.id); assert.deepStrictEqual(['u', 'r', 'e', 'm', 'l'].map((k) => l.filter((x) => x.rarity === k).length), [5, 4, 3, 2, 1], m.id); assert.ok(SM0.P.AIRCRAFT_TYPES[m.type], m.type);
+    assert.equal(l.filter((x) => x.blink).length, 1, 'je Modell genau ein Disco-Skin'); assert.ok(l.find((x) => x.blink).rarity === 'm', 'Disco ist rot'); }
+  // 0.21.55: alle 280 IDs von 0.21.52–0.21.54 bleiben gültig (Formel von damals)
+  { const OLD = { u: 4, r: 3, e: 2, l: 1 }; let n = 0;
+    for (const m of SK.MODELS) for (const rk of ['u', 'r', 'e', 'l']) { const pool = SK.DESIGNS[rk]; for (let j = 0; j < OLD[rk]; j++) { const d = pool[(m.idx * OLD[rk] + j + (rk === 'l' ? 0 : Math.floor(m.idx / pool.length))) % pool.length]; const old = SK.SKIN_BY_ID[`${m.id}__${d.k}`]; assert.ok(old && old.rarity === rk, `alte ID ${m.id}__${d.k}`); n++; } }
+    assert.equal(n, 280); }
   // Wahrscheinlichkeiten: 200.000 Packs mit dem Zufall des Servers
-  const N = 200000, cnt = { 1: 0, 2: 0, 3: 0 }, rar = { u: 0, r: 0, e: 0, l: 0 }, mod = {}; let tot = 0;
+  const N = 200000, cnt = { 1: 0, 2: 0, 3: 0 }, rar = { u: 0, r: 0, e: 0, m: 0, l: 0 }, mod = {}; let tot = 0;
   for (let i = 0; i < N; i++) { const r = SK.drawPack((n) => randomInt(n)); cnt[r.length]++; for (const id of r) { const k = SK.SKIN_BY_ID[id]; rar[k.rarity]++; mod[k.model] = (mod[k.model] || 0) + 1; tot++; } }
   const near = (x, p, tol, what) => assert.ok(Math.abs(x - p) < tol, `${what}: ${(x * 100).toFixed(2)} % statt ${(p * 100).toFixed(0)} %`);
   near(cnt[1] / N, 0.80, 0.006, '1 Skin'); near(cnt[2] / N, 0.17, 0.006, '2 Skins'); near(cnt[3] / N, 0.03, 0.003, '3 Skins');
-  near(rar.u / tot, 0.55, 0.006, 'grün'); near(rar.r / tot, 0.27, 0.006, 'blau'); near(rar.e / tot, 0.14, 0.005, 'lila'); near(rar.l / tot, 0.04, 0.003, 'gold');
+  near(rar.u / tot, 0.55, 0.006, 'grün'); near(rar.r / tot, 0.27, 0.006, 'blau'); near(rar.e / tot, 0.13, 0.005, 'pink'); near(rar.m / tot, 0.04, 0.003, 'rot'); near(rar.l / tot, 0.01, 0.0015, 'gold');
   for (const m of SK.MODELS) near(mod[m.id] / tot, 1 / 28, 0.004, m.id);
   // Admin vergibt Packs; normale Spieler dürfen das nicht
   assert.equal((await call('anna', 'POST', '/coll/admin/grant', { user: 'ben', count: 5 })).status, 403, 'Vergabe nur für Admins');
@@ -1535,6 +1540,32 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const rq3 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'starter' }), 'Anfrage 3').request; ok(await call('cleo', 'POST', `/shop/request/${rq3.id}/cancel`, {}), 'zurückziehen');
   assert.equal((await call('tim', 'POST', `/shop/request/${rq3.id}/approve`, {})).status, 409, 'zurückgezogene nicht freigeben');
   const ad = ok(await call('tim', 'GET', '/coll/admin'), 'Admin'); assert.equal(ad.stats.paidPacks, 10); assert.equal(ad.stats.adminPacks, 100); assert.equal(ad.stats.revenueCents, 500); assert.equal(ad.stats.opened, 100); assert.ok(ad.stats.trades === 1 && ad.grants.length === 2 && ad.grants[0].source === 'admin_grant');
-  console.log(`0.21.52 ok: Aircraft Collection – 280 Skins, Ziehung (${(rar.l / tot * 100).toFixed(2)} % gold), Öffnen einmalig, Aktivieren, Tausch, Kaufanfrage mit Freigabe, Admin`);
+  // 0.21.55: einzelne Packs, Anzahl frei (1–50), 0,5 Token je Pack
+  { const q1 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'single', count: 3 }), 'Einzelpacks').request;
+    assert.equal(q1.packs, 3); assert.equal(q1.amount, '1.5'); ok(await call('tim', 'POST', `/shop/request/${q1.id}/approve`, {}), 'freigeben');
+    assert.equal(ok(await call('cleo', 'GET', '/coll'), 'C').me.packs.length, 13, '3 Packs mehr');
+    const q2 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'single', count: 999 }), 'zu viele').request; assert.equal(q2.packs, 50); assert.equal(q2.amount, '25');
+    const q3 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'single', count: 0 }), 'null').request; assert.equal(q3.packs, 1); assert.equal(q3.amount, '0.5');
+    for (const q of [q2, q3]) ok(await call('cleo', 'POST', `/shop/request/${q.id}/cancel`, {}), 'zurückziehen');
+    const so = ok(await call('cleo', 'GET', '/shop/config'), 'Shop'); assert.deepStrictEqual(so.offers.map((o) => o.key), ['single', 'starter', 'collector'], 'Reihenfolge: einzeln, 10, 20'); }
+  console.log(`0.21.52 ok: Aircraft Collection – 420 Skins, Ziehung (${(rar.l / tot * 100).toFixed(2)} % gold), Öffnen einmalig, Aktivieren, Tausch, Kaufanfrage mit Freigabe, Admin`);
+}
+// 0.21.55: Wettbewerbsaufsicht mit konkretem Vorschlag (Grenze in Flügen, welche Strecken), Übernahme per Klick
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0); const P = SMx.P, A0 = { ...P.ANTITRUST };
+  const w = SMx.newWorld({ seed: 77 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAJ' }); w.playerId = 'P1';
+  a.ledger.equityFlow(2e9, 't'); Object.assign(P.ANTITRUST, { minDeps: 4, minPax: 0 });
+  for (let i = 0; i < 8; i++) SMx.applyAction(w, 'P1', { type: 'acquire', typeId: 'A320', base: 'HAJ', mode: 'lease' });
+  while (w.day <= Math.max(...a.fleet.map((x) => x.delivery_day))) w.step();
+  let n = 0; for (const c of SMx.AP_CODES) { if (n >= 3) break; if (c === 'HAJ' || SMx.gcDistanceKm('HAJ', c) < 300 || SMx.gcDistanceKm('HAJ', c) > 900) continue; if (SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HAJ', dest: c, typeId: 'A320', freq: 3 }).ok) n++; }
+  for (let i = 0; i < 20; i++) w.step(); w.antitrustCheck(); assert.ok(a.antitrust && a.antitrust.HAJ, 'Verfahren');
+  const pa = w.antitrustPlan(a, 'HAJ'); assert.ok(!pa.ok && pa.cuts.length && pa.after < pa.limit && pa.routes.length === n, 'Vorschlag mit Strecken: ' + pa.adviceTxt);
+  assert.ok(/höchstens \d+ eigene Abflüge am Tag/.test(pa.adviceTxt) && /→ \d+× täglich|schließen/.test(pa.adviceTxt), 'konkrete Zahlen: ' + pa.adviceTxt);
+  assert.ok(a.events.some((e) => /Wettbewerbsaufsicht: Hannover/.test(e.msg) && /Vorschlag: höchstens/.test(e.msg)), 'Meldung nennt Zahlen');
+  const fine0 = w.antitrustFine(a, 0.9); assert.ok(fine0 >= 0);
+  const r = SMx.applyAction(w, 'P1', { type: 'antitrustAdjust', apt: 'HAJ' }); assert.ok(r.ok, r.msg);
+  w.antitrustCheck(); assert.ok(!(a.antitrust && a.antitrust.HAJ), 'nach Übernahme kein Verfahren mehr');
+  assert.equal(SMx.applyAction(w, 'P1', { type: 'antitrustAdjust', apt: 'HAJ' }).ok, false, 'nichts mehr anzupassen');
+  Object.assign(P.ANTITRUST, A0);
+  console.log('0.21.55 ok: Wettbewerbsaufsicht mit Grenze in Flügen, Streckenliste und Vorschlag zum Übernehmen');
 }
 console.log('Alle Prüfungen bestanden.');

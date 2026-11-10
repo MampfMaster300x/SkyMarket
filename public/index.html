@@ -6,7 +6,7 @@
 <meta name="description" content="SKYMARKET – Airline-Wirtschaftssimulation: Hauptwelt für alle und private Runden">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b400'/%3E%3Cpath d='M26 16 L20 14.5 L13 6 L10.5 6 L14 14.5 L8 14.5 L6 11.5 L4.5 11.5 L5.5 16 L4.5 20.5 L6 20.5 L8 17.5 L14 17.5 L10.5 26 L13 26 L20 17.5 L26 16Z' fill='%231a1400'/%3E%3C/svg%3E">
 <style>[hidden]{display:none!important}</style>
-<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.54";</script>
+<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.55";</script>
 <title>Skymarket</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1279,10 +1279,10 @@ nav.main .lbs { display: none; }
   .patch-ov .dialog{max-width:520px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;display:grid;gap:10px}
   .patch-ov ul{margin:0;padding-left:18px;display:grid;gap:4px}
 /* ===================== AIRCRAFT COLLECTION ===================== */
-:root { --c-sammlung: #0891b2; --rar-u: #16a34a; --rar-r: #2563eb; --rar-e: #9333ea; --rar-l: #d4a017; }
-:root[data-theme="dark"] { --c-sammlung: #22d3ee; --rar-u: #22c55e; --rar-r: #3b82f6; --rar-e: #a855f7; --rar-l: #f5b301; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-sammlung: #22d3ee; --rar-u: #22c55e; --rar-r: #3b82f6; --rar-e: #a855f7; --rar-l: #f5b301; } }
-.rar-u { --rc: var(--rar-u); } .rar-r { --rc: var(--rar-r); } .rar-e { --rc: var(--rar-e); } .rar-l { --rc: var(--rar-l); }
+:root { --c-sammlung: #0891b2; --rar-u: #16a34a; --rar-r: #2563eb; --rar-e: #c026d3; --rar-m: #dc2626; --rar-l: #d4a017; }
+:root[data-theme="dark"] { --c-sammlung: #22d3ee; --rar-u: #22c55e; --rar-r: #3b82f6; --rar-e: #d946ef; --rar-m: #ef4444; --rar-l: #f5b301; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-sammlung: #22d3ee; --rar-u: #22c55e; --rar-r: #3b82f6; --rar-e: #d946ef; --rar-m: #ef4444; --rar-l: #f5b301; } }
+.rar-u { --rc: var(--rar-u); } .rar-r { --rc: var(--rar-r); } .rar-e { --rc: var(--rar-e); } .rar-m { --rc: var(--rar-m); } .rar-l { --rc: var(--rar-l); }
 .chip.rar { background: color-mix(in srgb, var(--rc) 16%, transparent); color: var(--rc); border: 1px solid color-mix(in srgb, var(--rc) 45%, transparent); font-weight: 600; }
 .chip.rar.rar-l { background: linear-gradient(90deg, color-mix(in srgb, var(--rc) 28%, transparent), color-mix(in srgb, var(--rc) 10%, transparent)); }
 .avatar-btn.coll-frame { box-shadow: 0 0 0 2px #22d3ee, 0 0 0 4px #a855f7, 0 0 12px rgba(168,85,247,.55); }
@@ -1315,6 +1315,7 @@ nav.main .lbs { display: none; }
 .ac-card.rar-l:not(.miss) { border: 1.5px solid transparent; background: linear-gradient(var(--panel), var(--panel)) padding-box, linear-gradient(120deg, #f5b301, #fff1b8, #c99a1e, #f5b301) border-box; background-size: 100% 100%, 300% 300%; animation: acGold 7s ease-in-out infinite; }
 @keyframes acGold { 0%, 100% { background-position: 0 0, 0% 50%; } 50% { background-position: 0 0, 100% 50%; } }
 .ac-card.rar-e:not(.miss) { box-shadow: 0 0 0 1px color-mix(in srgb, var(--rc) 30%, transparent) inset; }
+.ac-card.rar-m:not(.miss) { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--rc) 55%, transparent) inset, 0 0 14px color-mix(in srgb, var(--rc) 22%, transparent); }
 .ac-hist { display: grid; gap: 6px; } .ac-hrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .ac-mini { display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--rc) 45%, var(--line)); background: var(--panel); border-radius: 10px; padding: 3px 8px 3px 3px; font-size: 12px; color: var(--ink); text-align: left; max-width: 100%; }
 .ac-mini img { width: 58px; height: 17px; object-fit: contain; background: var(--sky); border-radius: 6px; flex: none; }
@@ -1323,7 +1324,7 @@ nav.main .lbs { display: none; }
 .ac-big { border-radius: 16px; background: radial-gradient(120% 120% at 50% 10%, color-mix(in srgb, var(--rc) 30%, #0b1530), #070d1f); padding: 16px; }
 .ac-big img { width: 100%; display: block; } .ac-big.miss img { opacity: .85; }
 .ac-pick { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-.fleet-row .thumb.rar-l { box-shadow: 0 0 0 1.5px var(--rar-l) inset; } .fleet-row .thumb.rar-e { box-shadow: 0 0 0 1.5px var(--rar-e) inset; } .fleet-row .thumb.rar-r { box-shadow: 0 0 0 1.5px var(--rar-r) inset; }
+.fleet-row .thumb.rar-l { box-shadow: 0 0 0 1.5px var(--rar-l) inset; } .fleet-row .thumb.rar-e { box-shadow: 0 0 0 1.5px var(--rar-e) inset; } .fleet-row .thumb.rar-m { box-shadow: 0 0 0 1.5px var(--rar-m) inset; } .fleet-row .thumb.rar-r { box-shadow: 0 0 0 1.5px var(--rar-r) inset; }
 .pc-skin { display: flex; gap: 6px; align-items: center; padding: 0 12px; font-size: 12px; }
 svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine { 0%, 70% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
 /* Shop (immer dunkel) */
@@ -1345,64 +1346,115 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .sh-offer h3 { margin: 4px 0 0; letter-spacing: .12em; font-size: 15px; }
 .sh-icons { display: flex; flex-wrap: wrap; gap: 4px; max-width: 260px; } .sh-icons i { width: 14px; height: 17px; border-radius: 3px; background: linear-gradient(160deg, #22d3ee, #1d4ed8); box-shadow: 0 0 6px rgba(34,211,238,.4); }
 .sh-offer.collector .sh-icons i { background: linear-gradient(160deg, #f5b301, #a855f7); box-shadow: 0 0 6px rgba(245,179,1,.4); }
+.sh-qty { display: flex; align-items: center; gap: 10px; } .sh-qty .btn { min-width: 36px; font-size: 18px; color: #e6edf7; border-color: #2b3c6a; } .sh-offer.single { border-color: #0891b2; box-shadow: 0 0 24px rgba(34,211,238,.18); }
 .sh-n { font: 800 22px var(--f-mono); letter-spacing: .06em; } .sh-price { font: 700 26px var(--f-body); }
 .btn.gold { background: linear-gradient(90deg, #f5b301, #ffd86b); color: #1a1100; border-color: #f5b301; font-weight: 700; }
 .sh-dark .callout { position: relative; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 /* Pack öffnen */
-.pk-ov { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; background: radial-gradient(60% 50% at 50% 45%, rgba(18,36,90,.97), rgba(2,6,23,.98)); color: #e6edf7; padding: 16px; overflow: auto; }
-.pk-stage { position: relative; width: min(520px, 100%); min-height: 420px; display: grid; place-items: center; gap: 14px; --rc: #22d3ee; }
-.pk-stage.rc-u { --rc: #22c55e; } .pk-stage.rc-r { --rc: #3b82f6; } .pk-stage.rc-e { --rc: #a855f7; } .pk-stage.rc-l { --rc: #f5b301; }
-.pk-skip { position: absolute; top: 0; right: 0; color: #c3cde0; border-color: #2b3c6a; z-index: 3; }
-.pk-box { width: 190px; position: relative; z-index: 2; filter: drop-shadow(0 12px 30px rgba(34,211,238,.25)); }
-.pk-box.wait { animation: pkFloat 2.4s ease-in-out infinite; opacity: .8; }
-.pk-stage .pk-box:not(.wait) { opacity: 0; transform: scale(.6); } .pk-stage.appear .pk-box { opacity: 1; transform: none; transition: opacity .5s ease, transform .6s cubic-bezier(.2, 1.3, .4, 1); }
+.pk-ov { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; background: radial-gradient(70% 60% at 50% 45%, #14275f 0%, #060c24 62%, #02040f 100%); color: #e6edf7; padding: 16px; overflow: auto; overflow-x: hidden; --rc: #a5b4fc; }
+.pk-ov.rc-u, .pk-stage.rc-u { --rc: #22c55e; } .pk-ov.rc-r, .pk-stage.rc-r { --rc: #3b82f6; } .pk-ov.rc-e, .pk-stage.rc-e { --rc: #d946ef; } .pk-ov.rc-m, .pk-stage.rc-m { --rc: #ef4444; } .pk-ov.rc-l, .pk-stage.rc-l { --rc: #f5b301; }
+.pk-bg { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+.pk-bgrays { position: absolute; left: 50%; top: 45%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 18%, transparent) 0 5deg, transparent 5deg 15deg); -webkit-mask: radial-gradient(circle, #000 0%, transparent 42%); mask: radial-gradient(circle, #000 0%, transparent 42%); animation: pkRays 40s linear infinite; opacity: .6; transition: opacity .8s; }
+.pk-ov.boom .pk-bgrays, .pk-ov[class*="rc-"] .pk-bgrays { opacity: 1; }
+.pk-bg i { position: absolute; width: var(--s); height: var(--s); border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff, 0 0 14px var(--rc); opacity: .12; animation: pkTw var(--d) ease-in-out var(--w) infinite alternate; }
+@keyframes pkTw { to { opacity: 1; transform: scale(1.8); } }
+.pk-white { position: fixed; inset: 0; pointer-events: none; z-index: 6; background: radial-gradient(circle at 50% 45%, #fff 0%, color-mix(in srgb, var(--rc) 70%, #fff) 30%, color-mix(in srgb, var(--rc) 30%, transparent) 60%, transparent 85%); opacity: 0; }
+.pk-ov.boom .pk-white { animation: pkWhite 1.1s ease-out; }
+@keyframes pkWhite { 0% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 0; } }
+.pk-ov.quake .pk-stage { animation: pkQuake .55s linear; }
+@keyframes pkQuake { 0%, 100% { transform: none; } 10% { transform: translate(-9px, 5px); } 20% { transform: translate(8px, -7px); } 30% { transform: translate(-7px, -4px); } 40% { transform: translate(6px, 6px); } 55% { transform: translate(-4px, 3px); } 70% { transform: translate(3px, -3px); } 85% { transform: translate(-2px, 1px); } }
+.pk-skip { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 8; color: #e6edf7; background: rgba(10, 18, 40, .65); border-color: #3b4f86; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.pk-stage { position: relative; z-index: 2; width: min(640px, 100%); min-height: min(620px, 90vh); display: grid; place-items: center; align-content: center; gap: 16px; }
+.pk-box { width: min(320px, 72vw, 54vh); position: relative; z-index: 3; filter: drop-shadow(0 0 16px rgba(34,211,238,.5)) drop-shadow(0 18px 40px rgba(0,0,0,.55)); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.pk-box:active { cursor: grabbing; }
+.pk-strip { transform-box: view-box; transform-origin: 210px 40px; transform: rotate(calc(var(--tear, 0) * -9deg)) translateY(calc(var(--tear, 0) * -4px)); }
+.pk-rip { stroke-dasharray: 190; stroke-dashoffset: calc((1 - var(--tear, 0)) * 190); filter: drop-shadow(0 0 3px #fff); }
+.pk-box.snap .pk-strip { transition: transform .25s ease; } .pk-box.snap .pk-rip { transition: stroke-dashoffset .25s ease; }
+.pk-box.torn .pk-strip { animation: pkTear .6s cubic-bezier(.3, .6, .4, 1) forwards; }
+@keyframes pkTear { from { transform: rotate(-9deg) translateY(-4px); } to { transform: translate(110px, -190px) rotate(-50deg); opacity: 0; } }
+.pk-hint { z-index: 3; display: grid; gap: 8px; justify-items: center; text-align: center; color: #c3cde0; font-size: 14px; }
+.pk-hint b { color: #fff; font-size: 18px; letter-spacing: .06em; text-shadow: 0 0 12px #22d3ee; animation: pkBlink 1.1s ease-in-out infinite alternate; }
+@keyframes pkBlink { from { opacity: .55; } to { opacity: 1; } }
+.pk-swipe { width: 140px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, transparent, #22d3ee, transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: pkSwipe 1.2s ease-in-out infinite; box-shadow: 0 0 10px rgba(34,211,238,.4); }
+@keyframes pkSwipe { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+.pk-stage.torn .pk-hint, .pk-stage.torn .pk-cap { visibility: hidden; }
+.pk-box.wait { animation: pkFloat 2.4s ease-in-out infinite, pkGlow 1.2s ease-in-out infinite alternate; opacity: .85; }
+.pk-stage .pk-box:not(.wait) { opacity: 0; transform: scale(.4) rotate(-8deg); } .pk-stage.appear .pk-box { opacity: 1; transform: none; transition: opacity .5s ease, transform .8s cubic-bezier(.2, 1.4, .4, 1); }
 .pk-stage .pk-lines { opacity: 0; } .pk-stage.float .pk-lines { opacity: 1; }
-.pk-stage.float .pk-box { animation: pkFloat 2.4s ease-in-out infinite; }
-.pk-wave { position: absolute; left: 50%; top: 45%; width: 40px; height: 40px; margin: -20px; border-radius: 50%; border: 3px solid var(--rc); box-shadow: 0 0 24px var(--rc), inset 0 0 18px var(--rc); opacity: 0; z-index: 1; pointer-events: none; }
-.pk-wave.on { animation: pkWave 1.1s ease-out forwards; } .pk-wave.w2 { animation-delay: .25s; border-width: 5px; }
-@keyframes pkWave { 0% { opacity: .9; transform: scale(.5); } 100% { opacity: 0; transform: scale(14); } }
-.pk-stage.reveal.rc-r .pk-card { animation: pkCard .55s cubic-bezier(.2, 1.4, .4, 1) both, pkFrame 2.4s ease-in-out infinite .6s; }
-.pk-stage.reveal.rc-e .pk-card { animation: pkCard .65s cubic-bezier(.2, 1.4, .4, 1) both, pkFrame 1.8s ease-in-out infinite .6s; }
-@keyframes pkFrame { 0%, 100% { box-shadow: 0 0 30px color-mix(in srgb, var(--rc) 40%, transparent); } 50% { box-shadow: 0 0 60px color-mix(in srgb, var(--rc) 75%, transparent); } }
-.pk-lines { position: absolute; inset: 8% 7%; border-radius: 16px; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.35) 50%, transparent 65%); background-size: 260% 100%; animation: shLines 1.6s linear infinite; mix-blend-mode: screen; }
-.pk-stage.shake .pk-box { animation: pkShake .09s linear infinite; filter: drop-shadow(0 0 22px var(--rc)); }
-.pk-beam { position: absolute; left: 50%; top: -10%; width: 0; height: 120%; transform: translateX(-50%); background: linear-gradient(180deg, transparent, var(--rc), transparent); opacity: 0; filter: blur(2px); z-index: 1; }
-.pk-stage.beam .pk-beam { animation: pkBeam .6s ease-out forwards; }
-.pk-flash { position: absolute; inset: -30%; background: radial-gradient(circle, color-mix(in srgb, var(--rc) 85%, #fff) 0%, transparent 55%); opacity: 0; pointer-events: none; z-index: 1; }
-.pk-stage.open .pk-flash, .pk-flash.on { animation: pkFlash .9s ease-out forwards; }
+.pk-stage.float .pk-box { animation: pkFloat 2.4s ease-in-out infinite, pkGlow 1.3s ease-in-out infinite alternate; }
+@keyframes pkGlow { from { filter: drop-shadow(0 0 12px rgba(34,211,238,.55)) drop-shadow(0 18px 40px rgba(0,0,0,.55)); } to { filter: drop-shadow(0 0 38px rgba(217,70,239,.85)) drop-shadow(0 18px 40px rgba(0,0,0,.55)); } }
+.pk-lines { position: absolute; inset: 14% 5% 2%; border-radius: 16px; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.4) 50%, transparent 65%); background-size: 260% 100%; animation: shLines 1.4s linear infinite; mix-blend-mode: screen; pointer-events: none; }
+.pk-halo { position: absolute; left: 50%; top: 50%; width: min(620px, 130vw); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--rc) 50%, transparent) 0%, transparent 62%); opacity: .35; z-index: 1; animation: pkHalo 1.8s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes pkHalo { to { opacity: .75; transform: translate(-50%, -50%) scale(1.15); } }
+.pk-stage.charge .pk-halo { animation-duration: .45s; } .pk-stage.beam .pk-halo { animation-duration: .2s; opacity: 1; }
+.pk-seam { position: absolute; left: 6%; right: 6%; top: 13.3%; height: 3px; border-radius: 2px; background: #fff; box-shadow: 0 0 10px #fff, 0 0 26px var(--rc), 0 0 60px var(--rc); opacity: 0; transform: scaleX(.15); transition: opacity .4s, transform 1.6s ease-in, height 1.6s ease-in; pointer-events: none; }
+.pk-stage.charge .pk-seam { opacity: 1; transform: scaleX(1); } .pk-stage.beam .pk-seam { height: 8px; }
+.pk-stage.charge .pk-box { animation: pkShake .12s linear infinite; filter: drop-shadow(0 0 30px var(--rc)) brightness(1.1); }
+.pk-stage.tease .pk-box { animation: pkShake .07s linear infinite, pkTease .4s steps(1) infinite; }
+@keyframes pkTease { 0% { filter: drop-shadow(0 0 44px #22c55e) brightness(1.15); } 20% { filter: drop-shadow(0 0 44px #3b82f6) brightness(1.15); } 40% { filter: drop-shadow(0 0 44px #d946ef) brightness(1.15); } 60% { filter: drop-shadow(0 0 44px #ef4444) brightness(1.15); } 80% { filter: drop-shadow(0 0 44px #f5b301) brightness(1.15); } }
+.pk-stage.beam .pk-box { animation: pkShake .045s linear infinite; filter: drop-shadow(0 0 70px var(--rc)) brightness(1.4); }
+.pk-beam { position: absolute; left: 50%; top: -70%; width: 0; height: 120%; transform: translateX(-50%); background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--rc) 75%, #fff) 75%, transparent); opacity: 0; filter: blur(3px); z-index: 2; pointer-events: none; }
+.pk-beam.b2 { top: -50%; transform: translateX(-50%) rotate(28deg); transform-origin: 50% 100%; } 
+.pk-stage.beam .pk-beam { animation: pkBeam .9s ease-out forwards; } .pk-stage.beam .pk-beam.b2 { animation: pkBeam2 .9s ease-out .15s forwards; }
+@keyframes pkBeam { 0% { width: 0; opacity: 0; } 40% { opacity: 1; } 100% { width: 150px; opacity: .95; } }
+@keyframes pkBeam2 { 0% { width: 0; opacity: 0; } 40% { opacity: .8; } 100% { width: 60px; opacity: .6; } }
+.pk-rays { position: absolute; left: 50%; top: 50%; width: 200vmax; height: 200vmax; margin: -100vmax 0 0 -100vmax; background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 45%, transparent) 0 6deg, transparent 6deg 18deg); -webkit-mask: radial-gradient(circle, #000 0%, transparent 34%); mask: radial-gradient(circle, #000 0%, transparent 34%); opacity: 0; z-index: 0; pointer-events: none; }
+.pk-stage.beam .pk-rays, .pk-stage.burst .pk-rays { animation: pkRays 7s linear infinite, pkIn .8s ease-out forwards; }
+.pk-flash { position: absolute; inset: -40%; background: radial-gradient(circle, color-mix(in srgb, var(--rc) 85%, #fff) 0%, transparent 55%); opacity: 0; pointer-events: none; z-index: 2; }
+.pk-stage.open .pk-flash, .pk-stage.burst .pk-flash { animation: pkFlash 1s ease-out forwards; }
 .pk-stage.open .pk-box { animation: pkOpen .5s ease-in forwards; }
-.pk-parts { position: absolute; left: 50%; top: 45%; width: 0; height: 0; z-index: 2; pointer-events: none; }
-.pk-parts i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--rc); box-shadow: 0 0 8px var(--rc); opacity: 0; }
-.pk-stage.open .pk-parts i, .pk-parts.on i { animation: pkPart var(--t) ease-out forwards; }
-.pk-rays { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg, rgba(245,179,1,.32) 0 6deg, transparent 6deg 18deg); -webkit-mask: radial-gradient(circle, #000 0%, transparent 60%); mask: radial-gradient(circle, #000 0%, transparent 60%); opacity: 0; z-index: 0; pointer-events: none; }
-.pk-stage.beam .pk-rays, .pk-rays.on { animation: pkRays 6s linear infinite, pkIn .8s ease-out forwards; }
-.pk-cap { margin: 0; color: #a5b4d0; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; z-index: 2; }
-.pk-card { position: relative; z-index: 2; width: min(460px, 100%); border-radius: 20px; padding: 18px; display: grid; gap: 8px; text-align: center; background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 20%, #0e1832), #0a1228); border: 2px solid var(--rc); box-shadow: 0 0 40px color-mix(in srgb, var(--rc) 45%, transparent); animation: pkCard .55s cubic-bezier(.2, 1.4, .4, 1) both; }
-.pk-card.rar-l { border-color: transparent; background: linear-gradient(180deg, #2a1f06, #0a1228) padding-box, linear-gradient(120deg, #f5b301, #fff1b8, #c99a1e, #f5b301) border-box; background-size: 100% 100%, 300% 300%; animation: pkCard .7s cubic-bezier(.2, 1.4, .4, 1) both, acGold 3s ease-in-out infinite; }
+@keyframes pkOpen { 0% { transform: scale(1); } 40% { transform: scale(1.12); filter: brightness(2.6) drop-shadow(0 0 90px var(--rc)); } 100% { transform: scale(1.7); opacity: 0; filter: brightness(4); } }
+.pk-wave { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px; border-radius: 50%; border: 3px solid var(--rc); box-shadow: 0 0 24px var(--rc), inset 0 0 18px var(--rc); opacity: 0; z-index: 1; pointer-events: none; }
+.pk-stage.open .pk-wave, .pk-stage.burst .pk-wave { animation: pkWave 1.2s ease-out forwards; } .pk-wave.w2 { animation-delay: .2s !important; border-width: 5px; } .pk-wave.w3 { animation-delay: .45s !important; border-width: 2px; }
+.pk-stage.rc-u.burst .pk-wave.w2, .pk-stage.rc-u.burst .pk-wave.w3, .pk-stage.rc-r.burst .pk-wave.w3 { display: none; }
+@keyframes pkWave { 0% { opacity: .95; transform: scale(.5); } 100% { opacity: 0; transform: scale(18); } }
+.pk-parts { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 4; pointer-events: none; }
+.pk-parts i { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--rc); box-shadow: 0 0 10px var(--rc); opacity: 0; }
+.pk-parts i:nth-child(3n) { width: 4px; height: 12px; border-radius: 2px; background: #fff; }
+.pk-stage.open .pk-parts i, .pk-stage.burst .pk-parts i { animation: pkPart var(--t) ease-out forwards; }
+.pk-cap { margin: 0; color: #a5b4d0; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; z-index: 3; }
+.pk-flip { position: relative; z-index: 3; width: min(560px, 100%); perspective: 1600px; cursor: pointer; animation: pkCard .7s cubic-bezier(.2, 1.4, .4, 1) both; }
+.pk-inner { display: grid; transform-style: preserve-3d; transition: transform .85s cubic-bezier(.3, 1.35, .5, 1); }
+.pk-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.pk-front { transform: rotateY(180deg); }
+.pk-stage.flipped .pk-inner { transform: rotateY(180deg); }
+.pk-back { border-radius: 20px; display: grid; place-items: center; align-content: center; gap: 14px; min-height: 260px; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--rc) 38%, #0e1832), #070d22 72%); border: 3px solid var(--rc); box-shadow: 0 0 40px var(--rc), inset 0 0 40px color-mix(in srgb, var(--rc) 40%, transparent); }
+.pk-stage.tease .pk-back { animation: pkPulse .45s ease-in-out infinite alternate; }
+.pk-stage.rc-m.tease .pk-back, .pk-stage.rc-l.tease .pk-back { animation-duration: .25s; }
+@keyframes pkPulse { from { box-shadow: 0 0 20px var(--rc), inset 0 0 18px color-mix(in srgb, var(--rc) 30%, transparent); transform: scale(1); } to { box-shadow: 0 0 90px var(--rc), inset 0 0 70px color-mix(in srgb, var(--rc) 60%, transparent); transform: scale(1.02); } }
+.pk-q { font: 900 clamp(84px, 22vw, 130px) / 1 var(--f-body); color: #fff; text-shadow: 0 0 20px var(--rc), 0 0 60px var(--rc); }
+.pk-backt { letter-spacing: .3em; font-size: 12px; color: #c3cde0; }
+.pk-card { position: relative; z-index: 2; border-radius: 20px; padding: 20px; display: grid; gap: 8px; text-align: center; background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 22%, #0e1832), #0a1228); border: 2px solid var(--rc); box-shadow: 0 0 30px color-mix(in srgb, var(--rc) 40%, transparent); }
+.pk-stage.flipped .pk-card { animation: pkFrame 2.2s ease-in-out infinite .9s; }
+.pk-stage.flipped.rc-e .pk-card { animation-duration: 1.6s; } .pk-stage.flipped.rc-m .pk-card { animation-duration: 1s; }
+.pk-stage.flipped.disco .pk-card, .pk-stage.disco .pk-back { animation: pkDisco 1.2s steps(1) infinite; }
+@keyframes pkDisco { 0% { border-color: #ff2bd6; box-shadow: 0 0 44px #ff2bd6; } 20% { border-color: #22e5ff; box-shadow: 0 0 44px #22e5ff; } 40% { border-color: #ffe14d; box-shadow: 0 0 44px #ffe14d; } 60% { border-color: #7cff4f; box-shadow: 0 0 44px #7cff4f; } 80% { border-color: #ff7a1a; box-shadow: 0 0 44px #ff7a1a; } }
+@keyframes pkFrame { 0%, 100% { box-shadow: 0 0 30px color-mix(in srgb, var(--rc) 40%, transparent); } 50% { box-shadow: 0 0 70px color-mix(in srgb, var(--rc) 80%, transparent); } }
+.pk-card.rar-l { border-color: transparent; background: linear-gradient(180deg, #2a1f06, #0a1228) padding-box, linear-gradient(120deg, #f5b301, #fff1b8, #c99a1e, #f5b301) border-box; background-size: 100% 100%, 300% 300%; }
+.pk-stage.flipped .pk-card.rar-l { animation: acGold 2.4s linear infinite, pkFrame 1.6s ease-in-out infinite; }
 .pk-card img { width: 100%; display: block; filter: drop-shadow(0 8px 16px rgba(0,0,0,.5)); }
-.pk-card h2 { margin: 0; font-size: 24px; } .pk-model { color: #a5b4d0; font-size: 13px; } .pk-card p { margin: 0; color: #c3cde0; font-size: 13.5px; }
-.pk-rar { justify-self: center; font: 800 12px var(--f-body); letter-spacing: .2em; color: var(--rc); text-transform: uppercase; }
-.pk-btns { z-index: 2; gap: 8px; justify-content: center; }
+.pk-card h2 { margin: 0; font-size: 28px; } .pk-model { color: #a5b4d0; font-size: 13px; } .pk-card p { margin: 0; color: #c3cde0; font-size: 13.5px; }
+.pk-rar { justify-self: center; font: 800 13px var(--f-body); letter-spacing: .24em; color: var(--rc); text-transform: uppercase; text-shadow: 0 0 12px var(--rc); }
+.pk-btns { z-index: 3; gap: 8px; justify-content: center; }
+.pk-stage.reveal .pk-btns { opacity: 0; transition: opacity .4s .6s; } .pk-stage.reveal.flipped .pk-btns { opacity: 1; }
 .pk-ov .btn { color: #e6edf7; border-color: #2b3c6a; } .pk-ov .btn.primary { color: #04122a; background: #22d3ee; border-color: #22d3ee; }
-.pk-stage.sum { align-content: center; } .pk-stage.sum h2 { margin: 0; }
-.pk-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; width: 100%; }
-.pk-mini { display: grid; gap: 4px; justify-items: center; text-align: center; padding: 10px; border-radius: 14px; background: #0e1832; border: 1.5px solid var(--rc); } .pk-mini img { width: 100%; } .pk-mini span { font-size: 11px; color: #a5b4d0; }
-@keyframes pkFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes pkShake { 0% { transform: translate(0, 0) rotate(0); } 25% { transform: translate(-2px, 1px) rotate(-1deg); } 50% { transform: translate(2px, -1px) rotate(1deg); } 75% { transform: translate(-1px, -1px) rotate(-.5deg); } 100% { transform: translate(0, 0) rotate(0); } }
-@keyframes pkBeam { 0% { width: 0; opacity: 0; } 40% { opacity: 1; } 100% { width: 70px; opacity: .9; } }
-@keyframes pkFlash { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.2); } }
-@keyframes pkOpen { to { transform: scale(1.25); opacity: 0; } }
+.pk-stage.sum { align-content: center; } .pk-stage.sum h2 { margin: 0; font-size: 26px; text-shadow: 0 0 18px var(--rc); }
+.pk-sum { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; width: 100%; }
+.pk-mini { display: grid; gap: 4px; justify-items: center; text-align: center; padding: 10px; border-radius: 14px; background: #0e1832; border: 1.5px solid var(--rc); box-shadow: 0 0 18px color-mix(in srgb, var(--rc) 35%, transparent); } .pk-mini img { width: 100%; } .pk-mini span { font-size: 11px; color: #a5b4d0; }
+@keyframes pkFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes pkShake { 0% { transform: translate(0, 0) rotate(0); } 25% { transform: translate(-3px, 1px) rotate(-1.2deg); } 50% { transform: translate(3px, -1px) rotate(1.2deg); } 75% { transform: translate(-1px, -2px) rotate(-.6deg); } 100% { transform: translate(0, 0) rotate(0); } }
+@keyframes pkFlash { 0% { opacity: 0; transform: scale(.4); } 20% { opacity: 1; } 100% { opacity: 0; transform: scale(1.3); } }
 @keyframes pkPart { 0% { opacity: 1; transform: rotate(var(--a)) translateX(0) scale(1); } 100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(.3); } }
 @keyframes pkRays { to { transform: rotate(360deg); } } @keyframes pkIn { to { opacity: 1; } }
-@keyframes pkCard { from { transform: scale(.6) translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pkCard { from { transform: scale(.5) translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 /* Tausch */
 .tr-card { gap: 8px; } .tr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
 .tr-items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .tr-build { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
 .tr-pool { display: flex; flex-wrap: wrap; gap: 6px; max-height: 260px; overflow: auto; padding: 6px 0; }
-@media (max-width: 600px) { .sh-hero { grid-template-columns: 110px minmax(0, 1fr); gap: 12px; } .sh-hero h2 { font-size: 19px; } .ac-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; } .pk-stage { min-height: 360px; } .pk-box { width: 150px; } }
-@media (prefers-reduced-motion: reduce) { .sh-dark::before, .sh-pack, .ac-card.rar-l, svg .sk-shine { animation: none !important; } }
+@media (max-width: 600px) { .sh-hero { grid-template-columns: 110px minmax(0, 1fr); gap: 12px; } .sh-hero h2 { font-size: 19px; } .ac-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; } .pk-stage { min-height: min(560px, 88vh); } .pk-box { width: min(270px, 70vw, 50vh); } .pk-card h2 { font-size: 22px; } .pk-back { min-height: 220px; } }
+@media (prefers-reduced-motion: reduce) { .sh-dark::before, .sh-pack, .ac-card.rar-l, svg .sk-shine, .pk-bg i, .pk-bgrays, .pk-halo { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -5433,16 +5485,46 @@ const SM = (() => {
           if (al.gateLock && al.gateLock[c]) continue;   // genehmigter Exklusivvertrag: kein Verfahren für die Laufzeit
           if (f < A.minDeps || paxEff(c) < A.minPax || sh < A.share) continue;
           now[c] = { since: prev[c] ? prev[c].since : day, share: Math.round(sh * 100) / 100 };
-          if (!prev[c]) { al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie haben ${Math.round(sh * 100)} % aller Abflüge. Neue Strecken dort sind untersagt; liegt Ihr Anteil in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder.`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Abflüge`, 'warn', al.id); }
+          if (!prev[c]) { const pa = this.antitrustPlan(al, c); al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie haben ${Math.round(sh * 100)} % aller Abflüge (${fmtF(pa.own)} von ${fmtF(pa.total)} am Tag). Neue Strecken dort sind untersagt; liegt Ihr Anteil in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder${pa.fine > 0 ? ` (etwa ${mioTxt(pa.fine)})` : ''}. ${pa.adviceTxt}`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Abflüge`, 'warn', al.id); }
           else if (day - now[c].since >= A.grace) {
-            const rev = al.ledger.months.slice(-12).reduce((x, m) => x + (m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0), 0) / 100 * 12 / Math.max(1, Math.min(12, al.ledger.months.length));
-            const fine = Math.round(A.fine * rev * Math.min(2, sh / A.share) / 1e4) * 1e4;
-            if (fine > 0) { al.ledger.post('one_off', -fine, true, `Bußgeld Wettbewerbsaufsicht › ${aTag(c)}`); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (Anteil ${Math.round(sh * 100)} %). Weniger Abflüge dort oder mehr Konkurrenz beenden das Verfahren.`, 'crit'); }
+            const fine = this.antitrustFine(al, sh);
+            if (fine > 0) { al.ledger.post('one_off', -fine, true, `Bußgeld Wettbewerbsaufsicht › ${aTag(c)}`); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (Anteil ${Math.round(sh * 100)} %). ${this.antitrustPlan(al, c).adviceTxt}`, 'crit'); }
           }
         }
-        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – ${al.gateLock && al.gateLock[c] ? 'der Exklusivvertrag ist genehmigt' : `Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %`}.`, 'good');
+        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – ${al.gateLock && al.gateLock[c] ? 'der Exklusivvertrag ist genehmigt' : (own[al.id] || {})[c] < A.minDeps ? `Sie haben dort weniger als ${A.minDeps} Abflüge am Tag` : `Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %`}.`, 'good');
         al.antitrust = Object.keys(now).length ? now : undefined;
       }
+    }
+    /** Bußgeld je Monat bei einem Anteil sh (0,5 % des Jahresumsatzes, bis zum Doppelten bei hohem Anteil). */
+    antitrustFine(al, sh) {
+      const A = P.ANTITRUST, rev = al.ledger.months.slice(-12).reduce((x, m) => x + (m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0), 0) / 100 * 12 / Math.max(1, Math.min(12, al.ledger.months.length));
+      return Math.round(A.fine * rev * Math.min(2, Math.max(sh, A.share) / A.share) / 1e4) * 1e4;
+    }
+    /** 0.21.55: Konkreter Vorschlag zur Wettbewerbsaufsicht an einem Flughafen: alle eigenen Strecken dort, die Grenze in Flügen am Tag
+     *  und welche Frequenzen sinken müssen (schwächster Ertrag je Flug zuerst, mit 5 % Puffer). Liest nur, ändert nichts. */
+    antitrustPlan(al, c) {
+      const A = P.ANTITRUST, day = this.day, fq = (r) => r.freq * (r.wk ? r.wk / 7 : 1);
+      let total = 0, own = 0; const mine = [], rivals = {};
+      for (const x of this.list) { if (x.status === 'insolvent') continue; for (const r of x.activeRoutes()) { if (r.opened_day > day || (r.base !== c && r.dest !== c)) continue; const q = fq(r); total += q; if (x === al) { own += q; mine.push(r); } else rivals[x.id] = (rivals[x.id] || 0) + q; } }
+      const other = total - own, share = own / Math.max(1, total);
+      const byShare = A.share * other / (1 - A.share), bySize = A.minDeps > byShare, limit = Math.max(byShare, A.minDeps), target = limit * 0.95;
+      const routes = mine.map((r) => { const st = autoRouteStats(al, r); return { id: r.id, base: r.base, dest: r.dest, freq: r.freq, wk: r.wk || 7, perDay: fq(r), dayRes: st.n ? st.db1 / st.n : 0, perFlight: st.n ? st.db1 / st.n / Math.max(0.15, fq(r)) : 0, to: r.freq, close: false }; })
+        .sort((a, b) => a.perFlight - b.perFlight || (a.id < b.id ? -1 : 1));
+      let after = own;
+      if (own >= limit) {
+        // erst Frequenzen senken (täglich geflogene Strecken, min. 1 Flug), dann schwächste Strecken schließen
+        for (let guard = 0; after > target && guard < 400; guard++) {
+          const r = routes.filter((x) => !x.close && x.wk >= 7 && x.to > 1).sort((a, b) => a.perFlight - b.perFlight || (a.id < b.id ? -1 : 1))[0];
+          if (!r) break; r.to--; after -= 1;
+        }
+        for (const r of routes) { if (after <= target) break; if (r.close) continue; after -= r.wk >= 7 ? r.to : r.perDay; r.close = true; }
+      }
+      const cuts = routes.filter((r) => r.close || r.to < r.freq);
+      const afterShare = after / Math.max(1, other + after), fine = this.antitrustFine(al, share);
+      const lockOk = !(al.gateLock && al.gateLock[c]) && !this.lockOwner(c), lock = lockOk ? this.gateLockPrice(c) : 0;
+      const cutTxt = cuts.map((r) => r.close ? `${r.base}–${r.dest} schließen` : `${r.base}–${r.dest} ${r.freq}× → ${r.to}× täglich`).join(', ');
+      const adviceTxt = own < limit ? '' : `Vorschlag: höchstens ${fmtF(Math.ceil(limit) - 1)} eigene Abflüge am Tag (jetzt ${fmtF(own)}) – ${cutTxt || 'Frequenzen senken'} (danach ${bySize ? `${fmtF(after)} Abflüge, unter der Prüfschwelle von ${A.minDeps}` : `${Math.round(afterShare * 100)} %`}).${lock ? ` Alternative: Exklusivvertrag für ${mioTxt(lock)}, dann ${P.GATE_LOCK.years} Jahre kein Verfahren.` : ''}`;
+      return { apt: c, own, total, other, share, limit, bySize, target, after, afterShare, routes, cuts, fine, lock, rivals, adviceTxt, ok: own < limit };
     }
     monthEnd() {
       const m = monthOf(this.day), y = Math.floor(this.day / 365);
@@ -6571,6 +6653,8 @@ const SM = (() => {
     if ((day + off) % 7 === 0) {
       // 0.21.48: Krisenvorschläge übernehmen (Preisautomatik, Frequenz anteilig runter) und nach der Krise zurücknehmen
       for (const e of w.events) if (!e.cancelled && e.start <= day && e.end > day && !(al.crisisDone && al.crisisDone[e.id]) && w.crisisPlan(al, e).length) { const r = act({ type: 'crisisAdjust', event: e.id }); if (r.ok) note(r.msg); }
+      // 0.21.55: Vorschlag zur Wettbewerbsaufsicht übernehmen, bevor Bußgelder fällig werden
+      if (al.antitrust) for (const c of Object.keys(al.antitrust)) { const r = act({ type: 'antitrustAdjust', apt: c }); if (r.ok) note(r.msg); }
       if (al.activeRoutes().some((r) => r.crisis && r.crisis.end <= day)) for (const r of al.activeRoutes().filter((x) => x.crisis && x.crisis.end <= day)) { const res = act({ type: 'crisisRestore', id: r.id }); if (res.ok) note(res.msg); }
       let n = 0; for (const r of al.activeRoutes()) if (!(r.ap > 0) && act({ type: 'autoPrice', id: r.id, on: true, lf: A.targetLf }).ok) n++;
       if (n) note(`Preisautomatik auf ${n} Strecke${n > 1 ? 'n' : ''} eingeschaltet (Ziel ${Math.round(A.targetLf * 100)} % Auslastung).`);
@@ -6600,7 +6684,7 @@ const SM = (() => {
   /** 0.21.48: Ein freies Flugzeug zuerst für eine volle, profitable Strecke desselben Musters an derselben Basis nutzen (+1 Flug täglich). */
   function autopilotMoreFreq(w, al, note) {
     const A = P.AUTOPILOT, day = w.day, idle = autoIdle(w, al); if (!idle.length) return false;
-    const cand = al.activeRoutes().filter((r) => !r.partial && !(r.wk && r.wk < 7) && r.freq < A.maxFreq && day - r.opened_day >= A.closeAfter && idle.some((a) => a.type_id === r.type_id && a.base === r.base))
+    const cand = al.activeRoutes().filter((r) => !r.partial && !(r.wk && r.wk < 7) && r.freq < A.maxFreq && !(al.antitrust && (al.antitrust[r.base] || al.antitrust[r.dest])) && day - r.opened_day >= A.closeAfter && idle.some((a) => a.type_id === r.type_id && a.base === r.base))
       .map((r) => [r, autoRouteStats(al, r)]).filter(([, st]) => st.n >= 21 && st.lf >= A.fullLf && st.db2 > 0).sort((x, y) => y[1].lf - x[1].lf);
     for (const [r, st] of cand) {
       if (!w.slotsOkFor(al, r.base, r.dest, 1) || w.slotCost(al, r.base, r.dest, 1).cost > Math.max(0, al.spendable(w.macro.bank ?? 1) - A.reserve * w.macro.cpi)) continue;
@@ -8177,6 +8261,7 @@ const SM = (() => {
   // ---------------------------------------------------------------------------
   // 0.20: Fairer Handel zwischen Spielenden und Wirtschaftsprüfung zum Jahresende
   // ---------------------------------------------------------------------------
+  const fmtF = (x) => (Math.round(x * 10) / 10).toLocaleString('de-DE');
   const mioTxt = (x) => (Math.abs(x) >= 1e6 ? `${(Math.round(x / 1e5) / 10).toLocaleString('de-DE')} Mio. EUR` : `${Math.round(x / 1000).toLocaleString('de-DE')} Tsd. EUR`);
   /** Marktwert einer Handelsposition aus neutraler Sicht. */
   function tradeItemValue(w, giver, receiver, it) {
@@ -8976,7 +9061,7 @@ const SM = (() => {
       case 'openRoute': {
         const { base, dest } = a, type = a.typeId, wk = a.wk !== undefined && a.wk !== null ? clamp(Math.round(num(a.wk, 7)), 1, 7) : 7, freq = wk < 7 ? 1 : clamp(Math.round(num(a.freq, 1)), 1, 8);
         if (!al.bases.includes(base) || !P.AIRPORTS[dest] || !P.AIRCRAFT_TYPES[type] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
-        { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %).` }; }
+        { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %). ${w.antitrustPlan(al, at).adviceTxt}` }; }
         if (P.AIRCRAFT_TYPES[type].role) return { ok: false, msg: `${P.AIRCRAFT_TYPES[type].label} fliegt keine Linie – ${P.AIRCRAFT_TYPES[type].role === 'cargo' ? 'Frachter' : 'Privatjets'} arbeiten im Charter-Pool (Flotte → Charter).` };
         if (!routeKmOk(base, dest)) return { ok: false, msg: `Unter ${P.MIN_ROUTE_KM} km gibt es keine Linienflüge.` };
         if (!aptOk(base, dest, type)) return { ok: false, msg: aptWhy(base, dest, type) };
@@ -9147,6 +9232,20 @@ const SM = (() => {
         al.crisisDone = { ...(al.crisisDone || {}), [e.id]: day };
         const msg = `Anpassung an „${String(e.short || e.text || '').split(':')[0]}“: ${nAp ? `Preisautomatik auf ${nAp} Strecke${nAp > 1 ? 'n' : ''}` : ''}${nAp && nF ? ', ' : ''}${nF ? `Frequenz gesenkt: ${notes.join(', ')}` : ''}.`;
         al.log(day, msg, 'route'); return { ok: true, msg };
+      }
+      case 'antitrustAdjust': {   // 0.21.55: Vorschlag zur Wettbewerbsaufsicht übernehmen
+        const c = String(a.apt || ''); if (!P.AIRPORTS[c]) return { ok: false, msg: 'Ungültig.' };
+        const pa = w.antitrustPlan(al, c); if (pa.ok || !pa.cuts.length) return { ok: false, msg: 'Nichts anzupassen – Ihr Anteil liegt unter der Grenze.' };
+        const done = [], miss = [];
+        for (const x of pa.cuts) {
+          const r = route(x.id); if (!r) continue;
+          if (x.close) { al.closeRoute(day, r, 'wegen der Wettbewerbsaufsicht eingestellt'); done.push(`${r.base}–${r.dest} geschlossen`); continue; }
+          const old = r.freq, res = applyAction(w, alId, { type: 'editRoute', id: r.id, freq: x.to });
+          if (res.ok && r.freq === x.to) done.push(`${r.base}–${r.dest} ${old}× → ${x.to}×`); else miss.push(`${r.base}–${r.dest}`);
+        }
+        w.operableFreq(al);
+        const now = w.antitrustPlan(al, c), msg = `Wettbewerbsaufsicht ${ap(c).name}: ${done.join(', ')}. Ihr Anteil liegt jetzt bei ${Math.round(now.share * 100)} % (${fmtF(now.own)} von ${fmtF(now.total)} Abflügen am Tag)${miss.length ? `; nicht geändert: ${miss.join(', ')}` : ''}. Das Verfahren endet zum Monatsende, wenn ${now.bySize ? `es bei weniger als ${P.ANTITRUST.minDeps} Abflügen am Tag bleibt` : `der Anteil unter ${Math.round(P.ANTITRUST.share * 100)} % bleibt`}.`;
+        al.log(day, msg, 'route'); return { ok: done.length > 0, msg };
       }
       case 'crisisSkip': { const e = w.events.find((x) => x.id === a.event); if (!e) return { ok: false, msg: 'Ereignis nicht gefunden.' }; al.crisisDone = { ...(al.crisisDone || {}), [e.id]: day }; return { ok: true }; }
       case 'crisisRestore': {   // Frequenzen nach der Krise zurück
@@ -9515,19 +9614,24 @@ window.SKYMAP = {"W":2000,"H":1115,"S":318.3098861837907,"TY":717.0893724404151,
 <script>
 /*
  * AIRCRAFT COLLECTION – Katalog der Flugzeug-Skins (rein kosmetisch).
- * 28 Modelle × 10 Skins = 280 Skins in vier Seltenheitsstufen (4 grün, 3 blau, 2 lila, 1 gold je Modell).
+ * 28 Modelle × 15 Skins = 420 Skins in fünf Seltenheitsstufen (5 grün, 4 blau, 3 pink, 2 rot, 1 gold je Modell).
+ * 0.21.55: Stufe Rot (zwischen Pink und Gold) neu; je Modell ist einer der beiden roten Skins „Disco Fever“ (blinkt).
+ * Alle Skin-IDs aus 0.21.52–0.21.54 bleiben unverändert gültig.
  * Wird vom Server (Ziehung, Inventar, Handel) und vom Browser (Darstellung) gemeinsam genutzt.
  * Die Ziehung bekommt den Zufall von außen (Server: crypto.randomInt), damit hier kein Math.random für produktive Ziehungen steckt.
  */
 (function () {
   'use strict';
   const RARITIES = {
-    u: { key: 'u', label: 'Ungewöhnlich', color: '#22c55e', order: 0, perModel: 4, odds: 55 },
-    r: { key: 'r', label: 'Selten', color: '#3b82f6', order: 1, perModel: 3, odds: 27 },
-    e: { key: 'e', label: 'Episch', color: '#a855f7', order: 2, perModel: 2, odds: 14 },
-    l: { key: 'l', label: 'Legendär', color: '#f5b301', order: 3, perModel: 1, odds: 4 },
+    u: { key: 'u', label: 'Ungewöhnlich', color: '#22c55e', colorName: 'Grün', order: 0, perModel: 5, odds: 55 },
+    r: { key: 'r', label: 'Selten', color: '#3b82f6', colorName: 'Blau', order: 1, perModel: 4, odds: 27 },
+    e: { key: 'e', label: 'Episch', color: '#d946ef', colorName: 'Pink', order: 2, perModel: 3, odds: 13 },
+    m: { key: 'm', label: 'Mythisch', color: '#ef4444', colorName: 'Rot', order: 3, perModel: 2, odds: 4 },
+    l: { key: 'l', label: 'Legendär', color: '#f5b301', colorName: 'Gold', order: 4, perModel: 1, odds: 1 },
   };
-  const RARITY_ORDER = ['u', 'r', 'e', 'l'];
+  const RARITY_ORDER = ['u', 'r', 'e', 'm', 'l'];
+  /** Anzahl je Modell bis 0.21.54 – die ersten Skins jeder Stufe werden genauso gewählt wie damals (IDs bleiben gleich). */
+  const OLD_PER_MODEL = { u: 4, r: 3, e: 2, m: 0, l: 1 };
   /** Anzahl Skins je Pack: 1 (80 %), 2 (17 %), 3 (3 %) */
   const PACK_COUNT_ODDS = [[1, 80], [2, 17], [3, 3]];
   const CATEGORIES = { regional: 'Regionalflugzeuge', short: 'Kurz- und Mittelstrecke', long: 'Langstrecke', cargo: 'Frachtflugzeuge', biz: 'Businessjets' };
@@ -9596,6 +9700,13 @@ window.SKYMAP = {"W":2000,"H":1115,"S":318.3098861837907,"TY":717.0893724404151,
       { k: 'cosmic', name: 'Cosmic', pal: { body: '#120c2a', body2: '#2c1b5e', belly: '#070418', tail: '#ff6ad5', tail2: '#7b5cff', stripe: '#ffb86b', accent: '#ff6ad5', line: '#2f2457', glass: '#ffb86b', eng: '#120c2a' }, pat: 'nebula', glow: true, desc: 'Nebelwolken in Pink und Ultramarin, dazwischen ein glühender Planetenring.' },
       { k: 'electric_storm', name: 'Electric Storm', pal: { body: '#1f2433', body2: '#363d55', belly: '#0f121b', tail: '#7c3aed', tail2: '#c084fc', stripe: '#c084fc', accent: '#e9d5ff', line: '#3a4158', glass: '#c084fc', eng: '#1f2433' }, pat: 'storm', glow: true, desc: 'Gewittergrau mit violetten Entladungen, die über Rumpf und Leitwerk zucken.' },
     ],
+    m: [
+      { k: 'disco_fever', name: 'Disco Fever', pal: { body: '#1a0b24', body2: '#3a1450', belly: '#0b0410', tail: '#ff2bd6', tail2: '#22e5ff', stripe: '#ffe14d', accent: '#ffffff', line: '#3d1d52', glass: '#ffe14d', eng: '#1a0b24' }, pat: 'disco', glow: true, blink: true, desc: 'Spiegelkacheln in allen Farben, die im Takt blinken, und eine Discokugel am Leitwerk – die Party fliegt mit.' },
+      { k: 'inferno', name: 'Inferno', pal: { body: '#1c0a06', body2: '#3a120a', belly: '#0d0403', tail: '#ff3b1f', tail2: '#ffb21f', stripe: '#ff6a1f', accent: '#ffd36a', line: '#4a1a0e', glass: '#ffb21f', eng: '#1c0a06' }, pat: 'flames', glow: true, desc: 'Flammen lodern vom Bauch bis über die Fenster – glühendes Rot, Orange und Gelb.' },
+      { k: 'crimson_dragon', name: 'Crimson Dragon', pal: { body: '#8a0f1a', body2: '#c81e2c', belly: '#3a050b', tail: '#3a050b', tail2: '#e23a3a', stripe: '#ffcf5a', accent: '#ffcf5a', line: '#5a0a12', glass: '#ffcf5a', eng: '#3a050b' }, pat: 'scales', glow: true, desc: 'Karmesinrote Drachenschuppen mit goldenen Kanten, die im Licht schimmern.' },
+      { k: 'ruby_comet', name: 'Ruby Comet', pal: { body: '#f8f1f2', body2: '#ffffff', belly: '#b3122a', tail: '#b3122a', tail2: '#ff5a6e', stripe: '#ff2d48', accent: '#ffd1d8', line: '#c9a3aa', glass: '#3a0a14', eng: '#b3122a' }, pat: 'comet', glow: true, desc: 'Ein rubinroter Komet zieht seinen glühenden Schweif über den weißen Rumpf.' },
+      { k: 'volcano', name: 'Volcano', pal: { body: '#211c1c', body2: '#3a3232', belly: '#0f0b0b', tail: '#211c1c', tail2: '#ff4d1a', stripe: '#ff4d1a', accent: '#ffb347', line: '#3d3434', glass: '#ff7a33', eng: '#211c1c' }, pat: 'lava', glow: true, desc: 'Erstarrtes Basaltschwarz, durchzogen von glühenden Lavarissen.' },
+    ],
     l: [
       { k: 'royal_phoenix', name: 'Royal Phoenix', pal: { body: '#7a0f1f', body2: '#c0262f', belly: '#3d0610', tail: '#f5b301', tail2: '#ff6a00', stripe: '#f5b301', accent: '#ffe08a', line: '#5a0a16', glass: '#ffe08a', eng: '#3d0610' }, pat: 'phoenix', glow: true, gold: true, desc: 'Ein goldener Phönix breitet seine Flammenschwingen über Karmesinrot aus.' },
       { k: 'golden_emperor', name: 'Golden Emperor', pal: { body: '#c99a1e', body2: '#ffe07a', belly: '#141414', tail: '#141414', tail2: '#c99a1e', stripe: '#141414', accent: '#fff3c4', line: '#8a6810', glass: '#141414', eng: '#141414' }, pat: 'emperor', glow: true, gold: true, desc: 'Vollgold mit schwarzem Bauch und kaiserlichem Wappen am Seitenleitwerk.' },
@@ -9605,18 +9716,25 @@ window.SKYMAP = {"W":2000,"H":1115,"S":318.3098861837907,"TY":717.0893724404151,
       { k: 'black_diamond', name: 'Black Diamond', pal: { body: '#0b0b0f', body2: '#2a2a33', belly: '#000000', tail: '#0b0b0f', tail2: '#f5c542', stripe: '#f5c542', accent: '#ffffff', line: '#2c2c36', glass: '#f5c542', eng: '#0b0b0f' }, pat: 'diamond', glow: true, gold: true, desc: 'Hochglanzschwarz mit goldgefassten Diamantfacetten – das Kronjuwel jeder Flotte.' },
     ],
   };
-  const MAP_EFFECT = { u: 'paint', r: 'sheen', e: 'glow', l: 'gold' };
+  const MAP_EFFECT = { u: 'paint', r: 'sheen', e: 'glow', m: 'fire', l: 'gold' };
 
-  // 280 Skins: je Modell 4 aus 8 grünen, 3 aus 6 blauen, 2 aus 6 lila und 1 aus 6 goldenen Designs (reihum, damit sich die Modelle unterscheiden)
+  // 420 Skins: je Modell 5 aus 8 grünen, 4 aus 6 blauen, 3 aus 6 pinken, 2 roten (Disco Fever + 1 aus 4) und 1 aus 6 goldenen Designs.
+  // Die ersten Skins jeder Stufe wie bis 0.21.54 (reihum), die neuen danach: die nächsten im Kreis, die das Modell noch nicht hat.
+  const pickDesigns = (m, rk) => {
+    const pool = DESIGNS[rk], n = RARITIES[rk].perModel, on = OLD_PER_MODEL[rk], out = [];
+    if (rk === 'm') return [pool[0], pool[1 + (m.idx % (pool.length - 1))]];
+    for (let j = 0; j < on; j++) out.push(pool[(m.idx * on + j + (rk === 'l' ? 0 : Math.floor(m.idx / pool.length))) % pool.length]);
+    let k = pool.indexOf(out[out.length - 1]);
+    while (out.length < n) { k = (k + 1) % pool.length; if (!out.includes(pool[k])) out.push(pool[k]); }
+    return out;
+  };
   const SKINS = [];
   for (const m of MODELS) {
     for (const rk of RARITY_ORDER) {
-      const pool = DESIGNS[rk], n = RARITIES[rk].perModel;
-      for (let j = 0; j < n; j++) {
-        const d = pool[(m.idx * n + j + (rk === 'l' ? 0 : Math.floor(m.idx / pool.length))) % pool.length];
+      for (const d of pickDesigns(m, rk)) {
         const id = `${m.id}__${d.k}`;
-        SKINS.push({ id, model: m.id, type: m.type, name: d.name, rarity: rk, design: d.k, pal: d.pal, pat: d.pat, glow: !!d.glow, gold: !!d.gold,
-          desc: d.desc, mapEffect: MAP_EFFECT[rk], artworkPath: `skins/${id}.png`, isTradable: true });
+        SKINS.push({ id, model: m.id, type: m.type, name: d.name, rarity: rk, design: d.k, pal: d.pal, pat: d.pat, glow: !!d.glow, gold: !!d.gold, blink: !!d.blink,
+          desc: d.desc, mapEffect: d.blink ? 'disco' : MAP_EFFECT[rk], artworkPath: `skins/${id}.png`, isTradable: true });
       }
     }
   }
@@ -9626,7 +9744,7 @@ window.SKYMAP = {"W":2000,"H":1115,"S":318.3098861837907,"TY":717.0893724404151,
 
   /**
    * Ein Pack ziehen. rnd(n) muss eine gleichverteilte ganze Zahl in [0, n) liefern (Server: crypto.randomInt).
-   * 1. Anzahl Skins (80/17/3), dann je Skin unabhängig: 2. Seltenheit (55/27/14/4), 3. Modell gleichverteilt (1/28), 4. Skin dieser Seltenheit des Modells gleichverteilt.
+   * 1. Anzahl Skins (80/17/3), dann je Skin unabhängig: 2. Seltenheit (55/27/13/4/1), 3. Modell gleichverteilt (1/28), 4. Skin dieser Seltenheit des Modells gleichverteilt.
    */
   function drawPack(rnd) {
     const pick = (table) => { let r = rnd(100); for (const [v, w] of table) { if (r < w) return v; r -= w; } return table[table.length - 1][0]; };
@@ -9643,9 +9761,11 @@ window.SKYMAP = {"W":2000,"H":1115,"S":318.3098861837907,"TY":717.0893724404151,
     { n: 25, key: 'badge', label: 'Sammler-Abzeichen', desc: 'Abzeichen „Sammler“ in der Sammlung und bei den Mitspielenden.' },
     { n: 75, key: 'frame', label: 'Exklusiver Profilrahmen', desc: 'Leuchtender Cyan-Violett-Rahmen um Ihr Profilbild.' },
     { n: 150, key: 'trail', label: 'Besonderer Karteneffekt', desc: 'Ihre Flugspuren auf der Karte schimmern in Cyan und Violett.' },
-    { n: 280, key: 'title', label: 'Titel „Ultimate Aircraft Collector“', desc: 'Der Titel erscheint bei Ihrem Namen.' },
+    { n: 420, key: 'title', label: 'Titel „Ultimate Aircraft Collector“', desc: 'Der Titel erscheint bei Ihrem Namen.' },
   ];
+  // Reihenfolge = Anzeige im Shop: einzelne Packs (Anzahl frei wählbar), dann die Bündel
   const OFFERS = {
+    single: { key: 'single', label: 'Einzelne Packs', packs: 1, price: '0.5', currency: 'TOKEN', perPack: true, max: 50 },
     starter: { key: 'starter', label: 'Starter Pack', packs: 10, price: '5', currency: 'TOKEN' },
     collector: { key: 'collector', label: 'Collector Pack', packs: 20, price: '10', currency: 'TOKEN' },
   };
@@ -10298,7 +10418,8 @@ function renderPlanes() {
     if (p.sel) { ctx.fillStyle = '#22d3ee'; ctx.fill(ic); ctx.strokeStyle = '#04122a'; ctx.lineWidth = 0.5; ctx.stroke(ic); return; }
     if (p.sk) {   // Aircraft Collection: Lackierung und Effekt je Seltenheit
       drawSkinFx(ctx, p, k, nowT);
-      if (p.sk.glow) { ctx.shadowColor = p.sk.glow; ctx.shadowBlur = (p.sk.fx === 'e' ? 6 : 4) * dpr; }
+      if (p.sk.fx === 'disco') { const dc = discoColor(nowT); ctx.shadowColor = dc; ctx.shadowBlur = 7 * dpr; ctx.fillStyle = dc; ctx.fill(ic); ctx.shadowBlur = 0; ctx.strokeStyle = '#1a0b24'; ctx.lineWidth = 0.6; ctx.stroke(ic); return; }
+      if (p.sk.glow) { ctx.shadowColor = p.sk.glow; ctx.shadowBlur = (p.sk.fx === 'e' || p.sk.fx === 'm' ? 6 : 4) * dpr; }
       if (p.sk.fx === 'l') { ctx.shadowColor = '#f5b301'; ctx.shadowBlur = 5 * dpr; }
       ctx.fillStyle = p.sk.fill; ctx.fill(ic); ctx.shadowBlur = 0; ctx.strokeStyle = p.sk.edge; ctx.lineWidth = 0.6; ctx.stroke(ic);
       if (p.sk.fx === 'l') { ctx.fillStyle = '#fff6d6'; ctx.beginPath(); ctx.arc(0, 0, 1.6 + (k >= 0.9 ? Math.sin(nowT / 350) * 0.5 : 0), 0, Math.PI * 2); ctx.fill(); }
@@ -11948,6 +12069,7 @@ VIEWS.stations = function viewStations() {
     const slots = slotsMine(apt);
     return `<div class="card pad stack"><div class="spread"><b>${apt} · ${apName(apt)} <span class="small muted">${NF1.format(SM.paxEff(apt))} Mio. Pax/Jahr${W.aptObs && W.aptObs[apt] ? ` – im Spiel gewachsen (ursprünglich ${NF1.format(P.AIRPORTS[apt].pax || 0)} Mio.)${SM.paxEff(apt) >= 25 && (P.AIRPORTS[apt].pax || 0) < 25 ? ', jetzt Code F' : ''}` : ''}</span></b><span>${pl.antitrust && pl.antitrust[apt] ? `<span class="chip crit" title="Wettbewerbsaufsicht: keine neuen Strecken, nach ${P.ANTITRUST.grace} Tagen monatliche Bußgelder">Kartellverfahren · ${pct(pl.antitrust[apt].share)} der Abflüge</span> ` : ''}${isBase ? '<span class="chip me">Basis</span> ' : ''}${isFinite(slots) ? `<span class="chip ${slots < 2 ? 'warn' : ''}">${slotTxt(apt)} Slots frei</span>` : '<span class="chip">ohne Slotvergabe</span>'}</span></div>
       <div class="small muted">${d.n} ${d.n === 1 ? 'Abflug' : 'Abflüge'} pro Tag · Fixkosten ${eur(monthly)} pro Monat</div>
+      ${antiHtml(apt)}
       <div class="stack small"><span class="muted">Terminal</span><div class="opts">${Object.entries(P.TERMINALS).map(([k, t]) => `<button data-act="term" data-apt="${apt}" data-v="${k}" aria-pressed="${s.terminal === k}" title="${esc(t.desc)}"><b>${t.label}</b><span>${eur(t.rent * x.cost * cpi() * proc)}/Mon.</span></button>`).join('')}</div>
         <span class="muted">${esc(P.TERMINALS[s.terminal].desc)}. Passagierentgelte ×${NF2.format(P.TERMINALS[s.terminal].paxF)}, Bodenzeit ${P.TERMINALS[s.terminal].turn > 0 ? '+' : ''}${P.TERMINALS[s.terminal].turn} Min., Geschäftsreisende ${s.terminal === 'prem' ? 'zahlen lieber mehr' : s.terminal === 'lcc' ? 'meiden Sie eher' : 'neutral'}.</span></div>
       <div class="stack small"><span class="muted">Abfertigung</span><div class="opts"><button data-act="hand" data-apt="${apt}" data-v="contract" aria-pressed="${s.handling === 'contract'}"><b>Dienstleister</b><span>${eur(contract)}/Tag</span></button><button data-act="hand" data-apt="${apt}" data-v="own" aria-pressed="${s.handling === 'own'}"><b>Eigenes Team</b><span>${eur(own)}/Tag</span></button></div>
@@ -14548,6 +14670,38 @@ function offersHtml() {
     ${list.map((o) => { const T = SM.offerText(pl, o); return `<div class="offer"><div><b>${esc(T.t)}</b><div class="small ink2">${esc(T.d)}</div><div class="small muted">gilt noch ${o.until - W.day} Tag${o.until - W.day === 1 ? '' : 'e'}</div></div>
       <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn small primary" data-act="offertake" data-id="${o.id}">Annehmen</button><button class="btn small ghost" data-act="offerdrop" data-id="${o.id}">Ablehnen</button></div></div>`; }).join('')}</section>`;
 }
+/** 0.21.55: Geldabfluss pro Tag (Mittel der letzten 30 Tage, 0 wenn das Konto wächst). */
+function burnPerDay(pl) { const h = pl.netHist || []; if (h.length < 10) return 0; const k = Math.min(30, h.length - 1); return Math.max(0, (h[h.length - 1 - k] - h[h.length - 1]) / k); }
+/** Kreditvorschlag mit Betrag (auf 0,5 Mio. gerundet, gedeckelt durch das Limit der Bank). */
+function loanTip(pl, need) {
+  if (!(need > 0)) return '';
+  const lim = W.loanLimit(pl); if (!(lim >= 5e5)) return ' Die Bank gibt derzeit keinen neuen Kredit.';
+  const amt = Math.min(Math.floor(lim / 5e5) * 5e5, Math.max(5e5, Math.ceil(need / 5e5) * 5e5));
+  return ` Vorschlag: Kredit über <b>${eur(amt)}</b>${amt < need ? ` (mehr gibt die Bank nicht)` : ''}.`;
+}
+/** Die Strecke mit dem größten Verlust (direkte Kosten) als konkreter Vorschlag. */
+function lossTip(routes) {
+  let w = null; for (const r of routes) { const s = rstats(r, 30); if (s.n >= 14 && s.db1 < 0 && (!w || s.db1 / s.n < w.d)) w = { r, d: s.db1 / s.n }; }
+  return w ? ` Größter Verlustbringer: ${w.r.base}–${w.r.dest} (${eur(w.d, { plus: true })} pro Tag) – schließen spart rund ${eur(-w.d * 30)} im Monat.` : '';
+}
+/** 0.21.55: Vorschlag zur Wettbewerbsaufsicht in einem Satz (konkrete Zahlen). */
+function antiAdvice(pa) {
+  if (pa.ok) return `Grenze: unter ${n1(pa.limit)} eigene Abflüge am Tag – das ist schon erreicht, zum Monatsende endet das Verfahren.`;
+  const cuts = pa.cuts.map((r) => r.close ? `<b>${r.base}–${r.dest}</b> schließen` : `<b>${r.base}–${r.dest}</b> ${r.freq}× → ${r.to}×`);
+  return `Vorschlag: höchstens <b>${n0(Math.ceil(pa.limit) - 1)} Abflüge am Tag</b> (−${n1(pa.own - pa.after)}): ${cuts.slice(0, 4).join(', ')}${cuts.length > 4 ? ` und ${cuts.length - 4} weitere` : ''} – danach ${pa.bySize ? `${n1(pa.after)} Abflüge, unter der Prüfschwelle von ${P.ANTITRUST.minDeps}` : pct(pa.afterShare)}.${pa.lock ? ` Alternative: Exklusivvertrag für ${eur(pa.lock)}.` : ''}`;
+}
+/** Alle eigenen Strecken an einem Flughafen mit Wettbewerbsaufsicht (oder knapp davor), mit Vorschlag je Strecke. */
+function antiHtml(c) {
+  const pl = W.player, A = P.ANTITRUST, on = pl.antitrust && pl.antitrust[c];
+  if (!on && (SM.paxEff(c) < A.minPax || (pl.gateLock && pl.gateLock[c]))) return '';
+  const pa = W.antitrustPlan(pl, c);
+  if (!on && (pa.share < A.share - 0.1 || pa.own < A.minDeps * 0.8)) return '';
+  const riv = Object.entries(pa.rivals).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, n]) => `${esc(W.airlines[id] ? W.airlines[id].name : id)} ${n1(n)}`).join(', ');
+  const rows = pa.routes.slice().sort((a, b) => b.perDay - a.perDay).map((r) => `<tr class="${r.close || r.to < r.freq ? 'warn' : ''}"><td style="white-space:nowrap"><a href="#" data-act="openroute" data-id="${r.id}">${r.base}–${r.dest}</a></td><td class="num" style="white-space:nowrap">${r.wk < 7 ? `${r.wk}× pro Woche` : `${r.freq}× täglich`}</td><td class="num ${r.dayRes < 0 ? 'neg' : ''}">${eur(r.dayRes, { plus: true })}</td><td style="white-space:nowrap">${on || !pa.ok ? (r.close ? '<b>schließen</b>' : r.to < r.freq ? `<b>→ ${r.to}× täglich</b>` : '–') : ''}</td></tr>`).join('');
+  return `<div class="callout ${on ? (W.day - on.since >= A.grace ? 'crit' : 'warn') : 'info'} stack"><span>${on ? `<b>Kartellverfahren:</b> ` : '<b>Wettbewerbsaufsicht – knapp unter der Grenze:</b> '}${pct(pa.share)} aller Abflüge in ${apName(c)} – Sie ${n1(pa.own)}, alle anderen ${n1(pa.other)} am Tag${riv ? ` (${riv})` : ''}. ${on ? ` ${antiAdvice(pa)}` : ` Grenze ${pct(A.share)}: höchstens ${n0(Math.ceil(pa.limit) - 1)} eigene Abflüge am Tag.`}</span>
+    <div class="tw"><table class="t"><thead><tr><th>Strecke</th><th class="num">Flüge</th><th class="num">Ergebnis/Tag</th><th>${on || !pa.ok ? 'Vorschlag' : ''}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${on && pa.cuts.length ? `<div class="row"><button class="btn small primary" data-act="antiadj" data-apt="${c}">Vorschlag übernehmen</button></div>` : ''}</div>`;
+}
 /** Regelbasierte Hinweise. cat: ops, fin, net, strat – die Assistenz zieht ihr Fachgebiet nach vorn. */
 function assistantHints() {
   const pl = W.player, out = [], routes = pl.activeRoutes(), add = (key, kind, cat, html, tab = null, extra = {}) => out.push({ key, kind, cat, html, tab, ...extra });
@@ -14555,11 +14709,12 @@ function assistantHints() {
   for (const d of incomingDeals().slice(0, 2)) add('deal' + d.id, 'info', 'strat', `<b>${esc(W.airlines[d.from].name)}</b> bietet einen Handel an (bis ${dateShort(d.expires)}): ${esc(SM.dealText(W, d))}.`, 'trade');
   for (const d of openDecisions()) add('dec' + d.id, 'crit', 'ops', `<b>Entscheidung bis ${dateShort(d.deadline)}:</b> ${esc(d.text)}`, 'cockpit');
   if (pl.status === 'restructuring') add('restr', 'crit', 'fin', `<b>Restrukturierung:</b> Noch ${P.RESTRUCT.humanDays - pl.distressDays} Tage, bis der Kontostand wieder positiv sein muss. Unter Finanzen → Sanierung liegen alle Hebel.`, 'credit');
-  else if (netCash(pl) < 0 && bs.cash >= 0) add('dispo', 'warn', 'fin', `<b>Konto im Dispo</b> (${eur(netCash(pl))}). Das ist erlaubt, kostet aber ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins – und kürzt die Bank die Linie, wird der Überhang sofort eingezogen.`, 'credit');
-  if (bs.cash < 0 && pl.status !== 'restructuring') add('neg', 'crit', 'fin', `<b>Dispo überzogen</b> (${eur(netCash(pl))}). Nach ${P.INSOLVENCY_AFTER_DAYS} Tagen droht die Insolvenz. Kredit aufnehmen oder Verlustbringer schließen.`, 'credit');
-  else if (isFinite(pl.runway) && pl.runway < 60 && routes.length) add('runway', 'warn', 'fin', `Das Geld reicht beim jetzigen Abfluss noch etwa <b>${n0(pl.runway)} Tage</b>.`, 'credit');
+  else if (netCash(pl) < 0 && bs.cash >= 0) add('dispo', 'warn', 'fin', `<b>Konto im Dispo</b> (${eur(netCash(pl))}). Das ist erlaubt, kostet aber ${pct(pl.creditRate(W.macro.rate, W.macro.bank ?? 1), 1)} Zins – und kürzt die Bank die Linie, wird der Überhang sofort eingezogen.${loanTip(pl, -netCash(pl) + 30 * burnPerDay(pl))}`, 'credit');
+  if (bs.cash < 0 && pl.status !== 'restructuring') add('neg', 'crit', 'fin', `<b>Dispo überzogen</b> (${eur(netCash(pl))}). Nach ${P.INSOLVENCY_AFTER_DAYS} Tagen droht die Insolvenz.${loanTip(pl, -netCash(pl) + 30 * burnPerDay(pl))}${lossTip(routes)}`, 'credit');
+  else if (isFinite(pl.runway) && pl.runway < 60 && routes.length) add('runway', 'warn', 'fin', `Das Geld reicht beim jetzigen Abfluss noch etwa <b>${n0(pl.runway)} Tage</b> (${eur(burnPerDay(pl))} weniger pro Tag).${loanTip(pl, Math.max(0, 90 - pl.runway) * burnPerDay(pl))}${lossTip(routes)}`, 'credit');
   if (ui.mp) { const fl = SM.auditPreview(W, pl).filter((e) => e.flagged); if (fl.length) add('audit', 'warn', 'fin', `Die Wirtschaftsprüfer würden zum Jahresabschluss die Geschäfte mit <b>${esc(fl[0].name)}</b> beanstanden: ${eur(fl[0].excess)} Vorteil über Marktwert. Freiwillig zurückzahlen erspart Bußgeld und Prüfvermerk.`, 'credit'); }
-  if (pl.antitrust) for (const [c, x] of Object.entries(pl.antitrust)) add('anti' + c, W.day - x.since >= P.ANTITRUST.grace ? 'crit' : 'warn', 'strat', `Die Wettbewerbsaufsicht hat uns in <b>${apName(c)}</b> im Visier: ${pct(x.share)} aller Abflüge. Neue Strecken dort sind untersagt${W.day - x.since >= P.ANTITRUST.grace ? ', und jeden Monat kommt ein Bußgeld' : `, in ${P.ANTITRUST.grace - (W.day - x.since)} Tagen drohen Bußgelder`}. Abflüge dort reduzieren oder Wachstum an andere Basen verlagern.`, 'stations');
+  if (pl.antitrust) for (const [c, x] of Object.entries(pl.antitrust)) { const late = W.day - x.since >= P.ANTITRUST.grace, pa = W.antitrustPlan(pl, c);
+    add('anti' + c, late ? 'crit' : 'warn', 'strat', `<b>Kartellverfahren ${apName(c)}:</b> ${pct(pa.share)} aller Abflüge (${n1(pa.own)} von ${n1(pa.total)} am Tag). Neue Strecken dort sind untersagt${late ? `, jeden Monat kommen etwa <b>${eur(pa.fine)}</b> Bußgeld` : `, ab ${dateShort(x.since + P.ANTITRUST.grace)} etwa <b>${eur(pa.fine)}</b> Bußgeld pro Monat`}. ${antiAdvice(pa)}`, 'stations', { anti: c, antiOk: pa.cuts.length > 0 }); }
   { const n = pl.fleet.length; if (n >= 90 && n < 100) add('hq100', 'info', 'strat', `Ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte: Bei 200 Flugzeugen kostet die Zentrale rund ${eur(200000 * cpi())} am Tag. Wachstum lohnt sich dann nur noch mit guten Strecken.`, 'finance'); }
   if (!pl.fleet.length) { const ok = ['A20N', 'E295', 'AT76', 'DH8D'].map((t) => [t, SM.riskTerms(pl, t)]), free = ok.find(([, r]) => !r.reject && !r.cond), a320 = ok[0][1];
     add('nofleet', 'info', 'strat', `Wir brauchen zuerst ein Flugzeug. Als junge Airline (Ansehen ${a320.st}) geben uns die Leasinggeber ${free ? `<b>${tl(free[0])}</b> und kleinere ohne Auflagen` : 'nur Turboprops ohne Auflagen'}${a320.reject ? ', die A320neo noch gar nicht' : a320.cond ? `, die A320neo nur unter Auflagen (+${pct(a320.lease - 1)} Rate, ${a320.dep} Monatsraten Kaution)` : ''}. Zwei ${free ? tl(free[0]) : 'Turboprops'} im Leasing sind ein solider Start – das kostet nur die Kaution. Mit Erfahrung, Pünktlichkeit und soliden Finanzen steigt das Ansehen.`, 'fleetBuy'); }
@@ -14569,10 +14724,10 @@ function assistantHints() {
   else if (cov && cov.agencyH > 0) add('agency', 'warn', 'ops', `Agenturpersonal fliegt mit – das kostet <b>${eur(cov.extraCost)} extra pro Tag</b>. Rechtzeitig fest einstellen.`, 'staff');
   const gap = SM.staffPlanOf(pl).filter((r) => r.have + r.pipe < r.need - 0.5);
   if (gap.length && routes.length) add('gap', 'warn', 'ops', `Personal reicht nicht: es fehlen ${gap.map((r) => `${n0(Math.ceil(r.need - r.have - r.pipe))} ${esc(r.label)}`).join(', ')}.`, 'staff');
-  if (pl.staff.morale < 0.55 && SM.sumObj(pl.staff.pil) > 0) add('morale', 'warn', 'ops', `Die Stimmung liegt bei <b>${pct(pl.staff.morale)}</b>. Unter 55 % steigt das Streikrisiko – Gehalt prüfen.`, 'staff');
+  if (pl.staff.morale < 0.55 && SM.sumObj(pl.staff.pil) > 0) add('morale', 'warn', 'ops', `Die Stimmung liegt bei <b>${pct(pl.staff.morale)}</b>. Unter 55 % steigt das Streikrisiko. Vorschlag: Gehalt um etwa <b>${n0(Math.min(15, Math.max(1, Math.ceil((0.62 - pl.staff.morale) / 1.6 * 100))))} %</b> anheben – die Stimmung zieht dann über einige Wochen nach.`, 'staff');
   for (const r of routes) if (r.partial && r.opened_day <= W.day) { const k = SM.kOf(r.type_id, pl.rotH(r)) || 1; add('part' + r.id, 'warn', 'net', `<b>${r.base}–${r.dest}</b> fliegt nur an ${pct(r.partial)} der Tage: Ein Umlauf dauert ${n1(pl.rotH(r))} h. Für täglichen Betrieb braucht es ${k} Flugzeuge.`, null, { route: r.id }); break; }
   if (pl.lineCut) add('linecut', 'crit', 'fin', 'Die Bank hat Ihre <b>Kreditlinie gekürzt</b>. Der Überhang wird vom Konto eingezogen.', 'credit');
-  if (pl.staff && pl.staff.pay < wageNow() - 0.01) add('wage', 'warn', 'ops', `Ihr Gehalt liegt <b>${pct(1 - pl.staff.pay / wageNow())} unter dem Marktlohn</b> – die Konkurrenz wirbt ab, die Stimmung sinkt.`, 'staff');
+  if (pl.staff && pl.staff.pay < wageNow() - 0.01) add('wage', 'warn', 'ops', `Ihr Gehalt liegt <b>${pct(1 - pl.staff.pay / wageNow())} unter dem Marktlohn</b> – die Konkurrenz wirbt ab, die Stimmung sinkt. Vorschlag: Gehalt um <b>${n0(Math.ceil((wageNow() / pl.staff.pay - 1) * 100))} %</b> anheben.`, 'staff');
   { const att = pl.events.filter((e) => e.kind === 'crit' && /greift Ihre Strecke/.test(e.msg) && e.day >= W.day - 21).pop(); if (att) { const m = /Strecke ([A-Z]{3})[–-]([A-Z]{3})/.exec(att.msg), r = m && routes.find((x) => (x.base === m[1] && x.dest === m[2]) || (x.base === m[2] && x.dest === m[1])); add('att' + att.day, 'crit', 'net', esc(att.msg) + ' Preise und Frequenz prüfen.', r ? null : 'routes', r ? { route: r.id } : {}); } }
   { const lot = (W.auctions || []).find((a) => !a.done && pl.fleet.some((x) => P.AIRCRAFT_TYPES[x.type_id].group === P.AIRCRAFT_TYPES[a.type].group) && a.bids[pl.id] === undefined); if (lot) add('lot' + lot.id, 'info', 'strat', `Auktion: ${lot.n} frühe Lieferpositionen für ${tl(lot.type)} bis ${dateShort(lot.closes)}.`, 'fleetBuy'); }
   if (routes.length >= 4 && !SM.acadAll(pl).some((x) => x.lv) && W.macro.laborTight > 1.25) add('acad', 'info', 'ops', 'Der Arbeitsmarkt ist angespannt. Eine geförderte <b>Flugschule</b> liefert eigenen Nachwuchs, der schwerer abzuwerben ist.', 'staff');
@@ -14595,10 +14750,10 @@ function assistantHints() {
     const c = W.competitorOffers(W.playerId, r.base, r.dest).filter((o) => o.fare < r.fare_out * 0.85).sort((a, b) => a.fare - b.fare)[0];
     if (c && !cheap) cheap = { r, c };
   }
-  if (worst) add('loss' + worst.r.id, 'warn', 'fin', `<b>${worst.r.base}–${worst.r.dest}</b> deckt nicht einmal die direkten Kosten (${eur(worst.s.db1 / worst.s.n, { plus: true })} pro Tag).`, null, { route: worst.r.id });
-  if (spill) add('spill' + spill.r.id, 'good', 'net', `<b>${spill.r.base}–${spill.r.dest}</b> ist zu ${pct(spill.s.lf)} ausgelastet – fast ausgebucht: Preis rauf oder Frequenz ausbauen.`, null, { route: spill.r.id });
-  if (empty) add('empty' + empty.r.id, 'warn', 'net', `<b>${empty.r.base}–${empty.r.dest}</b> fliegt nur zu ${pct(empty.s.lf)} voll. Kleineres Flugzeug oder günstigerer Tarif?`, null, { route: empty.r.id });
-  if (cheap) add('cheap' + cheap.r.id, 'warn', 'strat', `${esc(W.airlines[cheap.c.airline].name)} unterbietet uns auf <b>${cheap.r.base}–${cheap.r.dest}</b> mit ${eur(cheap.c.fare)}.`, null, { route: cheap.r.id });
+  if (worst) add('loss' + worst.r.id, 'warn', 'fin', `<b>${worst.r.base}–${worst.r.dest}</b> deckt nicht einmal die direkten Kosten (${eur(worst.s.db1 / worst.s.n, { plus: true })} pro Tag). Schließen spart rund <b>${eur(-worst.s.db1 / worst.s.n * 30)} im Monat</b>${worst.r.freq > 1 && !(worst.r.wk < 7) ? `; oder erst die Frequenz senken: ${worst.r.freq}× → ${Math.max(1, Math.floor(worst.r.freq / 2))}× täglich` : ''}.`, null, { route: worst.r.id });
+  if (spill) add('spill' + spill.r.id, 'good', 'net', `<b>${spill.r.base}–${spill.r.dest}</b> ist zu ${pct(spill.s.lf)} ausgelastet – fast ausgebucht. Vorschlag: Tarif um 8 % auf <b>${eur(spill.r.fare_out * 1.08)} / ${eur(spill.r.fare_in * 1.08)}</b>${spill.r.freq < 8 && !(spill.r.wk < 7) ? ` oder einen Flug mehr am Tag (${spill.r.freq}× → ${spill.r.freq + 1}×)` : ''}.`, null, { route: spill.r.id });
+  if (empty) add('empty' + empty.r.id, 'warn', 'net', `<b>${empty.r.base}–${empty.r.dest}</b> fliegt nur zu ${pct(empty.s.lf)} voll. Vorschlag: ${(() => { const r = empty.r, nf = Math.max(1, Math.round(r.freq * empty.s.lf / 0.75)); return `${nf < r.freq && !(r.wk < 7) ? `Frequenz ${r.freq}× → ${nf}× täglich (Auslastung dann etwa ${pct(Math.min(0.95, empty.s.lf * r.freq / nf))}) oder ` : ''}Tarif um 10 % auf <b>${eur(r.fare_out * 0.9)} / ${eur(r.fare_in * 0.9)}</b> senken; sonst ein kleineres Flugzeug`; })()}.`, null, { route: empty.r.id });
+  if (cheap) add('cheap' + cheap.r.id, 'warn', 'strat', `${esc(W.airlines[cheap.c.airline].name)} unterbietet uns auf <b>${cheap.r.base}–${cheap.r.dest}</b> mit ${eur(cheap.c.fare)} – wir verlangen ${eur(cheap.r.fare_out)} (${pct(cheap.c.fare / cheap.r.fare_out - 1)}). Gleichziehen hieße <b>${eur(cheap.c.fare)}</b>; mit besserem Service reichen oft ${eur(Math.max(cheap.c.fare, cheap.r.fare_out * 0.92))}.`, null, { route: cheap.r.id });
   const h = pl.hedge && pl.hedge.until > W.day ? pl.hedge : null;
   if (h && h.until - W.day <= 14) add('hedgeend', 'info', 'fin', `Die Kerosin-Absicherung läuft am <b>${dateShort(h.until)}</b> aus.`, 'supply');
   if (!h && routes.length && W.fuelPrice > W.fuelAvg() * 1.12) add('fuel', 'warn', 'fin', `Kerosin kostet ${pct(W.fuelPrice / W.fuelAvg() - 1)} mehr als im Jahresmittel – und wir sind nicht abgesichert.`, 'supply');
@@ -14617,7 +14772,7 @@ function assistantHints() {
     add('ev' + (e.id || e.text), e.severity === 'crit' ? 'crit' : e.severity === 'good' ? 'good' : 'warn', 'ops', `${e.start > W.day ? `Ab ${dateShort(e.start)}: ` : ''}${esc(e.text)}`, 'world');
     if (out.filter((x) => x.key.startsWith('ev')).length >= 2) break;
   }
-  if (routes.length >= 3 && pl.brand < 0.45 && !pl.marketing && !pl.mktPct) add('brand', 'info', 'strat', `Unsere Marke steht bei ${n0(pl.brand * 100)} von 100 – schon 2 % vom Umsatz für Marketing helfen bei der Buchungswahl.`, 'strategy');
+  if (routes.length >= 3 && pl.brand < 0.45 && !pl.marketing && !pl.mktPct) add('brand', 'info', 'strat', `Unsere Marke steht bei ${n0(pl.brand * 100)} von 100 – schon 2 % vom Umsatz für Marketing helfen bei der Buchungswahl${(() => { const m = pl.ledger.months[pl.ledger.months.length - 1]; const rev = m ? ((m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0)) / 100 : 0; return rev > 0 ? ` – bei uns etwa <b>${eur(rev * 0.02)} im Monat</b>` : ''; })()}.`, 'strategy');
   if (routes.length >= 3 && !pl.cabin && W.day > 20) add('cabin', 'info', 'strat', 'Auf Geschäftsstrecken lohnt meist eine kleine <b>Business-Kabine</b> (10–20 %) – Premium-Konkurrenten haben eine. Unter Karte → Strategie sehen Sie die Prognose für Ihr Netz.', 'strategy');
   if (!pl.logo && !pl.pixLogo && W.day > 3) add('logo', 'info', 'strat', 'Geben Sie Ihrer Airline ein Gesicht: Form, Symbol und Farben für Ihr <b>Logo</b> auswählen.', 'profile');
   if (routes.length && routes.length < 6 && pl.fleet.length) {
@@ -14628,6 +14783,7 @@ function assistantHints() {
   return out.sort((a, b) => order[a.kind] - order[b.kind] || (b.cat === focus) - (a.cat === focus));
 }
 function hintBtn(x) {
+  if (x.anti) return `${x.antiOk ? `<button class="btn small primary" data-act="antiadj" data-apt="${x.anti}">Vorschlag übernehmen</button> ` : ''}<button class="btn small" data-act="tab" data-tab="stations">Strecken ansehen</button>`;
   if (x.crisis) return crisisBtns(x.crisis);
   if (x.restore) return `<button class="btn small primary" data-act="crisisrestore">Zurücknehmen</button>`;
   if (x.route) return `<button class="btn small" data-act="openroute" data-id="${x.route}">Strecke öffnen</button>`;
@@ -14909,6 +15065,7 @@ function onPaneClick(e) {
   switch (act) {
     case 'tab': setTab(b.dataset.tab); break;
     case 'hubsel': ui.hubSel = b.dataset.apt; renderPane(true); break;
+    case 'antiadj': { const r = doAction({ type: 'antitrustAdjust', apt: b.dataset.apt }); toast(r.msg); refreshAll(); renderSidebar(); break; }
     case 'crisisadj': { const r = doAction({ type: 'crisisAdjust', event: b.dataset.ev }); if (r.ok) toast(r.msg); refreshAll(); renderSidebar(); break; }
     case 'crisisno': { doAction({ type: 'crisisSkip', event: b.dataset.ev }); refreshAll(); renderSidebar(); break; }
     case 'crisisrestore': { const r = doAction({ type: 'crisisRestore' }); if (r.ok) toast(r.msg); refreshAll(); renderSidebar(); break; }
@@ -16924,6 +17081,39 @@ function skinLivery(s, g) {
     case 'titan': over = belly(cy + h * 0.3) + Array.from({ length: 6 }, (_, i) => `<rect x="${f(x0 + L * (0.15 + i * 0.11))}" y="${f(cy - h * 0.38)}" width="${f(L * 0.09)}" height="${f(h * 0.12)}" fill="${p.stripe}" opacity=".55"/>`).join('') + `<rect x="${f(x0)}" y="${f(top + 1)}" width="${f(L)}" height="${f(h * 0.12)}" fill="#fff" opacity=".3"/>`; break;
     case 'sovereign': over = belly(cy + h * 0.3) + line(cy - h * 0.25, p.stripe, 0.5) + line(cy + h * 0.15, p.stripe, 0.7) + line(cy + h * 0.21, p.stripe, 0.4); fin = `<g${glow}><path d="M${f(xe - L * 0.095)},${f(top - 8)} l1.6,-4 l1.6,2.6 l1.6,-4 l1.6,4 l1.6,-2.6 l1.6,4 Z" fill="${p.stripe}"/></g>`; finFill = `url(#${id}g)`; break;
     case 'diamond': over = belly(cy + h * 0.3) + `<g${glow}>` + Array.from({ length: 7 }, (_, i) => { const x = x0 + L * (0.2 + i * 0.085), y = cy - h * 0.05; return `<path d="M${f(x)},${f(y - 3.5)} l3,3.5 l-3,3.5 l-3,-3.5Z" fill="none" stroke="${p.stripe}" stroke-width=".7"/>`; }).join('') + '</g>'; fin = `<g${glow}><path d="M${f(xe - L * 0.075)},${f(top - 14)} l4,5 l-4,5 l-4,-5Z" fill="${p.stripe}"/></g>`; break;
+    // 0.21.55: Stufe Rot
+    case 'disco': {   // Spiegelkacheln in vier Gruppen, jede Gruppe wechselt im Takt die Farbe (SMIL: läuft auch in <img>)
+      const C = ['#ff2bd6', '#22e5ff', '#ffe14d', '#7cff4f', '#ff7a1a'], grp = [[], [], [], []];
+      for (let y = top + h * 0.08, row = 0; y < cy + h * 0.24; y += h * 0.15, row++) for (let x = x0 + h * 0.9 + (row % 2) * 2.5, col = 0; x < xe - L * 0.1; x += 5.2, col++) grp[Math.floor(rnd() * 4)].push(`<rect x="${f(x)}" y="${f(y)}" width="4.2" height="${f(h * 0.12)}" rx=".6"/>`);
+      over = belly(cy + h * 0.3) + grp.map((g, i) => `<g fill="${C[i]}" opacity=".92"><animate attributeName="fill" values="${[0, 1, 2, 3, 4, 0].map((j) => C[(i + j) % 5]).join(';')}" dur="1.8s" begin="-${(i * 0.45).toFixed(2)}s" calcMode="discrete" repeatCount="indefinite"/>${g.join('')}</g>`).join('')
+        + `<rect x="${f(x0)}" y="${f(top + 1)}" width="${f(L)}" height="${f(h * 0.08)}" fill="#fff" opacity=".25"/>`;
+      const bx = xe - L * 0.085, by = top - 9;
+      defs += `<radialGradient id="${id}d" cx=".35" cy=".35"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#c9d2e3"/><stop offset="1" stop-color="#5b6577"/></radialGradient>`;
+      fin = `<circle cx="${f(bx)}" cy="${f(by)}" r="6" fill="url(#${id}d)"/>` + [-3, 0, 3].map((d) => `<path d="M${f(bx - 6)},${f(by + d)} L${f(bx + 6)},${f(by + d)} M${f(bx + d)},${f(by - 6)} L${f(bx + d)},${f(by + 6)}" stroke="#5b6577" stroke-width=".35"/>`).join('')
+        + C.slice(0, 4).map((c, i) => `<circle cx="${f(bx + [-3.4, 2.6, 3.2, -2][i])}" cy="${f(by + [-2.4, -3.2, 2.2, 3][i])}" r=".9" fill="${c}"><animate attributeName="opacity" values="1;.1;1" dur="${(0.7 + i * 0.2).toFixed(1)}s" repeatCount="indefinite"/></circle>`).join('');
+      break; }
+    case 'flames': {
+      defs += `<linearGradient id="${id}x" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${p.tail}"/><stop offset=".6" stop-color="${p.stripe}"/><stop offset="1" stop-color="${p.tail2}"/></linearGradient>`;
+      const tongue = (base, hi, step, ph) => { let d = `M${f(x0 - 4)},${f(bot + 4)} L${f(x0 - 4)},${f(base)}`; for (let x = x0, i = 0; x < xe; x += step, i++) { const tip = base - hi * (0.45 + 0.55 * Math.abs(Math.sin(i * 1.7 + ph))) * Math.min(1, (x - x0) / (L * 0.25) + 0.2); d += ` Q${f(x + step * 0.2)},${f(tip + hi * 0.25)} ${f(x + step * 0.55)},${f(tip)} Q${f(x + step * 0.7)},${f(base - hi * 0.15)} ${f(x + step)},${f(base)}`; } return `${d} L${f(xe + 4)},${f(bot + 4)}Z`; };
+      over = `<path d="${tongue(cy + h * 0.32, h * 0.75, 11, 0)}" fill="url(#${id}x)"${glow}/><path d="${tongue(cy + h * 0.4, h * 0.42, 8, 1.3)}" fill="${p.accent}" opacity=".75"/>`;
+      fin = `<path d="${tongue(top + 2, 14, 5, 0.6).replace(/^M[^L]*L/, `M${f(xe - L * 0.2)},${f(top + 4)} L`)}" fill="url(#${id}x)" opacity=".9"/>`; break; }
+    case 'scales': {
+      over = belly(cy + h * 0.32); let sc = '';
+      for (let y = top + h * 0.15, row = 0; y < cy + h * 0.3; y += h * 0.13, row++) for (let x = x0 + h * 0.6 + (row % 2) * 3.2; x < xe - L * 0.06; x += 6.4) sc += `M${f(x)},${f(y)} a3.2,3.2 0 0 0 6.4,0 `;
+      over += `<path d="${sc}" fill="none" stroke="${p.stripe}" stroke-width=".55" opacity=".7"/>` + line(cy + h * 0.3, p.stripe, 1.1);
+      for (let i = 0; i < 5; i++) fin += `<path d="M${f(xe - L * 0.15 + i * L * 0.022)},${f(top + 1)} l${f(L * 0.012)},-7 l${f(L * 0.012)},7" fill="${p.tail2}" stroke="${p.stripe}" stroke-width=".4"/>`; break; }
+    case 'comet': {
+      defs += `<linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${p.stripe}" stop-opacity="1"/><stop offset="1" stop-color="${p.tail2}" stop-opacity="0"/></linearGradient>`;
+      const hx = x0 + L * 0.3, hy = cy - h * 0.02;
+      over = belly(cy + h * 0.3) + `<path d="M${f(hx)},${f(hy - h * 0.16)} L${f(xe - L * 0.08)},${f(hy - h * 0.38)} L${f(xe - L * 0.08)},${f(hy + h * 0.18)} L${f(hx)},${f(hy + h * 0.16)}Z" fill="url(#${id}c)"/>`
+        + `<circle cx="${f(hx)}" cy="${f(hy)}" r="${f(h * 0.2)}" fill="${p.stripe}"${glow}/><circle cx="${f(hx - 1)}" cy="${f(hy - 1)}" r="${f(h * 0.08)}" fill="#fff"/>`;
+      for (let i = 0; i < 10; i++) over += `<circle cx="${f(hx + rnd() * L * 0.5)}" cy="${f(hy + (rnd() - 0.5) * h * 0.4)}" r="${f(0.3 + rnd() * 0.5)}" fill="${p.accent}"/>`;
+      fin = `<circle cx="${f(xe - L * 0.08)}" cy="${f(top - 9)}" r="3" fill="${p.stripe}"${glow}/>`; break; }
+    case 'lava': {
+      over = belly(cy + h * 0.32); let cr = '';
+      for (let i = 0; i < 9; i++) { let x = x0 + L * (0.08 + rnd() * 0.8), y = top + rnd() * h * 0.3; cr += `M${f(x)},${f(y)}`; for (let j = 0; j < 4; j++) { x += (rnd() - 0.3) * 9; y += 2 + rnd() * h * 0.18; cr += ` L${f(x)},${f(y)}`; } }
+      over += `<path d="${cr}" fill="none" stroke="${p.stripe}" stroke-width="1.3" stroke-linejoin="round"${glow}/><path d="${cr}" fill="none" stroke="${p.accent}" stroke-width=".45"/>`;
+      fin = `<path d="M${f(xe - L * 0.14)},${f(top)} L${f(xe - L * 0.1)},${f(top - 8)} L${f(xe - L * 0.07)},${f(top - 5)} L${f(xe - L * 0.05)},${f(finTop + 4)}" fill="none" stroke="${p.stripe}" stroke-width="1.2"${glow}/>`; break; }
     default: over = belly();
   }
   if (s.gold) over += `<rect x="${f(x0)}" y="${f(top - 2)}" width="${f(L)}" height="${f(h + 4)}" fill="url(#${id}s)" class="sk-shine"/>`;
@@ -16964,7 +17154,7 @@ VIEWS.collection = function viewCollection() {
       <div class="ac-tile"><span>Ungeöffnete Packs</span><b>${n0(m.packs.length)}</b></div><div class="ac-tile"><span>Geöffnet</span><b>${n0(m.openedTotal)}</b></div></div>
     <div class="ac-ms">${SK.MILESTONES.map((x) => `<div class="ac-msi${hasMs(x.key) ? ' on' : ''}" title="${esc(x.desc)}"><b>${x.n}</b><span>${esc(x.label)}</span></div>`).join('')}</div>`;
   const segs = (key, list) => `<div class="seg wrap">${list.map(([v, l]) => `<button data-act="acf" data-k="${key}" data-v="${v}" aria-pressed="${F[key] === v}">${l}</button>`).join('')}</div>`;
-  html += `<div class="ac-filters">${segs('cat', [['', 'Alle Flugzeuge'], ...CAT_KEYS.map((k) => [k, SK.CATEGORIES[k]])])}${segs('rar', [['', 'Alle Seltenheiten'], ['u', 'Grün'], ['r', 'Blau'], ['e', 'Lila'], ['l', 'Gold']])}${segs('own', [['', 'Alle'], ['have', 'Gesammelt'], ['miss', 'Nicht gesammelt'], ['dup', 'Duplikate']])}</div>`;
+  html += `<div class="ac-filters">${segs('cat', [['', 'Alle Flugzeuge'], ...CAT_KEYS.map((k) => [k, SK.CATEGORIES[k]])])}${segs('rar', [['', 'Alle Seltenheiten'], ...SK.RARITY_ORDER.map((k) => [k, RAR[k].colorName])])}${segs('own', [['', 'Alle'], ['have', 'Gesammelt'], ['miss', 'Nicht gesammelt'], ['dup', 'Duplikate']])}</div>`;
   const keep = (s) => (!F.cat || modelOf(s).cat === F.cat) && (!F.rar || s.rarity === F.rar) && (!F.own || (F.own === 'have' ? m.inv[s.id] > 0 : F.own === 'miss' ? !(m.inv[s.id] > 0) : m.inv[s.id] > 1));
   const models = SK.MODELS.filter((md) => !F.cat || md.cat === F.cat), shownAll = ui.showAll && ui.showAll.acgrid;
   let nModels = 0, more = 0;
@@ -16973,7 +17163,7 @@ VIEWS.collection = function viewCollection() {
     if (!shownAll && nModels >= 6) { more++; continue; }
     nModels++;
     const have = SK.SKINS.filter((s) => s.model === md.id && m.inv[s.id] > 0).length;
-    html += `<section class="ac-model"><h3>${esc(md.name)} <small>${have} / 10</small></h3><div class="ac-grid">${list.map((s) => skinCard(s)).join('')}</div></section>`;
+    html += `<section class="ac-model"><h3>${esc(md.name)} <small>${have} / ${SK.SKINS.filter((s) => s.model === md.id).length}</small></h3><div class="ac-grid">${list.map((s) => skinCard(s)).join('')}</div></section>`;
   }
   if (more) html += `<div class="row"><button class="btn small" data-act="showall" data-k="acgrid">Weitere ${more} Modelle zeigen</button></div>`;
   if (!nModels) html += '<p class="small muted">Kein Skin passt zu den Filtern.</p>';
@@ -16998,7 +17188,7 @@ function showSkinDetail(id) {
     <div class="ac-big${n ? '' : ' miss'}"><img src="${skinArt(s, !n)}" alt="${esc(s.name)}"></div>
     <h2>${n ? esc(s.name) : 'Noch nicht gesammelt'} ${rarChip(s.rarity)}</h2>
     <p class="ink2">${n ? esc(s.desc) : 'Diesen Skin gibt es nur in Aircraft Mystery Packs oder im Tausch mit anderen Spielern.'}</p>
-    <div class="small muted">Im Besitz: ${n} · frei: ${Math.max(0, free)}${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'violettes Leuchten mit Partikeln', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
+    <div class="small muted">Im Besitz: ${n} · frei: ${Math.max(0, free)}${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
     ${here.length ? `<div class="stack" style="gap:6px"><b class="small">Aktiv auf</b>${here.map(([, ac]) => `<div class="spread small"><span class="mono">${esc(acName(ac))}</span><button class="btn small" data-sd="off" data-ac="${esc(ac)}">Standardlackierung</button></div>`).join('')}</div>` : ''}
     ${acts.length > here.length ? `<p class="small muted">Außerdem aktiv in ${acts.length - here.length} Flugzeug(en) anderer Spiele.</p>` : ''}
     ${n && free > 0 && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Auf Flugzeug aktivieren</b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id); return `<button class="btn small" data-sd="on" data-ac="${a.id}" ${cur && cur.id === s.id ? 'disabled' : ''}>${esc(acName(a.id))}${cur ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
@@ -17038,23 +17228,40 @@ function showSkinPicker(acId) {
 }
 
 // ---------- Pack öffnen (Ergebnis kommt vom Server, die Animation zeigt es nur) ----------
-const packSvg = () => `<svg viewBox="0 0 200 240" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16244a"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#f5b301"/></linearGradient></defs>
-  <rect x="14" y="20" width="172" height="204" rx="18" fill="url(#pkg)" stroke="url(#pke)" stroke-width="2.5"/><rect x="26" y="32" width="148" height="180" rx="12" fill="none" stroke="#22d3ee" stroke-opacity=".35"/>
-  <path d="M30 70 H170 M30 182 H170" stroke="#22d3ee" stroke-opacity=".5"/><text x="100" y="56" text-anchor="middle" fill="#e6f6ff" font-size="12.5" font-weight="800" letter-spacing="2.2">AIRCRAFT COLLECTION</text>
-  <path d="M100 96 l10 26 l34 12 v8 l-34 -4 l-4 22 l10 8 v6 l-16 -4 l-16 4 v-6 l10 -8 l-4 -22 l-34 4 v-8 l34 -12z" fill="#e6f6ff" opacity=".9"/>
-  <text x="100" y="204" text-anchor="middle" fill="#a5f3fc" font-size="15" font-weight="700" letter-spacing="1">Mystery Pack</text>
-  ${['#22c55e', '#3b82f6', '#a855f7', '#f5b301'].map((c, i) => `<rect x="${44 + i * 30}" y="214" width="22" height="4" rx="2" fill="${c}"/>`).join('')}</svg>`;
+/** 0.21.55: Pack mit Aufreißlasche oben (Perforation, Lasche kippt beim Ziehen), Titel passt immer (textLength), fünf Seltenheitsfarben. */
+const packSvg = () => `<svg viewBox="0 0 220 300" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a2b58"/><stop offset=".55" stop-color="#0f1a3c"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".35" stop-color="#d946ef"/><stop offset=".7" stop-color="#ef4444"/><stop offset="1" stop-color="#f5b301"/></linearGradient><linearGradient id="pks" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26407c"/><stop offset="1" stop-color="#16244a"/></linearGradient></defs>
+  <rect x="10" y="40" width="200" height="252" rx="16" fill="url(#pkg)" stroke="url(#pke)" stroke-width="3"/>
+  <rect x="22" y="52" width="176" height="228" rx="10" fill="none" stroke="#22d3ee" stroke-opacity=".28"/>
+  <text x="110" y="80" text-anchor="middle" fill="#e6f6ff" font-size="13" font-weight="800" textLength="164" lengthAdjust="spacingAndGlyphs">AIRCRAFT COLLECTION</text>
+  <path d="M34 92 H186 M34 238 H186" stroke="#22d3ee" stroke-opacity=".45"/>
+  <circle cx="110" cy="165" r="54" fill="#22d3ee" opacity=".08"/>
+  <path transform="translate(110 165) scale(1.55) translate(-100 -126)" d="M100 96 l10 26 l34 12 v8 l-34 -4 l-4 22 l10 8 v6 l-16 -4 l-16 4 v-6 l10 -8 l-4 -22 l-34 4 v-8 l34 -12z" fill="#e6f6ff" opacity=".92"/>
+  <text x="110" y="263" text-anchor="middle" fill="#a5f3fc" font-size="19" font-weight="800" letter-spacing="1.5">MYSTERY PACK</text>
+  ${['#22c55e', '#3b82f6', '#d946ef', '#ef4444', '#f5b301'].map((c, i) => `<rect x="${43 + i * 28}" y="272" width="22" height="4" rx="2" fill="${c}"/>`).join('')}
+  <g class="pk-strip"><path d="M10 40 V18 Q10 6 22 6 H198 Q210 6 210 18 V40 Z" fill="url(#pks)" stroke="url(#pke)" stroke-width="3"/>
+    ${Array.from({ length: 21 }, (_, i) => `<path d="M${20 + i * 9} 12 V34" stroke="#ffffff" stroke-opacity=".1" stroke-width="1.6"/>`).join('')}
+    <path d="M196 23 l-8 -5 v10 z" fill="#22d3ee" opacity=".8"/></g>
+  <path d="M15 40 H205" stroke="#a5f3fc" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7"/>
+  <path class="pk-rip" d="M15 40 H205" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 let pkAudio = null;
 function goldChime() {
   try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); const t = pkAudio.currentTime;
     [523.25, 659.25, 783.99, 1046.5].forEach((fr, i) => { const o = pkAudio.createOscillator(), g = pkAudio.createGain(); o.type = 'triangle'; o.frequency.value = fr; g.gain.setValueAtTime(0, t + i * 0.12); g.gain.linearRampToValueAtTime(0.12, t + i * 0.12 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.9); o.connect(g).connect(pkAudio.destination); o.start(t + i * 0.12); o.stop(t + i * 0.12 + 1); });
   } catch (e) { /* ohne Ton */ }
 }
+/** Kurzes Reißgeräusch (gefiltertes Rauschen). */
+function ripSound() {
+  try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); const a = pkAudio, t = a.currentTime, n = Math.floor(a.sampleRate * 0.28), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) * (0.6 + 0.4 * Math.sin(i / 90));
+    const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain(); src.buffer = buf; bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.8; g.gain.value = 0.18;
+    src.connect(bp).connect(g).connect(a.destination); src.start(t);
+  } catch (e) { /* ohne Ton */ }
+}
 async function openPack(packId = null) {
   if (!coll.me || !coll.me.packs.length) { toast('Keine ungeöffneten Packs.'); return; }
   const id = packId || coll.me.packs[0].id;
   const ov = packOverlay();
-  ov.innerHTML = `<div class="pk-stage"><div class="pk-box wait">${packSvg()}</div><p class="pk-cap">Verbinde …</p></div>`;
+  ov.className = 'pk-ov'; ov.innerHTML = `${pkBg()}<div class="pk-stage"><div class="pk-box wait">${packSvg()}</div><p class="pk-cap">Pack wird vorbereitet …</p></div>`; pkAc();
   let r;
   try { r = await api('/coll/open', { body: { packId: id }, timeout: 20000 }); }
   catch (e) { ov.innerHTML = `<div class="pk-stage"><p class="pk-cap">${esc(e.message)}</p><button class="btn" data-pk="close">Schließen</button></div>`; return; }
@@ -17070,40 +17277,112 @@ function packOverlay() {
 function onPackOv(e) {
   const b = e.target.closest('[data-pk]'); if (!b) return;
   const k = b.dataset.pk, ov = $('#packOv');
-  if (k === 'close' || k === 'coll') { ov.hidden = true; ov.innerHTML = ''; clearTimeout(ov._t); if (k === 'coll') setTab('collection'); else if (ui.tab === 'collection' || ui.tab === 'shop') renderPane(true); }
+  if (k === 'close' || k === 'coll') { ov.hidden = true; ov.innerHTML = ''; ov.className = 'pk-ov'; clearTimeout(ov._t); clearTimeout(ov._f); if (k === 'coll') setTab('collection'); else if (ui.tab === 'collection' || ui.tab === 'shop') renderPane(true); }
   else if (k === 'next') openPack();
   else if (k === 'skip' && ov._skip) ov._skip();
+  else if (k === 'all' && ov._all) ov._all();
   else if (k === 'more' && ov._more) ov._more();
 }
+// ---------- Klang: Aufladen, Knall, Fanfare je Seltenheit ----------
+const pkAc = () => { try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); if (pkAudio.state === 'suspended') pkAudio.resume(); return pkAudio; } catch (e) { return null; } };
+function pkTone(fr, t0, dur, vol = 0.08, type = 'square') {
+  const a = pkAc(); if (!a) return; const t = a.currentTime + t0, o = a.createOscillator(), o2 = a.createOscillator(), lp = a.createBiquadFilter(), g = a.createGain();
+  o.type = type; o.frequency.value = fr; o2.type = 'triangle'; o2.frequency.value = fr / 2; lp.type = 'lowpass'; lp.frequency.value = 2400;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.015); g.gain.setValueAtTime(vol, t + Math.max(0.02, dur - 0.06)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.25);
+  o.connect(lp); o2.connect(lp); lp.connect(g).connect(a.destination); o.start(t); o2.start(t); o.stop(t + dur + 0.3); o2.stop(t + dur + 0.3);
+}
+function pkRiser(sec) {
+  const a = pkAc(); if (!a) return; const t = a.currentTime, o = a.createOscillator(), lp = a.createBiquadFilter(), g = a.createGain();
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(880, t + sec); lp.type = 'lowpass'; lp.frequency.setValueAtTime(300, t); lp.frequency.exponentialRampToValueAtTime(4000, t + sec);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + sec); g.gain.exponentialRampToValueAtTime(0.0001, t + sec + 0.15);
+  o.connect(lp).connect(g).connect(a.destination); o.start(t); o.stop(t + sec + 0.2);
+}
+function pkBoom() {
+  const a = pkAc(); if (!a) return; const t = a.currentTime, n = Math.floor(a.sampleRate * 0.6), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  const src = a.createBufferSource(), lp = a.createBiquadFilter(), g = a.createGain(); src.buffer = buf; lp.type = 'lowpass'; lp.frequency.value = 900; g.gain.value = 0.35; src.connect(lp).connect(g).connect(a.destination); src.start(t);
+  const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.5); g2.gain.setValueAtTime(0.3, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); o.connect(g2).connect(a.destination); o.start(t); o.stop(t + 0.65);
+}
+/** „Taramtamtam“: je seltener, desto länger und voller. */
+function pkFanfare(rk) {
+  const N = { G4: 392, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, C6: 1046.5 };
+  const tunes = { u: [['G4', 0, 0.12], ['C5', 0.14, 0.3]], r: [['C5', 0, 0.1], ['E5', 0.12, 0.1], ['G5', 0.24, 0.4]],
+    e: [['C5', 0, 0.1], ['E5', 0.12, 0.1], ['G5', 0.24, 0.1], ['C6', 0.36, 0.55]],
+    m: [['G4', 0, 0.09], ['C5', 0.11, 0.09], ['E5', 0.3, 0.16], ['E5', 0.5, 0.16], ['G5', 0.7, 0.18], ['C6', 0.92, 0.7]],
+    l: [['C5', 0, 0.1], ['C5', 0.13, 0.1], ['C5', 0.26, 0.1], ['E5', 0.39, 0.32], ['D5', 0.75, 0.1], ['F5', 0.88, 0.1], ['A5', 1.01, 0.12], ['G5', 1.16, 0.2], ['C6', 1.4, 0.9]] };
+  for (const [n, t, d] of tunes[rk] || tunes.u) pkTone(N[n], t, d, rk === 'u' ? 0.05 : 0.07);
+  if (rk === 'l') setTimeout(goldChime, 1500);
+}
+const RT = { u: 1, r: 1.1, e: 1.25, m: 1.45, l: 1.8 };   // Dauer der Spannung je Seltenheit
+const FLIP = { u: 500, r: 800, e: 1100, m: 1400, l: 1800 };   // Kartenrückseite, bis sie sich dreht
+function pkBg(n = 40) { return `<div class="pk-bg" aria-hidden="true"><div class="pk-bgrays"></div>${Array.from({ length: n }, () => `<i style="left:${(Math.random() * 100).toFixed(1)}%;top:${(Math.random() * 100).toFixed(1)}%;--s:${(1 + Math.random() * 2.5).toFixed(1)}px;--d:${(1 + Math.random() * 2.5).toFixed(2)}s;--w:${(Math.random() * 2).toFixed(2)}s"></i>`).join('')}</div><div class="pk-white" aria-hidden="true"></div>`; }
 function playReveal(ov, pack) {
   const items = pack.res.map((id, i) => ({ s: SK.SKIN_BY_ID[id], fresh: pack.fresh ? pack.fresh[i] : false })).filter((x) => x.s);
   const best = items.reduce((a, x) => (RAR[x.s.rarity].order > RAR[a].order ? x.s.rarity : a), 'u');
-  const gold = best === 'l', T = gold ? 1.6 : 1;
-  const parts = (n) => Array.from({ length: n }, (_, i) => `<i style="--a:${(i * 360 / n + Math.random() * 20).toFixed(0)}deg;--d:${(80 + Math.random() * 160).toFixed(0)}px;--t:${(0.7 + Math.random() * 0.8).toFixed(2)}s"></i>`).join('');
-  ov.innerHTML = `<div class="pk-stage"><button class="btn small ghost pk-skip" data-pk="skip">Überspringen</button>
-    <div class="pk-box">${packSvg()}<span class="pk-lines"></span></div><div class="pk-beam"></div><div class="pk-flash"></div><div class="pk-parts">${parts(gold ? 46 : 28)}</div>${gold ? '<div class="pk-rays"></div>' : ''}
+  const T = RT[best] || 1, reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const parts = (n, multi) => Array.from({ length: n }, (_, i) => `<i style="--a:${(i * 360 / n + Math.random() * 20).toFixed(0)}deg;--d:${(120 + Math.random() * 260).toFixed(0)}px;--t:${(0.9 + Math.random() * 1.1).toFixed(2)}s${multi ? `;background:${DISCO[i % DISCO.length]};box-shadow:0 0 10px ${DISCO[i % DISCO.length]}` : ''}"></i>`).join('');
+  const nParts = { u: 24, r: 40, e: 56, m: 72, l: 96 };
+  ov.innerHTML = `${pkBg()}<button class="btn small pk-skip" data-pk="skip">Überspringen ›</button><div class="pk-stage">
+    <div class="pk-box" role="button" tabindex="0" aria-label="Pack aufreißen">${packSvg()}<span class="pk-lines"></span><span class="pk-seam"></span></div><div class="pk-halo"></div><div class="pk-beam"></div><div class="pk-beam b2"></div><div class="pk-flash"></div>
+    <div class="pk-wave"></div><div class="pk-wave w2"></div><div class="pk-wave w3"></div><div class="pk-parts">${parts(nParts[best], best === 'l')}</div><div class="pk-rays"></div>
+    <div class="pk-hint"><b>Oben aufreißen</b><span class="pk-swipe"></span><span>Lasche zur Seite ziehen – oder antippen</span></div>
     <p class="pk-cap">${items.length > 1 ? `${items.length} Skins in diesem Pack` : 'Aircraft Mystery Pack'}</p></div>`;
-  // Ablauf: abdunkeln → Pack erscheint → schwebt, Lichtlinien → vibriert → Lichtstrahl → öffnet sich (Blitz, Partikel, Seltenheitsfarbe) → Flugzeug
-  const st = ov.querySelector('.pk-stage'), seq = [[60, 'appear'], [900 * T, 'float'], [1900 * T, 'shake'], [2700 * T, 'beam'], [3300 * T, 'open']];
-  let i = 0, idx = 0, done = false;
-  const tick = () => { if (done) return; if (i < seq.length) { st.classList.add(seq[i][1]); if (seq[i][1] === 'open') st.classList.add('rc-' + best); const nx = seq[i + 1] ? seq[i + 1][0] - seq[i][0] : 650 * T; i++; ov._t = setTimeout(tick, nx); } else show(0); };
-  const show = (k) => {
-    done = true; clearTimeout(ov._t); idx = k;
-    const x = items[k], s = x.s, last = k === items.length - 1;
-    if (s.rarity === 'l') goldChime();
-    ov.innerHTML = `<div class="pk-stage reveal rc-${s.rarity}"><div class="pk-flash on"></div>${s.rarity !== 'u' ? `<div class="pk-wave on"></div>${s.rarity !== 'r' ? '<div class="pk-wave on w2"></div>' : ''}` : ''}<div class="pk-parts on">${parts(s.rarity === 'l' ? 46 : s.rarity === 'e' ? 34 : s.rarity === 'r' ? 24 : 14)}</div>${s.rarity === 'l' ? '<div class="pk-rays on"></div>' : ''}
-      <div class="pk-card rar-${s.rarity}"><span class="pk-rar">${RAR[s.rarity].label}${x.fresh ? ' · NEU' : ''}</span><img src="${skinArt(s)}" alt="${esc(s.name)}"><h2>${esc(s.name)}</h2><span class="pk-model">${esc(modelOf(s).name)}</span><p>${esc(s.desc)}</p>
-      <span class="small">${items.length > 1 ? `Skin ${k + 1} von ${items.length}` : ''}</span></div>
+  // Ablauf: Pack erscheint und leuchtet → Spieler reißt die Lasche ab (oder tippt) → Pack lädt sich auf (Beben, Licht aus der Naht, Aufheulen)
+  // → Farben flackern → Lichtsäulen in der Seltenheitsfarbe → Explosion (Blitz über den ganzen Bildschirm, Druckwellen, Funken, Knall) → Karte verdeckt → dreht sich mit Fanfare
+  const st = ov.querySelector('.pk-stage'), box = st.querySelector('.pk-box');
+  const seq = [[0, 'charge'], [900 * T, 'tease'], [1700 * T, 'beam'], [2500 * T, 'open']];
+  let i = 0, idx = 0, done = false, torn = false, drag = null;
+  const tick = () => {
+    if (done) return;
+    if (i < seq.length) { const k = seq[i][1]; st.classList.add(k);
+      if (k === 'charge') pkRiser(2.5 * T);
+      if (k === 'beam') { st.classList.add('rc-' + best); ov.classList.add('rc-' + best); }
+      if (k === 'open') { pkBoom(); ov.classList.add('quake', 'boom'); try { navigator.vibrate && navigator.vibrate([40, 30, 80]); } catch (e) { /* egal */ } }
+      const nx = seq[i + 1] ? seq[i + 1][0] - seq[i][0] : 750 * T; i++; ov._t = setTimeout(tick, nx); }
+    else show(0);
+  };
+  const setT = (v) => box.style.setProperty('--tear', v.toFixed(3));
+  const tear = () => {
+    if (torn || done) return; torn = true; setT(1); box.classList.add('torn'); st.classList.add('torn'); ripSound();
+    try { navigator.vibrate && navigator.vibrate(18); } catch (e) { /* egal */ }
+    ov._t = setTimeout(tick, 500);
+  };
+  const autoTear = () => { if (torn) return; const t0 = performance.now(); const step = (now) => { if (torn || done) return; const v = Math.min(1, (now - t0) / 420); setT(v); if (v < 1) requestAnimationFrame(step); else tear(); }; requestAnimationFrame(step); };
+  box.onpointerdown = (e) => { if (torn) return; pkAc(); drag = { x: e.clientX, w: box.getBoundingClientRect().width, moved: false }; try { box.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } box.classList.remove('snap'); };
+  box.onpointermove = (e) => { if (!drag || torn) return; const dx = Math.abs(e.clientX - drag.x); if (dx > 8) drag.moved = true; const v = Math.min(1, dx / (drag.w * 0.7)); setT(v); if (v >= 1) { drag = null; tear(); } };
+  box.onpointerup = box.onpointercancel = () => { if (!drag || torn) return; const d = drag; drag = null;
+    if (!d.moved) { autoTear(); return; }
+    if ((parseFloat(box.style.getPropertyValue('--tear')) || 0) > 0.55) tear(); else { box.classList.add('snap'); setT(0); } };
+  box.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); autoTear(); } };
+  const show = (k, quick = false) => {
+    done = true; clearTimeout(ov._t); clearTimeout(ov._f); idx = k;
+    const x = items[k], s = x.s, last = k === items.length - 1, rk = s.rarity, fd = quick || reduce ? 0 : FLIP[rk];
+    ov.className = 'pk-ov rc-' + rk;
+    ov.innerHTML = `${pkBg()}${items.length > 1 && !last ? '<button class="btn small pk-skip" data-pk="all">Alle zeigen ›</button>' : ''}<div class="pk-stage reveal rc-${rk}${s.blink ? ' disco' : ''}" style="--fd:${fd}ms">
+      <div class="pk-flash"></div><div class="pk-wave"></div><div class="pk-wave w2"></div><div class="pk-wave w3"></div><div class="pk-parts">${parts(nParts[rk], rk === 'l' || s.blink)}</div><div class="pk-rays"></div>
+      <div class="pk-flip"><div class="pk-inner">
+        <div class="pk-face pk-back rar-${rk}"><span class="pk-q">?</span><span class="pk-backt">AIRCRAFT COLLECTION</span></div>
+        <div class="pk-face pk-front"><div class="pk-card rar-${rk}"><span class="pk-rar">${RAR[rk].label}${x.fresh ? ' · NEU' : ''}</span><img src="${skinArt(s)}" alt="${esc(s.name)}"><h2>${esc(s.name)}</h2><span class="pk-model">${esc(modelOf(s).name)}</span><p>${esc(s.desc)}</p>
+          <span class="small">${items.length > 1 ? `Skin ${k + 1} von ${items.length}` : ''}</span></div></div></div></div>
       <div class="row pk-btns">${last ? `<button class="btn" data-pk="more">Zusammenfassung</button>` : `<button class="btn primary" data-pk="more">Nächster Skin</button>`}</div></div>`;
+    const st2 = ov.querySelector('.pk-stage');
+    const flip = () => { st2.classList.add('flipped', 'burst'); ov.classList.add('boom'); pkFanfare(rk); if (rk === 'm' || rk === 'l') ov.classList.add('quake'); setTimeout(() => ov.classList.remove('quake', 'boom'), 900); };
+    ov.classList.remove('quake', 'boom');
+    if (fd) { st2.classList.add('tease'); ov._f = setTimeout(flip, fd); } else flip();
+    st2.querySelector('.pk-flip').onclick = () => { if (!st2.classList.contains('flipped')) { clearTimeout(ov._f); flip(); } };
   };
   const summary = () => {
-    const left = coll.me ? coll.me.packs.length : 0;
-    ov.innerHTML = `<div class="pk-stage sum"><h2>Erhalten</h2><div class="pk-sum">${items.map((x) => `<div class="pk-mini rar-${x.s.rarity}"><img src="${skinArt(x.s)}" alt=""><b>${esc(x.s.name)}</b><span>${esc(modelOf(x.s).name)}</span>${rarChip(x.s.rarity)}${x.fresh ? '<span class="chip good">neu</span>' : '<span class="chip">Duplikat</span>'}</div>`).join('')}</div>
+    clearTimeout(ov._f); const left = coll.me ? coll.me.packs.length : 0;
+    ov.className = 'pk-ov rc-' + best;
+    ov.innerHTML = `${pkBg()}<div class="pk-stage sum"><h2>Erhalten</h2><div class="pk-sum">${items.map((x) => `<div class="pk-mini rar-${x.s.rarity}"><img src="${skinArt(x.s)}" alt=""><b>${esc(x.s.name)}</b><span>${esc(modelOf(x.s).name)}</span>${rarChip(x.s.rarity)}${x.fresh ? '<span class="chip good">neu</span>' : '<span class="chip">Duplikat</span>'}</div>`).join('')}</div>
       <div class="row pk-btns"><button class="btn" data-pk="coll">Zur Sammlung</button>${left ? `<button class="btn primary" data-pk="next">Nächstes Pack öffnen (${left})</button>` : '<button class="btn" data-pk="close">Schließen</button>'}</div></div>`;
   };
-  ov._skip = () => show(0);
+  ov._skip = () => show(0, true);
+  ov._all = () => summary();
   ov._more = () => { if (idx < items.length - 1) show(idx + 1); else summary(); };
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) show(0); else ov._t = setTimeout(tick, 60);
+  ov.className = 'pk-ov';
+  if (reduce) show(0);
+  else { ov._t = setTimeout(() => { st.classList.add('appear'); ov._t = setTimeout(() => { st.classList.add('float'); try { box.focus({ preventScroll: true }); } catch (e) { /* egal */ } }, 700); }, 40); }
 }
 
 // ---------- Shop ----------
@@ -17114,15 +17393,21 @@ VIEWS.shop = function viewShop() {
   const tokS = (v) => `${Number(v).toLocaleString('de-DE')} Token`;
   const icons = (n) => `<div class="sh-icons">${Array.from({ length: n }, () => '<i></i>').join('')}</div>`;
   let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
-    <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus 280 Lackierungen für 28 Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
+    <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus ${SK.TOTAL} Lackierungen für ${SK.MODELS.length} Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip">${n0(m.packs.length)} ungeöffnete Packs</span>${m.packs.length ? '<button class="btn primary small" data-act="accopen">Pack öffnen</button>' : ''}</div></div></div>`;
   if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten im Menü oben rechts → Aircraft Pack Management. Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
-  html += `<div class="sh-offers">${S.offers.map((o) => `<div class="sh-offer ${o.key}"><span class="chip">Startangebot</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
+  const q = ui.shQty = Math.max(1, Math.min(50, ui.shQty || 1));
+  html += `<div class="sh-offers">${S.offers.map((o) => o.perPack
+    ? `<div class="sh-offer ${o.key}"><span class="chip">frei wählbar</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(Math.min(q, 10))}
+      <div class="sh-qty"><button class="btn small" data-act="shqty" data-v="-1" ${q <= 1 ? 'disabled' : ''} aria-label="Ein Pack weniger">−</button><b class="sh-n">${q} ${q === 1 ? 'PACK' : 'PACKS'}</b><button class="btn small" data-act="shqty" data-v="1" ${q >= (o.max || 50) ? 'disabled' : ''} aria-label="Ein Pack mehr">+</button></div>
+      <span class="sh-price">${tokS(q * Number(o.price))}</span><span class="small">${String(o.price).replace('.', ',')} Token pro Pack</span>
+      <button class="btn primary" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${q} ${q === 1 ? 'Pack' : 'Packs'} anfragen</button></div>`
+    : `<div class="sh-offer ${o.key}"><span class="chip">Paket</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
       <span class="sh-price">${tokS(o.price)}</span><span class="small">${String(Number(o.price) / o.packs).replace('.', ',')} Token pro Pack</span>
       <button class="btn ${o.key === 'collector' ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${o.packs} Packs anfragen</button></div>`).join('')}</div>
     <p class="small" style="position:relative;color:#c3cde0">So läuft es ab: Sie fragen ein Angebot an. Die Spielleitung prüft die Anfrage und gibt die Packs frei – danach liegen sie in Ihrem Inventar. ${esc(S.payInfo || '')}</p>`;
   { const R = ui.shReqs || [], ST = { open: 'wartet auf Freigabe', approved: 'freigegeben', declined: 'abgelehnt', cancelled: 'zurückgezogen' };
-    if (R.length) html += `<div class="card pad stack"><h3>Ihre Anfragen</h3>${R.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${new Date(q.created).toLocaleDateString('de-DE')} · ${q.packs} Packs · ${tokS(q.amount)}</span><span><span class="chip ${q.status === 'approved' ? 'good' : q.status === 'open' ? 'warn' : ''}">${ST[q.status] || esc(q.status)}</span>${q.note ? ` <span class="muted">${esc(q.note)}</span>` : ''}${q.status === 'open' ? ` <button class="btn small" data-act="shcancel" data-id="${esc(q.id)}">Zurückziehen</button>` : ''}</span></div>`).join('')}
+    if (R.length) html += `<div class="card pad stack"><h3>Ihre Anfragen</h3>${R.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${new Date(q.created).toLocaleDateString('de-DE')} · ${q.packs} ${q.packs === 1 ? 'Pack' : 'Packs'} · ${tokS(q.amount)}</span><span><span class="chip ${q.status === 'approved' ? 'good' : q.status === 'open' ? 'warn' : ''}">${ST[q.status] || esc(q.status)}</span>${q.note ? ` <span class="muted">${esc(q.note)}</span>` : ''}${q.status === 'open' ? ` <button class="btn small" data-act="shcancel" data-id="${esc(q.id)}">Zurückziehen</button>` : ''}</span></div>`).join('')}
       </div>`; }
   const cnt = S.odds.count.map(([n, w]) => `<tr><td>${n} Skin${n > 1 ? 's' : ''}</td><td class="r">${w} %</td></tr>`).join('');
   const rar = S.odds.rarity.map(([k, w]) => `<tr><td>${rarChip(k)}</td><td class="r">${w} %</td><td class="r small muted">${SK.MODELS.length * RAR[k].perModel} Skins</td></tr>`).join('');
@@ -17133,16 +17418,17 @@ VIEWS.shop = function viewShop() {
 };
 function showBuy(key) {
   const S = coll.shop, o = S && S.offers.find((x) => x.key === key); if (!o) return;
-  const md = modal(`<h1>${esc(o.label)}: ${o.packs} Aircraft Mystery Packs</h1>
-    <p><b>${Number(o.price).toLocaleString('de-DE')} Token</b></p>
-    <p class="small ink2">Sie senden eine Anfrage an die Spielleitung. Sobald sie freigegeben ist, liegen die ${o.packs} Packs in Ihrem Inventar. ${esc(S.payInfo || '')} Jedes Pack enthält 1 bis 3 zufällige, rein kosmetische Skins (Wahrscheinlichkeiten stehen im Shop).</p>
+  const n = o.perPack ? ui.shQty || 1 : o.packs, price = o.perPack ? n * Number(o.price) : Number(o.price);
+  const md = modal(`<h1>${n} Aircraft Mystery ${n === 1 ? 'Pack' : 'Packs'}${o.perPack ? '' : ` (${esc(o.label)})`}</h1>
+    <p><b>${price.toLocaleString('de-DE')} Token</b></p>
+    <p class="small ink2">Sie senden eine Anfrage an die Spielleitung. Sobald sie freigegeben ist, ${n === 1 ? 'liegt das Pack' : `liegen die ${n} Packs`} in Ihrem Inventar. ${esc(S.payInfo || '')} Jedes Pack enthält 1 bis 3 zufällige, rein kosmetische Skins (Wahrscheinlichkeiten stehen im Shop).</p>
     <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" data-b="no">Abbrechen</button><button class="btn primary" data-b="go">Anfrage senden</button></div>`, false);
   md.onclick = async (e) => {
     const b = e.target.closest('[data-b]'); if (!b) return;
     if (b.dataset.b === 'no' || b.dataset.b === 'ok') { md.hidden = true; return; }
     b.disabled = true;
     try {
-      const r = await api('/shop/request', { body: { offer: key }, timeout: 25000 });
+      const r = await api('/shop/request', { body: { offer: key, count: n }, timeout: 25000 });
       ui.shReqs = null;
       md.innerHTML = `<div class="dialog" role="dialog" aria-modal="true"><h1>Anfrage ${esc(r.request.id)} gesendet</h1><p>Ihre Anfragenummer: <b class="mono">${esc(r.request.id)}</b></p><p class="small ink2">Die ${r.request.packs} Packs erscheinen in Ihrem Inventar, sobald die Spielleitung die Anfrage freigegeben hat. ${esc(r.payInfo || '')}</p><div class="row" style="justify-content:flex-end"><button class="btn primary" data-b="ok">OK</button></div></div>`;
       if (ui.tab === 'shop') renderPane(true);
@@ -17208,6 +17494,7 @@ function collPaneClick(act, b) {
     case 'acdetail': showSkinDetail(b.dataset.id); return true;
     case 'skinpick': if (!coll.me) { loadColl(true).then(() => showSkinPicker(b.dataset.id)); } else showSkinPicker(b.dataset.id); return true;
     case 'shbuy': showBuy(b.dataset.v); return true;
+    case 'shqty': ui.shQty = Math.max(1, Math.min(50, (ui.shQty || 1) + Number(b.dataset.v))); renderPane(true); return true;
     case 'shcancel': api(`/shop/request/${encodeURIComponent(b.dataset.id)}/cancel`, { body: {} }).then(() => { ui.shReqs = null; renderPane(true); }).catch((e) => toast(e.message)); return true;
     case 'trsearch': trSearch(); return true;
     case 'trpick': trPick(b.dataset.v); return true;
@@ -17226,7 +17513,7 @@ async function showPackAdmin() {
   const S = d.stats, tokC = (c) => `${(c / 100).toLocaleString('de-DE')} Token`, tf = (t) => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
   const tiles = [['Packs aus Anfragen', n0(S.paidPacks), `${n0(S.orders)} freigegebene Anfragen`], ['Kostenlose Admin-Packs', n0(S.adminPacks), 'getrennt gezählt'], ['Geöffnete Packs', n0(S.opened), `${n0(S.unopened)} noch zu`], ['Gezogene Skins', n0(S.skinsOut), `${n0(S.uniqAll)} verschiedene im Umlauf`],
     ['Token (Anfragen)', tokC(S.revenueCents), 'nur freigegebene Anfragen'], ['Tauschvorgänge', n0(S.trades), `${n0(S.collectors)} Sammler`],
-    ['Seltenheiten', SK.RARITY_ORDER.map((k) => `${S.rarity[k] || 0}`).join(' / '), 'grün / blau / lila / gold']];
+    ['Seltenheiten', SK.RARITY_ORDER.map((k) => `${S.rarity[k] || 0}`).join(' / '), SK.RARITY_ORDER.map((k) => RAR[k].colorName.toLowerCase()).join(' / ')]];
   m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Aircraft Pack Management</h1><button class="btn small" data-pa="close">Schließen</button></div>
     <div class="tiles">${tiles.map(([k, v, s]) => `<div class="tile"><span>${esc(k)}</span><b>${v}</b><em>${esc(s)}</em></div>`).join('')}</div>
     <section class="card pad stack"><h3>Pack-Anfragen für alle Spieler</h3>
@@ -17235,7 +17522,7 @@ async function showPackAdmin() {
       <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ${d.shop.enabled ? '' : 'primary'}" data-pa="shop" data-on="${d.shop.enabled ? '' : '1'}">${d.shop.enabled ? 'Anfragen sperren' : 'Anfragen freischalten'}</button><button class="btn" data-pa="shop" data-on="${d.shop.enabled ? '1' : ''}">Nur Text speichern</button></div></section>
     <section class="card pad stack"><h3>Pack-Anfragen <small class="muted">${d.requests.filter((q) => q.status === 'open').length} offen</small></h3>
       <p class="small muted">Die Freigabe schreibt die Packs sofort gut und lässt sich nicht zurücknehmen.</p>
-      ${d.requests.length ? d.requests.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${tf(q.created)} · <b>${esc(q.userName)}</b> · ${q.packs} Packs · ${Number(q.amount).toLocaleString('de-DE')} Token</span>
+      ${d.requests.length ? d.requests.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${tf(q.created)} · <b>${esc(q.userName)}</b> · ${q.packs} ${q.packs === 1 ? 'Pack' : 'Packs'} · ${Number(q.amount).toLocaleString('de-DE')} Token</span>
         ${q.status === 'open' ? `<span class="row" style="gap:6px"><button class="btn small primary" data-pa="rq" data-k="approve" data-id="${esc(q.id)}">Freigeben</button><button class="btn small" data-pa="rq" data-k="decline" data-id="${esc(q.id)}">Ablehnen</button></span>` : `<span class="chip ${q.status === 'approved' ? 'good' : ''}">${({ approved: 'freigegeben', declined: 'abgelehnt', cancelled: 'zurückgezogen' })[q.status]}${q.by ? ' · ' + esc(q.by) : ''}</span>`}</div>`).join('') : '<p class="small muted">Keine Anfragen.</p>'}</section>
     <section class="card pad stack"><h3>Kostenlose Packs vergeben</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap"><input id="pa-q" type="search" placeholder="Spieler (Name)" style="flex:1;min-width:160px"><button class="btn small" data-pa="find">Suchen</button></div>
@@ -17269,12 +17556,19 @@ async function showPackAdmin() {
 
 // ---------- Karte: Skin-Effekte für das Flugzeug-Canvas ----------
 /** Farbe und Effekt eines Skins auf der Karte (nur Darstellung). */
-function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#f5b301' : s.pal.tail, edge: s.rarity === 'l' ? '#5a3d00' : s.pal.line, fx: s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? (s.pal.accent || '#a855f7') : null } : null; }
+function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#f5b301' : s.pal.tail, edge: s.rarity === 'l' ? '#5a3d00' : s.pal.line, fx: s.blink ? 'disco' : s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? (s.pal.accent || '#d946ef') : s.rarity === 'm' ? '#ef4444' : null } : null; }
+const DISCO = ['#ff2bd6', '#22e5ff', '#ffe14d', '#7cff4f', '#ff7a1a'];
+/** Disco Fever: Farbe wechselt im Takt (auf der Karte und in Listen). */
+const discoColor = (now) => DISCO[Math.floor(now / 260) % DISCO.length];
 function drawSkinFx(ctx, p, k, now) {
   const st = p.sk; if (!st) return;
   if (st.fx === 'e' && k >= 1) {   // violette Partikel hinter dem Flugzeug (nur nah genug herangezoomt)
     ctx.fillStyle = st.glow;
     for (let i = 1; i <= 3; i++) { const ph = ((now / 600) + i * 0.33) % 1; ctx.globalAlpha = 0.5 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 4 - ph * 4, Math.sin(now / 300 + i) * 1.5, 1.1, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+  if ((st.fx === 'm' || st.fx === 'disco') && k >= 0.9) {   // Funken (rot) bzw. bunte Lichtpunkte (Disco) hinter dem Flugzeug
+    for (let i = 1; i <= 4; i++) { const ph = ((now / 520) + i * 0.25) % 1; ctx.fillStyle = st.fx === 'disco' ? DISCO[(i + Math.floor(now / 260)) % DISCO.length] : (i % 2 ? '#ef4444' : '#ffb21f'); ctx.globalAlpha = 0.7 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.5 - ph * 5, Math.sin(now / 240 + i * 2) * 2, 1.1, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
   }
   if (st.fx === 'l') {   // pulsierender goldener Ring
@@ -17360,7 +17654,7 @@ function boot(hotData) {
   }
   applyOnlineChrome();
   requestAnimationFrame(frame);
-  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
+  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), reveal: (res, quick) => { const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
 }
 if (window.claude?.hot?.ready) window.claude.hot.ready(boot); else boot(window.claude?.hot?.data ?? {});
 })();

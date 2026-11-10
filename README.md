@@ -183,6 +183,14 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.55: Konkrete Vorschläge, Stufe Rot, Pack-Opening neu, einzelne Packs
+
+- **Wettbewerbsaufsicht mit Zahlen:** `w.antitrustPlan(al, apt)` (nur lesend) nennt eigene und fremde Abflüge am Tag, die Grenze in Flügen (unter 60 % oder unter der Prüfschwelle), alle eigenen Strecken dort mit Ergebnis je Tag und welche Frequenzen sinken (schwächster Ertrag je Flug zuerst, 5 % Puffer; erst Frequenzen, dann Strecken schließen). Meldungen, Assistenz-Hinweis und Ablehnung neuer Strecken nennen den Vorschlag, die Stationen-Karte zeigt die Streckenliste (auch knapp unter der Grenze). Aktion `antitrustAdjust {apt}` übernimmt ihn; die KI-Vertretung tut das wöchentlich und baut an solchen Flughäfen keine Frequenzen mehr aus. Bußgeldformel unverändert (`antitrustFine`).
+- **Weitere Hinweise mit Zahlen:** Kreditbetrag bei Dispo/knapper Reichweite (gedeckelt durch das Banklimit), größter Verlustbringer mit Ersparnis pro Monat, Tarif-/Frequenzvorschläge bei vollen und leeren Strecken, Preisabstand bei Unterbietung, Gehaltserhöhung in Prozent bei Stimmung und Marktlohn, Marketingbudget in Euro.
+- **Aircraft Collection – Stufe Rot:** 15 Skins je Modell (5 grün, 4 blau, 3 pink, 2 rot, 1 gold) = 420. Wahrscheinlichkeiten 55/27/13/4/1 %. Je Modell ist einer der roten Skins „Disco Fever“ (Spiegelkacheln blinken per SMIL, auch in Bildern; auf der Karte wechselt die Farbe im Takt). Alle bisherigen 280 Skin-IDs bleiben gültig (Test). Titel-Meilenstein jetzt bei 420.
+- **Pack-Opening:** größeres Pack mit Aufreißlasche – Lasche zur Seite ziehen oder antippen (Tastatur: Enter). Danach Aufladen (Beben, Licht aus der Naht, aufheulender Ton), Farbflackern, Lichtsäulen in der Seltenheitsfarbe, Explosion über den ganzen Bildschirm mit Knall, verdeckte Karte, die sich mit Fanfare dreht (je seltener, desto länger und lauter). „Überspringen“ oben rechts in der Ecke.
+- **Shop:** einzelne Packs mit frei wählbarer Anzahl (1–50, je 0,5 Token) vor den Paketen mit 10 und 20 Packs (`/shop/request {offer: 'single', count}`).
+
 ## Neu in 0.21.54: Sammlung in jedem Spiel, Freischaltung im Spiel, Bereichsleiste
 
 - **Sammlung in jedem Spiel:** Die Aircraft Collection hängt am Konto und gilt in der Hauptwelt, in privaten Online-Spielen und in Offline-Spielen (wenn man angemeldet ist). In Offline-Spielen liegen aktive Skins unter dem Schlüssel `solo`; geprüft werden Modell und freie Exemplare.

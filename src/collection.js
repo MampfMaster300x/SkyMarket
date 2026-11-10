@@ -93,6 +93,39 @@ function skinLivery(s, g) {
     case 'titan': over = belly(cy + h * 0.3) + Array.from({ length: 6 }, (_, i) => `<rect x="${f(x0 + L * (0.15 + i * 0.11))}" y="${f(cy - h * 0.38)}" width="${f(L * 0.09)}" height="${f(h * 0.12)}" fill="${p.stripe}" opacity=".55"/>`).join('') + `<rect x="${f(x0)}" y="${f(top + 1)}" width="${f(L)}" height="${f(h * 0.12)}" fill="#fff" opacity=".3"/>`; break;
     case 'sovereign': over = belly(cy + h * 0.3) + line(cy - h * 0.25, p.stripe, 0.5) + line(cy + h * 0.15, p.stripe, 0.7) + line(cy + h * 0.21, p.stripe, 0.4); fin = `<g${glow}><path d="M${f(xe - L * 0.095)},${f(top - 8)} l1.6,-4 l1.6,2.6 l1.6,-4 l1.6,4 l1.6,-2.6 l1.6,4 Z" fill="${p.stripe}"/></g>`; finFill = `url(#${id}g)`; break;
     case 'diamond': over = belly(cy + h * 0.3) + `<g${glow}>` + Array.from({ length: 7 }, (_, i) => { const x = x0 + L * (0.2 + i * 0.085), y = cy - h * 0.05; return `<path d="M${f(x)},${f(y - 3.5)} l3,3.5 l-3,3.5 l-3,-3.5Z" fill="none" stroke="${p.stripe}" stroke-width=".7"/>`; }).join('') + '</g>'; fin = `<g${glow}><path d="M${f(xe - L * 0.075)},${f(top - 14)} l4,5 l-4,5 l-4,-5Z" fill="${p.stripe}"/></g>`; break;
+    // 0.21.55: Stufe Rot
+    case 'disco': {   // Spiegelkacheln in vier Gruppen, jede Gruppe wechselt im Takt die Farbe (SMIL: läuft auch in <img>)
+      const C = ['#ff2bd6', '#22e5ff', '#ffe14d', '#7cff4f', '#ff7a1a'], grp = [[], [], [], []];
+      for (let y = top + h * 0.08, row = 0; y < cy + h * 0.24; y += h * 0.15, row++) for (let x = x0 + h * 0.9 + (row % 2) * 2.5, col = 0; x < xe - L * 0.1; x += 5.2, col++) grp[Math.floor(rnd() * 4)].push(`<rect x="${f(x)}" y="${f(y)}" width="4.2" height="${f(h * 0.12)}" rx=".6"/>`);
+      over = belly(cy + h * 0.3) + grp.map((g, i) => `<g fill="${C[i]}" opacity=".92"><animate attributeName="fill" values="${[0, 1, 2, 3, 4, 0].map((j) => C[(i + j) % 5]).join(';')}" dur="1.8s" begin="-${(i * 0.45).toFixed(2)}s" calcMode="discrete" repeatCount="indefinite"/>${g.join('')}</g>`).join('')
+        + `<rect x="${f(x0)}" y="${f(top + 1)}" width="${f(L)}" height="${f(h * 0.08)}" fill="#fff" opacity=".25"/>`;
+      const bx = xe - L * 0.085, by = top - 9;
+      defs += `<radialGradient id="${id}d" cx=".35" cy=".35"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#c9d2e3"/><stop offset="1" stop-color="#5b6577"/></radialGradient>`;
+      fin = `<circle cx="${f(bx)}" cy="${f(by)}" r="6" fill="url(#${id}d)"/>` + [-3, 0, 3].map((d) => `<path d="M${f(bx - 6)},${f(by + d)} L${f(bx + 6)},${f(by + d)} M${f(bx + d)},${f(by - 6)} L${f(bx + d)},${f(by + 6)}" stroke="#5b6577" stroke-width=".35"/>`).join('')
+        + C.slice(0, 4).map((c, i) => `<circle cx="${f(bx + [-3.4, 2.6, 3.2, -2][i])}" cy="${f(by + [-2.4, -3.2, 2.2, 3][i])}" r=".9" fill="${c}"><animate attributeName="opacity" values="1;.1;1" dur="${(0.7 + i * 0.2).toFixed(1)}s" repeatCount="indefinite"/></circle>`).join('');
+      break; }
+    case 'flames': {
+      defs += `<linearGradient id="${id}x" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${p.tail}"/><stop offset=".6" stop-color="${p.stripe}"/><stop offset="1" stop-color="${p.tail2}"/></linearGradient>`;
+      const tongue = (base, hi, step, ph) => { let d = `M${f(x0 - 4)},${f(bot + 4)} L${f(x0 - 4)},${f(base)}`; for (let x = x0, i = 0; x < xe; x += step, i++) { const tip = base - hi * (0.45 + 0.55 * Math.abs(Math.sin(i * 1.7 + ph))) * Math.min(1, (x - x0) / (L * 0.25) + 0.2); d += ` Q${f(x + step * 0.2)},${f(tip + hi * 0.25)} ${f(x + step * 0.55)},${f(tip)} Q${f(x + step * 0.7)},${f(base - hi * 0.15)} ${f(x + step)},${f(base)}`; } return `${d} L${f(xe + 4)},${f(bot + 4)}Z`; };
+      over = `<path d="${tongue(cy + h * 0.32, h * 0.75, 11, 0)}" fill="url(#${id}x)"${glow}/><path d="${tongue(cy + h * 0.4, h * 0.42, 8, 1.3)}" fill="${p.accent}" opacity=".75"/>`;
+      fin = `<path d="${tongue(top + 2, 14, 5, 0.6).replace(/^M[^L]*L/, `M${f(xe - L * 0.2)},${f(top + 4)} L`)}" fill="url(#${id}x)" opacity=".9"/>`; break; }
+    case 'scales': {
+      over = belly(cy + h * 0.32); let sc = '';
+      for (let y = top + h * 0.15, row = 0; y < cy + h * 0.3; y += h * 0.13, row++) for (let x = x0 + h * 0.6 + (row % 2) * 3.2; x < xe - L * 0.06; x += 6.4) sc += `M${f(x)},${f(y)} a3.2,3.2 0 0 0 6.4,0 `;
+      over += `<path d="${sc}" fill="none" stroke="${p.stripe}" stroke-width=".55" opacity=".7"/>` + line(cy + h * 0.3, p.stripe, 1.1);
+      for (let i = 0; i < 5; i++) fin += `<path d="M${f(xe - L * 0.15 + i * L * 0.022)},${f(top + 1)} l${f(L * 0.012)},-7 l${f(L * 0.012)},7" fill="${p.tail2}" stroke="${p.stripe}" stroke-width=".4"/>`; break; }
+    case 'comet': {
+      defs += `<linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${p.stripe}" stop-opacity="1"/><stop offset="1" stop-color="${p.tail2}" stop-opacity="0"/></linearGradient>`;
+      const hx = x0 + L * 0.3, hy = cy - h * 0.02;
+      over = belly(cy + h * 0.3) + `<path d="M${f(hx)},${f(hy - h * 0.16)} L${f(xe - L * 0.08)},${f(hy - h * 0.38)} L${f(xe - L * 0.08)},${f(hy + h * 0.18)} L${f(hx)},${f(hy + h * 0.16)}Z" fill="url(#${id}c)"/>`
+        + `<circle cx="${f(hx)}" cy="${f(hy)}" r="${f(h * 0.2)}" fill="${p.stripe}"${glow}/><circle cx="${f(hx - 1)}" cy="${f(hy - 1)}" r="${f(h * 0.08)}" fill="#fff"/>`;
+      for (let i = 0; i < 10; i++) over += `<circle cx="${f(hx + rnd() * L * 0.5)}" cy="${f(hy + (rnd() - 0.5) * h * 0.4)}" r="${f(0.3 + rnd() * 0.5)}" fill="${p.accent}"/>`;
+      fin = `<circle cx="${f(xe - L * 0.08)}" cy="${f(top - 9)}" r="3" fill="${p.stripe}"${glow}/>`; break; }
+    case 'lava': {
+      over = belly(cy + h * 0.32); let cr = '';
+      for (let i = 0; i < 9; i++) { let x = x0 + L * (0.08 + rnd() * 0.8), y = top + rnd() * h * 0.3; cr += `M${f(x)},${f(y)}`; for (let j = 0; j < 4; j++) { x += (rnd() - 0.3) * 9; y += 2 + rnd() * h * 0.18; cr += ` L${f(x)},${f(y)}`; } }
+      over += `<path d="${cr}" fill="none" stroke="${p.stripe}" stroke-width="1.3" stroke-linejoin="round"${glow}/><path d="${cr}" fill="none" stroke="${p.accent}" stroke-width=".45"/>`;
+      fin = `<path d="M${f(xe - L * 0.14)},${f(top)} L${f(xe - L * 0.1)},${f(top - 8)} L${f(xe - L * 0.07)},${f(top - 5)} L${f(xe - L * 0.05)},${f(finTop + 4)}" fill="none" stroke="${p.stripe}" stroke-width="1.2"${glow}/>`; break; }
     default: over = belly();
   }
   if (s.gold) over += `<rect x="${f(x0)}" y="${f(top - 2)}" width="${f(L)}" height="${f(h + 4)}" fill="url(#${id}s)" class="sk-shine"/>`;
@@ -133,7 +166,7 @@ VIEWS.collection = function viewCollection() {
       <div class="ac-tile"><span>Ungeöffnete Packs</span><b>${n0(m.packs.length)}</b></div><div class="ac-tile"><span>Geöffnet</span><b>${n0(m.openedTotal)}</b></div></div>
     <div class="ac-ms">${SK.MILESTONES.map((x) => `<div class="ac-msi${hasMs(x.key) ? ' on' : ''}" title="${esc(x.desc)}"><b>${x.n}</b><span>${esc(x.label)}</span></div>`).join('')}</div>`;
   const segs = (key, list) => `<div class="seg wrap">${list.map(([v, l]) => `<button data-act="acf" data-k="${key}" data-v="${v}" aria-pressed="${F[key] === v}">${l}</button>`).join('')}</div>`;
-  html += `<div class="ac-filters">${segs('cat', [['', 'Alle Flugzeuge'], ...CAT_KEYS.map((k) => [k, SK.CATEGORIES[k]])])}${segs('rar', [['', 'Alle Seltenheiten'], ['u', 'Grün'], ['r', 'Blau'], ['e', 'Lila'], ['l', 'Gold']])}${segs('own', [['', 'Alle'], ['have', 'Gesammelt'], ['miss', 'Nicht gesammelt'], ['dup', 'Duplikate']])}</div>`;
+  html += `<div class="ac-filters">${segs('cat', [['', 'Alle Flugzeuge'], ...CAT_KEYS.map((k) => [k, SK.CATEGORIES[k]])])}${segs('rar', [['', 'Alle Seltenheiten'], ...SK.RARITY_ORDER.map((k) => [k, RAR[k].colorName])])}${segs('own', [['', 'Alle'], ['have', 'Gesammelt'], ['miss', 'Nicht gesammelt'], ['dup', 'Duplikate']])}</div>`;
   const keep = (s) => (!F.cat || modelOf(s).cat === F.cat) && (!F.rar || s.rarity === F.rar) && (!F.own || (F.own === 'have' ? m.inv[s.id] > 0 : F.own === 'miss' ? !(m.inv[s.id] > 0) : m.inv[s.id] > 1));
   const models = SK.MODELS.filter((md) => !F.cat || md.cat === F.cat), shownAll = ui.showAll && ui.showAll.acgrid;
   let nModels = 0, more = 0;
@@ -142,7 +175,7 @@ VIEWS.collection = function viewCollection() {
     if (!shownAll && nModels >= 6) { more++; continue; }
     nModels++;
     const have = SK.SKINS.filter((s) => s.model === md.id && m.inv[s.id] > 0).length;
-    html += `<section class="ac-model"><h3>${esc(md.name)} <small>${have} / 10</small></h3><div class="ac-grid">${list.map((s) => skinCard(s)).join('')}</div></section>`;
+    html += `<section class="ac-model"><h3>${esc(md.name)} <small>${have} / ${SK.SKINS.filter((s) => s.model === md.id).length}</small></h3><div class="ac-grid">${list.map((s) => skinCard(s)).join('')}</div></section>`;
   }
   if (more) html += `<div class="row"><button class="btn small" data-act="showall" data-k="acgrid">Weitere ${more} Modelle zeigen</button></div>`;
   if (!nModels) html += '<p class="small muted">Kein Skin passt zu den Filtern.</p>';
@@ -167,7 +200,7 @@ function showSkinDetail(id) {
     <div class="ac-big${n ? '' : ' miss'}"><img src="${skinArt(s, !n)}" alt="${esc(s.name)}"></div>
     <h2>${n ? esc(s.name) : 'Noch nicht gesammelt'} ${rarChip(s.rarity)}</h2>
     <p class="ink2">${n ? esc(s.desc) : 'Diesen Skin gibt es nur in Aircraft Mystery Packs oder im Tausch mit anderen Spielern.'}</p>
-    <div class="small muted">Im Besitz: ${n} · frei: ${Math.max(0, free)}${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'violettes Leuchten mit Partikeln', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
+    <div class="small muted">Im Besitz: ${n} · frei: ${Math.max(0, free)}${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
     ${here.length ? `<div class="stack" style="gap:6px"><b class="small">Aktiv auf</b>${here.map(([, ac]) => `<div class="spread small"><span class="mono">${esc(acName(ac))}</span><button class="btn small" data-sd="off" data-ac="${esc(ac)}">Standardlackierung</button></div>`).join('')}</div>` : ''}
     ${acts.length > here.length ? `<p class="small muted">Außerdem aktiv in ${acts.length - here.length} Flugzeug(en) anderer Spiele.</p>` : ''}
     ${n && free > 0 && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Auf Flugzeug aktivieren</b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id); return `<button class="btn small" data-sd="on" data-ac="${a.id}" ${cur && cur.id === s.id ? 'disabled' : ''}>${esc(acName(a.id))}${cur ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
@@ -207,23 +240,40 @@ function showSkinPicker(acId) {
 }
 
 // ---------- Pack öffnen (Ergebnis kommt vom Server, die Animation zeigt es nur) ----------
-const packSvg = () => `<svg viewBox="0 0 200 240" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16244a"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset=".5" stop-color="#a855f7"/><stop offset="1" stop-color="#f5b301"/></linearGradient></defs>
-  <rect x="14" y="20" width="172" height="204" rx="18" fill="url(#pkg)" stroke="url(#pke)" stroke-width="2.5"/><rect x="26" y="32" width="148" height="180" rx="12" fill="none" stroke="#22d3ee" stroke-opacity=".35"/>
-  <path d="M30 70 H170 M30 182 H170" stroke="#22d3ee" stroke-opacity=".5"/><text x="100" y="56" text-anchor="middle" fill="#e6f6ff" font-size="12.5" font-weight="800" letter-spacing="2.2">AIRCRAFT COLLECTION</text>
-  <path d="M100 96 l10 26 l34 12 v8 l-34 -4 l-4 22 l10 8 v6 l-16 -4 l-16 4 v-6 l10 -8 l-4 -22 l-34 4 v-8 l34 -12z" fill="#e6f6ff" opacity=".9"/>
-  <text x="100" y="204" text-anchor="middle" fill="#a5f3fc" font-size="15" font-weight="700" letter-spacing="1">Mystery Pack</text>
-  ${['#22c55e', '#3b82f6', '#a855f7', '#f5b301'].map((c, i) => `<rect x="${44 + i * 30}" y="214" width="22" height="4" rx="2" fill="${c}"/>`).join('')}</svg>`;
+/** 0.21.55: Pack mit Aufreißlasche oben (Perforation, Lasche kippt beim Ziehen), Titel passt immer (textLength), fünf Seltenheitsfarben. */
+const packSvg = () => `<svg viewBox="0 0 220 300" class="pk-svg" aria-hidden="true"><defs><linearGradient id="pkg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a2b58"/><stop offset=".55" stop-color="#0f1a3c"/><stop offset="1" stop-color="#0a1230"/></linearGradient><linearGradient id="pke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset=".35" stop-color="#d946ef"/><stop offset=".7" stop-color="#ef4444"/><stop offset="1" stop-color="#f5b301"/></linearGradient><linearGradient id="pks" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26407c"/><stop offset="1" stop-color="#16244a"/></linearGradient></defs>
+  <rect x="10" y="40" width="200" height="252" rx="16" fill="url(#pkg)" stroke="url(#pke)" stroke-width="3"/>
+  <rect x="22" y="52" width="176" height="228" rx="10" fill="none" stroke="#22d3ee" stroke-opacity=".28"/>
+  <text x="110" y="80" text-anchor="middle" fill="#e6f6ff" font-size="13" font-weight="800" textLength="164" lengthAdjust="spacingAndGlyphs">AIRCRAFT COLLECTION</text>
+  <path d="M34 92 H186 M34 238 H186" stroke="#22d3ee" stroke-opacity=".45"/>
+  <circle cx="110" cy="165" r="54" fill="#22d3ee" opacity=".08"/>
+  <path transform="translate(110 165) scale(1.55) translate(-100 -126)" d="M100 96 l10 26 l34 12 v8 l-34 -4 l-4 22 l10 8 v6 l-16 -4 l-16 4 v-6 l10 -8 l-4 -22 l-34 4 v-8 l34 -12z" fill="#e6f6ff" opacity=".92"/>
+  <text x="110" y="263" text-anchor="middle" fill="#a5f3fc" font-size="19" font-weight="800" letter-spacing="1.5">MYSTERY PACK</text>
+  ${['#22c55e', '#3b82f6', '#d946ef', '#ef4444', '#f5b301'].map((c, i) => `<rect x="${43 + i * 28}" y="272" width="22" height="4" rx="2" fill="${c}"/>`).join('')}
+  <g class="pk-strip"><path d="M10 40 V18 Q10 6 22 6 H198 Q210 6 210 18 V40 Z" fill="url(#pks)" stroke="url(#pke)" stroke-width="3"/>
+    ${Array.from({ length: 21 }, (_, i) => `<path d="M${20 + i * 9} 12 V34" stroke="#ffffff" stroke-opacity=".1" stroke-width="1.6"/>`).join('')}
+    <path d="M196 23 l-8 -5 v10 z" fill="#22d3ee" opacity=".8"/></g>
+  <path d="M15 40 H205" stroke="#a5f3fc" stroke-width="1.4" stroke-dasharray="4 4" opacity=".7"/>
+  <path class="pk-rip" d="M15 40 H205" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 let pkAudio = null;
 function goldChime() {
   try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); const t = pkAudio.currentTime;
     [523.25, 659.25, 783.99, 1046.5].forEach((fr, i) => { const o = pkAudio.createOscillator(), g = pkAudio.createGain(); o.type = 'triangle'; o.frequency.value = fr; g.gain.setValueAtTime(0, t + i * 0.12); g.gain.linearRampToValueAtTime(0.12, t + i * 0.12 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.9); o.connect(g).connect(pkAudio.destination); o.start(t + i * 0.12); o.stop(t + i * 0.12 + 1); });
   } catch (e) { /* ohne Ton */ }
 }
+/** Kurzes Reißgeräusch (gefiltertes Rauschen). */
+function ripSound() {
+  try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); const a = pkAudio, t = a.currentTime, n = Math.floor(a.sampleRate * 0.28), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) * (0.6 + 0.4 * Math.sin(i / 90));
+    const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain(); src.buffer = buf; bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.8; g.gain.value = 0.18;
+    src.connect(bp).connect(g).connect(a.destination); src.start(t);
+  } catch (e) { /* ohne Ton */ }
+}
 async function openPack(packId = null) {
   if (!coll.me || !coll.me.packs.length) { toast('Keine ungeöffneten Packs.'); return; }
   const id = packId || coll.me.packs[0].id;
   const ov = packOverlay();
-  ov.innerHTML = `<div class="pk-stage"><div class="pk-box wait">${packSvg()}</div><p class="pk-cap">Verbinde …</p></div>`;
+  ov.className = 'pk-ov'; ov.innerHTML = `${pkBg()}<div class="pk-stage"><div class="pk-box wait">${packSvg()}</div><p class="pk-cap">Pack wird vorbereitet …</p></div>`; pkAc();
   let r;
   try { r = await api('/coll/open', { body: { packId: id }, timeout: 20000 }); }
   catch (e) { ov.innerHTML = `<div class="pk-stage"><p class="pk-cap">${esc(e.message)}</p><button class="btn" data-pk="close">Schließen</button></div>`; return; }
@@ -239,40 +289,112 @@ function packOverlay() {
 function onPackOv(e) {
   const b = e.target.closest('[data-pk]'); if (!b) return;
   const k = b.dataset.pk, ov = $('#packOv');
-  if (k === 'close' || k === 'coll') { ov.hidden = true; ov.innerHTML = ''; clearTimeout(ov._t); if (k === 'coll') setTab('collection'); else if (ui.tab === 'collection' || ui.tab === 'shop') renderPane(true); }
+  if (k === 'close' || k === 'coll') { ov.hidden = true; ov.innerHTML = ''; ov.className = 'pk-ov'; clearTimeout(ov._t); clearTimeout(ov._f); if (k === 'coll') setTab('collection'); else if (ui.tab === 'collection' || ui.tab === 'shop') renderPane(true); }
   else if (k === 'next') openPack();
   else if (k === 'skip' && ov._skip) ov._skip();
+  else if (k === 'all' && ov._all) ov._all();
   else if (k === 'more' && ov._more) ov._more();
 }
+// ---------- Klang: Aufladen, Knall, Fanfare je Seltenheit ----------
+const pkAc = () => { try { pkAudio = pkAudio || new (window.AudioContext || window.webkitAudioContext)(); if (pkAudio.state === 'suspended') pkAudio.resume(); return pkAudio; } catch (e) { return null; } };
+function pkTone(fr, t0, dur, vol = 0.08, type = 'square') {
+  const a = pkAc(); if (!a) return; const t = a.currentTime + t0, o = a.createOscillator(), o2 = a.createOscillator(), lp = a.createBiquadFilter(), g = a.createGain();
+  o.type = type; o.frequency.value = fr; o2.type = 'triangle'; o2.frequency.value = fr / 2; lp.type = 'lowpass'; lp.frequency.value = 2400;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.015); g.gain.setValueAtTime(vol, t + Math.max(0.02, dur - 0.06)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.25);
+  o.connect(lp); o2.connect(lp); lp.connect(g).connect(a.destination); o.start(t); o2.start(t); o.stop(t + dur + 0.3); o2.stop(t + dur + 0.3);
+}
+function pkRiser(sec) {
+  const a = pkAc(); if (!a) return; const t = a.currentTime, o = a.createOscillator(), lp = a.createBiquadFilter(), g = a.createGain();
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(880, t + sec); lp.type = 'lowpass'; lp.frequency.setValueAtTime(300, t); lp.frequency.exponentialRampToValueAtTime(4000, t + sec);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + sec); g.gain.exponentialRampToValueAtTime(0.0001, t + sec + 0.15);
+  o.connect(lp).connect(g).connect(a.destination); o.start(t); o.stop(t + sec + 0.2);
+}
+function pkBoom() {
+  const a = pkAc(); if (!a) return; const t = a.currentTime, n = Math.floor(a.sampleRate * 0.6), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+  const src = a.createBufferSource(), lp = a.createBiquadFilter(), g = a.createGain(); src.buffer = buf; lp.type = 'lowpass'; lp.frequency.value = 900; g.gain.value = 0.35; src.connect(lp).connect(g).connect(a.destination); src.start(t);
+  const o = a.createOscillator(), g2 = a.createGain(); o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.5); g2.gain.setValueAtTime(0.3, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); o.connect(g2).connect(a.destination); o.start(t); o.stop(t + 0.65);
+}
+/** „Taramtamtam“: je seltener, desto länger und voller. */
+function pkFanfare(rk) {
+  const N = { G4: 392, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, C6: 1046.5 };
+  const tunes = { u: [['G4', 0, 0.12], ['C5', 0.14, 0.3]], r: [['C5', 0, 0.1], ['E5', 0.12, 0.1], ['G5', 0.24, 0.4]],
+    e: [['C5', 0, 0.1], ['E5', 0.12, 0.1], ['G5', 0.24, 0.1], ['C6', 0.36, 0.55]],
+    m: [['G4', 0, 0.09], ['C5', 0.11, 0.09], ['E5', 0.3, 0.16], ['E5', 0.5, 0.16], ['G5', 0.7, 0.18], ['C6', 0.92, 0.7]],
+    l: [['C5', 0, 0.1], ['C5', 0.13, 0.1], ['C5', 0.26, 0.1], ['E5', 0.39, 0.32], ['D5', 0.75, 0.1], ['F5', 0.88, 0.1], ['A5', 1.01, 0.12], ['G5', 1.16, 0.2], ['C6', 1.4, 0.9]] };
+  for (const [n, t, d] of tunes[rk] || tunes.u) pkTone(N[n], t, d, rk === 'u' ? 0.05 : 0.07);
+  if (rk === 'l') setTimeout(goldChime, 1500);
+}
+const RT = { u: 1, r: 1.1, e: 1.25, m: 1.45, l: 1.8 };   // Dauer der Spannung je Seltenheit
+const FLIP = { u: 500, r: 800, e: 1100, m: 1400, l: 1800 };   // Kartenrückseite, bis sie sich dreht
+function pkBg(n = 40) { return `<div class="pk-bg" aria-hidden="true"><div class="pk-bgrays"></div>${Array.from({ length: n }, () => `<i style="left:${(Math.random() * 100).toFixed(1)}%;top:${(Math.random() * 100).toFixed(1)}%;--s:${(1 + Math.random() * 2.5).toFixed(1)}px;--d:${(1 + Math.random() * 2.5).toFixed(2)}s;--w:${(Math.random() * 2).toFixed(2)}s"></i>`).join('')}</div><div class="pk-white" aria-hidden="true"></div>`; }
 function playReveal(ov, pack) {
   const items = pack.res.map((id, i) => ({ s: SK.SKIN_BY_ID[id], fresh: pack.fresh ? pack.fresh[i] : false })).filter((x) => x.s);
   const best = items.reduce((a, x) => (RAR[x.s.rarity].order > RAR[a].order ? x.s.rarity : a), 'u');
-  const gold = best === 'l', T = gold ? 1.6 : 1;
-  const parts = (n) => Array.from({ length: n }, (_, i) => `<i style="--a:${(i * 360 / n + Math.random() * 20).toFixed(0)}deg;--d:${(80 + Math.random() * 160).toFixed(0)}px;--t:${(0.7 + Math.random() * 0.8).toFixed(2)}s"></i>`).join('');
-  ov.innerHTML = `<div class="pk-stage"><button class="btn small ghost pk-skip" data-pk="skip">Überspringen</button>
-    <div class="pk-box">${packSvg()}<span class="pk-lines"></span></div><div class="pk-beam"></div><div class="pk-flash"></div><div class="pk-parts">${parts(gold ? 46 : 28)}</div>${gold ? '<div class="pk-rays"></div>' : ''}
+  const T = RT[best] || 1, reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const parts = (n, multi) => Array.from({ length: n }, (_, i) => `<i style="--a:${(i * 360 / n + Math.random() * 20).toFixed(0)}deg;--d:${(120 + Math.random() * 260).toFixed(0)}px;--t:${(0.9 + Math.random() * 1.1).toFixed(2)}s${multi ? `;background:${DISCO[i % DISCO.length]};box-shadow:0 0 10px ${DISCO[i % DISCO.length]}` : ''}"></i>`).join('');
+  const nParts = { u: 24, r: 40, e: 56, m: 72, l: 96 };
+  ov.innerHTML = `${pkBg()}<button class="btn small pk-skip" data-pk="skip">Überspringen ›</button><div class="pk-stage">
+    <div class="pk-box" role="button" tabindex="0" aria-label="Pack aufreißen">${packSvg()}<span class="pk-lines"></span><span class="pk-seam"></span></div><div class="pk-halo"></div><div class="pk-beam"></div><div class="pk-beam b2"></div><div class="pk-flash"></div>
+    <div class="pk-wave"></div><div class="pk-wave w2"></div><div class="pk-wave w3"></div><div class="pk-parts">${parts(nParts[best], best === 'l')}</div><div class="pk-rays"></div>
+    <div class="pk-hint"><b>Oben aufreißen</b><span class="pk-swipe"></span><span>Lasche zur Seite ziehen – oder antippen</span></div>
     <p class="pk-cap">${items.length > 1 ? `${items.length} Skins in diesem Pack` : 'Aircraft Mystery Pack'}</p></div>`;
-  // Ablauf: abdunkeln → Pack erscheint → schwebt, Lichtlinien → vibriert → Lichtstrahl → öffnet sich (Blitz, Partikel, Seltenheitsfarbe) → Flugzeug
-  const st = ov.querySelector('.pk-stage'), seq = [[60, 'appear'], [900 * T, 'float'], [1900 * T, 'shake'], [2700 * T, 'beam'], [3300 * T, 'open']];
-  let i = 0, idx = 0, done = false;
-  const tick = () => { if (done) return; if (i < seq.length) { st.classList.add(seq[i][1]); if (seq[i][1] === 'open') st.classList.add('rc-' + best); const nx = seq[i + 1] ? seq[i + 1][0] - seq[i][0] : 650 * T; i++; ov._t = setTimeout(tick, nx); } else show(0); };
-  const show = (k) => {
-    done = true; clearTimeout(ov._t); idx = k;
-    const x = items[k], s = x.s, last = k === items.length - 1;
-    if (s.rarity === 'l') goldChime();
-    ov.innerHTML = `<div class="pk-stage reveal rc-${s.rarity}"><div class="pk-flash on"></div>${s.rarity !== 'u' ? `<div class="pk-wave on"></div>${s.rarity !== 'r' ? '<div class="pk-wave on w2"></div>' : ''}` : ''}<div class="pk-parts on">${parts(s.rarity === 'l' ? 46 : s.rarity === 'e' ? 34 : s.rarity === 'r' ? 24 : 14)}</div>${s.rarity === 'l' ? '<div class="pk-rays on"></div>' : ''}
-      <div class="pk-card rar-${s.rarity}"><span class="pk-rar">${RAR[s.rarity].label}${x.fresh ? ' · NEU' : ''}</span><img src="${skinArt(s)}" alt="${esc(s.name)}"><h2>${esc(s.name)}</h2><span class="pk-model">${esc(modelOf(s).name)}</span><p>${esc(s.desc)}</p>
-      <span class="small">${items.length > 1 ? `Skin ${k + 1} von ${items.length}` : ''}</span></div>
+  // Ablauf: Pack erscheint und leuchtet → Spieler reißt die Lasche ab (oder tippt) → Pack lädt sich auf (Beben, Licht aus der Naht, Aufheulen)
+  // → Farben flackern → Lichtsäulen in der Seltenheitsfarbe → Explosion (Blitz über den ganzen Bildschirm, Druckwellen, Funken, Knall) → Karte verdeckt → dreht sich mit Fanfare
+  const st = ov.querySelector('.pk-stage'), box = st.querySelector('.pk-box');
+  const seq = [[0, 'charge'], [900 * T, 'tease'], [1700 * T, 'beam'], [2500 * T, 'open']];
+  let i = 0, idx = 0, done = false, torn = false, drag = null;
+  const tick = () => {
+    if (done) return;
+    if (i < seq.length) { const k = seq[i][1]; st.classList.add(k);
+      if (k === 'charge') pkRiser(2.5 * T);
+      if (k === 'beam') { st.classList.add('rc-' + best); ov.classList.add('rc-' + best); }
+      if (k === 'open') { pkBoom(); ov.classList.add('quake', 'boom'); try { navigator.vibrate && navigator.vibrate([40, 30, 80]); } catch (e) { /* egal */ } }
+      const nx = seq[i + 1] ? seq[i + 1][0] - seq[i][0] : 750 * T; i++; ov._t = setTimeout(tick, nx); }
+    else show(0);
+  };
+  const setT = (v) => box.style.setProperty('--tear', v.toFixed(3));
+  const tear = () => {
+    if (torn || done) return; torn = true; setT(1); box.classList.add('torn'); st.classList.add('torn'); ripSound();
+    try { navigator.vibrate && navigator.vibrate(18); } catch (e) { /* egal */ }
+    ov._t = setTimeout(tick, 500);
+  };
+  const autoTear = () => { if (torn) return; const t0 = performance.now(); const step = (now) => { if (torn || done) return; const v = Math.min(1, (now - t0) / 420); setT(v); if (v < 1) requestAnimationFrame(step); else tear(); }; requestAnimationFrame(step); };
+  box.onpointerdown = (e) => { if (torn) return; pkAc(); drag = { x: e.clientX, w: box.getBoundingClientRect().width, moved: false }; try { box.setPointerCapture(e.pointerId); } catch (x) { /* egal */ } box.classList.remove('snap'); };
+  box.onpointermove = (e) => { if (!drag || torn) return; const dx = Math.abs(e.clientX - drag.x); if (dx > 8) drag.moved = true; const v = Math.min(1, dx / (drag.w * 0.7)); setT(v); if (v >= 1) { drag = null; tear(); } };
+  box.onpointerup = box.onpointercancel = () => { if (!drag || torn) return; const d = drag; drag = null;
+    if (!d.moved) { autoTear(); return; }
+    if ((parseFloat(box.style.getPropertyValue('--tear')) || 0) > 0.55) tear(); else { box.classList.add('snap'); setT(0); } };
+  box.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); autoTear(); } };
+  const show = (k, quick = false) => {
+    done = true; clearTimeout(ov._t); clearTimeout(ov._f); idx = k;
+    const x = items[k], s = x.s, last = k === items.length - 1, rk = s.rarity, fd = quick || reduce ? 0 : FLIP[rk];
+    ov.className = 'pk-ov rc-' + rk;
+    ov.innerHTML = `${pkBg()}${items.length > 1 && !last ? '<button class="btn small pk-skip" data-pk="all">Alle zeigen ›</button>' : ''}<div class="pk-stage reveal rc-${rk}${s.blink ? ' disco' : ''}" style="--fd:${fd}ms">
+      <div class="pk-flash"></div><div class="pk-wave"></div><div class="pk-wave w2"></div><div class="pk-wave w3"></div><div class="pk-parts">${parts(nParts[rk], rk === 'l' || s.blink)}</div><div class="pk-rays"></div>
+      <div class="pk-flip"><div class="pk-inner">
+        <div class="pk-face pk-back rar-${rk}"><span class="pk-q">?</span><span class="pk-backt">AIRCRAFT COLLECTION</span></div>
+        <div class="pk-face pk-front"><div class="pk-card rar-${rk}"><span class="pk-rar">${RAR[rk].label}${x.fresh ? ' · NEU' : ''}</span><img src="${skinArt(s)}" alt="${esc(s.name)}"><h2>${esc(s.name)}</h2><span class="pk-model">${esc(modelOf(s).name)}</span><p>${esc(s.desc)}</p>
+          <span class="small">${items.length > 1 ? `Skin ${k + 1} von ${items.length}` : ''}</span></div></div></div></div>
       <div class="row pk-btns">${last ? `<button class="btn" data-pk="more">Zusammenfassung</button>` : `<button class="btn primary" data-pk="more">Nächster Skin</button>`}</div></div>`;
+    const st2 = ov.querySelector('.pk-stage');
+    const flip = () => { st2.classList.add('flipped', 'burst'); ov.classList.add('boom'); pkFanfare(rk); if (rk === 'm' || rk === 'l') ov.classList.add('quake'); setTimeout(() => ov.classList.remove('quake', 'boom'), 900); };
+    ov.classList.remove('quake', 'boom');
+    if (fd) { st2.classList.add('tease'); ov._f = setTimeout(flip, fd); } else flip();
+    st2.querySelector('.pk-flip').onclick = () => { if (!st2.classList.contains('flipped')) { clearTimeout(ov._f); flip(); } };
   };
   const summary = () => {
-    const left = coll.me ? coll.me.packs.length : 0;
-    ov.innerHTML = `<div class="pk-stage sum"><h2>Erhalten</h2><div class="pk-sum">${items.map((x) => `<div class="pk-mini rar-${x.s.rarity}"><img src="${skinArt(x.s)}" alt=""><b>${esc(x.s.name)}</b><span>${esc(modelOf(x.s).name)}</span>${rarChip(x.s.rarity)}${x.fresh ? '<span class="chip good">neu</span>' : '<span class="chip">Duplikat</span>'}</div>`).join('')}</div>
+    clearTimeout(ov._f); const left = coll.me ? coll.me.packs.length : 0;
+    ov.className = 'pk-ov rc-' + best;
+    ov.innerHTML = `${pkBg()}<div class="pk-stage sum"><h2>Erhalten</h2><div class="pk-sum">${items.map((x) => `<div class="pk-mini rar-${x.s.rarity}"><img src="${skinArt(x.s)}" alt=""><b>${esc(x.s.name)}</b><span>${esc(modelOf(x.s).name)}</span>${rarChip(x.s.rarity)}${x.fresh ? '<span class="chip good">neu</span>' : '<span class="chip">Duplikat</span>'}</div>`).join('')}</div>
       <div class="row pk-btns"><button class="btn" data-pk="coll">Zur Sammlung</button>${left ? `<button class="btn primary" data-pk="next">Nächstes Pack öffnen (${left})</button>` : '<button class="btn" data-pk="close">Schließen</button>'}</div></div>`;
   };
-  ov._skip = () => show(0);
+  ov._skip = () => show(0, true);
+  ov._all = () => summary();
   ov._more = () => { if (idx < items.length - 1) show(idx + 1); else summary(); };
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) show(0); else ov._t = setTimeout(tick, 60);
+  ov.className = 'pk-ov';
+  if (reduce) show(0);
+  else { ov._t = setTimeout(() => { st.classList.add('appear'); ov._t = setTimeout(() => { st.classList.add('float'); try { box.focus({ preventScroll: true }); } catch (e) { /* egal */ } }, 700); }, 40); }
 }
 
 // ---------- Shop ----------
@@ -283,15 +405,21 @@ VIEWS.shop = function viewShop() {
   const tokS = (v) => `${Number(v).toLocaleString('de-DE')} Token`;
   const icons = (n) => `<div class="sh-icons">${Array.from({ length: n }, () => '<i></i>').join('')}</div>`;
   let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
-    <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus 280 Lackierungen für 28 Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
+    <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus ${SK.TOTAL} Lackierungen für ${SK.MODELS.length} Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip">${n0(m.packs.length)} ungeöffnete Packs</span>${m.packs.length ? '<button class="btn primary small" data-act="accopen">Pack öffnen</button>' : ''}</div></div></div>`;
   if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten im Menü oben rechts → Aircraft Pack Management. Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
-  html += `<div class="sh-offers">${S.offers.map((o) => `<div class="sh-offer ${o.key}"><span class="chip">Startangebot</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
+  const q = ui.shQty = Math.max(1, Math.min(50, ui.shQty || 1));
+  html += `<div class="sh-offers">${S.offers.map((o) => o.perPack
+    ? `<div class="sh-offer ${o.key}"><span class="chip">frei wählbar</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(Math.min(q, 10))}
+      <div class="sh-qty"><button class="btn small" data-act="shqty" data-v="-1" ${q <= 1 ? 'disabled' : ''} aria-label="Ein Pack weniger">−</button><b class="sh-n">${q} ${q === 1 ? 'PACK' : 'PACKS'}</b><button class="btn small" data-act="shqty" data-v="1" ${q >= (o.max || 50) ? 'disabled' : ''} aria-label="Ein Pack mehr">+</button></div>
+      <span class="sh-price">${tokS(q * Number(o.price))}</span><span class="small">${String(o.price).replace('.', ',')} Token pro Pack</span>
+      <button class="btn primary" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${q} ${q === 1 ? 'Pack' : 'Packs'} anfragen</button></div>`
+    : `<div class="sh-offer ${o.key}"><span class="chip">Paket</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
       <span class="sh-price">${tokS(o.price)}</span><span class="small">${String(Number(o.price) / o.packs).replace('.', ',')} Token pro Pack</span>
       <button class="btn ${o.key === 'collector' ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${o.packs} Packs anfragen</button></div>`).join('')}</div>
     <p class="small" style="position:relative;color:#c3cde0">So läuft es ab: Sie fragen ein Angebot an. Die Spielleitung prüft die Anfrage und gibt die Packs frei – danach liegen sie in Ihrem Inventar. ${esc(S.payInfo || '')}</p>`;
   { const R = ui.shReqs || [], ST = { open: 'wartet auf Freigabe', approved: 'freigegeben', declined: 'abgelehnt', cancelled: 'zurückgezogen' };
-    if (R.length) html += `<div class="card pad stack"><h3>Ihre Anfragen</h3>${R.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${new Date(q.created).toLocaleDateString('de-DE')} · ${q.packs} Packs · ${tokS(q.amount)}</span><span><span class="chip ${q.status === 'approved' ? 'good' : q.status === 'open' ? 'warn' : ''}">${ST[q.status] || esc(q.status)}</span>${q.note ? ` <span class="muted">${esc(q.note)}</span>` : ''}${q.status === 'open' ? ` <button class="btn small" data-act="shcancel" data-id="${esc(q.id)}">Zurückziehen</button>` : ''}</span></div>`).join('')}
+    if (R.length) html += `<div class="card pad stack"><h3>Ihre Anfragen</h3>${R.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${new Date(q.created).toLocaleDateString('de-DE')} · ${q.packs} ${q.packs === 1 ? 'Pack' : 'Packs'} · ${tokS(q.amount)}</span><span><span class="chip ${q.status === 'approved' ? 'good' : q.status === 'open' ? 'warn' : ''}">${ST[q.status] || esc(q.status)}</span>${q.note ? ` <span class="muted">${esc(q.note)}</span>` : ''}${q.status === 'open' ? ` <button class="btn small" data-act="shcancel" data-id="${esc(q.id)}">Zurückziehen</button>` : ''}</span></div>`).join('')}
       </div>`; }
   const cnt = S.odds.count.map(([n, w]) => `<tr><td>${n} Skin${n > 1 ? 's' : ''}</td><td class="r">${w} %</td></tr>`).join('');
   const rar = S.odds.rarity.map(([k, w]) => `<tr><td>${rarChip(k)}</td><td class="r">${w} %</td><td class="r small muted">${SK.MODELS.length * RAR[k].perModel} Skins</td></tr>`).join('');
@@ -302,16 +430,17 @@ VIEWS.shop = function viewShop() {
 };
 function showBuy(key) {
   const S = coll.shop, o = S && S.offers.find((x) => x.key === key); if (!o) return;
-  const md = modal(`<h1>${esc(o.label)}: ${o.packs} Aircraft Mystery Packs</h1>
-    <p><b>${Number(o.price).toLocaleString('de-DE')} Token</b></p>
-    <p class="small ink2">Sie senden eine Anfrage an die Spielleitung. Sobald sie freigegeben ist, liegen die ${o.packs} Packs in Ihrem Inventar. ${esc(S.payInfo || '')} Jedes Pack enthält 1 bis 3 zufällige, rein kosmetische Skins (Wahrscheinlichkeiten stehen im Shop).</p>
+  const n = o.perPack ? ui.shQty || 1 : o.packs, price = o.perPack ? n * Number(o.price) : Number(o.price);
+  const md = modal(`<h1>${n} Aircraft Mystery ${n === 1 ? 'Pack' : 'Packs'}${o.perPack ? '' : ` (${esc(o.label)})`}</h1>
+    <p><b>${price.toLocaleString('de-DE')} Token</b></p>
+    <p class="small ink2">Sie senden eine Anfrage an die Spielleitung. Sobald sie freigegeben ist, ${n === 1 ? 'liegt das Pack' : `liegen die ${n} Packs`} in Ihrem Inventar. ${esc(S.payInfo || '')} Jedes Pack enthält 1 bis 3 zufällige, rein kosmetische Skins (Wahrscheinlichkeiten stehen im Shop).</p>
     <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" data-b="no">Abbrechen</button><button class="btn primary" data-b="go">Anfrage senden</button></div>`, false);
   md.onclick = async (e) => {
     const b = e.target.closest('[data-b]'); if (!b) return;
     if (b.dataset.b === 'no' || b.dataset.b === 'ok') { md.hidden = true; return; }
     b.disabled = true;
     try {
-      const r = await api('/shop/request', { body: { offer: key }, timeout: 25000 });
+      const r = await api('/shop/request', { body: { offer: key, count: n }, timeout: 25000 });
       ui.shReqs = null;
       md.innerHTML = `<div class="dialog" role="dialog" aria-modal="true"><h1>Anfrage ${esc(r.request.id)} gesendet</h1><p>Ihre Anfragenummer: <b class="mono">${esc(r.request.id)}</b></p><p class="small ink2">Die ${r.request.packs} Packs erscheinen in Ihrem Inventar, sobald die Spielleitung die Anfrage freigegeben hat. ${esc(r.payInfo || '')}</p><div class="row" style="justify-content:flex-end"><button class="btn primary" data-b="ok">OK</button></div></div>`;
       if (ui.tab === 'shop') renderPane(true);
@@ -377,6 +506,7 @@ function collPaneClick(act, b) {
     case 'acdetail': showSkinDetail(b.dataset.id); return true;
     case 'skinpick': if (!coll.me) { loadColl(true).then(() => showSkinPicker(b.dataset.id)); } else showSkinPicker(b.dataset.id); return true;
     case 'shbuy': showBuy(b.dataset.v); return true;
+    case 'shqty': ui.shQty = Math.max(1, Math.min(50, (ui.shQty || 1) + Number(b.dataset.v))); renderPane(true); return true;
     case 'shcancel': api(`/shop/request/${encodeURIComponent(b.dataset.id)}/cancel`, { body: {} }).then(() => { ui.shReqs = null; renderPane(true); }).catch((e) => toast(e.message)); return true;
     case 'trsearch': trSearch(); return true;
     case 'trpick': trPick(b.dataset.v); return true;
@@ -395,7 +525,7 @@ async function showPackAdmin() {
   const S = d.stats, tokC = (c) => `${(c / 100).toLocaleString('de-DE')} Token`, tf = (t) => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
   const tiles = [['Packs aus Anfragen', n0(S.paidPacks), `${n0(S.orders)} freigegebene Anfragen`], ['Kostenlose Admin-Packs', n0(S.adminPacks), 'getrennt gezählt'], ['Geöffnete Packs', n0(S.opened), `${n0(S.unopened)} noch zu`], ['Gezogene Skins', n0(S.skinsOut), `${n0(S.uniqAll)} verschiedene im Umlauf`],
     ['Token (Anfragen)', tokC(S.revenueCents), 'nur freigegebene Anfragen'], ['Tauschvorgänge', n0(S.trades), `${n0(S.collectors)} Sammler`],
-    ['Seltenheiten', SK.RARITY_ORDER.map((k) => `${S.rarity[k] || 0}`).join(' / '), 'grün / blau / lila / gold']];
+    ['Seltenheiten', SK.RARITY_ORDER.map((k) => `${S.rarity[k] || 0}`).join(' / '), SK.RARITY_ORDER.map((k) => RAR[k].colorName.toLowerCase()).join(' / ')]];
   m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Aircraft Pack Management</h1><button class="btn small" data-pa="close">Schließen</button></div>
     <div class="tiles">${tiles.map(([k, v, s]) => `<div class="tile"><span>${esc(k)}</span><b>${v}</b><em>${esc(s)}</em></div>`).join('')}</div>
     <section class="card pad stack"><h3>Pack-Anfragen für alle Spieler</h3>
@@ -404,7 +534,7 @@ async function showPackAdmin() {
       <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ${d.shop.enabled ? '' : 'primary'}" data-pa="shop" data-on="${d.shop.enabled ? '' : '1'}">${d.shop.enabled ? 'Anfragen sperren' : 'Anfragen freischalten'}</button><button class="btn" data-pa="shop" data-on="${d.shop.enabled ? '1' : ''}">Nur Text speichern</button></div></section>
     <section class="card pad stack"><h3>Pack-Anfragen <small class="muted">${d.requests.filter((q) => q.status === 'open').length} offen</small></h3>
       <p class="small muted">Die Freigabe schreibt die Packs sofort gut und lässt sich nicht zurücknehmen.</p>
-      ${d.requests.length ? d.requests.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${tf(q.created)} · <b>${esc(q.userName)}</b> · ${q.packs} Packs · ${Number(q.amount).toLocaleString('de-DE')} Token</span>
+      ${d.requests.length ? d.requests.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${tf(q.created)} · <b>${esc(q.userName)}</b> · ${q.packs} ${q.packs === 1 ? 'Pack' : 'Packs'} · ${Number(q.amount).toLocaleString('de-DE')} Token</span>
         ${q.status === 'open' ? `<span class="row" style="gap:6px"><button class="btn small primary" data-pa="rq" data-k="approve" data-id="${esc(q.id)}">Freigeben</button><button class="btn small" data-pa="rq" data-k="decline" data-id="${esc(q.id)}">Ablehnen</button></span>` : `<span class="chip ${q.status === 'approved' ? 'good' : ''}">${({ approved: 'freigegeben', declined: 'abgelehnt', cancelled: 'zurückgezogen' })[q.status]}${q.by ? ' · ' + esc(q.by) : ''}</span>`}</div>`).join('') : '<p class="small muted">Keine Anfragen.</p>'}</section>
     <section class="card pad stack"><h3>Kostenlose Packs vergeben</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap"><input id="pa-q" type="search" placeholder="Spieler (Name)" style="flex:1;min-width:160px"><button class="btn small" data-pa="find">Suchen</button></div>
@@ -438,12 +568,19 @@ async function showPackAdmin() {
 
 // ---------- Karte: Skin-Effekte für das Flugzeug-Canvas ----------
 /** Farbe und Effekt eines Skins auf der Karte (nur Darstellung). */
-function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#f5b301' : s.pal.tail, edge: s.rarity === 'l' ? '#5a3d00' : s.pal.line, fx: s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? (s.pal.accent || '#a855f7') : null } : null; }
+function skinMapStyle(s) { return s ? { fill: s.rarity === 'l' ? '#f5b301' : s.pal.tail, edge: s.rarity === 'l' ? '#5a3d00' : s.pal.line, fx: s.blink ? 'disco' : s.rarity, glow: s.rarity === 'r' ? '#60a5fa' : s.rarity === 'e' ? (s.pal.accent || '#d946ef') : s.rarity === 'm' ? '#ef4444' : null } : null; }
+const DISCO = ['#ff2bd6', '#22e5ff', '#ffe14d', '#7cff4f', '#ff7a1a'];
+/** Disco Fever: Farbe wechselt im Takt (auf der Karte und in Listen). */
+const discoColor = (now) => DISCO[Math.floor(now / 260) % DISCO.length];
 function drawSkinFx(ctx, p, k, now) {
   const st = p.sk; if (!st) return;
   if (st.fx === 'e' && k >= 1) {   // violette Partikel hinter dem Flugzeug (nur nah genug herangezoomt)
     ctx.fillStyle = st.glow;
     for (let i = 1; i <= 3; i++) { const ph = ((now / 600) + i * 0.33) % 1; ctx.globalAlpha = 0.5 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 4 - ph * 4, Math.sin(now / 300 + i) * 1.5, 1.1, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+  if ((st.fx === 'm' || st.fx === 'disco') && k >= 0.9) {   // Funken (rot) bzw. bunte Lichtpunkte (Disco) hinter dem Flugzeug
+    for (let i = 1; i <= 4; i++) { const ph = ((now / 520) + i * 0.25) % 1; ctx.fillStyle = st.fx === 'disco' ? DISCO[(i + Math.floor(now / 260)) % DISCO.length] : (i % 2 ? '#ef4444' : '#ffb21f'); ctx.globalAlpha = 0.7 * (1 - ph); ctx.beginPath(); ctx.arc(-9 - i * 3.5 - ph * 5, Math.sin(now / 240 + i * 2) * 2, 1.1, 0, Math.PI * 2); ctx.fill(); }
     ctx.globalAlpha = 1;
   }
   if (st.fx === 'l') {   // pulsierender goldener Ring

@@ -22,7 +22,7 @@ async function updateJson(store, key, fn, init = null, tries = 8) {
   }
   throw Object.assign(new Error('Gerade viel Betrieb, bitte noch einmal versuchen.'), { status: 409 });
 }
-const emptyReg = () => ({ v: 1, users: {}, trades: {}, credited: {}, stats: { paidPacks: 0, adminPacks: 0, opened: 0, skinsOut: 0, rarity: { u: 0, r: 0, e: 0, l: 0 }, trades: 0, revenueCents: 0, donationCents: 0, donations: 0, orders: 0 }, seq: 0 });
+const emptyReg = () => ({ v: 1, users: {}, trades: {}, credited: {}, stats: { paidPacks: 0, adminPacks: 0, opened: 0, skinsOut: 0, rarity: { u: 0, r: 0, e: 0, m: 0, l: 0 }, trades: 0, revenueCents: 0, donationCents: 0, donations: 0, orders: 0 }, seq: 0 });
 const userOf = (reg, key, name) => { const u = reg.users[key] || (reg.users[key] = { name: name || key, inv: {}, packs: [], opened: [], active: {}, notes: [], ms: [], openedTotal: 0 }); if (name) u.name = name; return u; };
 const uniqOf = (u) => Object.values(u.inv).filter((n) => n > 0).length;
 const activeCount = (u, skinId) => Object.values(u.active).filter((s) => s === skinId).length;
@@ -105,7 +105,7 @@ export async function handleCollection(req, ctx) {
       if (i < 0 || !u.packs[i]) { result = { none: true }; return undefined; }
       const p = u.packs.splice(i, 1)[0], before = new Set(Object.keys(u.inv).filter((k) => u.inv[k] > 0));
       const res = SKINS.drawPack((n) => randomInt(n));
-      for (const s of res) { u.inv[s] = (u.inv[s] || 0) + 1; reg.stats.rarity[SKINS.SKIN_BY_ID[s].rarity]++; }
+      for (const s of res) { u.inv[s] = (u.inv[s] || 0) + 1; { const rk = SKINS.SKIN_BY_ID[s].rarity; reg.stats.rarity[rk] = (reg.stats.rarity[rk] || 0) + 1; } }
       const done = { id: p.id, src: p.src, at: p.at, op: Date.now(), res, fresh: res.map((s, k) => !before.has(s) && res.indexOf(s) === k) };
       u.opened.unshift(done); if (u.opened.length > HIST_KEEP) u.opened.length = HIST_KEEP;
       u.openedTotal = (u.openedTotal || 0) + 1; reg.stats.opened++; reg.stats.skinsOut += res.length;
@@ -268,7 +268,10 @@ export async function handleCollection(req, ctx) {
     await updateJson(store, KEY.reqs, (list) => {
       list = list || [];
       if (list.filter((x) => x.user === me && x.status === 'open').length >= MAX_OPEN_REQ) { err = `Höchstens ${MAX_OPEN_REQ} offene Anfragen gleichzeitig.`; return undefined; }
-      made = { id: randomUUID().slice(0, 8).toUpperCase(), user: me, userName: user.name, offer: of.key, label: of.label, packs: of.packs, amount: of.price, currency: of.currency, status: 'open', created: Date.now() };
+      // 0.21.55: einzelne Packs – Anzahl 1 bis max, Preis je Pack
+      const n = of.perPack ? Math.max(1, Math.min(of.max || 50, Math.floor(Number(b.count) || 1))) : of.packs;
+      const amount = of.perPack ? String(Math.round(n * Number(of.price) * 100) / 100) : of.price;
+      made = { id: randomUUID().slice(0, 8).toUpperCase(), user: me, userName: user.name, offer: of.key, label: of.perPack ? `${n} ${n === 1 ? 'Pack' : 'Packs'}` : of.label, packs: n, amount, currency: of.currency, status: 'open', created: Date.now() };
       list.push(made); return list.slice(-3000);
     }, [], 8);
     if (err) return fail(409, err);

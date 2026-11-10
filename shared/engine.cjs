@@ -3957,16 +3957,46 @@ const SM = (() => {
           if (al.gateLock && al.gateLock[c]) continue;   // genehmigter Exklusivvertrag: kein Verfahren für die Laufzeit
           if (f < A.minDeps || paxEff(c) < A.minPax || sh < A.share) continue;
           now[c] = { since: prev[c] ? prev[c].since : day, share: Math.round(sh * 100) / 100 };
-          if (!prev[c]) { al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie haben ${Math.round(sh * 100)} % aller Abflüge. Neue Strecken dort sind untersagt; liegt Ihr Anteil in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder.`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Abflüge`, 'warn', al.id); }
+          if (!prev[c]) { const pa = this.antitrustPlan(al, c); al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie haben ${Math.round(sh * 100)} % aller Abflüge (${fmtF(pa.own)} von ${fmtF(pa.total)} am Tag). Neue Strecken dort sind untersagt; liegt Ihr Anteil in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder${pa.fine > 0 ? ` (etwa ${mioTxt(pa.fine)})` : ''}. ${pa.adviceTxt}`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Abflüge`, 'warn', al.id); }
           else if (day - now[c].since >= A.grace) {
-            const rev = al.ledger.months.slice(-12).reduce((x, m) => x + (m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0), 0) / 100 * 12 / Math.max(1, Math.min(12, al.ledger.months.length));
-            const fine = Math.round(A.fine * rev * Math.min(2, sh / A.share) / 1e4) * 1e4;
-            if (fine > 0) { al.ledger.post('one_off', -fine, true, `Bußgeld Wettbewerbsaufsicht › ${aTag(c)}`); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (Anteil ${Math.round(sh * 100)} %). Weniger Abflüge dort oder mehr Konkurrenz beenden das Verfahren.`, 'crit'); }
+            const fine = this.antitrustFine(al, sh);
+            if (fine > 0) { al.ledger.post('one_off', -fine, true, `Bußgeld Wettbewerbsaufsicht › ${aTag(c)}`); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (Anteil ${Math.round(sh * 100)} %). ${this.antitrustPlan(al, c).adviceTxt}`, 'crit'); }
           }
         }
-        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – ${al.gateLock && al.gateLock[c] ? 'der Exklusivvertrag ist genehmigt' : `Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %`}.`, 'good');
+        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – ${al.gateLock && al.gateLock[c] ? 'der Exklusivvertrag ist genehmigt' : (own[al.id] || {})[c] < A.minDeps ? `Sie haben dort weniger als ${A.minDeps} Abflüge am Tag` : `Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %`}.`, 'good');
         al.antitrust = Object.keys(now).length ? now : undefined;
       }
+    }
+    /** Bußgeld je Monat bei einem Anteil sh (0,5 % des Jahresumsatzes, bis zum Doppelten bei hohem Anteil). */
+    antitrustFine(al, sh) {
+      const A = P.ANTITRUST, rev = al.ledger.months.slice(-12).reduce((x, m) => x + (m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0), 0) / 100 * 12 / Math.max(1, Math.min(12, al.ledger.months.length));
+      return Math.round(A.fine * rev * Math.min(2, Math.max(sh, A.share) / A.share) / 1e4) * 1e4;
+    }
+    /** 0.21.55: Konkreter Vorschlag zur Wettbewerbsaufsicht an einem Flughafen: alle eigenen Strecken dort, die Grenze in Flügen am Tag
+     *  und welche Frequenzen sinken müssen (schwächster Ertrag je Flug zuerst, mit 5 % Puffer). Liest nur, ändert nichts. */
+    antitrustPlan(al, c) {
+      const A = P.ANTITRUST, day = this.day, fq = (r) => r.freq * (r.wk ? r.wk / 7 : 1);
+      let total = 0, own = 0; const mine = [], rivals = {};
+      for (const x of this.list) { if (x.status === 'insolvent') continue; for (const r of x.activeRoutes()) { if (r.opened_day > day || (r.base !== c && r.dest !== c)) continue; const q = fq(r); total += q; if (x === al) { own += q; mine.push(r); } else rivals[x.id] = (rivals[x.id] || 0) + q; } }
+      const other = total - own, share = own / Math.max(1, total);
+      const byShare = A.share * other / (1 - A.share), bySize = A.minDeps > byShare, limit = Math.max(byShare, A.minDeps), target = limit * 0.95;
+      const routes = mine.map((r) => { const st = autoRouteStats(al, r); return { id: r.id, base: r.base, dest: r.dest, freq: r.freq, wk: r.wk || 7, perDay: fq(r), dayRes: st.n ? st.db1 / st.n : 0, perFlight: st.n ? st.db1 / st.n / Math.max(0.15, fq(r)) : 0, to: r.freq, close: false }; })
+        .sort((a, b) => a.perFlight - b.perFlight || (a.id < b.id ? -1 : 1));
+      let after = own;
+      if (own >= limit) {
+        // erst Frequenzen senken (täglich geflogene Strecken, min. 1 Flug), dann schwächste Strecken schließen
+        for (let guard = 0; after > target && guard < 400; guard++) {
+          const r = routes.filter((x) => !x.close && x.wk >= 7 && x.to > 1).sort((a, b) => a.perFlight - b.perFlight || (a.id < b.id ? -1 : 1))[0];
+          if (!r) break; r.to--; after -= 1;
+        }
+        for (const r of routes) { if (after <= target) break; if (r.close) continue; after -= r.wk >= 7 ? r.to : r.perDay; r.close = true; }
+      }
+      const cuts = routes.filter((r) => r.close || r.to < r.freq);
+      const afterShare = after / Math.max(1, other + after), fine = this.antitrustFine(al, share);
+      const lockOk = !(al.gateLock && al.gateLock[c]) && !this.lockOwner(c), lock = lockOk ? this.gateLockPrice(c) : 0;
+      const cutTxt = cuts.map((r) => r.close ? `${r.base}–${r.dest} schließen` : `${r.base}–${r.dest} ${r.freq}× → ${r.to}× täglich`).join(', ');
+      const adviceTxt = own < limit ? '' : `Vorschlag: höchstens ${fmtF(Math.ceil(limit) - 1)} eigene Abflüge am Tag (jetzt ${fmtF(own)}) – ${cutTxt || 'Frequenzen senken'} (danach ${bySize ? `${fmtF(after)} Abflüge, unter der Prüfschwelle von ${A.minDeps}` : `${Math.round(afterShare * 100)} %`}).${lock ? ` Alternative: Exklusivvertrag für ${mioTxt(lock)}, dann ${P.GATE_LOCK.years} Jahre kein Verfahren.` : ''}`;
+      return { apt: c, own, total, other, share, limit, bySize, target, after, afterShare, routes, cuts, fine, lock, rivals, adviceTxt, ok: own < limit };
     }
     monthEnd() {
       const m = monthOf(this.day), y = Math.floor(this.day / 365);
@@ -5095,6 +5125,8 @@ const SM = (() => {
     if ((day + off) % 7 === 0) {
       // 0.21.48: Krisenvorschläge übernehmen (Preisautomatik, Frequenz anteilig runter) und nach der Krise zurücknehmen
       for (const e of w.events) if (!e.cancelled && e.start <= day && e.end > day && !(al.crisisDone && al.crisisDone[e.id]) && w.crisisPlan(al, e).length) { const r = act({ type: 'crisisAdjust', event: e.id }); if (r.ok) note(r.msg); }
+      // 0.21.55: Vorschlag zur Wettbewerbsaufsicht übernehmen, bevor Bußgelder fällig werden
+      if (al.antitrust) for (const c of Object.keys(al.antitrust)) { const r = act({ type: 'antitrustAdjust', apt: c }); if (r.ok) note(r.msg); }
       if (al.activeRoutes().some((r) => r.crisis && r.crisis.end <= day)) for (const r of al.activeRoutes().filter((x) => x.crisis && x.crisis.end <= day)) { const res = act({ type: 'crisisRestore', id: r.id }); if (res.ok) note(res.msg); }
       let n = 0; for (const r of al.activeRoutes()) if (!(r.ap > 0) && act({ type: 'autoPrice', id: r.id, on: true, lf: A.targetLf }).ok) n++;
       if (n) note(`Preisautomatik auf ${n} Strecke${n > 1 ? 'n' : ''} eingeschaltet (Ziel ${Math.round(A.targetLf * 100)} % Auslastung).`);
@@ -5124,7 +5156,7 @@ const SM = (() => {
   /** 0.21.48: Ein freies Flugzeug zuerst für eine volle, profitable Strecke desselben Musters an derselben Basis nutzen (+1 Flug täglich). */
   function autopilotMoreFreq(w, al, note) {
     const A = P.AUTOPILOT, day = w.day, idle = autoIdle(w, al); if (!idle.length) return false;
-    const cand = al.activeRoutes().filter((r) => !r.partial && !(r.wk && r.wk < 7) && r.freq < A.maxFreq && day - r.opened_day >= A.closeAfter && idle.some((a) => a.type_id === r.type_id && a.base === r.base))
+    const cand = al.activeRoutes().filter((r) => !r.partial && !(r.wk && r.wk < 7) && r.freq < A.maxFreq && !(al.antitrust && (al.antitrust[r.base] || al.antitrust[r.dest])) && day - r.opened_day >= A.closeAfter && idle.some((a) => a.type_id === r.type_id && a.base === r.base))
       .map((r) => [r, autoRouteStats(al, r)]).filter(([, st]) => st.n >= 21 && st.lf >= A.fullLf && st.db2 > 0).sort((x, y) => y[1].lf - x[1].lf);
     for (const [r, st] of cand) {
       if (!w.slotsOkFor(al, r.base, r.dest, 1) || w.slotCost(al, r.base, r.dest, 1).cost > Math.max(0, al.spendable(w.macro.bank ?? 1) - A.reserve * w.macro.cpi)) continue;
@@ -6701,6 +6733,7 @@ const SM = (() => {
   // ---------------------------------------------------------------------------
   // 0.20: Fairer Handel zwischen Spielenden und Wirtschaftsprüfung zum Jahresende
   // ---------------------------------------------------------------------------
+  const fmtF = (x) => (Math.round(x * 10) / 10).toLocaleString('de-DE');
   const mioTxt = (x) => (Math.abs(x) >= 1e6 ? `${(Math.round(x / 1e5) / 10).toLocaleString('de-DE')} Mio. EUR` : `${Math.round(x / 1000).toLocaleString('de-DE')} Tsd. EUR`);
   /** Marktwert einer Handelsposition aus neutraler Sicht. */
   function tradeItemValue(w, giver, receiver, it) {
@@ -7500,7 +7533,7 @@ const SM = (() => {
       case 'openRoute': {
         const { base, dest } = a, type = a.typeId, wk = a.wk !== undefined && a.wk !== null ? clamp(Math.round(num(a.wk, 7)), 1, 7) : 7, freq = wk < 7 ? 1 : clamp(Math.round(num(a.freq, 1)), 1, 8);
         if (!al.bases.includes(base) || !P.AIRPORTS[dest] || !P.AIRCRAFT_TYPES[type] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
-        { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %).` }; }
+        { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %). ${w.antitrustPlan(al, at).adviceTxt}` }; }
         if (P.AIRCRAFT_TYPES[type].role) return { ok: false, msg: `${P.AIRCRAFT_TYPES[type].label} fliegt keine Linie – ${P.AIRCRAFT_TYPES[type].role === 'cargo' ? 'Frachter' : 'Privatjets'} arbeiten im Charter-Pool (Flotte → Charter).` };
         if (!routeKmOk(base, dest)) return { ok: false, msg: `Unter ${P.MIN_ROUTE_KM} km gibt es keine Linienflüge.` };
         if (!aptOk(base, dest, type)) return { ok: false, msg: aptWhy(base, dest, type) };
@@ -7671,6 +7704,20 @@ const SM = (() => {
         al.crisisDone = { ...(al.crisisDone || {}), [e.id]: day };
         const msg = `Anpassung an „${String(e.short || e.text || '').split(':')[0]}“: ${nAp ? `Preisautomatik auf ${nAp} Strecke${nAp > 1 ? 'n' : ''}` : ''}${nAp && nF ? ', ' : ''}${nF ? `Frequenz gesenkt: ${notes.join(', ')}` : ''}.`;
         al.log(day, msg, 'route'); return { ok: true, msg };
+      }
+      case 'antitrustAdjust': {   // 0.21.55: Vorschlag zur Wettbewerbsaufsicht übernehmen
+        const c = String(a.apt || ''); if (!P.AIRPORTS[c]) return { ok: false, msg: 'Ungültig.' };
+        const pa = w.antitrustPlan(al, c); if (pa.ok || !pa.cuts.length) return { ok: false, msg: 'Nichts anzupassen – Ihr Anteil liegt unter der Grenze.' };
+        const done = [], miss = [];
+        for (const x of pa.cuts) {
+          const r = route(x.id); if (!r) continue;
+          if (x.close) { al.closeRoute(day, r, 'wegen der Wettbewerbsaufsicht eingestellt'); done.push(`${r.base}–${r.dest} geschlossen`); continue; }
+          const old = r.freq, res = applyAction(w, alId, { type: 'editRoute', id: r.id, freq: x.to });
+          if (res.ok && r.freq === x.to) done.push(`${r.base}–${r.dest} ${old}× → ${x.to}×`); else miss.push(`${r.base}–${r.dest}`);
+        }
+        w.operableFreq(al);
+        const now = w.antitrustPlan(al, c), msg = `Wettbewerbsaufsicht ${ap(c).name}: ${done.join(', ')}. Ihr Anteil liegt jetzt bei ${Math.round(now.share * 100)} % (${fmtF(now.own)} von ${fmtF(now.total)} Abflügen am Tag)${miss.length ? `; nicht geändert: ${miss.join(', ')}` : ''}. Das Verfahren endet zum Monatsende, wenn ${now.bySize ? `es bei weniger als ${P.ANTITRUST.minDeps} Abflügen am Tag bleibt` : `der Anteil unter ${Math.round(P.ANTITRUST.share * 100)} % bleibt`}.`;
+        al.log(day, msg, 'route'); return { ok: done.length > 0, msg };
       }
       case 'crisisSkip': { const e = w.events.find((x) => x.id === a.event); if (!e) return { ok: false, msg: 'Ereignis nicht gefunden.' }; al.crisisDone = { ...(al.crisisDone || {}), [e.id]: day }; return { ok: true }; }
       case 'crisisRestore': {   // Frequenzen nach der Krise zurück

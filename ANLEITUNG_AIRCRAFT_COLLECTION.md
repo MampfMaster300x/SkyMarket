@@ -1,6 +1,6 @@
 # Aircraft Collection – Anleitung zur Einrichtung und zum Betrieb
 
-Stand: Version 0.21.54. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
+Stand: Version 0.21.55. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
 
 ## 1. Bestandsaufnahme: So ist es eingebaut
 
@@ -15,7 +15,7 @@ Neue und geänderte Dateien:
 
 | Datei | Inhalt |
 |---|---|
-| `shared/skins.cjs` | Katalog: 28 Modelle, 280 Skins, Seltenheiten, Wahrscheinlichkeiten, Ziehung, Meilensteine, Angebote |
+| `shared/skins.cjs` | Katalog: 28 Modelle, 420 Skins in fünf Stufen, Wahrscheinlichkeiten, Ziehung, Meilensteine, Angebote |
 | `server/collection.mjs` | Alle Server-Funktionen: Inventar, Pack öffnen, Aktivieren, Tausch, Pack-Anfragen, Admin |
 | `src/collection.js` | Oberfläche: Collection, Shop, Trading, Pack-Opening, Skin-Auswahl, Admin-Dialog, Karteneffekte |
 | `server/api.mjs` | Leitet `/coll…` und `/shop…` weiter; `/games/<id>/info` liefert aktive Skins und Abzeichen |
@@ -41,9 +41,9 @@ Speicherorte in Netlify Blobs:
 
 ## 3. Pack-Anfragen freischalten
 
-Das Spiel kennt kein Geld und keine Bezahlung. Die Angebote sind in Token ausgezeichnet (10 Packs für 5 Token, 20 Packs für 10 Token). Token sind nur eine Angabe am Angebot; es gibt kein Token-Guthaben im Spiel. Ob und wofür jemand Packs bekommt, entscheidest du mit der Freigabe.
+Das Spiel kennt kein Geld und keine Bezahlung. Die Angebote sind in Token ausgezeichnet: einzelne Packs (Anzahl 1 bis 50 frei wählbar, je 0,5 Token), 10 Packs für 5 Token, 20 Packs für 10 Token. Token sind nur eine Angabe am Angebot; es gibt kein Token-Guthaben im Spiel. Ob und wofür jemand Packs bekommt, entscheidest du mit der Freigabe.
 
-1. Der Spieler wählt im Shop „10 Packs anfragen“ oder „20 Packs anfragen“ und sendet die Anfrage. Er bekommt eine Anfragenummer.
+1. Der Spieler wählt im Shop eine Anzahl einzelner Packs oder eines der Pakete mit 10 oder 20 Packs und sendet die Anfrage. Er bekommt eine Anfragenummer.
 2. Du öffnest oben rechts das Menü → „Aircraft Pack Management“ und klickst bei der Anfrage auf „Freigeben“ (zweiter Klick bestätigt). Erst dann liegen die Packs im Inventar.
 3. Du kannst Anfragen ablehnen. Der Spieler kann offene Anfragen selbst zurückziehen.
 
@@ -57,7 +57,7 @@ Menü → „Aircraft Pack Management“ → Spieler suchen, Anzahl (1 bis 100) 
 
 ## 5. Eigene Artworks nachliefern
 
-Bis eigene Grafiken da sind, zeichnet das Spiel jede Lackierung selbst auf die Seitenansicht des Modells.
+Bis eigene Grafiken da sind, zeichnet das Spiel jede Lackierung selbst auf die Seitenansicht des Modells. Alle Skin-IDs aus früheren Versionen bleiben gültig; neue Skins kommen nur hinzu.
 
 1. PNG mit transparentem Hintergrund, Seitenansicht, Nase links, Seitenverhältnis 320 : 76 (z. B. 1280 × 304).
 2. Dateiname = Skin-ID, z. B. `airbus_a350_900__royal_phoenix.png`. Die IDs stehen in `shared/skins.cjs` (Modell-ID, zwei Unterstriche, Design).
@@ -80,9 +80,9 @@ Getestet in `npm test` (Abschnitt 0.21.52 der Tests): 200.000 Ziehungen gegen di
 
 | Punkt | Stand |
 |---|---|
-| 28 Modelle, 280 Skins, 4 Seltenheiten | umgesetzt |
+| 28 Modelle, 4 Seltenheiten | erweitert auf 420 Skins und 5 Stufen: je Modell 5 grün, 4 blau, 3 pink, 2 rot (davon „Disco Fever“, blinkt), 1 gold; Wahrscheinlichkeiten 55/27/13/4/1 % |
 | Pack-Verteilung und Wahrscheinlichkeiten, im Shop sichtbar | umgesetzt |
-| Pack-Inventar, Öffnen mit Animation, Seltenheitseffekte, Ton bei Gold | umgesetzt |
+| Pack-Inventar, Öffnen mit Animation, Seltenheitseffekte, Ton | umgesetzt; ab 0.21.55 Pack aufreißen (ziehen oder antippen), längere Inszenierung mit Bildschirmblitz, verdeckter Karte und Fanfare je Seltenheit |
 | Sammlung mit Fortschritt, Filtern, Silhouetten, Duplikaten | umgesetzt |
 | Skins in der Flotte und auf der Karte | umgesetzt |
 | Trading | umgesetzt |
