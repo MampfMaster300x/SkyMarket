@@ -1676,4 +1676,9 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.equal(new Set(w2.humans.map((h) => h.color)).size, 12, 'beim Laden aufgelöst'); assert.equal(w2.airlines.P2.color, 30, 'wer zuerst da war, behält sie');
   console.log('0.21.62 ok: Farben eindeutig und wählbar');
 }
+// 0.21.64: Lobby-IDs eindeutig (doppelte ID ließ den Klick auf die Hauptwelt in der Verwaltung landen)
+{ const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'), ids = [...src.matchAll(/id="(lb[A-Za-z]+)"/g)].map((m) => m[1]), dup = ids.filter((x, i) => ids.indexOf(x) !== i);
+  assert.deepStrictEqual(dup, [], 'doppelte Lobby-IDs: ' + dup.join(', '));
+  for (const id of new Set([...src.matchAll(/\$\('#(lb[A-Za-z]+)'\)\.addEventListener/g)].map((m) => m[1]))) assert.ok(ids.includes(id), 'Handler ohne Element: ' + id);
+  console.log('0.21.64 ok: ' + ids.length + ' Lobby-IDs eindeutig'); }
 console.log('Alle Prüfungen bestanden.');

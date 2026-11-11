@@ -183,6 +183,10 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.64: Hauptwelt lässt sich wieder öffnen
+
+- Fehler aus 0.21.63: Der Admin-Knopf „Hauptwelt verwalten“ hatte dieselbe ID wie die Hauptwelt-Karte (`lbMain`). Der Klickhandler hing an der Karte, sodass jeder Klick darauf – auch „Weiterspielen“ – zusätzlich die Verwaltung öffnete und zur Lobby zurückführte, für alle Spieler. Knopf heißt jetzt `lbMainAdm`; der Smoke-Test prüft, dass Lobby-IDs eindeutig sind und jeder Lobby-Handler ein Element hat.
+
 ## Neu in 0.21.63: Kompakter Shop, Angebote selbst einstellen, Admin-Leiste in der Lobby
 
 - **Shop kleiner:** Angebote als schmale Zeilen (Name, Preis je Pack, Anzahl, Gesamtpreis, Anfragen-Knopf) statt großer Karten; der Pack-Kopf ist deutlich kleiner. Auf dem Handy steht der Knopf unter der Zeile.
