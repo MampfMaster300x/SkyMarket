@@ -183,6 +183,95 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.73: Neues Logo
+
+- **Neues Skymarket-Logo:** das Logo der Nutzerin 1:1 als Bild mit seinem Leuchten. Der dunkle Hintergrund ist durchsichtig gemacht (WebP mit Alpha, einmal im Seitenkopf eingebettet). Es ersetzt den alten Papierflieger im Kopf der Seite, ist das Tab-Symbol und sitzt statt des Flugzeugs in der Mitte des Mystery Packs (`packLogo()` nutzt das Bild aus dem Kopf).
+- **Schnipsel:** Er hebt sich beim Ziehen nach oben ab und dreht sich leicht von der Tüte weg. Danach fliegt er nach oben aus dem Bild und überlappt die Tüte nie.
+- **Pack:**
+  - Die Reißkante der Tüte liegt hinter dem Schnipsel und scheint nicht mehr durch, wenn er davor liegt.
+  - Die Lasche hat unten einen Streifen in Tütenfarbe (gemeinsamer Verlauf, `userSpaceOnUse`). Vor dem Reißen ist deshalb nur die gerade Bandkante zu sehen, die zackige Kante entsteht erst beim Reißen.
+
+## Neu in 0.21.72: Reißkante, kein Rahmen, weiche Bühnenränder
+
+- **Reißen:** Die Kante ist unsauber gezackt, mit kleinen Fasern. Tüte und Schnipsel teilen dieselbe Kante (`PK_TEAR`) und passen genau aufeinander. Vorher ist nichts vorgezeichnet: keine Perforation, keine laufende Linie. Die Kante erscheint erst, wenn der Spalt aufgeht. Der Schnipsel fliegt nach oben weg.
+- **Kein Rahmen mehr beim Hochspringen:** Der leuchtende Balken an der Reißkante (`.pk-seam`) ist entfernt. Der Sprung-Effekt am Pack nutzt einen Schein entlang der Pack-Form statt eines rechteckigen Schattens.
+- **Walkout-Hintergründe:** Die Ränder laufen weich aus (Maske an der Motto-Ebene). Die Goldsäulen bei Golden Emperor sowie die Muster bei Crimson Dragon und Sovereign haben keine harten Kanten mehr.
+
+## Neu in 0.21.71: Sprechblase nur beim SIUUU
+
+- Beim Gold-Jubel erscheint eine Sprechblase nur noch beim SIUUU-Sprung. Alle anderen Jubel und Tänze laufen ohne Text.
+
+## Neu in 0.21.70: Biegsamer Rumpf, mehr Tänze
+
+- **Taille:** Die Gold-Figur besteht aus Unter- und Oberkörper (zwei beschnittene Kopien der Seitenansicht mit Gelenk). Der Oberkörper mit Gesicht und Armen kann sich biegen (`.wk-upper`).
+- **Drei neue Einläufe**, insgesamt acht: Gummi-Gang mit wabbelndem Oberkörper, Laufsteg mit Hüftschwung und zurückgelehnt, Rad schlagend.
+- **Zwölf neue Tänze**, insgesamt 24 Jubel: Dab, Wabbel, Verbeugung, Limbo, Shuffle, Fieber (Zeigefinger hoch und runter), Arm-Choreo (Eeeeh!), Pferdetanz, Welle, Hype, La-la-la-Schwingen und Twist.
+- Einlauf-Posen gelten nur bis zur Ankunft (`:not(.arrived)`). Vorher blieb z. B. nach dem Moonwalk ein Arm oben.
+
+## Neu in 0.21.69: Gold läuft aufrecht und jubelt, Motto-Hintergründe
+
+- **Walkout in Stufen** (`WALK_STEPS`):
+  - Seltenheit knallt herein (0,3 s), dann gleitet die Kategorie ein (1,7 s), der Hersteller wird eingeblendet (3,1 s) und das Modell erscheint groß mit Glanz und Knall (4,5 s).
+  - Danach blendet die Motto-Bühne ein (5,6 s), ab 6,3 s folgt der Auftritt. Die Texte rutschen dabei klein nach oben.
+- **Ohne Karten-Vorlauf:** Bei Rot und Gold startet der Walkout direkt. Die verdeckte Karte erscheint nicht vorher, sondern nach dem Auftritt gleich aufgedeckt.
+- **Gold läuft aufrecht.** Die Seitenansicht ist um 90° gedreht: unten die Nase mit Beinen und Turnschuhen, oben das Heck mit Glubschaugen und Mund, an der Seite Arme mit Handschuhen.
+  - Gebaut als inline-SVG (`walkerSvg`), damit CSS die Glieder bewegen kann. `acSvg` liefert dafür die Maße über `o.geo`.
+- **Fünf Einlaufarten (zufällig):** Watscheln, Moonwalk, Sprint mit Bremsen, Hüpfen, Anschleichen.
+- **Zwölf Torjubel (zufällig), jeweils mit Sprechblase:**
+  - SIUUU-Sprung mit Drehung, Flieger, Knieslide, Salto, Floss, Jubelfaust
+  - Psssst, Baby wiegen, Roboter, Radschlag, Headspin, Bogenschütze
+- **Motto-Hintergründe** (`WALK_THEME`, für alle roten und goldenen Designs):
+  - Inferno: Feuerschein und Funken · Crimson Dragon: Schuppenmuster und Rauch · Ruby Comet: Sterne und Kometen · Volcano: Lava und Asche · Disco: drehende Farbkegel und Lichtpunkte
+  - Royal Phoenix: Feuerhimmel · Golden Emperor: Purpur, Goldsäulen und Münzregen · Imperial: Nachtblau mit Goldsternen · Golden Titan: drehende Goldstrahlen · Sovereign: Samtpurpur und Juwelen · Black Diamond: Dunkel mit Regenbogen-Funkeln
+- Rot fliegt weiter ein, jetzt ebenfalls vor dem Motto-Hintergrund.
+
+## Neu in 0.21.68: Walkout ab Rot
+
+- Nach der Spannungsleiter, bevor die Karte sich dreht: Bühne mit Scheinwerfer, die Seltenheit („MYTHISCH“, „LEGENDÄR“) und das Flugzeugmodell erscheinen nacheinander, dann der Auftritt.
+- **Rot:** Das Flugzeug fliegt von oben rechts mit Kondensstreifen und Vorbeiflug-Rauschen ein, bremst ab, schwebt, dann Funkenregen.
+- **Gold:** Das Flugzeug läuft auf zwei Beinen mit Turnschuhen herein, watschelt mit tapsigen Schritten, hat Glubschaugen am Cockpit (im SVG, also passend zu jedem Modell), springt zweimal und kickt. Danach Konfetti.
+- Ein Tipp überspringt den Walkout; „Überspringen“ und „Bewegung reduzieren“ lassen ihn weg. Disco-Skins blinken auch im Walkout.
+
+## Neu in 0.21.67: Bewegte Lackierungen ab Pink
+
+- **Skin-Bild** (Sammlung, Pack, Shop, Trading): Animationen per SMIL direkt im SVG, laufen deshalb auch als `<img>`.
+  - Cyberpunk: Scan-Strahl und blinkende Neonpunkte
+  - Galaxy und Cosmic: funkelnde Sterne und wandernder Nebelglanz
+  - Neon Pulse: Lichtpuls läuft die Linie entlang
+  - Aurora: Bänder wehen und atmen
+  - Electric Storm: Blitze und Rumpf zucken dauernd hell auf
+  - Inferno: Flammen flackern
+  - Crimson Dragon: Schimmer über den Schuppen
+  - Ruby Comet: Glanz und Funkeln
+  - Volcano: glühende Risse
+  - Royal Phoenix: Flammenflügel wechseln Farbe
+  - Golden Titan: Leisten pulsieren nacheinander
+  - Black Diamond: Diamanten funkeln in Regenbogenfarben
+  - Kronen: Glanzlicht
+  - Alle Gold-Skins glänzen durchgehend: zwei Glanzstreifen und funkelnde Sterne.
+- **Flugzeug auf der Karte** (`MAP_FILL`, ab Pink): Die Füllung bewegt sich passend zum Design.
+  - Inferno flackert in Feuerfarben, Electric Storm blitzt weiß auf, Cyberpunk wechselt Cyan/Magenta, Neon Pulse pulsiert durch die Farben, Aurora wandert durch Grün, Cyan und Violett, Galaxy und Cosmic drehen ihren Farbverlauf.
+  - Gold hat einen durchlaufenden Glanzstreifen (`goldSheen`). Phoenix, Titan und Sovereign haben eigene Goldtöne, Black Diamond ist schwarz mit Regenbogen-Glanz.
+
+## Neu in 0.21.66: Das Pack selbst steigt stufenweise
+
+- Beim Aufreißen startet das Pack grün (kein Farbflackern mehr) und lädt sich auf. Kurz vor dem Platzen springt es eine Stufe höher (Blitz, Druckwelle, steigender Ton, Vibration) und lädt sich erneut auf – bis zur besten Seltenheit im Pack. Erst dann platzt es.
+- Sprünge langsamer: Aufbau je Stufe 1,3 / 1,25 / 1,35 / 1,5 / 1,7 s (`STEP_MS`) – Grün platzt nach 1,3 s, Gold nach rund 7 s Leiter.
+- Einzelpack: Die Karte dreht sich danach direkt in dieser Farbe um (keine zweite Leiter). Packs mit mehreren Skins: Das Pack zeigt die beste Farbe, jede Karte hat weiter ihre eigene Leiter ab Grün.
+- **Eigene Karteneffekte je Design** (`MAP_THEME` in `src/collection.js`, zusätzlich zu Ring/Glanz der Seltenheit):
+  - Rot: Inferno Flammenschweif · Crimson Dragon Feueratem nach vorn und Schuppen · Ruby Comet Kometenschweif mit Rubinfunkeln · Volcano Rauch und Glutregen
+  - Pink: Cyberpunk zwei schwenkende Laser und Glitch-Pixel · Galaxy Sternenspirale und Nebel · Neon Pulse Neonwellen · Aurora Polarlicht-Bänder · Cosmic kreisende Planeten · Electric Storm zuckende Blitze
+  - Gold: Royal Phoenix Feuerflügel und Goldflammen · Golden Emperor Münzregen · Imperial Sternenkranz · Golden Titan Druckwellen und Goldstrahl · Sovereign Juwelen und Banner · Black Diamond dunkler Halo mit Regenbogen-Glanz
+  - Blau dezent: Sternenspur, Geschwindigkeitslinien, kleine Blitze, Luftblasen, Schneeflocken
+  - Die Sammlung nennt den Effekt bei „Karteneffekt“.
+- Vorschau-Schnittstelle `window.skyPackDemo(ids)`, nur aktiv mit `window.SKYMARKET_PACKDEMO = true` (für die separate Vorschau-Seite).
+
+## Neu in 0.21.65: Spannungsleiter beim Pack-Öffnen
+
+- Beim Aufreißen leuchtet das Pack immer grün (vorher schon in der besten Seltenheit des Packs – das hat das Ergebnis verraten). Auch Dauer und Funkenzahl sind jetzt für alle Packs gleich.
+- Jede Karte beginnt grün und lädt sich auf, als würde sie sich gleich drehen. Ist sie seltener, springt sie kurz vorher eine Stufe höher (Lichtblitz, Druckwelle, steigender Ton, Vibration) und lädt sich erneut auf – grün → blau → pink → rot → gold, bis die gezogene Seltenheit erreicht ist; dort dreht sie sich mit Fanfare. Der Disco-Effekt startet erst beim Umdrehen.
+- Dauer je Stufe 0,8 / 0,72 / 0,78 / 0,88 / 0,98 s (`STEP_MS`), also etwa 0,8 s für Grün bis 4,2 s für Gold. „Überspringen“, „Alle zeigen“, ein Tipp auf die Karte und „Bewegung reduzieren“ decken sofort auf.
+
 ## Neu in 0.21.64: Hauptwelt lässt sich wieder öffnen
 
 - Fehler aus 0.21.63: Der Admin-Knopf „Hauptwelt verwalten“ hatte dieselbe ID wie die Hauptwelt-Karte (`lbMain`). Der Klickhandler hing an der Karte, sodass jeder Klick darauf – auch „Weiterspielen“ – zusätzlich die Verwaltung öffnete und zur Lobby zurückführte, für alle Spieler. Knopf heißt jetzt `lbMainAdm`; der Smoke-Test prüft, dass Lobby-IDs eindeutig sind und jeder Lobby-Handler ein Element hat.

@@ -459,13 +459,14 @@ function sstSvg(t, o) {
   const gear = `<line x1="${f(x0 + 44)}" y1="${f(bot)}" x2="${f(x0 + 44)}" y2="${f(bot + 10)}" stroke="var(--gear)" stroke-width="1.2"/><circle cx="${f(x0 + 44)}" cy="${f(bot + 11)}" r="2.4" fill="var(--gear)"/>
     <line x1="${f(x0 + L * 0.6)}" y1="${f(bot + 3)}" x2="${f(x0 + L * 0.6)}" y2="${f(bot + 10)}" stroke="var(--gear)" stroke-width="1.6"/><circle cx="${f(x0 + L * 0.6)}" cy="${f(bot + 11.5)}" r="3" fill="var(--gear)"/>`;
   const label = o.pix ? `<image${o.pixId ? ` id="${o.pixId}"` : ''} href="${o.pix}" x="${f(xe - L * 0.065 - 6.5)}" y="${f(top - 20)}" width="13" height="13" style="image-rendering:pixelated"/>` : code ? `<text x="${f(xe - L * 0.065)}" y="${f(top - 11)}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="8" fill="${o.ink || 'var(--on-accent)'}">${esc(code)}</text>` : '';
-  const LV = o.skin ? skinLivery(o.skin, { fus, fin, x0, xe, top, bot, cy, h, L, fh: 27 }) : o.sil ? SIL : null;   // Aircraft Collection: Skin-Lackierung bzw. Silhouette
+  const LV = o.skin ? skinLivery(o.skin, { fus, fin, x0, xe, top, bot, cy, h, L, fh: 27, eyes: !!o.eyes }) : o.sil ? SIL : null;   // Aircraft Collection: Skin-Lackierung bzw. Silhouette
+  if (o.geo) o.geo({ x0, xe, top, bot, cy, h, L });   // 0.21.69: Maße für die aufrechte Walkout-Figur
   return `<svg class="${o.cls || 'acv'}" viewBox="0 0 320 76" role="img" aria-label="${esc(t.label)}"${LV ? ` style="${LV.style}"` : ''}>${LV ? LV.defs : ''}
     <ellipse cx="160" cy="${f(bot + 14)}" rx="${f(L * 0.42)}" ry="2.2" fill="#000" opacity=".1"/>${gear}
     <path d="${fin}" fill="${LV ? LV.fin : color}"/>${LV ? LV.finOver : ''}<path d="${fus}" fill="${LV ? LV.body : 'var(--fus)'}" stroke="var(--fus-line)" stroke-width=".9"/>${LV ? LV.over : ''}
     <path d="M${f(x0 + 40)},${f(cy + 2.2)} L${f(xe - L * 0.2)},${f(cy + 2.2)}" stroke="${LV ? LV.stripe : color}" stroke-width="1.8" stroke-linecap="round"/>
     <g fill="var(--glass)">${win}</g><path d="M${f(x0 + 18)},${f(cy - 0.5)} L${f(x0 + 27)},${f(top + 1.6)} L${f(x0 + 31)},${f(top + 1.6)} L${f(x0 + 27)},${f(cy - 0.5)}Z" fill="var(--glass)"/>
-    <path d="${wing}" fill="var(--fus-line)"/>${eng}${LV ? '' : label}
+    <path d="${wing}" fill="var(--fus-line)"/>${eng}${LV ? '' : label}${LV && LV.eyes ? LV.eyes : ''}
   </svg>`;
 }
 function acSvg(id, o = {}) {
@@ -518,7 +519,8 @@ function acSvg(id, o = {}) {
       <line x1="${f(gx)}" y1="${f(bot - 1)}" x2="${f(gx)}" y2="${f(bot + 5)}" stroke="var(--gear)" stroke-width="1.6"/><circle cx="${f(gx)}" cy="${f(bot + 7)}" r="3.4" fill="var(--gear)"/>`;
   }
   const pixS = prop ? 12 : 14, label = o.pix ? `<image${o.pixId ? ` id="${o.pixId}"` : ''} href="${o.pix}" x="${f((tailX + xe) / 2 + (prop ? 4 : 2) - pixS / 2)}" y="${f(top - fh * 0.42 - pixS * 0.62)}" width="${pixS}" height="${pixS}" style="image-rendering:pixelated" preserveAspectRatio="xMidYMid meet"/>` : code ? `<text x="${f((tailX + xe) / 2 + (prop ? 4 : 2))}" y="${f(top - fh * 0.42)}" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="${prop ? 8 : 9}" fill="${o.ink || 'var(--on-accent)'}">${esc(code)}</text>` : '';
-  const LV = o.skin ? skinLivery(o.skin, { fus, fin, x0, xe, top, bot, cy, h, L, fh }) : o.sil ? SIL : null;   // Aircraft Collection: Skin-Lackierung bzw. Silhouette
+  const LV = o.skin ? skinLivery(o.skin, { fus, fin, x0, xe, top, bot, cy, h, L, fh, eyes: !!o.eyes }) : o.sil ? SIL : null;   // Aircraft Collection: Skin-Lackierung bzw. Silhouette
+  if (o.geo) o.geo({ x0, xe, top, bot, cy, h, L });   // 0.21.69: Maße für die aufrechte Walkout-Figur
   return `<svg class="${o.cls || 'acv'}" viewBox="0 0 320 76" role="img" aria-label="${esc(t.label)}"${LV ? ` style="${LV.style}"` : ''}>${LV ? LV.defs : ''}
     <ellipse cx="160" cy="${f(bot + 10.5)}" rx="${f(L * 0.42)}" ry="2.4" fill="#000" opacity=".1"/>
     ${gear}${prop ? '' : eng}
@@ -526,7 +528,7 @@ function acSvg(id, o = {}) {
     <path d="${fus}" fill="${LV ? LV.body : 'var(--fus)'}" stroke="var(--fus-line)" stroke-width=".9"/>${hump}${LV ? LV.over : ''}
     <path d="M${f(x0 + h * 1.1)},${f(cy + h * 0.28)} L${f(tailX - 4)},${f(cy + h * 0.28)}" stroke="${LV ? LV.stripe : color}" stroke-width="2.4" stroke-linecap="round"/>
     <path d="${stab}" fill="${prop ? (LV ? LV.fin : color) : 'var(--fus-line)'}"/>
-    <g fill="var(--glass)">${win}</g>${doors}${shield}${wing}${prop ? eng : ''}${LV ? '' : label}
+    <g fill="var(--glass)">${win}</g>${doors}${shield}${wing}${prop ? eng : ''}${LV ? '' : label}${LV && LV.eyes ? LV.eyes : ''}
   </svg>`;
 }
 
@@ -667,8 +669,11 @@ function renderPlanes() {
       if (p.sk.fx === 'disco') { const dc = discoColor(nowT); ctx.shadowColor = dc; ctx.shadowBlur = 7 * dpr; ctx.fillStyle = dc; ctx.fill(ic); ctx.shadowBlur = 0; ctx.strokeStyle = '#1a0b24'; ctx.lineWidth = 0.6; ctx.stroke(ic); return; }
       if (p.sk.glow) { ctx.shadowColor = p.sk.glow; ctx.shadowBlur = (p.sk.fx === 'e' || p.sk.fx === 'm' ? 6 : 4) * dpr; }
       if (p.sk.fx === 'l') { ctx.shadowColor = '#ffd34d'; ctx.shadowBlur = 10 * dpr; }
-      if (p.sk.fx === 'l') { const g = ctx.createLinearGradient(-9, -6, 9, 6), m = (Math.sin(nowT / 450) + 1) / 2; g.addColorStop(0, '#c98a00'); g.addColorStop(Math.max(0.05, Math.min(0.95, m)), '#ffffff'); g.addColorStop(1, '#ffd34d'); ctx.fillStyle = g; } else
-      ctx.fillStyle = p.sk.fill; ctx.fill(ic); ctx.shadowBlur = 0; ctx.strokeStyle = p.sk.edge; ctx.lineWidth = 0.6; ctx.stroke(ic);
+      const mf = MAP_FILL[p.sk.d];   // 0.21.67: bewegte Lackierung ab Pink
+      if (mf) mf(ctx, nowT, p.sk, dpr);
+      else if (p.sk.fx === 'l') { ctx.fillStyle = goldSheen(ctx, nowT); }
+      else ctx.fillStyle = p.sk.fill;
+      ctx.fill(ic); ctx.shadowBlur = 0; ctx.strokeStyle = p.sk.edge; ctx.lineWidth = 0.6; ctx.stroke(ic);
       if (p.sk.fx === 'l') { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0, 0, 1.6 + Math.sin(nowT / 350) * 0.5, 0, Math.PI * 2); ctx.fill(); }
       return;
     }
@@ -7523,6 +7528,8 @@ function boot(hotData) {
   }
   applyOnlineChrome();
   requestAnimationFrame(frame);
+  // Vorschau-Seite für das Pack-Öffnen (nur wenn ausdrücklich eingeschaltet, z. B. in der Demo-Seite)
+  if (window.SKYMARKET_PACKDEMO) window.skyPackDemo = (ids) => { const ov = packOverlay(); playReveal(ov, { res: ids, fresh: ids.map(() => true) }); };
   if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), coll: () => coll, reveal: async (res, quick) => { await loadColl(true); const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
 }
 if (window.claude?.hot?.ready) window.claude.hot.ready(boot); else boot(window.claude?.hot?.data ?? {});

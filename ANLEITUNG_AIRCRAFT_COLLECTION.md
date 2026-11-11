@@ -1,6 +1,6 @@
 # Aircraft Collection – Anleitung zur Einrichtung und zum Betrieb
 
-Stand: Version 0.21.63. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
+Stand: Version 0.21.73. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
 
 ## 1. Bestandsaufnahme: So ist es eingebaut
 
@@ -90,7 +90,9 @@ Getestet in `npm test` (Abschnitt 0.21.52 der Tests): 200.000 Ziehungen gegen di
 |---|---|
 | 28 Modelle, 4 Seltenheiten | erweitert auf 420 Skins und 5 Stufen: je Modell 5 grün, 4 blau, 3 pink, 2 rot (davon „Disco Fever“, blinkt), 1 gold; Wahrscheinlichkeiten 55/27/13/4/1 % |
 | Pack-Verteilung und Wahrscheinlichkeiten, im Shop sichtbar | umgesetzt |
-| Pack-Inventar, Öffnen mit Animation, Seltenheitseffekte, Ton | umgesetzt; ab 0.21.55 Pack aufreißen (ziehen oder antippen), längere Inszenierung mit Bildschirmblitz, verdeckter Karte und Fanfare je Seltenheit |
+| Pack-Inventar, Öffnen mit Animation, Seltenheitseffekte, Ton | umgesetzt; ab 0.21.55 Pack aufreißen (ziehen oder antippen), längere Inszenierung mit Bildschirmblitz, verdeckter Karte und Fanfare je Seltenheit; ab 0.21.66 Spannungsleiter: Das Pack leuchtet beim Aufreißen zuerst grün und springt kurz vor dem Platzen Stufe für Stufe (blau, pink, rot, gold) bis zur besten Seltenheit im Pack; bei mehreren Skins hat zusätzlich jede Karte ihre eigene Leiter |
+| Effekte ab Pink | ab 0.21.66 eigener Karteneffekt je Design (Flammenschweif, Laser, Blitze, Feuerflügel, Münzregen …); ab 0.21.67 bewegte Lackierung im Skin-Bild und auf dem Flugzeug der Karte, Gold glänzt durchgehend |
+| Walkout ab Rot | ab 0.21.68: Rot fliegt vor dem Aufdecken ein, Gold läuft auf Beinen mit Glubschaugen herein; Tippen überspringt. Ab 0.21.69 ohne Karten-Vorlauf, Gold läuft aufrecht (Nase = Beine), 5 Einlaufarten und 12 Torjubel zufällig, Hintergrund je Skin-Motto. Ab 0.21.70 biegsamer Rumpf, 8 Einläufe und 24 Jubel/Tänze; ab 0.21.71 Sprechblase nur beim SIUUU |
 | Sammlung mit Fortschritt, Filtern, Silhouetten, Duplikaten | umgesetzt |
 | Skins in der Flotte und auf der Karte | umgesetzt; ab 0.21.56 direkt nach dem Ziehen per Knopf ausrüstbar |
 | Trading | umgesetzt |
