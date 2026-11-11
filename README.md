@@ -183,6 +183,19 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.59: Tägliches Gratis-Pack
+
+- Beim ersten Laden der Sammlung an einem Kalendertag (Berliner Zeit, also beim Öffnen eines Spiels) bekommt jedes angemeldete Konto ein Aircraft Mystery Pack (Herkunft `daily`). Die Gutschrift läuft atomar über das Register (ETag), gleichzeitige Aufrufe geben nur ein Pack. Tage in Folge werden mitgezählt (`streak`).
+- Hinweisfenster „Tägliches Gratis-Pack“ mit „Jetzt öffnen“; in der Sammlung steht, ob das heutige Pack abgeholt ist.
+- Admins schalten es unter Menü → Aircraft Pack Management an und aus (Blob `shop/config`, Feld `daily`; Standard an, Umgebungsvariable `DAILY_PACK=0` schaltet den Standard aus). Statistik: `stats.dailyPacks`.
+
+## Neu in 0.21.58: Frachtmarkt nachjustiert, Cargo-Ansichten fürs Handy
+
+- **Frachtraten:** Marktrate je Kilo jetzt Sockel + Distanzanteil (`rate0 + rateK · (km/1000)^rateP`, 0,72 + 0,44 · …^0,545): kurze Frachtstrecken bringen je Kilo mehr (Express, Zubringer), lange etwa wie bisher. Damit rechnen sich ATR 72F und A321P2F ab mittleren Flughäfen; 767F und 777F brauchen große Drehkreuze. Typische Marge bei voller Auslastung ohne Konkurrenz 12–25 %.
+- **Beste Frequenz:** `w.freightBest(al, base, dest, type, rate)` probiert 1–28 Umläufe pro Woche und nimmt das beste Ergebnis; die KI nutzt das ebenfalls.
+- **Neue Frachtstrecke:** oben „Lohnt sich am meisten“ über alle eigenen Basen und Frachter (einmal pro Spieltag gerechnet), darunter die Auswahl je Basis und Frachter mit der besten Frequenz je Ziel. Rechnet sich nichts, sagt ein Hinweis warum und was besser passt. Fehlt der Frachter, führt der Knopf zur Beschaffung.
+- **Darstellung:** Frachtstrecken und Ziele als Karten statt breiter Tabellen – auf dem Handy ohne seitliches Scrollen.
+
 ## Neu in 0.21.57: Skin auf bis zu 5 Flugzeugen, aufgeräumte Karte, Pack-Ecken
 
 - **Collection:** Ein Exemplar eines Skins deckt bis zu `SKINS.PER_COPY` = 5 Flugzeuge. Server: `slotsOf` (weitere Flugzeuge möglich) für das Aktivieren, `freeOf` (Exemplare ohne aktives Flugzeug) für den Tausch. Skin-Detail: Flugzeuge per Antippen an- und abwählen; nach dem Ziehen mehrere Flugzeuge direkt ausrüsten.

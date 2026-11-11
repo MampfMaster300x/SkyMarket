@@ -1,6 +1,6 @@
 # Aircraft Collection – Anleitung zur Einrichtung und zum Betrieb
 
-Stand: Version 0.21.57. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
+Stand: Version 0.21.59. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
 
 ## 1. Bestandsaufnahme: So ist es eingebaut
 
@@ -54,6 +54,10 @@ Regeln im Code: höchstens 3 offene Anfragen je Konto; eine Anfrage kann nur ein
 ## 4. Kostenlose Packs vergeben
 
 Menü → „Aircraft Pack Management“ → Spieler suchen, Anzahl (1 bis 100) und optional einen Grund eintragen → „Kostenlos vergeben“. Der Spieler bekommt die Meldung „Sie haben ein kostenloses Aircraft Mystery Pack erhalten!“. Die Vergabe steht in der Historie und wird getrennt gezählt.
+
+## 4a. Tägliches Gratis-Pack
+
+Jedes angemeldete Konto bekommt einmal pro Kalendertag (Berliner Zeit) ein Pack, sobald es ein Spiel öffnet. Ein Fenster bietet „Jetzt öffnen“ an. Mehrfaches Öffnen am selben Tag gibt kein weiteres Pack. Ein- und ausschalten: Menü → „Aircraft Pack Management“ → „Tägliches Gratis-Pack“. Die Zahl der verteilten Tagespacks steht dort ebenfalls.
 
 ## 5. Eigene Artworks nachliefern
 

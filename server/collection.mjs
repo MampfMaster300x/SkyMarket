@@ -42,13 +42,15 @@ async function logPay(store, e) { try { await updateJson(store, KEY.log, (l) => 
 export async function shopConfig(store) {
   // Freischaltung und Hinweistext pflegen Admins im Spiel (Blob shop/config); die Umgebungsvariablen gelten nur, solange dort nichts gespeichert ist
   const c = (await store.get(KEY.cfg, { type: 'json' })) || null;
-  return { enabled: c ? !!c.enabled : env('SHOP_ENABLED') === '1', offers: Object.values(SKINS.OFFERS), payInfo: c ? c.info || '' : env('SHOP_REQUEST_INFO') || '',
+  return { enabled: c ? !!c.enabled : env('SHOP_ENABLED') === '1', daily: c ? c.daily !== false : env('DAILY_PACK') !== '0', offers: Object.values(SKINS.OFFERS), payInfo: c ? c.info || '' : env('SHOP_REQUEST_INFO') || '',
     odds: { count: SKINS.PACK_COUNT_ODDS, rarity: SKINS.RARITY_ORDER.map((k) => [k, SKINS.RARITIES[k].odds]), models: SKINS.MODELS.length } };
 }
+/** 0.21.59: Kalendertag in Deutschland (Wechsel um Mitternacht Berliner Zeit). */
+export const berlinDay = (t = Date.now()) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
 function meView(reg, key) {
   const u = reg.users[key] || { inv: {}, packs: [], opened: [], active: {}, notes: [], ms: [], openedTotal: 0 };
   const reserved = {}; for (const t of Object.values(reg.trades)) if (t.status === 'open' && t.from === key) for (const s of t.give) reserved[s] = (reserved[s] || 0) + 1;
-  return { inv: u.inv, packs: u.packs, opened: u.opened, active: u.active, notes: u.notes, ms: u.ms, openedTotal: u.openedTotal || 0, uniq: uniqOf(u), total: SKINS.TOTAL, reserved };
+  return { inv: u.inv, packs: u.packs, opened: u.opened, active: u.active, notes: u.notes, ms: u.ms, openedTotal: u.openedTotal || 0, uniq: uniqOf(u), total: SKINS.TOTAL, reserved, dailyDay: u.daily || null, today: berlinDay() };
 }
 function tradeView(t, reg) { return { ...t, fromName: (reg.users[t.from] || {}).name || t.from, toName: (reg.users[t.to] || {}).name || t.to }; }
 
@@ -88,8 +90,22 @@ export async function handleCollection(req, ctx) {
 
   // ---- Übersicht ----
   if (path === '/coll' && method === 'GET') {
-    const reg = (await store.get(KEY.reg, { type: 'json' })) || emptyReg();
-    return json({ me: meView(reg, me), shop: await shopConfig(store), admin: isAdmin(user) });
+    let reg = (await store.get(KEY.reg, { type: 'json' })) || emptyReg();
+    const shop = await shopConfig(store), today = berlinDay();
+    // 0.21.59: tägliches Gratis-Pack – beim ersten Laden der Sammlung an einem Kalendertag (einmal je Konto und Tag, atomar)
+    if (shop.daily && (!reg.users[me] || reg.users[me].daily !== today)) {
+      const r = await updateJson(store, KEY.reg, (cur) => {
+        cur = cur || emptyReg(); const u = userOf(cur, me, user.name);
+        if (u.daily === today) return undefined;
+        const streak = u.daily && u.daily === berlinDay(Date.now() - 864e5) ? (u.streak || 1) + 1 : 1;
+        u.daily = today; u.streak = streak; addPacks(u, 1, 'daily', today);
+        cur.stats.dailyPacks = (cur.stats.dailyPacks || 0) + 1;
+        note(u, `Tägliches Gratis-Pack: Ein Aircraft Mystery Pack liegt für Sie bereit${streak > 1 ? ` (${streak} Tage in Folge)` : ''}.`, 'daily');
+        return cur;
+      }, null);
+      if (r && r.value) reg = r.value; else reg = (await store.get(KEY.reg, { type: 'json' })) || reg;
+    }
+    return json({ me: meView(reg, me), shop, admin: isAdmin(user) });
   }
   if (path === '/coll/notes/read' && method === 'POST') {
     const b = await readJson(req), ids = new Set(Array.isArray(b.ids) ? b.ids.map(String) : []);
@@ -241,7 +257,11 @@ export async function handleCollection(req, ctx) {
   if (path === '/coll/admin/shop' && method === 'POST') {   // Anfragen für alle freischalten oder sperren, Hinweistext setzen
     if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
     const b = await readJson(req);
-    await store.setJSON(KEY.cfg, { enabled: !!b.enabled, info: String(b.info || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600), by: user.key, at: Date.now() });
+    const prev = (await store.get(KEY.cfg, { type: 'json' })) || null;
+    const daily = b.daily === undefined || b.daily === null ? (prev ? prev.daily !== false : env('DAILY_PACK') !== '0') : !!b.daily;
+    const enabled = b.enabled === undefined || b.enabled === null ? (prev ? !!prev.enabled : env('SHOP_ENABLED') === '1') : !!b.enabled;
+    const info = b.info === undefined || b.info === null ? (prev ? prev.info || '' : '') : String(b.info).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600);
+    await store.setJSON(KEY.cfg, { enabled, daily, info, by: user.key, at: Date.now() });
     return json({ ok: true, shop: await shopConfig(store) });
   }
   if (path === '/coll/admin/grant' && method === 'POST') {

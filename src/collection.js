@@ -27,9 +27,20 @@ async function loadColl(force = false) {
 function collNotes() {
   const n = coll.me && coll.me.notes; if (!n || !n.length) return;
   const ids = n.map((x) => x.id);
-  n.slice(-3).forEach((x, i) => setTimeout(() => toast(x.msg), i * 1600));
+  const daily = n.find((x) => x.kind === 'daily');
+  n.filter((x) => x.kind !== 'daily').slice(-3).forEach((x, i) => setTimeout(() => toast(x.msg), i * 1600));
+  if (daily) setTimeout(() => showDaily(daily.msg), 900);
   coll.me.notes = [];
   api('/coll/notes/read', { body: { ids } }).catch(() => {});
+}
+/** 0.21.59: Tägliches Gratis-Pack – kleines Fenster mit „Jetzt öffnen“. */
+function showDaily(msg, tries = 0) {
+  if (!coll.me || !coll.me.packs.length || document.querySelector('#packOv:not([hidden])')) { toast(msg); return; }
+  if (!$('#modal').hidden) { if (tries < 40) setTimeout(() => showDaily(msg, tries + 1), 3000); else toast(msg); return; }   // anderes Fenster offen: warten statt verdrängen
+  const md = modal(`<div class="dly"><div class="dly-pack">${packSvg()}</div><div class="stack" style="gap:6px"><h1 style="margin:0">Tägliches Gratis-Pack</h1><p class="small" style="margin:0">${esc(msg.replace(/^Tägliches Gratis-Pack:\s*/, ''))}</p>
+    <p class="small muted" style="margin:0">Jeden Tag ab Mitternacht liegt ein neues Pack bereit, sobald Sie das Spiel öffnen.</p></div></div>
+    <div class="row" style="gap:8px;justify-content:flex-end"><button class="btn" data-x="later">Später</button><button class="btn primary" data-x="open">Jetzt öffnen</button></div>`);
+  md.onclick = (e) => { const b = e.target.closest('[data-x]'); if (!b) return; md.hidden = true; if (b.dataset.x === 'open') openPack(coll.me.packs.find((p) => p.src === 'daily') ? coll.me.packs.find((p) => p.src === 'daily').id : null); };
 }
 /** Profilrahmen (Meilenstein 75) am Menüknopf. */
 function collChrome() { const b = $('#userBtn'); if (b) b.classList.toggle('coll-frame', !!(coll.me && coll.me.ms.includes('frame'))); }
@@ -164,7 +175,7 @@ VIEWS.collection = function viewCollection() {
   const byR = {}; for (const rk of SK.RARITY_ORDER) byR[rk] = SK.SKINS.filter((s) => s.rarity === rk && m.inv[s.id] > 0).length;
   const share = m.uniq / SK.TOTAL;
   let html = `<div class="ac-wrap"><div class="ac-head"><div><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Ihre Sammlung${hasMs('title') ? ' <span class="chip rar rar-l">Ultimate Aircraft Collector</span>' : ''}</h2></div>
-    <button class="btn primary ac-open" data-act="accopen" ${m.packs.length ? '' : 'disabled'}>${m.packs.length ? `Pack öffnen <b>${n0(m.packs.length)}</b>` : 'Keine ungeöffneten Packs'}</button></div>
+    <button class="btn primary ac-open" data-act="accopen" ${m.packs.length ? '' : 'disabled'}>${m.packs.length ? `Pack öffnen <b>${n0(m.packs.length)}</b>` : 'Keine ungeöffneten Packs'}</button>${coll.shop && coll.shop.daily ? `<span class="small muted">${m.dailyDay && m.dailyDay === m.today ? 'Tägliches Gratis-Pack für heute abgeholt – das nächste gibt es ab Mitternacht.' : 'Tägliches Gratis-Pack: jeden Tag eins beim Öffnen des Spiels.'}</span>` : ''}</div>
     <div class="ac-progress"><div class="spread"><b>${n0(m.uniq)} / ${SK.TOTAL} SKINS GESAMMELT</b><span>${pct(share, 1)}</span></div><div class="ac-bar"><i style="width:${(share * 100).toFixed(1)}%"></i></div></div>
     <div class="ac-tiles">${SK.RARITY_ORDER.map((rk) => `<div class="ac-tile rar-${rk}"><span>${RAR[rk].label}</span><b>${byR[rk]}<small> / ${SK.MODELS.length * RAR[rk].perModel}</small></b></div>`).join('')}
       <div class="ac-tile"><span>Ungeöffnete Packs</span><b>${n0(m.packs.length)}</b></div><div class="ac-tile"><span>Geöffnet</span><b>${n0(m.openedTotal)}</b></div></div>
@@ -547,6 +558,9 @@ async function showPackAdmin() {
       <p class="small ${d.shop.enabled ? 'pos' : 'muted'}">${d.shop.enabled ? 'Freigeschaltet: Spieler können im Shop Packs anfragen.' : 'Gesperrt: Der Shop zeigt die Angebote, Anfragen sind aber nicht möglich. Kostenlose Vergabe geht trotzdem.'}</p>
       <label class="f"><span>Hinweistext im Shop (optional)</span><input id="pa-info" maxlength="600" value="${esc(d.shop.payInfo || '')}" placeholder="z. B. wie man Token bekommt"></label>
       <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ${d.shop.enabled ? '' : 'primary'}" data-pa="shop" data-on="${d.shop.enabled ? '' : '1'}">${d.shop.enabled ? 'Anfragen sperren' : 'Anfragen freischalten'}</button><button class="btn" data-pa="shop" data-on="${d.shop.enabled ? '1' : ''}">Nur Text speichern</button></div></section>
+    <section class="card pad stack"><h3>Tägliches Gratis-Pack</h3>
+      <p class="small ${d.shop.daily ? 'pos' : 'muted'}">${d.shop.daily ? 'An: Jeder angemeldete Spieler bekommt einmal pro Kalendertag (Berliner Zeit) ein Pack, sobald er das Spiel öffnet.' : 'Aus: Es gibt keine täglichen Gratis-Packs.'}${d.stats.dailyPacks ? ` Bisher verteilt: ${d.stats.dailyPacks}.` : ''}</p>
+      <div class="row"><button class="btn ${d.shop.daily ? '' : 'primary'}" data-pa="daily" data-on="${d.shop.daily ? '' : '1'}">${d.shop.daily ? 'Ausschalten' : 'Einschalten'}</button></div></section>
     <section class="card pad stack"><h3>Pack-Anfragen <small class="muted">${d.requests.filter((q) => q.status === 'open').length} offen</small></h3>
       <p class="small muted">Die Freigabe schreibt die Packs sofort gut und lässt sich nicht zurücknehmen.</p>
       ${d.requests.length ? d.requests.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${tf(q.created)} · <b>${esc(q.userName)}</b> · ${q.packs} ${q.packs === 1 ? 'Pack' : 'Packs'} · ${Number(q.amount).toLocaleString('de-DE')} Token</span>
@@ -562,6 +576,7 @@ async function showPackAdmin() {
     const b = e.target.closest('[data-pa]'); if (!b) return;
     const k = b.dataset.pa;
     if (k === 'close') { m.hidden = true; return; }
+    if (k === 'daily') { b.disabled = true; try { await api('/coll/admin/shop', { body: { daily: !!b.dataset.on } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Tägliches Gratis-Pack ist an.' : 'Tägliches Gratis-Pack ist aus.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'shop') { b.disabled = true; try { await api('/coll/admin/shop', { body: { enabled: !!b.dataset.on, info: $('#pa-info').value } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Pack-Anfragen sind freigeschaltet.' : 'Pack-Anfragen sind gesperrt.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'find') { try { const r = await api('/coll/players?q=' + encodeURIComponent($('#pa-q').value)); $('#pa-res').innerHTML = r.players.map((p) => `<button class="btn small" data-pa="pick" data-v="${esc(p.key)}">${esc(p.name)}</button>`).join('') || '<span class="small muted">Niemand gefunden.</span>'; } catch (err) { toast(err.message); } return; }
     if (k === 'pick') { $('#pa-user').value = b.dataset.v; return; }

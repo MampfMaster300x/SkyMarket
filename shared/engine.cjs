@@ -494,7 +494,7 @@ const SM = (() => {
     CARGO: { k: 120, yield: 1.2, handling: 0.20, commission: 0.15, gsaMonth: 8000, loadMax: 0.8 },
     // 0.21.56: Frachtsparte mit eigenen Frachtern (getrennt von der Beiladefracht): Bedarf je Strecke und Richtung in kg/Tag = Beiladebedarf × k × Distanzfaktor,
     // Rate = Beilade-Ertrag × rateX (Spielende wählen 60–160 %), Aufteilung nach Kapazität und Rate (Rate hoch −compete), Gesamtnachfrage elastisch zum Mittelpreis.
-    FREIGHT: { k: 25, rateX: 0.8, loadMax: 0.88, handling: 0.10, sales: 0.06, elast: 1.1, compete: 3, sigma: 0.15, maxWeek: 28, lead: 3, minRate: 0.6, maxRate: 1.6,
+    FREIGHT: { k: 25, rateX: 1, rate0: 0.72, rateK: 0.44, rateP: 0.545, loadMax: 0.88, handling: 0.10, sales: 0.06, elast: 1.1, compete: 3, sigma: 0.15, maxWeek: 28, lead: 3, minRate: 0.6, maxRate: 1.6,
       ai: { p: 0.12, minDay: 45, maxRoutes: { premium: 4, regional: 1, leisure: 1, lcc: 0 }, types: { premium: ['B77F', 'B76F', 'A21F'], regional: ['AT7F'], leisure: ['A21F'], lcc: [] }, margin: 0.1 } },
     MARKETING_K: 0.04, BRAND_DECAY: 0.015,
     // Marketing als Anteil am Umsatz mit Sättigung: Wirkung ~ 1 − e^(−Anteil/MKT_SAT)
@@ -1053,8 +1053,8 @@ const SM = (() => {
   const freightDistF = (km) => clamp((km - 250) / 1250, 0.08, 1);
   /** Frachtbedarf je Richtung in kg pro Tag (ohne Zufall, ohne Preiswirkung). */
   function freightDemand(o, d, econ = 1) { return cargoDemand(o, d, econ) * P.FREIGHT.k * freightDistF(gcDistanceKm(o, d)); }
-  /** Marktrate in € je kg (vor Preisindex). */
-  const freightRef = (o, d) => cargoYield(o, d) * P.FREIGHT.rateX;
+  /** Marktrate in € je kg (vor Preisindex). 0.21.58: Sockel + Distanzanteil – kurze Frachtstrecken (Express, Zubringer) bringen je Kilo mehr als im Beiladetarif. */
+  const freightRef = (o, d) => (P.FREIGHT.rate0 + P.FREIGHT.rateK * (gcDistanceKm(o, d) / 1000) ** P.FREIGHT.rateP) * P.FREIGHT.rateX;
   const isFreighter = (typeId) => !!(P.AIRCRAFT_TYPES[typeId] && P.AIRCRAFT_TYPES[typeId].role === 'cargo');
   /** Umläufe pro Tag, die ein Frachter auf dieser Strecke schafft (unter 1: ein Umlauf braucht mehrere Flugzeuge). */
   function cgPerAc(base, dest, typeId) { const h = rotationHours(base, dest, typeId, 'standard', 'normal'), w = winOf(typeId); return h <= w ? Math.max(1, Math.floor(w / h)) : 1 / Math.max(1, kOf(typeId, h)); }
@@ -3668,6 +3668,12 @@ const SM = (() => {
       return { base, dest, typeId, freq, rate, per, need, dem: D, comp: comp.reduce((s2, x) => s2 + x.cap, 0), rivals: comp.length, cap, kg, lf: fl ? kg / (fl * t.cargo_kg) : 0, rateKg: freightRef(base, dest) * rate * cpi,
         rev, flightCost, cargoCost, fixed, db1, res: db1 - fixed, margin: rev ? (db1 - fixed) / rev : 0, km: gcDistanceKm(base, dest), bh: blockHours(base, dest, typeId) };
     }
+    /** 0.21.58: beste Frequenz (Ergebnis pro Tag) für eine Strecke und ein Muster. */
+    freightBest(al, base, dest, typeId, rate = 1, exceptId = null) {
+      let best = null;
+      for (const f of [1, 2, 3, 4, 5, 7, 10, 14, 21, 28]) { if (f > P.FREIGHT.maxWeek) break; const q = this.freightQuote(al, base, dest, typeId, f, rate, exceptId); if (!best || q.res > best.res + 1) best = q; }
+      return best;
+    }
     /** Ein Tag Frachtsparte: Flüge je Strecke, Nachfrage je Richtung aufteilen, Erlöse und Kosten buchen, Flugstunden. */
     freightDay() {
       // Nachfrage fällt jeden Tag an und wird nach geplanter Tageskapazität verteilt; sie wartet beim Anbieter bis zum nächsten Flug
@@ -5937,11 +5943,8 @@ const SM = (() => {
       const cands = AP_CODES.filter((c) => c !== base && !al.cgRoutes().some((q) => pairKey(q.base, q.dest) === pairKey(base, c))).map((c) => [c, freightDemand(base, c) * freightRef(base, c)]).sort((x, y) => y[1] - x[1]).slice(0, 12);
       for (const [dest] of cands) for (const typeId of types) {
         if (!rangeOk(base, dest, typeId)) continue;
-        for (const fq of [3, 7]) {
-          if (!w.slotsOkFor(al, base, dest, cgSlotN(fq))) continue;
-          const qt = w.freightQuote(al, base, dest, typeId, fq, 1);
-          if (qt.margin >= A.margin && qt.res > 0 && (!best || qt.res > best.res)) best = qt;
-        }
+        const qt = w.freightBest(al, base, dest, typeId, 1);
+        if (qt && w.slotsOkFor(al, base, dest, cgSlotN(qt.freq)) && qt.margin >= A.margin && qt.res > 0 && (!best || qt.res > best.res)) best = qt;
       }
     }
     if (!best) return;

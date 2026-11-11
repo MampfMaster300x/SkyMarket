@@ -2298,11 +2298,13 @@ function cgStats(al, q, days = 30) {
 function cgFreeAt(pl, base, type) { return pl.fleet.filter((a) => a.type_id === type && a.base === base && !a.cg && !SM.acmiList(a, W.day).length); }
 const rateSeg = (act, cur, extra = '') => `<div class="seg wrap">${[0.7, 0.85, 1, 1.15, 1.3].map((v) => `<button data-act="${act}" data-v="${v}"${extra} aria-pressed="${Math.abs((cur || 1) - v) < 0.001}">${n0(v * 100)} %</button>`).join('')}</div>`;
 const freqStep = (act, f, extra = '') => `<div class="row" style="gap:8px;align-items:center"><button class="btn small" data-act="${act}" data-v="-1"${extra} ${f <= 1 ? 'disabled' : ''} aria-label="Weniger">−</button><b class="mono">${f}× pro Woche</b><button class="btn small" data-act="${act}" data-v="1"${extra} ${f >= P.FREIGHT.maxWeek ? 'disabled' : ''} aria-label="Mehr">+</button></div>`;
+/** Eine Zeile als Karte (passt auf jede Breite): Titel, Unterzeile, Kennzahlen, Knopf rechts. */
+const cgRow = (title, sub, vals, act = '', cls = '') => `<div class="cgr ${cls}"><div class="cgt"><b>${title}</b>${sub ? ` <span class="m">${sub}</span>` : ''}</div>${act ? `<div class="act">${act}</div>` : ''}<div class="v">${vals.filter(Boolean).map((v) => `<span>${v}</span>`).join('')}</div></div>`;
 VIEWS.cargo = function viewCargo() {
   const pl = W.player, qs = pl.cgRoutes(), frs = pl.fleet.filter((a) => SM.isFreighter(a.type_id));
   let html = '<div class="stack">';
   if (!qs.length) html += `<div class="callout info stack"><b>Frachtsparte</b><span>Mit eigenen Frachtern fliegen Sie feste Frachtstrecken – getrennt von der Fracht, die in Ihren Passagierflügen mitfliegt. Jede Strecke hat ihren eigenen Frachtbedarf und eine Marktrate je Kilo. Andere Airlines (auch die KI) können ebenfalls Frachtsparten eröffnen und auf denselben Strecken konkurrieren.</span>
-    <span class="small">So geht es: 1. Frachter beschaffen (Flotte → Beschaffung: ATR 72-600F, A321P2F, 767-300F, 777F) · 2. Cargo → Neue Frachtstrecke: Ziel, Frequenz und Rate wählen · 3. Hier Auslastung und Ergebnis verfolgen.</span>
+    <span class="small">So geht es: 1. Cargo → Neue Frachtstrecke zeigt, welche Strecke sich mit welchem Frachter ab Ihren Basen lohnt · 2. Frachter beschaffen (Flotte → Beschaffung: ATR 72-600F, A321P2F, 767-300F, 777F) · 3. Strecke eröffnen und hier Auslastung und Ergebnis verfolgen.</span>
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="tab" data-tab="cargoNew">Neue Frachtstrecke</button><button class="btn small" data-act="tab" data-tab="fleetBuy">Frachter beschaffen</button></div></div>`;
   const st = qs.map((q) => [q, cgStats(pl, q)]), tot = st.reduce((a, [, x]) => ({ kg: a.kg + x.kgDay, rev: a.rev + x.revDay, res: a.res + (x.days ? x.resDay : 0), cap: a.cap + (x.lf ? x.kgDay / x.lf : 0) }), { kg: 0, rev: 0, res: 0, cap: 0 });
   html += `<div class="tiles"><div class="tile"><span>Frachtstrecken</span><b>${qs.length}</b><em>${qs.filter((q) => q.opened_day > W.day).length ? `${qs.filter((q) => q.opened_day > W.day).length} starten bald` : 'in Betrieb'}</em></div>
@@ -2311,50 +2313,63 @@ VIEWS.cargo = function viewCargo() {
     <div class="tile"><span>Auslastung</span><b>${tot.cap ? pct(tot.kg / tot.cap) : '–'}</b><em>Nutzlast der geflogenen Frachter</em></div>
     <div class="tile"><span>Umsatz</span><b>${eur(tot.rev)}</b><em>pro Tag</em></div>
     <div class="tile"><span>Ergebnis</span><b class="${sgn(tot.res)}">${eur(tot.res, { plus: true })}</b><em>pro Tag, nach Frachterkosten</em></div></div>`;
-  if (qs.length) {
-    html += `<div class="tw"><table class="t"><thead><tr><th>Strecke</th><th>Frachter</th><th class="num">Umläufe</th><th class="num">Rate</th><th class="num">Fracht/Tag</th><th class="num">Auslastung</th><th class="num">Ergebnis/Tag</th><th></th></tr></thead><tbody>${st.map(([q, x]) => {
-      const t = P.AIRCRAFT_TYPES[q.type_id], ed = ui.cgEdit && ui.cgEdit.id === q.id;
-      let row = `<tr${ed ? ' class="sel"' : ''}><td style="white-space:nowrap"><b>${q.base}–${q.dest}</b> <span class="small muted">${n0(SM.gcDistanceKm(q.base, q.dest))} km</span></td><td style="white-space:nowrap">${x.nAc}× ${esc(t.label)}</td><td class="num" style="white-space:nowrap">${q.freq}× / Woche</td><td class="num" style="white-space:nowrap">${NF2.format(x.rateKg)} €/kg <span class="small muted">(${n0((q.rate || 1) * 100)} %)</span></td>
-        <td class="num">${q.opened_day > W.day ? `<span class="small muted">ab ${dateShort(q.opened_day)}</span>` : tKg(x.kgDay)}</td><td class="num">${x.days ? pct(x.lf) : '–'}</td><td class="num ${sgn(x.resDay)}">${x.days ? eur(x.resDay, { plus: true }) : '–'}</td>
-        <td><button class="btn small" data-act="cgedit" data-id="${q.id}">${ed ? 'Zuklappen' : 'Ändern'}</button></td></tr>`;
-      if (ed) {
-        const e = ui.cgEdit, qt = W.freightQuote(pl, q.base, q.dest, q.type_id, e.freq, e.rate, q.id), have = x.nAc, free = cgFreeAt(pl, q.base, q.type_id).length;
-        ui._cgEd = `<div class="card pad stack" style="gap:10px"><h3 style="margin:0">Fracht ${q.base}–${q.dest} ändern</h3>
-          <div class="grid2"><div class="stack" style="gap:6px"><span class="small muted">Umläufe pro Woche (je Umlauf hin und zurück)</span>${freqStep('cgefreq', e.freq)}<span class="small ${qt.need > have + free ? 'neg' : 'muted'}">braucht ${qt.need} Frachter – ${have} im Einsatz, ${free} frei in ${q.base}</span></div>
-          <div class="stack" style="gap:6px"><span class="small muted">Rate gegenüber Markt (${NF2.format(SM.freightRef(q.base, q.dest) * cpi())} €/kg)</span>${rateSeg('cgerate', e.rate)}</div></div>
-          <div class="small">Prognose: <b>${tKg(2 * qt.kg)}</b> Fracht pro Tag (Auslastung ${pct(qt.lf)}), Umsatz ${eur(qt.rev)}, Flug- und Frachtkosten ${eur(qt.flightCost + qt.cargoCost)}, Frachterkosten ${eur(qt.fixed)} → <b class="${sgn(qt.res)}">${eur(qt.res, { plus: true })} pro Tag</b>${qt.rivals ? ` · ${qt.rivals} Konkurrent${qt.rivals > 1 ? 'en' : ''} mit ${tKg(qt.comp)} pro Tag` : ' · keine Konkurrenz'}</div>
-          <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="cgsave" data-id="${q.id}">Übernehmen</button>${ui.confirm === 'cgclose:' + q.id ? `<button class="btn small danger" data-act="cgclose" data-id="${q.id}">Ja, Strecke schließen</button><button class="btn small" data-act="cancelconfirm">Abbrechen</button>` : `<button class="btn small danger" data-act="cgaskclose" data-id="${q.id}">Strecke schließen</button>`}</div></div>`;
-      }
-      return row; }).join('')}</tbody></table></div>${ui.cgEdit && ui._cgEd ? ui._cgEd : ''}`;
-    ui._cgEd = '';
-  }
+  if (qs.length) html += `<div class="cgl">${st.map(([q, x]) => {
+    const t = P.AIRCRAFT_TYPES[q.type_id], ed = ui.cgEdit && ui.cgEdit.id === q.id;
+    let row = cgRow(`${q.base}–${q.dest}`, `${esc(apName(q.dest))} · ${n0(SM.gcDistanceKm(q.base, q.dest))} km · ${x.nAc}× ${esc(t.label)}`,
+      [`${q.freq}× pro Woche`, `${NF2.format(x.rateKg)} €/kg (${n0((q.rate || 1) * 100)} %)`, q.opened_day > W.day ? `startet ${dateShort(q.opened_day)}` : `Fracht ${tKg(x.kgDay)}/Tag`, x.days ? `Auslastung ${pct(x.lf)}` : '', x.days ? `<b class="${sgn(x.resDay)}">${eur(x.resDay, { plus: true })}/Tag</b>` : ''],
+      `<button class="btn small" data-act="cgedit" data-id="${q.id}">${ed ? 'Zuklappen' : 'Ändern'}</button>`, ed ? 'sel' : '');
+    if (ed) {
+      const e = ui.cgEdit, qt = W.freightQuote(pl, q.base, q.dest, q.type_id, e.freq, e.rate, q.id), have = x.nAc, free = cgFreeAt(pl, q.base, q.type_id).length, bf = W.freightBest(pl, q.base, q.dest, q.type_id, e.rate, q.id);
+      row += `<div class="card pad stack" style="gap:10px">
+        <div class="stack" style="gap:6px"><span class="small muted">Umläufe pro Woche (je Umlauf hin und zurück)</span>${freqStep('cgefreq', e.freq)}<span class="small ${qt.need > have + free ? 'neg' : 'muted'}">braucht ${qt.need} Frachter – ${have} im Einsatz, ${free} frei in ${q.base}${bf && bf.freq !== e.freq ? ` · bestes Ergebnis mit ${bf.freq}× pro Woche (${eur(bf.res, { plus: true })}/Tag)` : ''}</span></div>
+        <div class="stack" style="gap:6px"><span class="small muted">Rate gegenüber Markt (${NF2.format(SM.freightRef(q.base, q.dest) * cpi())} €/kg)</span>${rateSeg('cgerate', e.rate)}</div>
+        <div class="small">Prognose: <b>${tKg(2 * qt.kg)}</b> Fracht pro Tag (Auslastung ${pct(qt.lf)}), Umsatz ${eur(qt.rev)}, Flug- und Frachtkosten ${eur(qt.flightCost + qt.cargoCost)}, Frachterkosten ${eur(qt.fixed)} → <b class="${sgn(qt.res)}">${eur(qt.res, { plus: true })} pro Tag</b>${qt.rivals ? ` · ${qt.rivals} Konkurrent${qt.rivals > 1 ? 'en' : ''} mit ${tKg(qt.comp)} pro Tag` : ' · keine Konkurrenz'}</div>
+        <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="cgsave" data-id="${q.id}">Übernehmen</button>${ui.confirm === 'cgclose:' + q.id ? `<button class="btn small danger" data-act="cgclose" data-id="${q.id}">Ja, Strecke schließen</button><button class="btn small" data-act="cancelconfirm">Abbrechen</button>` : `<button class="btn small danger" data-act="cgaskclose" data-id="${q.id}">Strecke schließen</button>`}</div></div>`;
+    }
+    return row; }).join('')}</div>`;
   const idle = frs.filter((a) => !a.cg && a.delivery_day <= W.day && !SM.acmiList(a, W.day).length);
-  if (idle.length) html += `<div class="callout warn"><span><b>${idle.length} Frachter ohne Einsatz:</b> ${idle.slice(0, 6).map((a) => `${acName(a.id)} (${a.type_id}, ${a.base})`).join(', ')}. Sie kosten jeden Tag Leasing oder Abschreibung – auf eine Frachtstrecke setzen oder Charteraufträge annehmen.</span></div>`;
+  if (idle.length) html += `<div class="callout warn"><span><b>${idle.length} Frachter ohne Einsatz:</b> ${idle.slice(0, 6).map((a) => `${acName(a.id)} (${a.type_id}, ${a.base})`).join(', ')}. Sie kosten jeden Tag Leasing oder Abschreibung – auf eine Frachtstrecke setzen (Neue Frachtstrecke) oder Charteraufträge annehmen.</span></div>`;
   html += `<p class="small muted">Beiladefracht in Passagierflügen läuft getrennt davon (${pl.cargo ? 'eingeschaltet' : 'ausgeschaltet'} – Karte → Strategie). Frachter auf Frachtstrecken nehmen keine Charteraufträge an.</p>`;
   return html + '</div>';
 };
+/** Beste Frachtstrecken ab allen eigenen Basen (je Muster die 10 Ziele mit dem größten Potenzial, beste Frequenz). Einmal pro Spieltag gerechnet. */
+function cgBestAll(pl, rate) {
+  const key = `${W.day}|${rate}|${pl.bases.join()}|${pl.fleet.filter((a) => SM.isFreighter(a.type_id) && !a.cg).length}|${pl.cgRoutes().length}`;
+  if (ui._cgBest && ui._cgBest.key === key) return ui._cgBest.list;
+  const out = [];
+  for (const base of pl.bases) for (const t of CG_TYPES()) {
+    const cands = SM.AP_CODES.filter((c) => c !== base && SM.rangeOk(base, c, t) && !pl.cgRoutes().some((x) => x.type_id === t && [x.base, x.dest].sort().join() === [base, c].sort().join())).map((c) => [c, SM.freightDemand(base, c) * SM.freightRef(base, c)]).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    for (const [c] of cands) { const q = W.freightBest(pl, base, c, t, rate); if (q && q.res > 0) out.push(q); }
+  }
+  out.sort((a, b) => b.res - a.res);
+  ui._cgBest = { key, list: out }; return out;
+}
 VIEWS.cargoNew = function viewCargoNew() {
-  const pl = W.player, F = ui.cgNew = ui.cgNew || { base: pl.bases[0], type: null, freq: 5, rate: 1 };
+  const pl = W.player, F = ui.cgNew = ui.cgNew || { base: pl.bases[0], type: null, rate: 1 };
   if (!pl.bases.includes(F.base)) F.base = pl.bases[0];
   const types = CG_TYPES();
   if (!F.type) { const own = pl.fleet.find((a) => SM.isFreighter(a.type_id) && a.base === F.base && !a.cg); F.type = own ? own.type_id : 'A21F'; }
   const t = P.AIRCRAFT_TYPES[F.type], free = cgFreeAt(pl, F.base, F.type).length;
-  let html = `<div class="stack"><div class="card pad stack"><div class="stack" style="gap:6px"><span class="small muted">Basis</span><div class="seg wrap">${pl.bases.map((b) => `<button data-act="cgnbase" data-v="${b}" aria-pressed="${b === F.base}">${b}</button>`).join('')}</div></div>
-    <div class="stack" style="gap:6px"><span class="small muted">Frachter</span><div class="seg wrap">${types.map((k) => { const n = cgFreeAt(pl, F.base, k).length; return `<button data-act="cgntype" data-v="${k}" aria-pressed="${k === F.type}">${esc(P.AIRCRAFT_TYPES[k].label)} <span class="small muted">${n0(P.AIRCRAFT_TYPES[k].cargo_kg / 1000)} t · ${n} frei</span></button>`; }).join('')}</div>
+  const openBtn = (q, primary) => { const fr = cgFreeAt(pl, q.base, q.typeId).length; return fr >= q.need ? `<button class="btn small${primary ? ' primary' : ''}" data-act="cgopen" data-b="${q.base}" data-v="${q.dest}" data-t="${q.typeId}" data-f="${q.freq}">Eröffnen</button>` : `<button class="btn small" data-act="tab" data-tab="fleetBuy" title="${q.need} ${esc(P.AIRCRAFT_TYPES[q.typeId].label)} in ${q.base} nötig, frei: ${fr}">Frachter fehlt</button>`; };
+  const qRow = (q, withType) => cgRow(`${withType ? `${q.base} → ` : ''}${q.dest} <span class="m">${esc(apName(q.dest))}</span>`, `${n0(q.km)} km${withType ? ` · ${esc(P.AIRCRAFT_TYPES[q.typeId].label)}` : ''} · Bedarf ${tKg(2 * q.dem)}/Tag${q.rivals ? ` · Konkurrenz ${tKg(2 * q.comp / P.FREIGHT.loadMax)}` : ''}`,
+    [`<b>${q.freq}× pro Woche</b> (${q.need} Frachter)`, `${NF2.format(q.rateKg)} €/kg`, `Fracht ${tKg(2 * q.kg)}/Tag`, `Auslastung ${pct(q.lf)}`, `<b class="${sgn(q.res)}">${eur(q.res, { plus: true })}/Tag</b>${q.rev > 0 ? ` <span class="m">(${pct(q.margin)} Marge)</span>` : ''}`], openBtn(q, q.res > 0), q.res > 0 ? '' : 'weak');
+  const best = cgBestAll(pl, F.rate).slice(0, 5);
+  let html = '<div class="stack">';
+  html += `<div class="card pad stack"><h3 style="margin:0">Lohnt sich am meisten</h3><p class="small muted">Über alle Ihre Basen und alle Frachter, jeweils mit der besten Frequenz. Bedarf, Fracht und Auslastung zählen beide Richtungen. Fehlt der Frachter, führt der Knopf zur Beschaffung.</p>
+    ${best.length ? `<div class="cgl">${best.map((q) => qRow(q, true)).join('')}</div>` : '<p class="small">Ab Ihren Basen rechnet sich derzeit keine Frachtstrecke – zu wenig Frachtbedarf oder zu viel Konkurrenz. Große Drehkreuze (z. B. FRA, LHR, CDG, AMS, IST, DXB) haben den meisten Bedarf.</p>'}</div>`;
+  html += `<div class="card pad stack"><h3 style="margin:0">Selbst wählen</h3>
+    <div class="stack" style="gap:6px"><span class="small muted">Basis</span><div class="seg wrap">${pl.bases.map((b) => `<button data-act="cgnbase" data-v="${b}" aria-pressed="${b === F.base}">${b}</button>`).join('')}</div></div>
+    <div class="stack" style="gap:6px"><span class="small muted">Frachter</span><div class="seg wrap">${types.map((k) => { const n = cgFreeAt(pl, F.base, k).length; return `<button data-act="cgntype" data-v="${k}" aria-pressed="${k === F.type}">${esc(P.AIRCRAFT_TYPES[k].label)} <span class="small muted">${n0(P.AIRCRAFT_TYPES[k].cargo_kg / 1000)} t${n ? ` · ${n} frei` : ''}</span></button>`; }).join('')}</div>
       <span class="small muted">${esc(t.label)}: ${n0(t.cargo_kg / 1000)} t Nutzlast, ${n0(t.range_km)} km Reichweite · in ${F.base} frei: <b>${free}</b>${free ? '' : ' – <a href="#" data-act="tab" data-tab="fleetBuy">Frachter beschaffen</a>'}</span></div>
-    <div class="grid2"><div class="stack" style="gap:6px"><span class="small muted">Umläufe pro Woche</span>${freqStep('cgnfreq', F.freq)}</div><div class="stack" style="gap:6px"><span class="small muted">Rate gegenüber Markt</span>${rateSeg('cgnrate', F.rate)}</div></div></div>`;
-  // Ziele: nach Frachtpotenzial vorsortiert, dann mit voller Vorschau bewertet
-  const all = SM.AP_CODES.filter((c) => c !== F.base && SM.rangeOk(F.base, c, F.type)).map((c) => [c, SM.freightDemand(F.base, c) * SM.freightRef(F.base, c)]).sort((a, b) => b[1] - a[1]).slice(0, 40);
-  const quotes = all.map(([c]) => W.freightQuote(pl, F.base, c, F.type, F.freq, F.rate)).sort((a, b) => b.res - a.res);
-  const shown = ui.showAll && ui.showAll.cgdest ? quotes : quotes.slice(0, 12);
-  html += `<div class="card pad stack"><h3 style="margin:0">Ziele ab ${F.base} mit ${esc(t.label)}, ${F.freq}× pro Woche</h3>
-    <p class="small muted">Prognose ohne Zufall, mit der heutigen Konkurrenz. Fracht und Auslastung gelten für beide Richtungen; Ergebnis nach Flug-, Fracht- und Frachterkosten.</p>
-    <div class="tw"><table class="t"><thead><tr><th>Ziel</th><th class="num">km</th><th class="num">Bedarf/Tag</th><th class="num">Konkurrenz/Tag</th><th class="num">Rate</th><th class="num">Fracht/Tag</th><th class="num">Auslastung</th><th class="num">Ergebnis/Tag</th><th></th></tr></thead><tbody>${shown.map((q) => {
-      const own = pl.cgRoutes().some((x) => x.type_id === F.type && [x.base, x.dest].sort().join() === [q.base, q.dest].sort().join());
-      return `<tr><td style="white-space:nowrap"><b>${q.dest}</b> <span class="small muted">${esc(apName(q.dest))}</span></td><td class="num">${n0(q.km)}</td><td class="num">${tKg(q.dem)}</td><td class="num">${q.rivals ? tKg(q.comp / P.FREIGHT.loadMax) : '–'}</td><td class="num" style="white-space:nowrap">${NF2.format(q.rateKg)} €/kg</td><td class="num">${tKg(2 * q.kg)}</td><td class="num">${pct(q.lf)}</td><td class="num ${sgn(q.res)}">${eur(q.res, { plus: true })}</td>
-        <td>${own ? '<span class="chip">fliegen Sie</span>' : `<button class="btn small ${q.res > 0 ? 'primary' : ''}" data-act="cgopen" data-v="${q.dest}" title="braucht ${q.need} Frachter">Eröffnen</button>`}</td></tr>`; }).join('')}</tbody></table></div>
-    ${quotes.length > 12 ? listMore('cgdest', quotes.length, 12) : ''}
-    <p class="small muted">Je Umlauf braucht es Slots an beiden Flughäfen (aufgerundet auf Flüge pro Tag). Der erste Flug startet ${P.FREIGHT.lead} Tage nach der Eröffnung. Rate unter 100 % zieht Fracht von der Konkurrenz ab und vergrößert den Markt etwas, über 100 % bringt mehr je Kilo, aber weniger Fracht.</p></div>`;
+    <div class="stack" style="gap:6px"><span class="small muted">Rate gegenüber Markt</span>${rateSeg('cgnrate', F.rate)}</div></div>`;
+  const all = SM.AP_CODES.filter((c) => c !== F.base && SM.rangeOk(F.base, c, F.type) && !pl.cgRoutes().some((x) => x.type_id === F.type && [x.base, x.dest].sort().join() === [F.base, c].sort().join())).map((c) => [c, SM.freightDemand(F.base, c) * SM.freightRef(F.base, c)]).sort((a, b) => b[1] - a[1]).slice(0, 30);
+  const quotes = all.map(([c]) => W.freightBest(pl, F.base, c, F.type, F.rate)).filter(Boolean).sort((a, b) => b.res - a.res);
+  const shown = ui.showAll && ui.showAll.cgdest ? quotes : quotes.slice(0, 10), pos = quotes.filter((q) => q.res > 0).length;
+  html += `<div class="card pad stack"><h3 style="margin:0">Ziele ab ${F.base} mit ${esc(t.label)}</h3>
+    ${pos ? `<p class="small muted">${pos} Ziel${pos > 1 ? 'e rechnen' : ' rechnet'} sich. Je Ziel mit der Frequenz, die das beste Ergebnis bringt; ändern können Sie sie nach der Eröffnung im Frachtnetz.</p>` : `<div class="callout warn"><span>Mit der ${esc(t.label)} rechnet sich ab ${F.base} kein Ziel – der Frachtbedarf reicht für diesen Frachter nicht. ${best.length ? `Besser: ${esc(P.AIRCRAFT_TYPES[best[0].typeId].label)} ab ${best[0].base} nach ${best[0].dest} (${eur(best[0].res, { plus: true })}/Tag).` : 'Ein kleinerer Frachter oder ein großes Drehkreuz als Basis hilft.'}</span></div>`}
+    <div class="cgl">${shown.map((q) => qRow(q, false)).join('')}</div>
+    ${quotes.length > 10 ? listMore('cgdest', quotes.length, 10) : ''}
+    <p class="small muted">Prognose ohne Zufall, mit der heutigen Konkurrenz; Fracht und Auslastung für beide Richtungen, Ergebnis nach Flug-, Fracht- und Frachterkosten. Slots braucht es an beiden Flughäfen, der erste Flug startet ${P.FREIGHT.lead} Tage nach der Eröffnung. Eine Rate unter 100 % zieht Fracht von der Konkurrenz ab, über 100 % bringt mehr je Kilo, aber weniger Fracht.</p></div>`;
   return html + '</div>';
 };
 VIEWS.cargoMarket = function viewCargoMarket() {
@@ -5385,9 +5400,8 @@ function onPaneClick(e) {
     case 'cgclose': { const r = doAction({ type: 'cgClose', id: b.dataset.id }); if (r.ok) toast(r.msg); ui.confirm = null; ui.cgEdit = null; refreshAll(); break; }
     case 'cgnbase': ui.cgNew = { ...(ui.cgNew || {}), base: b.dataset.v, type: null }; renderPane(true); break;
     case 'cgntype': ui.cgNew = { ...(ui.cgNew || {}), type: b.dataset.v }; renderPane(true); break;
-    case 'cgnfreq': if (ui.cgNew) { ui.cgNew.freq = Math.max(1, Math.min(P.FREIGHT.maxWeek, ui.cgNew.freq + Number(b.dataset.v))); renderPane(true); } break;
     case 'cgnrate': if (ui.cgNew) { ui.cgNew.rate = Number(b.dataset.v); renderPane(true); } break;
-    case 'cgopen': { const F = ui.cgNew; if (!F) break; const r = doAction({ type: 'cgOpen', base: F.base, dest: b.dataset.v, typeId: F.type, freq: F.freq, rate: F.rate }); if (r.ok) { toast(r.msg); setTab('cargo'); } refreshAll(); break; }
+    case 'cgopen': { const F = ui.cgNew || { rate: 1 }; const r = doAction({ type: 'cgOpen', base: b.dataset.b, dest: b.dataset.v, typeId: b.dataset.t, freq: Number(b.dataset.f), rate: F.rate || 1 }); if (r.ok) { toast(r.msg); setTab('cargo'); } refreshAll(); break; }
     case 'antiadj': { const r = doAction({ type: 'antitrustAdjust', apt: b.dataset.apt }); toast(r.msg); refreshAll(); renderSidebar(); break; }
     case 'crisisadj': { const r = doAction({ type: 'crisisAdjust', event: b.dataset.ev }); if (r.ok) toast(r.msg); refreshAll(); renderSidebar(); break; }
     case 'crisisno': { doAction({ type: 'crisisSkip', event: b.dataset.ev }); refreshAll(); renderSidebar(); break; }

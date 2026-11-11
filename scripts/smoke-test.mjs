@@ -1466,7 +1466,8 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   console.log('0.21.44 ok: Handel ab 0,1 %, Kurse ohne Monatsgrenze');
 }
 // 0.21.52: AIRCRAFT COLLECTION – Katalog, Ziehung, Packs, Aktivierung, Tausch, Kaufanfragen, Admin
-{ const SK = (await import('../shared/skins.cjs')).default, { randomInt } = await import('node:crypto');
+{ process.env.DAILY_PACK = '0';   // tägliches Gratis-Pack hier aus, eigener Test unten (0.21.59)
+  const SK = (await import('../shared/skins.cjs')).default, { randomInt } = await import('node:crypto');
   const SM0 = (await import('../shared/engine.cjs')).default, load = async () => { const m = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' }); return { m, w: SM0.deserialize(JSON.parse(gunzipSync(Buffer.from(m.data)).toString())) }; };
   const fleetSig = async (id) => (await load()).w.airlines[id].fleet.map((a) => [a.id, a.type_id, a.base, a.mode || '', (a.assigned || []).length].join(':')).join('|');
   assert.equal(SK.SKINS.length, 420); assert.equal(new Set(SK.SKINS.map((x) => x.id)).size, 420); assert.equal(SK.MODELS.length, 28); assert.equal(SK.TOTAL, 420);
@@ -1553,6 +1554,24 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     const q3 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'single', count: 0 }), 'null').request; assert.equal(q3.packs, 1); assert.equal(q3.amount, '0.5');
     for (const q of [q2, q3]) ok(await call('cleo', 'POST', `/shop/request/${q.id}/cancel`, {}), 'zurückziehen');
     const so = ok(await call('cleo', 'GET', '/shop/config'), 'Shop'); assert.deepStrictEqual(so.offers.map((o) => o.key), ['single', 'starter', 'collector'], 'Reihenfolge: einzeln, 10, 20'); }
+  // 0.21.59: tägliches Gratis-Pack – einmal je Konto und Berliner Kalendertag, auch bei gleichzeitigen Aufrufen; Admin schaltet an und aus
+  { ok(await call('tim', 'POST', '/coll/admin/shop', { daily: true }), 'täglich an');
+    const p0 = ok(await call('anna', 'GET', '/coll'), 'A').me.packs.length;
+    const rs = await Promise.all([1, 2, 3, 4].map(() => call('anna', 'GET', '/coll')));
+    const p1 = ok(await call('anna', 'GET', '/coll'), 'A').me;
+    assert.equal(p1.packs.length, p0, 'nur einmal am Tag (erster Aufruf hat schon gegeben)');
+    const first = rs.concat([]).map((r) => r.status); assert.ok(first.every((x) => x === 200));
+    assert.equal(p1.dailyDay, p1.today, 'heute abgeholt');
+    const reg = await store.get('coll/registry', { type: 'json' }); assert.equal(reg.users.anna.packs.filter((x) => x.src === 'daily').length, 1, 'genau ein Tagespack');
+    const yest = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() - 864e5));
+    reg.users.anna.daily = yest; reg.users.anna.notes = []; await store.setJSON('coll/registry', reg);
+    await Promise.all([1, 2, 3, 4, 5].map(() => call('anna', 'GET', '/coll')));   // gleichzeitig am neuen Tag: trotzdem nur ein Pack
+    const p2 = ok(await call('anna', 'GET', '/coll'), 'A').me; assert.equal(p2.packs.length, p0 + 1, 'nächster Tag: genau ein neues Pack');
+    assert.ok(p2.notes.some((x) => x.kind === 'daily' && /2 Tage in Folge/.test(x.msg)), 'Serie');
+    ok(await call('tim', 'POST', '/coll/admin/shop', { daily: false }), 'täglich aus');
+    const r3 = await store.get('coll/registry', { type: 'json' }); r3.users.anna.daily = yest; await store.setJSON('coll/registry', r3);
+    assert.equal(ok(await call('anna', 'GET', '/coll'), 'A').me.packs.length, p0 + 1, 'aus: kein Pack');
+    assert.equal(ok(await call('cleo', 'GET', '/shop/config'), 'S').daily, false); }
   console.log(`0.21.52 ok: Aircraft Collection – 420 Skins, Ziehung (${(rar.l / tot * 100).toFixed(2)} % gold), Öffnen einmalig, Aktivieren, Tausch, Kaufanfrage mit Freigabe, Admin`);
 }
 // 0.21.55: Wettbewerbsaufsicht mit konkretem Vorschlag (Grenze in Flügen, welche Strecken), Übernahme per Klick

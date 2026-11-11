@@ -179,6 +179,13 @@ nav.main.ico button { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 .side { --sec: var(--c-karte); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); display: grid; grid-template-rows: auto auto 1fr; min-height: 0; overflow: hidden; }
 .side[data-sec="flotte"] { --sec: var(--c-flotte); } .side[data-sec="strecken"] { --sec: var(--c-strecken); } .side[data-sec="finanzen"] { --sec: var(--c-finanzen); }
 .side[data-sec="markt"] { --sec: var(--c-markt); } .side[data-sec="unternehmen"] { --sec: var(--c-unternehmen); } .side[data-sec="cargo"] { --sec: var(--c-cargo); }
+.cgl { display: grid; gap: 8px; }
+.cgr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel, transparent); }
+.cgr.sel { border-color: var(--c-cargo); } .cgr.weak { opacity: .72; }
+.cgr .cgt { min-width: 0; } .cgr .cgt b { font-size: 14.5px; } .cgr .m { color: var(--ink-3, var(--ink-2)); font-size: 12.5px; font-weight: 400; }
+.cgr .act { grid-column: 2; grid-row: 1; align-self: start; }
+.cgr .v { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.dly { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; align-items: center; margin-bottom: 14px; } .dly-pack { filter: drop-shadow(0 0 16px rgba(217,70,239,.45)); animation: pkFloat 2.4s ease-in-out infinite; }
 .chip.cgc { background: color-mix(in srgb, var(--c-cargo) 16%, transparent); color: var(--c-cargo); }
 .rt.cg { stroke: var(--c-cargo); stroke-dasharray: 5 4; fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; } .rt.cgai { stroke-dasharray: 3 4; opacity: .4; fill: none; stroke-width: .7; vector-effect: non-scaling-stroke; }
 .sechead { display: flex; align-items: center; gap: 12px; padding: 14px 16px 12px; background: linear-gradient(120deg, color-mix(in srgb, var(--sec) 26%, transparent), transparent 75%); border-bottom: 1px solid var(--line); }
