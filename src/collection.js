@@ -54,10 +54,10 @@ function skinFor(al, acId) {
   return id ? SK.SKIN_BY_ID[id] || null : null;
 }
 const actCount = (id) => (coll.me ? Object.values(coll.me.active).filter((x) => x === id).length : 0);
-/** Exemplare frei für den Tausch (0.21.57: ein Exemplar deckt bis zu PER_COPY Flugzeuge). */
-const freeCopies = (id) => { const m = coll.me; if (!m) return 0; return (m.inv[id] || 0) - Math.ceil(actCount(id) / SK.PER_COPY) - ((m.reserved || {})[id] || 0); };
+/** Exemplare frei für den Tausch (0.21.61: ein Exemplar deckt SK.perCopy(id) Flugzeuge – Grün/Blau 2, ab Pink 1). */
+const freeCopies = (id) => { const m = coll.me; if (!m) return 0; return (m.inv[id] || 0) - Math.ceil(actCount(id) / SK.perCopy(id)) - ((m.reserved || {})[id] || 0); };
 /** Wie viele weitere Flugzeuge diesen Skin noch bekommen können. */
-const freeSlots = (id) => { const m = coll.me; if (!m) return 0; return ((m.inv[id] || 0) - ((m.reserved || {})[id] || 0)) * SK.PER_COPY - actCount(id); };
+const freeSlots = (id) => { const m = coll.me; if (!m) return 0; return ((m.inv[id] || 0) - ((m.reserved || {})[id] || 0)) * SK.perCopy(id) - actCount(id); };
 
 // ---------- Lackierungen auf den vorhandenen Seitenansichten ----------
 let skinSeq = 0;
@@ -195,7 +195,7 @@ VIEWS.collection = function viewCollection() {
   if (more) html += `<div class="row"><button class="btn small" data-act="showall" data-k="acgrid">Weitere ${more} Modelle zeigen</button></div>`;
   if (!nModels) html += '<p class="small muted">Kein Skin passt zu den Filtern.</p>';
   if (m.opened.length) html += `<section class="ac-model"><h3>Zuletzt geöffnet</h3><div class="ac-hist">${m.opened.slice(0, 10).map((p) => `<div class="ac-hrow"><span class="small muted">${new Date(p.op).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${p.src === 'admin_grant' ? ' · Geschenk' : ''}</span>${p.res.map((id) => { const s = SK.SKIN_BY_ID[id]; return s ? `<button class="ac-mini rar-${s.rarity}" data-act="acdetail" data-id="${s.id}" title="${esc(s.name)} · ${esc(modelOf(s).name)}"><img src="${skinArt(s)}" alt=""><span>${esc(s.name)}</span></button>` : ''; }).join('')}</div>`).join('')}</div></section>`;
-  html += `<p class="small muted">Alle Skins sind rein kosmetisch: Sie ändern weder Reichweite noch Kosten, Einnahmen oder sonst etwas am Spiel. Ein Exemplar kann auf bis zu ${SK.PER_COPY} Flugzeugen des passenden Modells aktiv sein; Duplikate lassen sich auf weiteren Flugzeugen zeigen oder tauschen.</p></div>`;
+  html += `<p class="small muted">Alle Skins sind rein kosmetisch: Sie ändern weder Reichweite noch Kosten, Einnahmen oder sonst etwas am Spiel. Ein Exemplar gilt für bis zu 2 Flugzeuge des passenden Modells (Grün und Blau), ab Pink für eins; Duplikate lassen sich auf weiteren Flugzeugen zeigen oder tauschen.</p></div>`;
   return html;
 };
 function skinCard(s) {
@@ -215,7 +215,7 @@ function showSkinDetail(id) {
     <div class="ac-big${n ? '' : ' miss'}"><img src="${skinArt(s, !n)}" alt="${esc(s.name)}"></div>
     <h2>${n ? esc(s.name) : 'Noch nicht gesammelt'} ${rarChip(s.rarity)}</h2>
     <p class="ink2">${n ? esc(s.desc) : 'Diesen Skin gibt es nur in Aircraft Mystery Packs oder im Tausch mit anderen Spielern.'}</p>
-    <div class="small muted">Im Besitz: ${n} · aktiv auf ${actCount(s.id)} von ${Math.max(0, (n - ((m.reserved || {})[s.id] || 0)) * SK.PER_COPY)} möglichen Flugzeugen (je Exemplar ${SK.PER_COPY})${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
+    <div class="small muted">Im Besitz: ${n} · aktiv auf ${actCount(s.id)} von ${Math.max(0, (n - ((m.reserved || {})[s.id] || 0)) * SK.perCopy(s.id))} möglichen Flugzeugen (je Exemplar ${SK.perCopy(s.id) === 1 ? 'eins' : SK.perCopy(s.id)})${(m.reserved || {})[s.id] ? ` · im Tauschangebot: ${m.reserved[s.id]}` : ''} · Karteneffekt: ${({ paint: 'neue Lackierung', sheen: 'blauer Glanz', glow: 'pinkes Leuchten mit Partikeln', fire: 'rotes Glühen mit Funken', disco: 'blinkt in allen Farben', gold: 'goldener Ring, goldene Route' })[s.mapEffect]}</div>
     ${acts.length > here.length ? `<p class="small muted">Außerdem aktiv in ${acts.length - here.length} Flugzeug(en) anderer Spiele.</p>` : ''}
     ${n && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Flugzeuge wählen <span class="muted">(antippen zum An- und Abwählen, noch ${Math.max(0, freeSlots(s.id))} frei)</span></b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id), on = cur && cur.id === s.id; return `<button class="btn small${on ? ' primary' : ''}" data-sd="${on ? 'off' : 'on'}" data-ac="${a.id}" aria-pressed="${!!on}" ${!on && freeSlots(s.id) < 1 ? 'disabled' : ''}>${on ? '✓ ' : ''}${esc(acName(a.id))}${cur && !on ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
       : n && !fits.length ? `<p class="small muted">Sie haben keine ${esc(modelOf(s).name)} in Ihrer Flotte.</p>` : ''}
@@ -350,7 +350,7 @@ function equipHtml(s, msg = '') {
   if (!fits.length) return head || `<span class="small" style="color:#a5b4d0">Keine ${esc(modelOf(s).name)} in Ihrer Flotte – der Skin wartet in der Sammlung.</span>`;
   const left = freeSlots(s.id), cur = (a) => { const k = skinFor(pl, a.id); return k ? k.name : 'Standard'; }, on = (a) => { const k = skinFor(pl, a.id); return !!(k && k.id === s.id); };
   const btn = (a) => `<button class="btn small${on(a) ? '' : ' gold'}" data-pk="eq" data-ac="${a.id}" ${on(a) || left < 1 ? 'disabled' : ''}>${on(a) ? '✓ ' : ''}${esc(acName(a.id))}${on(a) ? '' : ` <span class="small" style="opacity:.75">(${esc(cur(a))})</span>`}</button>`;
-  return `${head}<span class="small" style="color:#c3cde0">${left > 0 ? `Jetzt ausrüsten – auf bis zu ${SK.PER_COPY} Flugzeugen je Exemplar (noch ${left} frei):` : `Alle ${SK.PER_COPY * Math.max(1, (coll.me && coll.me.inv[s.id]) || 1)} Plätze dieses Skins sind belegt.`}</span><div class="row" style="gap:6px;flex-wrap:wrap;justify-content:center">${fits.slice(0, 10).map(btn).join('')}</div>${fits.length > 10 ? `<span class="small" style="color:#a5b4d0">und ${fits.length - 10} weitere – in der Sammlung wählbar</span>` : ''}`;
+  return `${head}<span class="small" style="color:#c3cde0">${left > 0 ? `Jetzt ausrüsten – ${SK.perCopy(s.id) === 1 ? 'ein Flugzeug je Exemplar' : `bis zu ${SK.perCopy(s.id)} Flugzeuge je Exemplar`} (noch ${left} frei):` : `Alle Plätze dieses Skins sind belegt (${SK.perCopy(s.id) === 1 ? 'ein Flugzeug' : `${SK.perCopy(s.id)} Flugzeuge`} je Exemplar).`}</span><div class="row" style="gap:6px;flex-wrap:wrap;justify-content:center">${fits.slice(0, 10).map(btn).join('')}</div>${fits.length > 10 ? `<span class="small" style="color:#a5b4d0">und ${fits.length - 10} weitere – in der Sammlung wählbar</span>` : ''}`;
 }
 function playReveal(ov, pack) {
   const items = pack.res.map((id, i) => ({ s: SK.SKIN_BY_ID[id], fresh: pack.fresh ? pack.fresh[i] : false })).filter((x) => x.s);

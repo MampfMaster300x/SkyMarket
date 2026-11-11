@@ -1063,7 +1063,11 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     for (let i = 0; i < 9; i++) w.step(); assert.equal(dc.resolved, 'ignored'); assert.equal(SMx.auditDebtSum(b.audit).left > 0 || b.audit.debts.length === 0, true);
     const w2 = mk(54); SMx.auditOrder(w2.w, { b: 'P2', a: 'P1', amount: 10e6 }); const d2 = w2.b.decisions.find((x) => x.type === 'auditpay'), c0 = w2.b.ledger.cash;
     assert.ok(SMx.applyAction(w2.w, 'P2', { type: 'decide', id: d2.id, choice: 'now' }).ok); assert.equal(Math.round((c0 - w2.b.ledger.cash) / 100), 10e6 + 0.9e6, 'sofort: 10 Mio. + 1 Mio. Bußgeld − 10 % Nachlass');
-    assert.ok(Math.abs(SMx.balanceSheet(w2.b).check) < 0.01, 'Bilanz stimmt'); }
+    assert.ok(Math.abs(SMx.balanceSheet(w2.b).check) < 0.01, 'Bilanz stimmt');
+    // 0.21.61: Bescheide nachvollziehbar – Zusammensetzung, wer wann gewählt hat, Stand der Raten
+    const bA = b.audit.bills.at(-1); assert.ok(bA.how === 'auto' && bA.mode === 'r12' && bA.claw === 10e6 && bA.fine0 === 1e6 && bA.total === Math.round(11e6 * 1.05 / 1e3) * 1e3 && bA.n === 12 && bA.deadline, 'automatisch gewählt, 12 Raten mit Aufschlag');
+    const bB = w2.b.audit.bills.at(-1); assert.ok(bB.how === 'self' && bB.mode === 'now' && bB.skonto === 1e5 && bB.paid === 10.9e6 && bB.rest === 0, 'selbst gewählt, sofort mit Nachlass');
+    for (let i = 0; i < 40; i++) w.step(); assert.ok(bA.paidN >= 1 && bA.paid >= bA.monthly && bA.rest === bA.total - bA.paid, 'Raten werden mitgezählt'); }
   { const { w, b } = mk(55); SMx.auditOrder(w, { b: 'P2', a: 'P1', amount: 8e6, mode: 'now' }); const txt = b.events.map((e) => e.msg).join(' ') + w.news.map((n) => n.msg).join(' ');
     assert.ok(/Nachprüfung/.test(txt) && !/Spielleitung|Anordnung|angeordnet von/i.test(txt.replace(/Rückzahlung und Bußgeld angeordnet/g, '')), 'Spieler sehen eine gewöhnliche Nachprüfung, keinen Hinweis auf die Spielleitung'); }
   console.log('0.21.24 ok: Partner nicht mehr im Spiel (neu gegründet/entfernt) → Staatskasse, Zahlungsweisen sofort/6/12/24 Raten, Wahl durch die Airline mit Nachlass, ohne Wahl 12 Raten');
@@ -1528,11 +1532,15 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   { const sid = Object.keys(me.inv).find((x) => me.inv[x] === 1 && !Object.values(me.active).includes(x)), sk = SK.SKIN_BY_ID[sid];
     assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-001', skinId: sid, type: 'XXXX', fleet: ['P1-001', 'P1-002'] })).status, 400, 'solo: falsches Modell');
     let m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-001', skinId: sid, type: sk.type, fleet: ['P1-001', 'P1-002'] }), 'solo aktivieren').me; assert.equal(m2.active['solo|P1-001'], sid);
-    // 0.21.57: ein Exemplar deckt bis zu 5 Flugzeuge, das sechste nicht
-    const F6 = ['P1-001', 'P1-002', 'P1-003', 'P1-004', 'P1-005', 'P1-006'];
-    for (const ac of F6.slice(1, 5)) m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: ac, skinId: sid, type: sk.type, fleet: F6 }), 'solo: ' + ac).me;
-    assert.equal(Object.values(m2.active).filter((x) => x === sid).length, 5, 'fünf Flugzeuge mit einem Exemplar');
-    assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-006', skinId: sid, type: sk.type, fleet: F6 })).status, 409, 'solo: sechstes Flugzeug braucht ein zweites Exemplar');
+    // 0.21.61: ein Exemplar deckt 2 Flugzeuge (Grün/Blau) bzw. 1 (ab Pink)
+    const F6 = ['P1-001', 'P1-002', 'P1-003', 'P1-004', 'P1-005', 'P1-006'], cap = SK.perCopy(sid);
+    assert.equal(SK.perCopy(SK.SKINS.find((x) => x.rarity === 'u').id), 2); assert.equal(SK.perCopy(SK.SKINS.find((x) => x.rarity === 'e').id), 1); assert.equal(SK.perCopy(SK.SKINS.find((x) => x.rarity === 'l').id), 1);
+    for (const ac of F6.slice(1, cap)) m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: ac, skinId: sid, type: sk.type, fleet: F6 }), 'solo: ' + ac).me;
+    assert.equal(Object.values(m2.active).filter((x) => x === sid).length, cap, `${cap} Flugzeug(e) mit einem Exemplar`);
+    assert.equal((await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: F6[cap], skinId: sid, type: sk.type, fleet: F6 })).status, 409, 'solo: darüber braucht es ein zweites Exemplar');
+    // ältere Stände mit mehr Flugzeugen werden beim Laden auf die Grenze zurückgesetzt
+    { const rg = await store.get('coll/registry', { type: 'json' }); for (const ac of F6) rg.users.anna.active['solo|' + ac] = sid; await store.setJSON('coll/registry', rg);
+      const mt = ok(await call('anna', 'GET', '/coll'), 'trim').me; assert.equal(Object.values(mt.active).filter((x) => x === sid).length, cap, 'auf die Grenze zurückgesetzt'); assert.ok(mt.notes.some((x) => /Neue Regel/.test(x.msg)), 'Hinweis'); }
     m2 = ok(await call('anna', 'POST', '/coll/activate', { game: 'solo', acId: 'P1-002', skinId: null, type: sk.type, fleet: ['P1-002'] }), 'solo aufräumen').me; assert.ok(!m2.active['solo|P1-001'], 'verkauftes Flugzeug gibt den Skin frei');
     assert.ok(!Object.keys(m2.active).some((k) => k.startsWith('solo|') && k !== 'solo|P1-002'), 'alle verkauften Flugzeuge geben frei'); }
   assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'x' })).status, 400);
@@ -1599,6 +1607,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.ok(/Passagier|fliegt keine Linie/.test(SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'FRA', dest: 'MAD', typeId: 'A21F', freq: 1 }).msg || ''), 'Frachter fliegen keine Passagierlinie');
   for (const t of ['A21F', 'A21F']) assert.ok(SMx.applyAction(w, 'P1', { type: 'acquire', typeId: t, base: 'FRA', mode: 'lease' }).ok);
   while (w.day <= Math.max(...a.fleet.map((x) => x.delivery_day))) w.step();
+  assert.ok(a.dayHist.some((x) => x.cf && x.cf.deposit < 0) && a.dayHist.every((x) => typeof x.nc === 'number'), '0.21.61: Tagesverlauf zeigt Geldbewegungen ohne Ergebnis (Kaution) und Kontostand netto');
   assert.equal(SMx.applyAction(w, 'P1', { type: 'cgOpen', base: 'FRA', dest: 'A320', typeId: 'A21F', freq: 5 }).ok, false);
   const qt = w.freightQuote(a, 'FRA', 'MAD', 'A21F', 5, 1); assert.ok(qt.need === 1 && qt.kg > 0 && qt.dem > qt.kg, 'Vorschau');
   const u0 = w.slotUse('MAD'), r = SMx.applyAction(w, 'P1', { type: 'cgOpen', base: 'FRA', dest: 'MAD', typeId: 'A21F', freq: 5, rate: 1 }); assert.ok(r.ok, r.msg);
@@ -1619,11 +1628,41 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.ok(SMx.applyAction(w, 'P1', { type: 'cgEdit', id: q.id, freq: 4, rate: 1.15 }).ok); assert.equal(a.fleet.filter((x) => x.cg === q.id).length, 1, 'Frachter wieder frei'); assert.equal(q.rate, 1.15);
   const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))), a2 = w2.airlines.P1; assert.ok(a2.cgRoutes().length === 1 && a2.fleet.some((x) => x.cg === q.id) && a2.cgRoutes()[0].hist.length === q.hist.length, 'gespeichert');
   for (let i = 0; i < 3; i++) { w.step(); w2.step(); } assert.equal(JSON.stringify(w.airlines.P1.cgRoutes()[0].hist.at(-1)), JSON.stringify(a2.cgRoutes()[0].hist.at(-1)), 'nach dem Laden gleich weiter');
-  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgClose', id: q.id }).ok); assert.ok(!a.fleet.some((x) => x.cg) && !a.cgRoutes().length, 'geschlossen, Frachter frei'); assert.ok(a.cgSlotsAt('MAD') === 0, 'keine Frachtslots mehr in Nutzung');
+  // 0.21.60: Planung und Voraussetzungen
+  const ck = w.cgCheck(a, 'FRA', 'LHR', 'B77F', 3); assert.ok(!ck.ok && ck.missing >= 1 && ck.range, 'Voraussetzung: Frachter fehlt');
+  const pa = SMx.applyAction(w, 'P1', { type: 'cgPlanAdd', base: 'FRA', dest: 'LHR', typeId: 'B77F', freq: 3 }); assert.ok(pa.ok, pa.msg);
+  assert.equal(SMx.applyAction(w, 'P1', { type: 'cgPlanAdd', base: 'LHR', dest: 'FRA', typeId: 'B77F', freq: 3 }).ok, false, 'doppelt geplant');
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgPlanEdit', id: pa.plan.id, freq: 5 }).ok); assert.equal(a.cg.plans[0].freq, 5);
+  const wp = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.equal(wp.airlines.P1.cg.plans.length, 1, 'Planung gespeichert');
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgPlanAdd', base: 'FRA', dest: 'BCN', typeId: 'A21F', freq: 2 }).ok);
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgPlanDel', id: pa.plan.id }).ok); assert.equal(a.cg.plans.length, 1);
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgClose', id: q.id }).ok);
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgOpen', base: 'FRA', dest: 'BCN', typeId: 'A21F', freq: 2 }).ok, 'aus der Planung eröffnet'); assert.equal(a.cg.plans.length, 0, 'eröffnete Strecke verschwindet aus der Planung');
+  assert.ok(SMx.applyAction(w, 'P1', { type: 'cgClose', id: a.cgRoutes()[0].id }).ok); assert.ok(!a.fleet.some((x) => x.cg) && !a.cgRoutes().length, 'geschlossen, Frachter frei'); assert.ok(a.cgSlotsAt('MAD') === 0, 'keine Frachtslots mehr in Nutzung');
   // KI eröffnet Frachtsparten
   const w3 = SMx.newWorld({ seed: 9 }); SMx.addHuman(w3, { id: 'P1', name: 'B', code: 'BB', base: 'HAM' }); w3.playerId = 'P1';
   for (let i = 0; i < 240; i++) w3.step();
   const aiCg = w3.list.filter((x) => x.archetype && x.cg && x.cgRoutes().length); assert.ok(aiCg.length >= 1, 'KI mit Frachtsparte');
   console.log(`0.21.56 ok: Frachtsparte – ${Math.round(kg / 30 / 1000)} t/Tag FRA–MAD (Vorschau ${Math.round(2 * qt.kg / 1000)} t), ${aiCg.length} KI-Frachtsparten nach 240 Tagen`);
+}
+// 0.21.60: Charteranfragen wachsen mit der Zahl der Spielenden, werden wöchentlich aufgefüllt, Anlass-Charter je Monat
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const count = (H) => { const w = SMx.newWorld({ seed: 3 }); for (let i = 1; i <= H; i++) SMx.addHuman(w, { id: 'P' + i, name: 'A' + i, code: 'Q' + String.fromCharCode(64 + i), base: ['FRA', 'HAM', 'MUC', 'DUS', 'BER', 'CGN', 'STR', 'HAJ', 'NUE', 'LEJ', 'AMS', 'VIE'][i - 1] }); w.playerId = 'P1';
+    for (let d = 0; d < 70; d++) w.step(); return { pax: w.acmiOffers.filter((x) => !x.kind && !x.ev).length, occ: w.acmiOffers.filter((x) => /^occ/.test(x.ev || '')).length }; };
+  const c1 = count(1), c12 = count(12);
+  assert.ok(c12.pax > c1.pax, `mehr Anfragen bei mehr Spielenden: ${c1.pax} → ${c12.pax}`); assert.ok(c12.occ >= 2, 'Anlass-Charter vorhanden');
+  console.log(`0.21.60 ok: Charteranfragen ${c1.pax} (1 Spieler) → ${c12.pax} (12 Spielende), ${c12.occ} Anlass-Charter; Frachtplanung`);
+}
+// 0.21.62: Farben der Spielenden – eindeutig, wählbar, vergebene gesperrt, ältere Doppel werden aufgelöst
+{ const SMx = (await import('../shared/engine.cjs')).default; const P = SMx.P;
+  assert.ok(P.AL_COLORS.length >= 40 && new Set(P.AL_COLORS.map((c) => c.hex)).size === P.AL_COLORS.length, 'genug verschiedene Farben');
+  const w = SMx.newWorld({ seed: 2 }); const bases = ['FRA', 'HAM', 'MUC', 'DUS', 'BER', 'CGN', 'STR', 'HAJ', 'NUE', 'LEJ', 'AMS', 'VIE'];
+  for (let i = 0; i < 12; i++) SMx.addHuman(w, { id: 'P' + (i + 1), name: 'A' + i, code: 'Q' + String.fromCharCode(65 + i), base: bases[i] });
+  assert.equal(new Set(w.humans.map((h) => h.color)).size, 12, 'keine Farbe doppelt (früher reihum 8)');
+  assert.equal(SMx.applyAction(w, 'P2', { type: 'setColor', color: w.airlines.P1.color }).ok, false, 'vergebene Farbe gesperrt');
+  assert.ok(SMx.applyAction(w, 'P2', { type: 'setColor', color: 30 }).ok); assert.equal(w.airlines.P2.color, 30);
+  w.airlines.P3.color = 30; w.airlines.P4.color = 99;   // alter Stand mit Doppel und ungültiger Farbe
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.equal(new Set(w2.humans.map((h) => h.color)).size, 12, 'beim Laden aufgelöst'); assert.equal(w2.airlines.P2.color, 30, 'wer zuerst da war, behält sie');
+  console.log('0.21.62 ok: Farben eindeutig und wählbar');
 }
 console.log('Alle Prüfungen bestanden.');

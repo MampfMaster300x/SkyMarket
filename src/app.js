@@ -44,7 +44,9 @@ const dateShort = (day) => { const p = dateParts(day); return `${p.d}. ${MONTHS[
 const dateY = (day) => { const p = dateParts(day); return `${p.d}. ${MONTHS[p.m]} ${p.y}`; };
 const dateLong = (day) => { const p = dateParts(day); return `${p.wd}, ${p.d}. ${MONTHS[p.m]} ${p.y}`; };
 const apName = (c) => P.AIRPORTS[c].name;
-const colorOf = (al) => (al.id === W.playerId ? 'var(--accent)' : al.archetype ? `var(--ai${al.color})` : `var(--hum${al.color || 1})`);
+/** 0.21.62: Spieler-Airlines in ihrer festen Farbe – auf jedem Gerät gleich, auch die eigene. */
+const humHex = (c) => (P.AL_COLORS[(c || 1) - 1] || P.AL_COLORS[0]).hex;
+const colorOf = (al) => (al.archetype ? `var(--ai${al.color})` : humHex(al.color));
 const svcLabel = (s) => P.SERVICE[s].label;
 const bufLabel = (b) => P.BUFFER_POLICY[b].label;
 const modeLabel = (a) => (a.owned ? 'Eigentum' : a.flex ? 'Flex-Leasing' : 'Leasing');
@@ -345,15 +347,27 @@ function renderAirports() {
   ui.viewDirty = false;
 }
 // Welche Airlines auf der Karte erscheinen: Filter „Live-Flüge“ und Schalter Konkurrenz
+/** 0.21.61: In der Legende ausgeblendete Airlines (je Spiel im Browser gemerkt). */
+const hideKey = () => `sky-hideal-${ui.mp ? ui.mp.id : 'solo'}`;
+function hiddenAl() {
+  if (!ui.hideAl || ui.hideAl.key !== hideKey()) { let ids = []; try { ids = JSON.parse(localStorage.getItem(hideKey()) || '[]'); } catch (e) { ids = []; } ui.hideAl = { key: hideKey(), set: new Set(Array.isArray(ids) ? ids : []) }; }
+  return ui.hideAl.set;
+}
+function toggleHideAl(id) {
+  const h = hiddenAl(); if (h.has(id)) h.delete(id); else h.add(id);
+  try { localStorage.setItem(hideKey(), JSON.stringify([...h])); } catch (e) { /* nur für diese Sitzung */ }
+  renderMapRoutes(true); ui.planesNow = true;
+}
 function visibleAl(al) {
   if (al.id === W.playerId) return true;
+  if (hiddenAl().has(al.id)) return false;
   if (al.status === 'insolvent' || al.removed) return false;   // insolvente und entfernte Airlines verschwinden von der Karte
   if (!al.archetype) return ui.flightFilter !== 'mine';
   return ui.flightFilter === 'all' && ui.showAi;
 }
 function renderMapRoutes(force = false) {
   const evs = SM.AP_CODES.map(aptEventState).join(','), dead = deadCountries();
-  const sig = dead.join('') + W.list.map((al) => al.activeRoutes().map((r) => r.id + r.freq + (r.flyingToday || 0)).join(',') + (al.cg ? al.cgRoutes().map((q) => q.id + q.freq).join(',') : '')).join('|') + ui.showAi + ui.flightFilter + ui.expanded + ui.selApt + evs + W.player.bases.join() + '|' + W.day + '|' + W.geoLists().fly.map((e) => e.id).join();
+  const sig = dead.join('') + W.list.map((al) => al.activeRoutes().map((r) => r.id + r.freq + (r.flyingToday || 0)).join(',') + (al.cg ? al.cgRoutes().map((q) => q.id + q.freq).join(',') : '')).join('|') + ui.showAi + ui.flightFilter + ui.expanded + ui.selApt + [...hiddenAl()].join() + evs + W.player.bases.join() + '|' + W.day + '|' + W.geoLists().fly.map((e) => e.id).join();
   if (!force && sig === ui.routesSig) return;
   ui.routesSig = sig;
   let ai = '', hum = '', mine = '';
@@ -373,6 +387,7 @@ function renderMapRoutes(force = false) {
   // 0.21.56: Frachtstrecken gestrichelt (eigene kräftig, andere dünn)
   let cg = '';
   for (const al of W.list) { if (!al.cg || al.status === 'insolvent' || (al.id !== W.playerId && !visibleAl(al))) continue; for (const q of al.cgRoutes()) cg += `<path class="rt ${al.id === W.playerId ? 'cg' : 'cgai'}" d="${lineD(gcLine(q.base, q.dest))}"${al.id === W.playerId ? '' : ` stroke="${colorOf(al)}"`}/>`; }
+  document.documentElement.style.setProperty('--mine', humHex(W.player.color));
   $('#gRoutes').innerHTML = ai + hum + cg + mine;
   renderGrey(dead); ui.dead = new Set(dead);
   ui.viewDirty = true;
@@ -398,14 +413,19 @@ function distLabelHtml() {
 }
 function renderLegend() {
   const n = W.list.filter((al) => al.archetype && al.status !== 'insolvent').length;
-  const items = [`<span><i style="background:var(--accent);box-shadow:0 0 8px var(--accent)"></i>${esc(W.player.name)}</span>`]
-    .concat(ui.flightFilter === 'mine' ? [] : W.humans.filter((h) => h.id !== W.playerId && !h.removed && h.status !== 'insolvent').map((h) => `<span><i style="background:${colorOf(h)};box-shadow:0 0 8px ${colorOf(h)}"></i>${esc(h.name)}</span>`));
-  if (ui.showAi && ui.flightFilter === 'all') items.push(`<span><i style="background:var(--plane-ai)"></i>${n} Konkurrenten</span>`);
+  const items = [`<span><i style="background:${colorOf(W.player)};box-shadow:0 0 8px ${colorOf(W.player)}"></i>${esc(W.player.name)}</span>`]
+    .concat(ui.flightFilter === 'mine' ? [] : W.humans.filter((h) => h.id !== W.playerId && !h.removed && h.status !== 'insolvent').map((h) => { const off = hiddenAl().has(h.id); return `<button class="lg${off ? ' off' : ''}" data-lg="${h.id}" aria-pressed="${!off}" title="${off ? 'Einblenden' : 'Im Streckennetz ausblenden'}"><i style="background:${colorOf(h)};box-shadow:0 0 8px ${colorOf(h)}"></i>${esc(h.name)}</button>`; }));
+  if (ui.flightFilter === 'all') items.push(`<button class="lg${ui.showAi ? '' : ' off'}" data-lg="_ai" aria-pressed="${!!ui.showAi}" title="${ui.showAi ? 'KI-Konkurrenz ausblenden' : 'KI-Konkurrenz einblenden'}"><i style="background:var(--plane-ai)"></i>${n} Konkurrenten</button>`);
   if (SM.AP_CODES.some((c) => aptEventState(c) === 'bad')) items.push('<span><i class="ring crit"></i>Störung</span>');
   if (SM.AP_CODES.some((c) => aptEventState(c) === 'good')) items.push('<span><i class="ring good"></i>Großereignis</span>');
   if (ui.dead && ui.dead.size) items.push('<span><i style="background:#6b7280"></i>keine Nachfrage</span>');
   if (W && W.geoLists().fly.length) items.push('<span><i style="background:transparent;border:1.5px dashed var(--crit)"></i>Überflug gesperrt</span>');
-  $('#legend').innerHTML = `<div class="row">${items.join('')}</div>`;
+  if (hiddenAl().size) items.push(`<button class="lg lg-all" data-lg="_all">alle einblenden</button>`);
+  const lg = $('#legend'); lg.innerHTML = `<div class="row">${items.join('')}</div>`;
+  lg.onclick = (e) => { const b = e.target.closest('[data-lg]'); if (!b) return; e.stopPropagation(); const id = b.dataset.lg;
+    if (id === '_ai') { ui.showAi = !ui.showAi; const t = $('#tglAi'); if (t) t.setAttribute('aria-pressed', String(ui.showAi)); renderMapRoutes(true); ui.planesNow = true; return; }
+    if (id === '_all') { hiddenAl().clear(); try { localStorage.removeItem(hideKey()); } catch (x) { /* egal */ } renderMapRoutes(true); ui.planesNow = true; return; }
+    toggleHideAl(id); };
 }
 // Zähler „Aktive Flüge“ mit Tagesprofil (eigene Flüge je Stunde)
 function activeFlights() {
@@ -567,7 +587,7 @@ function sizePlaneCanvas() {
 }
 function planeColors() {
   const cs = getComputedStyle($('#map') || document.documentElement), g = (k, d) => cs.getPropertyValue(k).trim() || d;
-  planeCv.col = { ai: g('--plane-ai', '#8c9db6'), me: g('--plane', '#f2b400'), edge: g('--plane-edge', '#5a4400'), trail: g('--trail', '#f2b400') };
+  planeCv.col = { ai: g('--plane-ai', '#8c9db6'), me: W && W.player ? humHex(W.player.color) : g('--plane', '#f2b400'), edge: g('--plane-edge', '#5a4400'), trail: g('--trail', '#f2b400') };
   planeCv.cs = cs; planeCv.vars = new Map();
   planeCv.colAt = performance.now();
 }
@@ -687,7 +707,7 @@ function renderPlaneCard() {
   const phase = ground ? (h < l.t0 ? `Am Boden in ${l.a}` : `Am Boden in ${l.b}`) : f < 0.14 ? 'Steigflug' : f > 0.86 ? 'Sinkflug' : `Reiseflug FL${t.ill.kind === 'prop' ? 240 : 360}`;
   const last = l.r.hist.at(-1), seatsDir = l.r.seats(), fl = l.r.flyingToday || l.r.freq;
   const pax = last ? Math.round((last['pax_' + l.dir] || 0) / Math.max(1, fl)) : null;
-  const color = me ? 'var(--accent)' : `var(--ai${al.color})`;
+  const color = colorOf(al);
   const hu = !me && !al.archetype;
   box.innerHTML = `<div class="pc-head${me || hu ? '' : ' ai'}"${hu ? ` style="background:linear-gradient(120deg, ${colorOf(al)}, #0b1a33)"` : ''}><div><span class="badge">${ground ? 'Am Boden' : 'In der Luft'}</span><b style="display:block;margin-top:5px">${flightNo(al, l.r, l.dir)}</b><small>${esc(al.name)} · ${t.label}</small></div><button data-pc="close" aria-label="Schließen">×</button></div>
     ${(() => { const sk = skinFor(al, a.id); return sk ? acSvg(a.type_id, { skin: sk }) + `<div class="pc-skin">${rarChip(sk.rarity)} <b>${esc(sk.name)}</b></div>` : acSvg(a.type_id, { ...(al.logo ? { color: al.logo.c1, ink: al.logo.c2, code: al.code } : { color, code: me ? al.code : al.id.slice(0, 2), ink: me ? 'var(--on-accent)' : '#fff' }), pix: al.pixLogo ? pixUrl(al.pixLogo) || null : null }); })()}
@@ -777,7 +797,7 @@ const SECTIONS = [
   { key: 'karte', label: 'Karte', sub: 'Live-Lage und Überblick', icon: 'globe', tabs: [['dashboard', 'Dashboard'], ['strategy', 'Strategie'], ['history', 'Verlauf'], ['cockpit', 'Übersicht'], ['departures', 'Abflüge'], ['news', 'Meldungen']] },
   { key: 'flotte', label: 'Flotte', sub: 'Jedes Flugzeug zählt', icon: 'plane', tabs: [['fleetOwn', 'Ihre Flotte'], ['fleetPlan', 'Einsatzplan'], ['fleetBuy', 'Beschaffung'], ['fleetAcmi', 'Charter']] },
   { key: 'strecken', label: 'Strecken', sub: 'Verbindungen sind Chancen', icon: 'route', tabs: [['routes', 'Netz'], ['plan', 'Planung'], ['plans', 'Pläne'], ['hubs', 'Drehkreuze'], ['slots', 'Slots']] },
-  { key: 'cargo', label: 'Cargo', sub: 'Fracht mit eigenen Frachtern', icon: 'box', tabs: [['cargo', 'Frachtnetz'], ['cargoNew', 'Neue Frachtstrecke'], ['cargoMarket', 'Frachtmarkt']] },
+  { key: 'cargo', label: 'Cargo', sub: 'Fracht mit eigenen Frachtern', icon: 'box', tabs: [['cargo', 'Frachtnetz'], ['cargoPlan', 'Planung'], ['cargoNew', 'Ziele finden'], ['cargoFleet', 'Frachter'], ['cargoMarket', 'Frachtmarkt']] },
   { key: 'finanzen', label: 'Finanzen', sub: 'Zahlen. Fakten. Entscheidungen.', icon: 'chart', tabs: [['finance', 'Ergebnis und Bilanz'], ['credit', 'Kredite und Rating'], ['rescue', 'Sanierung'], ['cfo', 'CFO-Beratung']] },
   { key: 'markt', label: 'Markt', sub: 'Trends erkennen. Chancen nutzen.', icon: 'trend', tabs: [['market', 'Nachfrage'], ['studies', 'Marktstudien'], ['rivals', 'Wettbewerb'], ['exchange', 'Börse'], ['players', 'Mitspielende', 'mp'], ['trade', 'Handel'], ['world', 'Weltlage']] },
   { key: 'sammlung', label: 'Collection', short: 'Sammlung', sub: 'Skins sammeln, öffnen, tauschen', icon: 'gem', mp: true, tabs: [['collection', 'Collection'], ['shop', 'Shop'], ['trading', 'Trading']] },
@@ -2305,7 +2325,7 @@ VIEWS.cargo = function viewCargo() {
   let html = '<div class="stack">';
   if (!qs.length) html += `<div class="callout info stack"><b>Frachtsparte</b><span>Mit eigenen Frachtern fliegen Sie feste Frachtstrecken – getrennt von der Fracht, die in Ihren Passagierflügen mitfliegt. Jede Strecke hat ihren eigenen Frachtbedarf und eine Marktrate je Kilo. Andere Airlines (auch die KI) können ebenfalls Frachtsparten eröffnen und auf denselben Strecken konkurrieren.</span>
     <span class="small">So geht es: 1. Cargo → Neue Frachtstrecke zeigt, welche Strecke sich mit welchem Frachter ab Ihren Basen lohnt · 2. Frachter beschaffen (Flotte → Beschaffung: ATR 72-600F, A321P2F, 767-300F, 777F) · 3. Strecke eröffnen und hier Auslastung und Ergebnis verfolgen.</span>
-    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="tab" data-tab="cargoNew">Neue Frachtstrecke</button><button class="btn small" data-act="tab" data-tab="fleetBuy">Frachter beschaffen</button></div></div>`;
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small primary" data-act="tab" data-tab="cargoNew">Ziele finden</button><button class="btn small" data-act="cgbuy">Frachter beschaffen</button></div></div>`;
   const st = qs.map((q) => [q, cgStats(pl, q)]), tot = st.reduce((a, [, x]) => ({ kg: a.kg + x.kgDay, rev: a.rev + x.revDay, res: a.res + (x.days ? x.resDay : 0), cap: a.cap + (x.lf ? x.kgDay / x.lf : 0) }), { kg: 0, rev: 0, res: 0, cap: 0 });
   html += `<div class="tiles"><div class="tile"><span>Frachtstrecken</span><b>${qs.length}</b><em>${qs.filter((q) => q.opened_day > W.day).length ? `${qs.filter((q) => q.opened_day > W.day).length} starten bald` : 'in Betrieb'}</em></div>
     <div class="tile"><span>Frachter</span><b>${frs.filter((a) => a.cg).length} / ${frs.length}</b><em>auf Frachtstrecken / gesamt</em></div>
@@ -2351,8 +2371,10 @@ VIEWS.cargoNew = function viewCargoNew() {
   if (!F.type) { const own = pl.fleet.find((a) => SM.isFreighter(a.type_id) && a.base === F.base && !a.cg); F.type = own ? own.type_id : 'A21F'; }
   const t = P.AIRCRAFT_TYPES[F.type], free = cgFreeAt(pl, F.base, F.type).length;
   const openBtn = (q, primary) => { const fr = cgFreeAt(pl, q.base, q.typeId).length; return fr >= q.need ? `<button class="btn small${primary ? ' primary' : ''}" data-act="cgopen" data-b="${q.base}" data-v="${q.dest}" data-t="${q.typeId}" data-f="${q.freq}">Eröffnen</button>` : `<button class="btn small" data-act="tab" data-tab="fleetBuy" title="${q.need} ${esc(P.AIRCRAFT_TYPES[q.typeId].label)} in ${q.base} nötig, frei: ${fr}">Frachter fehlt</button>`; };
-  const qRow = (q, withType) => cgRow(`${withType ? `${q.base} → ` : ''}${q.dest} <span class="m">${esc(apName(q.dest))}</span>`, `${n0(q.km)} km${withType ? ` · ${esc(P.AIRCRAFT_TYPES[q.typeId].label)}` : ''} · Bedarf ${tKg(2 * q.dem)}/Tag${q.rivals ? ` · Konkurrenz ${tKg(2 * q.comp / P.FREIGHT.loadMax)}` : ''}`,
-    [`<b>${q.freq}× pro Woche</b> (${q.need} Frachter)`, `${NF2.format(q.rateKg)} €/kg`, `Fracht ${tKg(2 * q.kg)}/Tag`, `Auslastung ${pct(q.lf)}`, `<b class="${sgn(q.res)}">${eur(q.res, { plus: true })}/Tag</b>${q.rev > 0 ? ` <span class="m">(${pct(q.margin)} Marge)</span>` : ''}`], openBtn(q, q.res > 0), q.res > 0 ? '' : 'weak');
+  const qRow = (q, withType) => { const chk = W.cgCheck(pl, q.base, q.dest, q.typeId, q.freq), planned = ((pl.cg && pl.cg.plans) || []).some((x) => x.type_id === q.typeId && [x.base, x.dest].sort().join() === [q.base, q.dest].sort().join());
+    return cgRow(`${withType ? `${q.base} → ` : ''}${q.dest} <span class="m">${esc(apName(q.dest))}</span>`, `${n0(q.km)} km${withType ? ` · ${esc(P.AIRCRAFT_TYPES[q.typeId].label)}` : ''} · Bedarf ${tKg(2 * q.dem)}/Tag${q.rivals ? ` · Konkurrenz ${tKg(2 * q.comp / P.FREIGHT.loadMax)}` : ''}`,
+    [`<b>${q.freq}× pro Woche</b> (${q.need} Frachter)`, `${NF2.format(q.rateKg)} €/kg`, `Fracht ${tKg(2 * q.kg)}/Tag`, `Auslastung ${pct(q.lf)}`, `<b class="${sgn(q.res)}">${eur(q.res, { plus: true })}/Tag</b>${q.rev > 0 ? ` <span class="m">(${pct(q.margin)} Marge)</span>` : ''}`, cgReqHtml(chk)],
+      `<div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:wrap">${chk.ok ? `<button class="btn small${q.res > 0 ? ' primary' : ''}" data-act="cgopen" data-b="${q.base}" data-v="${q.dest}" data-t="${q.typeId}" data-f="${q.freq}">Eröffnen</button>` : ''}${planned ? '<span class="chip">in Planung</span>' : `<button class="btn small${!chk.ok && q.res > 0 ? ' primary' : ''}" data-act="cgplan" data-b="${q.base}" data-v="${q.dest}" data-t="${q.typeId}" data-f="${q.freq}">Planen</button>`}</div>`, q.res > 0 ? '' : 'weak'); };
   const best = cgBestAll(pl, F.rate).slice(0, 5);
   let html = '<div class="stack">';
   html += `<div class="card pad stack"><h3 style="margin:0">Lohnt sich am meisten</h3><p class="small muted">Über alle Ihre Basen und alle Frachter, jeweils mit der besten Frequenz. Bedarf, Fracht und Auslastung zählen beide Richtungen. Fehlt der Frachter, führt der Knopf zur Beschaffung.</p>
@@ -2360,7 +2382,7 @@ VIEWS.cargoNew = function viewCargoNew() {
   html += `<div class="card pad stack"><h3 style="margin:0">Selbst wählen</h3>
     <div class="stack" style="gap:6px"><span class="small muted">Basis</span><div class="seg wrap">${pl.bases.map((b) => `<button data-act="cgnbase" data-v="${b}" aria-pressed="${b === F.base}">${b}</button>`).join('')}</div></div>
     <div class="stack" style="gap:6px"><span class="small muted">Frachter</span><div class="seg wrap">${types.map((k) => { const n = cgFreeAt(pl, F.base, k).length; return `<button data-act="cgntype" data-v="${k}" aria-pressed="${k === F.type}">${esc(P.AIRCRAFT_TYPES[k].label)} <span class="small muted">${n0(P.AIRCRAFT_TYPES[k].cargo_kg / 1000)} t${n ? ` · ${n} frei` : ''}</span></button>`; }).join('')}</div>
-      <span class="small muted">${esc(t.label)}: ${n0(t.cargo_kg / 1000)} t Nutzlast, ${n0(t.range_km)} km Reichweite · in ${F.base} frei: <b>${free}</b>${free ? '' : ' – <a href="#" data-act="tab" data-tab="fleetBuy">Frachter beschaffen</a>'}</span></div>
+      <span class="small muted">${esc(t.label)}: ${n0(t.cargo_kg / 1000)} t Nutzlast, ${n0(t.range_km)} km Reichweite · in ${F.base} frei: <b>${free}</b>${free ? '' : ' – <a href="#" data-act="cgbuy">Frachter beschaffen</a>'}</span></div>
     <div class="stack" style="gap:6px"><span class="small muted">Rate gegenüber Markt</span>${rateSeg('cgnrate', F.rate)}</div></div>`;
   const all = SM.AP_CODES.filter((c) => c !== F.base && SM.rangeOk(F.base, c, F.type) && !pl.cgRoutes().some((x) => x.type_id === F.type && [x.base, x.dest].sort().join() === [F.base, c].sort().join())).map((c) => [c, SM.freightDemand(F.base, c) * SM.freightRef(F.base, c)]).sort((a, b) => b[1] - a[1]).slice(0, 30);
   const quotes = all.map(([c]) => W.freightBest(pl, F.base, c, F.type, F.rate)).filter(Boolean).sort((a, b) => b.res - a.res);
@@ -2371,6 +2393,45 @@ VIEWS.cargoNew = function viewCargoNew() {
     ${quotes.length > 10 ? listMore('cgdest', quotes.length, 10) : ''}
     <p class="small muted">Prognose ohne Zufall, mit der heutigen Konkurrenz; Fracht und Auslastung für beide Richtungen, Ergebnis nach Flug-, Fracht- und Frachterkosten. Slots braucht es an beiden Flughäfen, der erste Flug startet ${P.FREIGHT.lead} Tage nach der Eröffnung. Eine Rate unter 100 % zieht Fracht von der Konkurrenz ab, über 100 % bringt mehr je Kilo, aber weniger Fracht.</p></div>`;
   return html + '</div>';
+};
+/** 0.21.60: Voraussetzungen als Chips (grün erfüllt, rot fehlt). */
+function cgReqHtml(chk) {
+  const ok = (t) => `<span class="chip good">✓ ${t}</span>`, no = (t) => `<span class="chip bad">✗ ${t}</span>`, out = [];
+  if (!chk.isBase) out.push(no('keine eigene Basis'));
+  if (!chk.range) out.push(no('Reichweite reicht nicht')); else if (!chk.apt) out.push(no(esc(chk.aptWhy || 'Startbahn zu kurz')));
+  out.push(chk.free >= chk.need ? ok(`${chk.need} Frachter frei`) : no(`${chk.missing} ${esc(chk.typeLabel)} fehl${chk.missing > 1 ? 'en' : 't'}${chk.other ? ` (${chk.other} frei an anderer Basis)` : ''}`));
+  out.push(!chk.slots.ok ? no(`keine Slots frei in ${chk.slots.short.join(' und ')}`) : chk.slots.cost > 0 ? `<span class="chip ${chk.cash ? 'warn' : 'bad'}">${chk.cash ? '!' : '✗'} ${chk.slots.parts.map((x) => `${x.n} Slot${x.n > 1 ? 's' : ''} ${x.apt}`).join(', ')} kaufen: ${eur(chk.slots.cost)}</span>` : ok(`Slots frei (${chk.slots.n} pro Tag)`));
+  if (chk.dup) out.push(no('fliegen Sie schon'));
+  return `<span class="cgreq">${out.join('')}</span>`;
+}
+VIEWS.cargoPlan = function viewCargoPlan() {
+  const pl = W.player, plans = (pl.cg && pl.cg.plans) || [];
+  let html = '<div class="stack">';
+  if (!plans.length) return html + `<div class="callout info stack"><b>Frachtplanung</b><span>Merken Sie hier Frachtstrecken vor – auch bevor Sie Frachter oder Slots haben. Die Planung zeigt, was fehlt, was es kostet und was die Strecken bringen würden. Sobald alles erfüllt ist, eröffnen Sie mit einem Klick.</span><div class="row"><button class="btn small primary" data-act="tab" data-tab="cargoNew">Ziele finden</button></div></div></div>`;
+  const rows = plans.map((x) => ({ x, q: W.freightQuote(pl, x.base, x.dest, x.type_id, x.freq, x.rate), chk: W.cgCheck(pl, x.base, x.dest, x.type_id, x.freq) }));
+  // Bedarf an Frachtern je Muster und Basis über die ganze Planung
+  const need = {}; for (const { x, chk } of rows) { const k = `${x.type_id}|${x.base}`; const e = need[k] || (need[k] = { t: x.type_id, b: x.base, n: 0, free: chk.free }); e.n += chk.need; }
+  const sum = rows.reduce((a, { q, chk }) => ({ res: a.res + q.res, rev: a.rev + q.rev, slot: a.slot + (chk.slots.ok ? chk.slots.cost : 0) }), { res: 0, rev: 0, slot: 0 }), ready = rows.filter((r) => r.chk.ok).length;
+  html += `<div class="tiles"><div class="tile"><span>Geplant</span><b>${plans.length}</b><em>${ready} sofort startklar</em></div><div class="tile"><span>Umsatz</span><b>${eur(sum.rev)}</b><em>pro Tag, wenn alle fliegen</em></div><div class="tile"><span>Ergebnis</span><b class="${sgn(sum.res)}">${eur(sum.res, { plus: true })}</b><em>pro Tag, nach Frachterkosten</em></div><div class="tile"><span>Slots kaufen</span><b>${eur(sum.slot)}</b><em>einmalig</em></div></div>`;
+  html += `<div class="card pad stack"><h3 style="margin:0">Frachter für die Planung</h3><div class="cgl">${Object.values(need).map((e) => { const miss = Math.max(0, e.n - e.free), t = P.AIRCRAFT_TYPES[e.t]; return cgRow(`${esc(t.label)} in ${e.b}`, `${n0(t.cargo_kg / 1000)} t Nutzlast`, [`${e.n} nötig`, `${e.free} frei`, miss ? `<b class="neg">${miss} fehl${miss > 1 ? 'en' : 't'}</b>` : '<b class="pos">genug</b>', miss ? `Leasing etwa ${eur(t.lease_month * cpi() * miss)} pro Monat` : ''], miss ? `<button class="btn small primary" data-act="cgbuy">Beschaffen</button>` : ''); }).join('')}</div></div>`;
+  html += `<div class="cgl">${rows.map(({ x, q, chk }) => cgRow(`${x.base}–${x.dest} <span class="m">${esc(apName(x.dest))}</span>`, `${n0(q.km)} km · ${esc(P.AIRCRAFT_TYPES[x.type_id].label)} · geplant am ${dateShort(x.added)}`,
+    [`${freqStep('cgpfreq', x.freq, ` data-id="${x.id}"`)}`, `Fracht ${tKg(2 * q.kg)}/Tag (${pct(q.lf)})`, `${NF2.format(q.rateKg)} €/kg`, `<b class="${sgn(q.res)}">${eur(q.res, { plus: true })}/Tag</b>`, cgReqHtml(chk)],
+    `<div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:wrap">${chk.ok ? `<button class="btn small primary" data-act="cgopen" data-b="${x.base}" data-v="${x.dest}" data-t="${x.type_id}" data-f="${x.freq}">Eröffnen</button>` : chk.missing ? '<button class="btn small" data-act="cgbuy">Frachter beschaffen</button>' : ''}<button class="btn small ghost" data-act="cgplandel" data-id="${x.id}" aria-label="Aus der Planung entfernen">Entfernen</button></div>`, chk.ok ? 'sel' : '')).join('')}</div>`;
+  html += `<p class="small muted">Prognose mit der heutigen Konkurrenz. Slotpreise und freie Frachter ändern sich – die Häkchen zeigen den Stand von heute.</p>`;
+  return html + '</div>';
+};
+VIEWS.cargoFleet = function viewCargoFleet() {
+  const pl = W.player, frs = pl.fleet.filter((a) => SM.isFreighter(a.type_id)), qs = pl.cgRoutes();
+  let html = `<div class="stack"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center"><span class="small muted">${frs.length ? `${frs.length} Frachter · ${frs.filter((a) => a.cg).length} auf Frachtstrecken · ${frs.filter((a) => !a.cg && SM.acmiList(a, W.day).length).length} im Charter` : 'Noch keine Frachter in der Flotte.'}</span><button class="btn small primary" data-act="cgbuy">Frachter beschaffen</button></div>`;
+  if (!frs.length) html += `<div class="callout info"><span>Frachter gibt es neu oder gebraucht unter Flotte → Beschaffung, Bereich „Frachter“: ATR 72-600F (9 t, Zubringer bis ~1.500 km), A321P2F (28 t, Mittelstrecke), 767-300F (52 t) und 777F (102 t, Langstrecke).</span></div>`;
+  html += `<div class="cgl">${frs.map((a) => {
+    const t = P.AIRCRAFT_TYPES[a.type_id], q = a.cg && qs.find((x) => x.id === a.cg), ch = SM.acmiList(a, W.day)[0];
+    const st = a.delivery_day > W.day ? `<span class="chip">Auslieferung ${dateShort(a.delivery_day)}</span>` : a.status === 'ccheck' ? '<span class="chip warn">C-Check</span>' : a.status === 'aog' ? '<span class="chip bad">am Boden (AOG)</span>' : q ? `<span class="chip cgc">Fracht ${q.base}–${q.dest} · ${q.freq}× pro Woche</span>` : ch ? `<span class="chip">Charter bis ${dateShort(ch.end)}</span>` : '<span class="chip warn">ohne Einsatz</span>';
+    const cost = a.owned ? `Eigentum · Buchwert ${eur(a.nbv || 0)}` : `Leasing ${eur((a.leaseMonth || t.lease_month) * 1)} pro Monat`;
+    const act = q ? `<button class="btn small" data-act="tab" data-tab="cargo">Strecke</button>` : !ch && a.delivery_day <= W.day + 30 ? `<button class="btn small primary" data-act="cgfind" data-b="${a.base}" data-t="${a.type_id}">Strecke finden</button>` : '';
+    return cgRow(`${acName(a.id)} <span class="m">${esc(t.label)}</span>`, `Basis ${a.base} · ${n0(t.cargo_kg / 1000)} t · ${cost}`, [st, a.fh ? `${n0(a.fh)} Flugstunden` : ''], act);
+  }).join('')}</div></div>`;
+  return html;
 };
 VIEWS.cargoMarket = function viewCargoMarket() {
   const rows = [], pairs = new Map();
@@ -3162,13 +3223,28 @@ VIEWS.history = function viewHistory() {
   html += `<div class="card pad stack hdetail"><div class="spread"><button class="btn small" data-act="hsel" data-v="${all[si - 1] ? all[si - 1].d : sel.d}" ${si > 0 ? '' : 'disabled'} aria-label="Vortag">‹</button>
       <div style="text-align:center"><span class="small muted">${dateLong(sel.d)}</span><div class="hbig ${sgn(sel.net)}">${eur(sel.net, { plus: true })}</div></div>
       <button class="btn small" data-act="hsel" data-v="${all[si + 1] ? all[si + 1].d : sel.d}" ${si < all.length - 1 ? '' : 'disabled'} aria-label="Folgetag">›</button></div>
-    <div class="hchips">${[['Passagiere', n0(sel.pax || 0)], ['Auslastung', lf === null ? '–' : pct(lf)], ['Flüge', n0(sel.fl || 0)], ['verspätet', n0(sel.late || 0)], ['ausgefallen', n0(sel.canc || 0)], ['Kontostand', sel.cash === null ? '–' : eur(sel.cash)]].map(([l, v]) => `<span><em>${l}</em><b>${v}</b></span>`).join('')}</div>
+    <div class="hchips">${[['Passagiere', n0(sel.pax || 0)], ['Auslastung', lf === null ? '–' : pct(lf)], ['Flüge', n0(sel.fl || 0)], ['verspätet', n0(sel.late || 0)], ['ausgefallen', n0(sel.canc || 0)], ['Kontostand', sel.cash === null ? '–' : eur(sel.nc ?? sel.cash)]].map(([l, v]) => `<span><em>${l}</em><b>${v}</b></span>`).join('')}</div>
     ${histGroupsHtml(sel.g, sel.g ? sel.g[0] : sel.rev)}
+    ${cfDayHtml(sel)}
     <p class="small muted">Erlöse aus Tickets, Zusatzleistungen, Fracht und Charter; Kosten nach Gruppen, Prozent = Anteil an den Erlösen des Tages. Einmalkosten sind z. B. Basen, Strafen oder Flugzeugrückgaben.</p></div>`;
   html += `<div class="tw"><table class="t hlist"><thead><tr><th>Tag</th><th class="r">Pax</th><th class="r">Ausl.</th><th class="r">Erlöse</th><th class="r">Kosten</th><th class="r">Ergebnis</th><th class="r">Kontostand</th></tr></thead><tbody>${days.slice().reverse().map((x) => { const rev = x.g ? x.g[0] : x.rev;
-    return `<tr data-act="hsel" data-v="${x.d}" class="${x === sel ? 'on' : ''}"><td>${dateShort(x.d)}</td><td class="r">${n0(x.pax || 0)}</td><td class="r">${x.seats ? pct(x.pax / x.seats) : '–'}</td><td class="r">${eur(rev || 0)}</td><td class="r">${eur((x.net || 0) - (rev || 0))}</td><td class="r ${sgn(x.net)}"><b>${eur(x.net, { plus: true })}</b></td><td class="r">${x.cash === null ? '–' : eur(x.cash)}</td></tr>`; }).join('')}</tbody></table></div>`;
+    return `<tr data-act="hsel" data-v="${x.d}" class="${x === sel ? 'on' : ''}"><td>${dateShort(x.d)}</td><td class="r">${n0(x.pax || 0)}</td><td class="r">${x.seats ? pct(x.pax / x.seats) : '–'}</td><td class="r">${eur(rev || 0)}</td><td class="r">${eur((x.net || 0) - (rev || 0))}</td><td class="r ${sgn(x.net)}"><b>${eur(x.net, { plus: true })}</b></td><td class="r">${x.cash === null ? '–' : eur(x.nc ?? x.cash)}${cfTop(x) ? `<div class="small muted">${cfTop(x)}</div>` : ''}</td></tr>`; }).join('')}</tbody></table></div>`;
   return html;
 };
+/** 0.21.61: Geldbewegungen ohne Ergebniswirkung an einem Tag (Kauf, Tilgung, Dividende, Dispo …). */
+const CF_SKIP_TOP = new Set(['credit_draw', 'credit_repay']);
+function cfTop(x) {
+  if (!x.cf) return '';
+  const e = Object.entries(x.cf).filter(([k]) => !CF_SKIP_TOP.has(k)).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+  return e && Math.abs(e[1]) >= 1e4 ? `${esc(CF_LABEL[e[0]] || e[0])} ${eur(e[1], { plus: true })}` : '';
+}
+function cfDayHtml(x) {
+  if (!x.cf) return '';
+  const rows = Object.entries(x.cf).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const sum = rows.reduce((a, [, v]) => a + v, 0);
+  return `<div class="stack" style="gap:4px"><b class="small">Geldbewegungen ohne Ergebniswirkung</b>${rows.map(([k, v]) => `<div class="spread small"><span>${esc(CF_LABEL[k] || k)}</span><b class="${sgn(v)}">${eur(v, { plus: true })}</b></div>`).join('')}
+    <p class="small muted" style="margin:0">Ergebnis ${eur(x.net, { plus: true })} ${sum >= 0 ? '+' : '−'} Geldbewegungen ${eur(Math.abs(sum))} = Veränderung des Kontostands. Der Kontostand zeigt Guthaben abzüglich genutztem Dispo.</p></div>`;
+}
 function histFilterBar() {
   const pl = W.player, H = ui.hist, rs = pl.routes.filter((r) => r.hist.length).sort((a, b) => a.base.localeCompare(b.base) || a.dest.localeCompare(b.dest));
   const types = [...new Set(rs.map((r) => r.type_id))].sort();
@@ -3599,7 +3675,39 @@ function auditHtml(pl) {
     <p class="small ink2">Die Prüfer sehen sich alle Handelsgeschäfte mit Mitspielenden an. Wer daraus mehr als ${pct(A.tol)} über Marktwert gewinnt (mindestens ${eur(A.minGain * cpi())}), muss den Vorteil zurückzahlen (an den Partner – ist der pleite, entfernt oder neu gegründet, an die Staatskasse), zahlt ein Bußgeld (${A.fine.map((x) => pct(x)).join(' / ')} beim 1./2./3. Mal) und bekommt einen Prüfvermerk (Ansehen −${A.malus[0]} für ein Jahr). Wer vorher freiwillig zurückzahlt, bleibt straffrei. Wie gezahlt wird, wählen Sie nach dem Bescheid: sofort (10 % Nachlass aufs Bußgeld) oder in 6, 12 oder 24 Monatsraten (+2/+5/+12 %).</p>
     ${rows.length ? `<table class="t"><thead><tr><th>Partner</th><th class="r">erhalten · gegeben</th><th class="r">Vorteil</th><th></th></tr></thead><tbody>${rows.map((e) => `<tr><td>${esc(e.name)}<div class="small muted">${e.n} Geschäft${e.n === 1 ? '' : 'e'}</div></td><td class="r">${eur(e.got)}<div class="small muted">${eur(e.gave)}</div></td><td class="r ${e.flagged ? 'neg' : e.excess > 0 ? 'warnc' : ''}">${e.excess > 0 ? eur(e.excess) : '–'}${e.flagged ? '<div class="small">wird beanstandet</div>' : ''}</td><td class="r">${e.excess > 0 ? `<button class="btn small${e.flagged ? ' primary' : ''}" data-act="auditsettle" data-id="${e.partner}" title="Vorteil jetzt zurückzahlen – ohne Bußgeld und Prüfvermerk">Zurückzahlen</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="small muted">Keine Handelsgeschäfte mit Mitspielenden in diesem Jahr.</p>'}
     ${cur ? `<div class="callout warn"><b>Prüfvermerk bis ${dateShort(au.until)}</b><span class="small">Ansehen −${au.malus}. ${au.strikes > 1 ? `${au.strikes}. Beanstandung – ` : ''}Nach zwei Jahren ohne neue Beanstandung wird die Zählung gelöscht.</span></div>` : ''}
-    ${debt.n ? `<div class="callout info"><b>Ratenplan${debt.n > 1 ? `e (${debt.n})` : ''}</b><span class="small">Noch ${eur(debt.left)} offen, monatlich ${eur(debt.monthly)}.</span></div>` : ''}</div>`;
+    ${auditPendingHtml(pl)}${auditBillsHtml(pl, debt)}</div>`;
+}
+const AUDIT_MODE_TXT = { now: 'sofort', r6: '6 Monatsraten', r12: '12 Monatsraten', r24: '24 Monatsraten' };
+/** 0.21.61: offene Wahl der Zahlungsweise mit Frist und dem, was ohne Antwort passiert. */
+function auditPendingHtml(pl) {
+  const Y = P.AUDIT.pay, open = (pl.decisions || []).filter((d) => d.type === 'auditpay' && !d.resolved);
+  return open.map((d) => `<div class="callout warn stack"><b>Zahlungsweise offen – Bescheid vom ${dateShort(d.day)} (${esc(d.bill.name)})</b><span class="small">Rückzahlung ${eur(d.bill.claw)} ${d.bill.to ? `an ${esc(d.bill.name)}` : 'an die Staatskasse'}, Bußgeld ${eur(d.bill.fine)}. Bitte bis <b>${dateShort(d.deadline)}</b> wählen: sofort (${pct(Y.skonto)} Nachlass aufs Bußgeld), 6 Raten (+${pct(Y.r6.x - 1)}), 12 Raten (+${pct(Y.r12.x - 1)}) oder 24 Raten (+${pct(Y.r24.x - 1)}). Ohne Antwort gelten automatisch ${AUDIT_MODE_TXT[Y.auto]} (+${pct(Y[Y.auto].x - 1)}).</span>
+    <div class="row" style="gap:6px;flex-wrap:wrap">${['now', 'r6', 'r12', 'r24'].map((m) => `<button class="btn small${m === 'now' ? ' primary' : ''}" data-act="decide" data-id="${d.id}" data-choice="${m}">${AUDIT_MODE_TXT[m]}</button>`).join('')}</div></div>`).join('');
+}
+/** 0.21.61: Jeder Bescheid einzeln – wie sich der Betrag zusammensetzt, wer die Zahlungsweise wann gewählt hat, Stand der Raten. */
+function auditBillsHtml(pl, debt) {
+  const au = pl.audit, bills = ((au && au.bills) || []).slice().reverse(), ds = SM.auditDebts ? SM.auditDebts(au) : [];
+  let nextRate = W.day + 1; while (dateParts(nextRate + 1).d !== 1 && nextRate < W.day + 40) nextRate++;
+  let html = '';
+  for (const b of bills) {
+    const rate = b.n && b.mode !== 'now', done = !b.rest || b.rest <= 0;
+    const how = b.how === 'self' ? `von Ihnen gewählt am ${dateShort(b.chosen)}` : b.how === 'auto' ? `automatisch gewählt am ${dateShort(b.chosen)} – bis zur Frist ${b.deadline ? `(${dateShort(b.deadline)}) ` : ''}kam keine Antwort` : 'bei der Prüfung festgelegt';
+    const lines = [[`Rückzahlung ${b.to ? `an ${esc(b.name)}` : 'an die Staatskasse'}`, b.claw],
+      [`Bußgeld${b.fineRate ? ` (${pct(b.fineRate)} des Vorteils${b.strike ? `, ${b.strike}. Beanstandung` : ''})` : ''}`, b.fine0]];
+    if (b.skonto > 0) lines.push(['Nachlass für Sofortzahlung', -b.skonto]);
+    if (b.x > 1) lines.push([`Aufschlag für ${b.n} Monatsraten (+${pct(b.x - 1)})`, b.total - b.due]);
+    html += `<div class="card pad stack" style="gap:6px"><div class="spread"><b>Bescheid vom ${dateShort(b.day)}${b.late ? ' (Nachprüfung)' : ''}</b><span class="chip ${done ? 'good' : 'warn'}">${done ? 'bezahlt' : `offen ${eur(b.rest)}`}</span></div>
+      <span class="small muted">Geschäfte mit ${esc(b.name)}</span>
+      ${lines.map(([l, v]) => `<div class="spread small"><span>${l}</span><span class="mono">${eur(v, { plus: v < 0 })}</span></div>`).join('')}
+      <div class="spread small" style="border-top:1px solid var(--line);padding-top:4px"><b>Zu zahlen</b><b class="mono">${eur(b.total)}</b></div>
+      <div class="small"><b>Zahlungsweise: ${b.mode === 'now' ? (b.short ? `sofort – verfügbar waren nur ${eur(b.now)}, der Rest von ${eur(b.total - b.now)} läuft in ${b.n} Monatsraten zu ${eur(b.monthly)}` : `sofort, ${eur(b.now)} am ${dateShort(b.chosen)} bezahlt`) : `${b.n} Monatsraten zu ${eur(b.monthly)}`}</b> · ${how}.</div>
+      ${b.n ? `<div class="small">Stand: ${b.paidN || 0} von ${b.n} Raten bezahlt (${eur((b.paid || 0) - (b.now || 0))}${b.now ? ` plus ${eur(b.now)} sofort` : ''})${done ? '' : ` · offen ${eur(b.rest)} · nächste Rate ${eur(Math.min(b.monthly, b.rest))} am ${dateShort(nextRate)}`}</div>` : ''}</div>`;
+  }
+  const legacy = ds.filter((d) => !d.bill);
+  if (legacy.length) { const left = legacy.reduce((a, d) => a + d.left, 0), mo = legacy.reduce((a, d) => a + Math.min(d.left, d.monthly), 0);
+    html += `<div class="callout info"><b>Ratenplan aus älteren Bescheiden</b><span class="small">Noch ${eur(left)} offen, monatlich ${eur(mo)} (nächste Rate am ${dateShort(nextRate)}). Für diese Bescheide wurde die Zusammensetzung vor Version 0.21.61 nicht gespeichert.</span></div>`; }
+  else if (!bills.length && debt.n) html += `<div class="callout info"><b>Ratenplan</b><span class="small">Noch ${eur(debt.left)} offen, monatlich ${eur(debt.monthly)}.</span></div>`;
+  return html;
 }
 VIEWS.credit = function viewCredit() {
   const pl = W.player, bs = SM.balanceSheet(pl);
@@ -4101,12 +4209,19 @@ function logoSvg(al, size = 40, lg = null) {
     : `<g transform="translate(${L.shape === 'tail' ? 13.5 : 11} ${L.shape === 'shield' ? 10 : 11}) scale(${L.shape === 'none' ? 1.1 : 1.08})"><path d="${sym.d}" ${sym.st ? `fill="none" stroke="${fg}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"` : `fill="${fg}"`}/></g>`;
   return `<svg class="logo-svg" width="${size}" height="${size}" viewBox="0 0 48 48" role="img" aria-label="Logo ${esc(al.name || '')}">${bg ? `<g fill="${L.c1}">${LOGO_SHAPE[L.shape]}</g>` : ''}${inner}</svg>`;
 }
+/** 0.21.62: Farbe der Airline wählen – vergebene Farben sind gesperrt. */
+function colorPickHtml(pl) {
+  const used = SM.colorHolders(W, pl.id);
+  return `<div class="card pad stack"><div class="spread"><b>Ihre Farbe auf der Karte</b><span class="small muted">${esc(P.AL_COLORS[(pl.color || 1) - 1].name)}</span></div>
+    <span class="small muted">Strecken, Flugzeuge und Legende zeigen Ihre Airline in dieser Farbe – bei allen Mitspielenden gleich. Jede Farbe gibt es nur einmal; vergebene sind durchgestrichen.</span>
+    <div class="swatches">${P.AL_COLORS.map((c, i) => { const n = i + 1, h = used[n], on = n === pl.color; return `<button class="swc${on ? ' on' : ''}${h ? ' taken' : ''}" style="--c:${c.hex}" data-act="setcolor" data-v="${n}" ${h ? 'disabled' : ''} aria-pressed="${on}" title="${esc(c.name)}${h ? ` – vergeben an ${esc(h.name)}` : ''}" aria-label="${esc(c.name)}${h ? `, vergeben an ${esc(h.name)}` : ''}"></button>`; }).join('')}</div></div>`;
+}
 VIEWS.profile = function viewProfile() {
   const pl = W.player, cur = logoOf(pl);
   ui.logo = ui.logo || { shape: cur.dflt ? 'shield' : cur.shape, sym: cur.dflt ? 'paper' : cur.sym, c1: cur.c1, c2: cur.c2 };
   const L = ui.logo, demo = { ...pl, logo: L };
   const canRb = !pl.fleet.length && !pl.activeRoutes().length && !Object.keys(pl.stakes || {}).length;
-  return `<h2 class="sec">Profil & Logo <small>${esc(pl.name)} · ${esc(pl.code || '')}</small></h2>
+  return `<h2 class="sec">Profil & Logo <small>${esc(pl.name)} · ${esc(pl.code || '')}</small></h2>${colorPickHtml(pl)}
     <div class="card pad spread" style="gap:10px;flex-wrap:wrap"><div class="stack" style="gap:2px"><b>Name, Kürzel und Heimatbasis</b><span class="small">${esc(pl.name)} (${esc(pl.code || '')}) · Start in <b class="mono">${esc(pl.bases[0])}</b> ${esc(apName(pl.bases[0]))}</span>
       <span class="small muted">${canRb ? (preStart() ? `Bis zum Start am ${esc(startTxt(preStart()))} jederzeit änderbar.` : 'Änderbar, solange Sie noch kein Flugzeug, keine Strecke und keine Beteiligung haben.') : 'Nicht mehr änderbar – Ihre Airline hat schon Flugzeuge, Strecken oder Beteiligungen.'}</span></div>
       <button class="btn small${canRb ? ' primary' : ''}" data-act="rebase" ${canRb ? '' : 'disabled'}>Name und Basis ändern</button></div>
@@ -5398,6 +5513,12 @@ function onPaneClick(e) {
     case 'cgsave': { const e = ui.cgEdit; if (!e) break; const r = doAction({ type: 'cgEdit', id: e.id, freq: e.freq, rate: e.rate }); if (r.ok) { toast(r.msg); ui.cgEdit = null; } refreshAll(); break; }
     case 'cgaskclose': ui.confirm = 'cgclose:' + b.dataset.id; renderPane(true); break;
     case 'cgclose': { const r = doAction({ type: 'cgClose', id: b.dataset.id }); if (r.ok) toast(r.msg); ui.confirm = null; ui.cgEdit = null; refreshAll(); break; }
+    case 'setcolor': { const r = doAction({ type: 'setColor', color: Number(b.dataset.v) }); toast(r.msg); planeCv.col = null; ui.planesNow = true; renderMapRoutes(true); refreshAll(); break; }
+    case 'cgplan': { const r = doAction({ type: 'cgPlanAdd', base: b.dataset.b, dest: b.dataset.v, typeId: b.dataset.t, freq: Number(b.dataset.f), rate: (ui.cgNew && ui.cgNew.rate) || 1 }); toast(r.msg); refreshAll(); break; }
+    case 'cgplandel': { const r = doAction({ type: 'cgPlanDel', id: b.dataset.id }); if (!r.ok) toast(r.msg); refreshAll(); break; }
+    case 'cgpfreq': { const x = ((W.player.cg && W.player.cg.plans) || []).find((y) => y.id === b.dataset.id); if (x) { doAction({ type: 'cgPlanEdit', id: x.id, freq: x.freq + Number(b.dataset.v) }); refreshAll(); } break; }
+    case 'cgbuy': ui.buySeg = 'cargo'; setTab('fleetBuy'); break;
+    case 'cgfind': ui.cgNew = { ...(ui.cgNew || { rate: 1 }), base: b.dataset.b, type: b.dataset.t }; setTab('cargoNew'); break;
     case 'cgnbase': ui.cgNew = { ...(ui.cgNew || {}), base: b.dataset.v, type: null }; renderPane(true); break;
     case 'cgntype': ui.cgNew = { ...(ui.cgNew || {}), type: b.dataset.v }; renderPane(true); break;
     case 'cgnrate': if (ui.cgNew) { ui.cgNew.rate = Number(b.dataset.v); renderPane(true); } break;

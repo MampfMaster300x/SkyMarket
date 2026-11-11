@@ -491,6 +491,8 @@ const SM = (() => {
     PRICE_CHANGE_LAG_DAYS: 2, AUTO_PRICE: { gain: 0.6, max_step: 0.08 },
     FUEL_HEDGE: { premium: 0.030, contango: 0.006, maxShare: 0.8 },
     CCHECK_FH: 4500, CCHECK_DAYS: 10, AOG_MONTHLY: 0.008, AOG_DAYS: [4, 12], AOG_COST: [250e3, 900e3],
+    /** 0.21.62: Farben der Spielenden – jede höchstens einmal je Welt, wählbar, auf allen Geräten gleich. */
+    AL_COLORS: [{ hex: '#f2b400', name: 'Sonnengelb' }, { hex: '#b08cff', name: 'Lavendel' }, { hex: '#38bdf8', name: 'Himmelblau' }, { hex: '#ff7a8f', name: 'Koralle' }, { hex: '#4ade80', name: 'Mintgrün' }, { hex: '#f472b6', name: 'Pink' }, { hex: '#2dd4bf', name: 'Türkis' }, { hex: '#818cf8', name: 'Indigo' }, { hex: '#ef4444', name: 'Rot' }, { hex: '#f97316', name: 'Orange' }, { hex: '#84cc16', name: 'Limette' }, { hex: '#06b6d4', name: 'Cyan' }, { hex: '#a855f7', name: 'Violett' }, { hex: '#e11d48', name: 'Karmin' }, { hex: '#22c55e', name: 'Grün' }, { hex: '#3b82f6', name: 'Blau' }, { hex: '#eab308', name: 'Senf' }, { hex: '#ec4899', name: 'Magenta' }, { hex: '#14b8a6', name: 'Petrol' }, { hex: '#6366f1', name: 'Ultramarin' }, { hex: '#fb923c', name: 'Apricot' }, { hex: '#a3e635', name: 'Gelbgrün' }, { hex: '#c084fc', name: 'Flieder' }, { hex: '#f43f5e', name: 'Rose' }, { hex: '#10b981', name: 'Smaragd' }, { hex: '#0ea5e9', name: 'Azur' }, { hex: '#d946ef', name: 'Fuchsia' }, { hex: '#fde047', name: 'Zitrone' }, { hex: '#f87171', name: 'Lachs' }, { hex: '#6ee7b7', name: 'Jade' }, { hex: '#93c5fd', name: 'Kornblume' }, { hex: '#f0abfc', name: 'Orchidee' }, { hex: '#fdba74', name: 'Pfirsich' }, { hex: '#bef264', name: 'Pistazie' }, { hex: '#67e8f9', name: 'Eisblau' }, { hex: '#fda4af', name: 'Rosé' }, { hex: '#d97706', name: 'Bernstein' }, { hex: '#16a34a', name: 'Tannengrün' }, { hex: '#2563eb', name: 'Königsblau' }, { hex: '#9333ea', name: 'Purpur' }, { hex: '#be123c', name: 'Weinrot' }, { hex: '#0d9488', name: 'Ozean' }, { hex: '#ca8a04', name: 'Ocker' }, { hex: '#db2777', name: 'Beere' }, { hex: '#65a30d', name: 'Oliv' }, { hex: '#0284c7', name: 'Stahlblau' }, { hex: '#ea580c', name: 'Rost' }, { hex: '#7c3aed', name: 'Aubergine' }],
     CARGO: { k: 120, yield: 1.2, handling: 0.20, commission: 0.15, gsaMonth: 8000, loadMax: 0.8 },
     // 0.21.56: Frachtsparte mit eigenen Frachtern (getrennt von der Beiladefracht): Bedarf je Strecke und Richtung in kg/Tag = Beiladebedarf × k × Distanzfaktor,
     // Rate = Beilade-Ertrag × rateX (Spielende wählen 60–160 %), Aufteilung nach Kapazität und Rate (Rate hoch −compete), Gesamtnachfrage elastisch zum Mittelpreis.
@@ -1046,6 +1048,21 @@ const SM = (() => {
     return { ...extra, extraU: { leisure: (u.leisure || 0) + b.leisure, business: (u.business || 0) + b.business, vfr: (u.vfr || 0) + b.vfr } };
   }
   function cargoDemand(o, d, econ = 1) { const A = ap(o), B = ap(d); return P.CARGO.k * Math.sqrt(A.pop * B.pop) * A.biz * B.biz * econ; }
+  // 0.21.60: Anlässe für Charteranfragen je Monat: [Flughafen, Anlass, typische Dauer in Tagen]
+  const OCCASIONS = {
+    1: [['INN', 'Skiferien in den Alpen', 7], ['GVA', 'Skisaison in den Westalpen', 7], ['ZRH', 'Weltwirtschaftsforum', 5], ['SZG', 'Skiwochen im Salzburger Land', 7]],
+    2: [['CGN', 'Karneval im Rheinland', 5], ['VCE', 'Karneval in Venedig', 5], ['INN', 'Faschingsferien in den Bergen', 7], ['LPA', 'Winterflucht auf die Kanaren', 10]],
+    3: [['BER', 'Internationale Reisemesse', 5], ['GVA', 'Autosalon', 4], ['MUC', 'Baumaschinenmesse', 6], ['AMS', 'Blumensaison Keukenhof', 7]],
+    4: [['AMS', 'Königstag', 3], ['BCN', 'Ärztekongress', 4], ['FCO', 'Ostern in Rom', 5], ['HAJ', 'Industriemesse', 5]],
+    5: [['HAM', 'Hafengeburtstag', 4], ['NCE', 'Filmfestspiele', 7], ['NCE', 'Grand Prix an der Riviera', 4], ['IST', 'Europapokal-Finale', 3]],
+    6: [['LHR', 'Tennisturnier auf Rasen', 7], ['CPH', 'Musikfestival', 5], ['PMI', 'Pfingstferien auf Mallorca', 10], ['ATH', 'Inselsaison', 10]],
+    7: [['PMI', 'Sommerferien auf Mallorca', 14], ['AYT', 'Pauschalreise-Hochsaison', 14], ['SPU', 'Musikfestival an der Adria', 5], ['HER', 'Sommerferien auf Kreta', 14]],
+    8: [['EDI', 'Kulturfestival', 7], ['IBZ', 'Clubsaison', 7], ['FAO', 'Algarve-Hochsaison', 14], ['BUD', 'Grand Prix', 4]],
+    9: [['MUC', 'Oktoberfest', 7], ['FRA', 'Automobilmesse', 5], ['BER', 'Marathon', 3], ['MXP', 'Modewoche', 5]],
+    10: [['FRA', 'Buchmesse', 5], ['LIS', 'Technologiekonferenz', 4], ['BCN', 'Kreuzfahrt-Saisonende', 7], ['DXB', 'Herbstferien in der Sonne', 10]],
+    11: [['DUS', 'Medizinmesse', 4], ['DXB', 'Luftfahrtmesse', 5], ['MAD', 'Tourismuskongress', 4], ['TFS', 'Winterflucht auf Teneriffa', 10]],
+    12: [['NUE', 'Christkindlesmarkt', 4], ['VIE', 'Weihnachtsmärkte', 4], ['LPA', 'Weihnachten in der Sonne', 10], ['RVN', 'Polarlichter in Lappland', 6]],
+  };
   const cargoYield = (o, d) => P.CARGO.yield * (gcDistanceKm(o, d) / 1000) ** 0.4;
   // 0.21.56: Frachtsparte – Hauptdeckfracht mit Frachtern. Auf kurzen Strecken fährt die Fracht meist Lkw (Distanzfaktor).
   const hashU = (k) => ((hashStr(k) >>> 0) + 0.5) / 4294967296;
@@ -1229,15 +1246,18 @@ const SM = (() => {
         m[t] = (m[t] || 0) + c; q[t] = (q[t] || 0) + c;
       }
     }
-    cashOnly(amount, label) { const c = cents(amount); if (!c) return; this.cash += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c; if (this.fx) this.fx.cf[label] = (this.fx.cf[label] || 0) + c; }
+    cashOnly(amount, label) { const c = cents(amount); if (!c) return; this.cash += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c; this.today[k] = (this.today[k] || 0) + c; if (this.fx) this.fx.cf[label] = (this.fx.cf[label] || 0) + c; }
     /** Eigenkapital rein (Kapitalerhöhung) oder raus (Dividende, Aktienrückkauf): Kasse und Einlagen ändern sich, das Ergebnis nicht. */
     equityFlow(amount, label) {
-      const c = cents(amount); if (!c) return; this.cash += c; this.equityContrib += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c;
+      const c = cents(amount); if (!c) return; this.cash += c; this.equityContrib += c; const k = 'cf_' + label; this.month[k] = (this.month[k] || 0) + c; this.today[k] = (this.today[k] || 0) + c;
       if (this.fx) { this.fx.cf[label] = (this.fx.cf[label] || 0) + c; this.fx.eq[label] = (this.fx.eq[label] || 0) + c; this.fx.meq[label] = (this.fx.meq[label] || 0) + c; }
     }
     closeDay() {
       let r = 0; for (const k in this.today) if (!k.startsWith('cf_')) r += this.today[k];
       this.lastDay = r / 100;
+      // 0.21.61: Geldbewegungen ohne Ergebniswirkung des Tages (Kauf, Tilgung, Dividende, Dispo …) für den Tagesverlauf
+      const cf = {}; for (const k in this.today) if (k.startsWith('cf_') && this.today[k]) cf[k.slice(3)] = Math.round(this.today[k] / 100);
+      this.lastCf = Object.keys(cf).length ? cf : null;
       this.cashHist.push(this.cash / 100); if (this.cashHist.length > 400) this.cashHist.shift(); this.today = {};
     }
     closeMonth(label) {
@@ -3479,6 +3499,7 @@ const SM = (() => {
       }
       for (const al of this.humans) if (al.status !== 'insolvent') hubFlowsDaily(al, flows);
       this.freightDay();   // 0.21.56: Frachtsparte (nur wenn es Frachtstrecken gibt – sonst unverändert)
+      if (this.day % 7 === 3 && this.humans.length) this.refreshCharters(false);   // 0.21.60: Charteranfragen jede Woche auffüllen
       for (const al of this.list) if (al.isPlayer && al.status !== 'insolvent') this.staffCoverage(al);
       for (const al of this.list) {
         if (al.status === 'insolvent') continue;
@@ -3513,7 +3534,7 @@ const SM = (() => {
         if (al.isPlayer) {
           // Tagesreihe für das Dashboard (90 Tage)
           const t = al._today || { pax: 0, seats: 0, rev: 0, cost: 0, flights: 0, late: 0, canc: 0 }; al._today = null;
-          al.dayHist = al.dayHist || []; al.dayHist.push({ d: day, net: Math.round(al.ledger.lastDay || 0), pax: t.pax, seats: t.seats, rev: Math.round(t.rev), db1: Math.round(t.rev - t.cost), fl: t.flights, late: t.late, canc: t.canc, g: dayG, cash: Math.round(al.ledger.cash / 100) });
+          al.dayHist = al.dayHist || []; al.dayHist.push({ d: day, net: Math.round(al.ledger.lastDay || 0), pax: t.pax, seats: t.seats, rev: Math.round(t.rev), db1: Math.round(t.rev - t.cost), fl: t.flights, late: t.late, canc: t.canc, g: dayG, cash: Math.round(al.ledger.cash / 100), nc: Math.round(al.ledger.cash / 100 - (al.creditUsed || 0)), ...(al.ledger.lastCf ? { cf: al.ledger.lastCf } : {}) });
           if (al.dayHist.length > 90) al.dayHist.shift();
           if (al.prog) this.checkCareer(al);
         }
@@ -3751,12 +3772,49 @@ const SM = (() => {
       al.cg.n = (al.cg.n || 0) + 1;
       const q = { id: `${al.id}-C${al.cg.n}`, base, dest, type_id: typeId, freq, rate, opened_day: day + F.lead, acc: 0, hist: [] };
       al.cg.routes.push(q);
+      if (al.cg.plans) al.cg.plans = al.cg.plans.filter((x) => !(pairKey(x.base, x.dest) === pairKey(base, dest) && x.type_id === typeId));
       for (const a of free.slice(0, need)) a.cg = q.id;
       this.takeSlots(al, base, dest, sn);
       const msg = `Frachtstrecke ${base}–${dest} eröffnet: ${t.label}, ${freq} Umläufe pro Woche, ${need} Frachter, erster Flug am ${dayDE(q.opened_day)}.`;
       al.log(day, msg, 'route');
       if (ai) this.pushNews(day, `${al.name} ${al.cg.routes.length === 1 ? 'startet eine Frachtsparte' : 'baut die Fracht aus'}: ${ap(base).name}–${ap(dest).name} mit ${t.label}`, 'ai', al.id);
       return { ok: true, msg, route: q };
+    }
+    /** 0.21.60: Voraussetzungen einer Frachtstrecke auf einen Blick: Basis, Reichweite, Startbahn, Frachter, Slots (mit Kaufpreis), Geld. */
+    cgCheck(al, base, dest, typeId, freq) {
+      const t = P.AIRCRAFT_TYPES[typeId], F = P.FREIGHT; freq = clamp(Math.round(num(freq, 1)), 1, F.maxWeek);
+      const isBase = al.bases.includes(base), range = rangeOk(base, dest, typeId), apt = aptOk(base, dest, typeId);
+      const need = cgNeedAc(base, dest, typeId, freq), free = this.cgFree(al, base, typeId).length, other = al.fleet.filter((a) => a.type_id === typeId && a.base !== base && !a.cg && !acmiList(a, this.day).length).length;
+      const sn = cgSlotN(freq), slotsOk = this.slotsOkFor(al, base, dest, sn), sc = this.slotCost(al, base, dest, sn);
+      const short = [base, dest].filter((x) => this.slotsFreeFor(al, x) < sn);
+      const dup = al.cgRoutes().some((q) => pairKey(q.base, q.dest) === pairKey(base, dest) && q.type_id === typeId);
+      const cash = sc.cost <= al.spendable(this.macro.bank ?? 1);
+      const ok = isBase && range && apt && free >= need && slotsOk && cash && !dup;
+      return { ok, isBase, range, apt, aptWhy: apt ? '' : aptWhy(base, dest, typeId), need, free, other, missing: Math.max(0, need - free), slots: { ok: slotsOk, n: sn, cost: sc.cost, parts: sc.parts, short }, cash, dup, typeLabel: t.label };
+    }
+    /** 0.21.60: Frachtplanung – Strecken vormerken, auch ohne Frachter. */
+    cgPlanAdd(al, base, dest, typeId, freq, rate = 1) {
+      const F = P.FREIGHT;
+      if (!isFreighter(typeId) || !P.AIRPORTS[base] || !P.AIRPORTS[dest] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
+      if (!al.bases.includes(base)) return { ok: false, msg: `${base} ist keine Ihrer Basen.` };
+      al.cg = al.cg || { n: 0, routes: [] }; al.cg.plans = al.cg.plans || [];
+      if (al.cg.plans.some((x) => pairKey(x.base, x.dest) === pairKey(base, dest) && x.type_id === typeId)) return { ok: false, msg: `${base}–${dest} mit diesem Frachter steht schon in der Planung.` };
+      if (al.cg.plans.length >= 20) return { ok: false, msg: 'Höchstens 20 Strecken in der Planung.' };
+      al.cg.pn = (al.cg.pn || 0) + 1;
+      const x = { id: 'G' + al.cg.pn, base, dest, type_id: typeId, freq: clamp(Math.round(num(freq, 3)), 1, F.maxWeek), rate: clamp(num(rate, 1), F.minRate, F.maxRate), added: this.day };
+      al.cg.plans.push(x);
+      return { ok: true, msg: `${base}–${dest} (${P.AIRCRAFT_TYPES[typeId].label}, ${x.freq}× pro Woche) steht in der Frachtplanung.`, plan: x };
+    }
+    cgPlanEdit(al, id, freq, rate) {
+      const F = P.FREIGHT, x = al.cg && (al.cg.plans || []).find((y) => y.id === id); if (!x) return { ok: false, msg: 'Planung nicht gefunden.' };
+      if (freq !== undefined && freq !== null) x.freq = clamp(Math.round(num(freq, x.freq)), 1, F.maxWeek);
+      if (rate !== undefined && rate !== null) x.rate = clamp(num(rate, x.rate), F.minRate, F.maxRate);
+      return { ok: true, msg: 'Planung geändert.' };
+    }
+    cgPlanDel(al, id) {
+      if (!al.cg || !al.cg.plans) return { ok: false, msg: 'Planung nicht gefunden.' };
+      const n0 = al.cg.plans.length; al.cg.plans = al.cg.plans.filter((y) => y.id !== id);
+      return n0 === al.cg.plans.length ? { ok: false, msg: 'Planung nicht gefunden.' } : { ok: true, msg: 'Aus der Planung entfernt.' };
     }
     /** Freie Frachter eines Musters an einer Basis (nicht auf einer Frachtstrecke, kein laufender oder künftiger Charter). */
     cgFree(al, base, typeId) { return al.fleet.filter((a) => a.type_id === typeId && a.base === base && !a.cg && !acmiList(a, this.day).length && a.status !== 'sold'); }
@@ -4371,7 +4429,7 @@ const SM = (() => {
       for (const [k, s] of Object.entries(al.studies)) if (!s.done && s.ready <= this.day) { s.done = true; al.log(this.day, `Marktstudie ${k} liegt vor`, 'good'); }
       this.completeStudies(al);
       for (const dcs of al.decisions) if (!dcs.resolved && dcs.deadline < this.day) {
-        if (dcs.type === 'auditpay') { this.resolveDecision(al, dcs.id, P.AUDIT.pay.auto); dcs.resolved = 'ignored'; al.log(this.day, `Keine Wahl zur Zahlungsweise: Der Prüfungsbescheid wird in ${P.AUDIT.pay[P.AUDIT.pay.auto].n} Monatsraten bezahlt.`, 'warn'); continue; }
+        if (dcs.type === 'auditpay') { dcs.auto = true; this.resolveDecision(al, dcs.id, P.AUDIT.pay.auto); dcs.resolved = 'ignored'; al.log(this.day, `Keine Wahl zur Zahlungsweise: Der Prüfungsbescheid wird in ${P.AUDIT.pay[P.AUDIT.pay.auto].n} Monatsraten bezahlt.`, 'warn'); continue; }
         if (dcs.type === 'agm') { this.resolveDecision(al, dcs.id, 'yes'); dcs.resolved = 'ignored'; al.log(this.day, 'Sie haben auf der Hauptversammlung nicht abgestimmt – die Minderheit hat den Antrag allein beschlossen.', 'warn'); continue; }
         dcs.resolved = 'ignored'; al.log(this.day, 'Keine Antwort an die Gewerkschaft: Der Streik findet statt', 'warn'); if (dcs.type === 'profit') this.unionStrike(al);
       }
@@ -4405,13 +4463,19 @@ const SM = (() => {
           price: Math.round(t.value_eur * Math.max(0.25, 1 - P.AGE.value * rel) * pf * r.range(0.92, 1.06) / 1e5) * 1e5, delivery: r.int(10, 40), fhSinceC: r.int(0, P.CCHECK_FH - 500),
           expires: day + r.int(20, 60), kind: t.supersonic ? 'buy' : r.random() < 0.65 ? 'lease' : 'buy' });
       }
+      this.refreshCharters(true);
+    }
+
+    /** Charteranfragen auffüllen (monatlich mit den Marktangeboten, 0.21.60 zusätzlich jede Woche). */
+    refreshCharters(monthly = false) {
+      const r = this.rng, day = this.day, H = this.humans.filter((h) => !h.removed && h.status !== 'insolvent').length;
       this.acmiOffers = this.acmiOffers.filter((o) => o.expires > day);
       // Charteranfragen: mehr als früher und bevorzugt für Muster, die Spielende auch fliegen
       const allHT = this.humans.filter((h) => !h.removed && h.status !== 'insolvent').flatMap((h) => h.fleet.map((a) => a.type_id)), humanTypes = allHT.filter((t) => !P.AIRCRAFT_TYPES[t].role);
       // Privatjet- und Frachtcharter: eigene Kundschaft, eigene Muster
       for (const kind of ['biz', 'cargo']) {
         const pool = Object.keys(P.AIRCRAFT_TYPES).filter((k) => P.AIRCRAFT_TYPES[k].role === kind), mine = allHT.filter((t) => P.AIRCRAFT_TYPES[t].role === kind);
-        const want = P.ACMI[kind] + (mine.length ? Math.min(6, Math.ceil(mine.length / 2)) : 0);
+        const want = P.ACMI[kind] + Math.min(6, Math.ceil(H / 4)) + (mine.length ? Math.min(6, Math.ceil(mine.length / 2)) : 0);
         let guard = 0;
         while (this.acmiOffers.filter((o) => o.kind === kind).length < want && guard++ < 20) {
           const typeId = mine.length && r.random() < 0.7 ? r.pick(mine) : r.pick(pool), t = P.AIRCRAFT_TYPES[typeId];
@@ -4422,13 +4486,34 @@ const SM = (() => {
           this.acmiOffers.push({ id: 'W' + (++this.offerCounter), kind, client, type: typeId, start, end: start + dur, rate: Math.round(t.acmi_day * P.ACMI.rate * short * peak * r.range(0.9, 1.2) * this.macro.cpi / 100) * 100, expires: start - 2 });
         }
       }
-      while (this.acmiOffers.filter((o) => !o.ev && !o.kind).length < P.ACMI.n) {
+      // 0.21.60: mit der Zahl der Spielenden mehr Anfragen, damit in großen Welten nicht alles sofort weg ist
+      const nPax = P.ACMI.n + Math.min(18, Math.ceil(H * 0.6));
+      let g2 = 0;
+      while (this.acmiOffers.filter((o) => !o.ev && !o.kind).length < nPax && g2++ < 40) {
         const typeId = humanTypes.length && r.random() < P.ACMI.humanShare ? r.pick(humanTypes) : r.pick(['AT76', 'DH8D', 'E295', 'BCS3', 'A20N', 'A20N', 'B38M', 'A21N', 'A339', 'B789', 'A359']), t = P.AIRCRAFT_TYPES[typeId];
         const start = day + r.int(10, 35), dur = r.pick([7, 14, 21, 30, 45, 60, 90]);
         const client = r.pick(['Reiseveranstalter SunTours', 'Netzwerkcarrier mit Flugzeugmangel', 'Sportverband für Mannschaftsflüge', 'Kreuzfahrtreederei', 'Ferienairline in der Hochsaison', 'Regierungsdelegation', 'Airline nach Triebwerksschaden', 'Konzertagentur auf Tournee']);
         const short = dur <= 14 ? 1.12 : 1;
         this.acmiOffers.push({ id: 'W' + (++this.offerCounter), client, type: typeId, start, end: start + dur, rate: Math.round(t.acmi_day * P.ACMI.rate * short * r.range(0.9, 1.2) * this.macro.cpi / 100) * 100, expires: start - 3 });
       }
+      if (monthly) this.occasionCharters(H);
+    }
+    /** 0.21.60: Anlass-Charter – Messen, Feste, Ferienspitzen, Sport: jeden Monat einige Anfragen mit Aufschlag zu einem Ort. */
+    occasionCharters(H) {
+      const r = this.rng, day = this.day, m = monthOf(day + 20) + 1, list = (OCCASIONS[m] || []).filter(([c]) => P.AIRPORTS[c]);
+      const humanTypes = this.humans.filter((h) => !h.removed && h.status !== 'insolvent').flatMap((h) => h.fleet.map((a) => a.type_id)).filter((t) => !P.AIRCRAFT_TYPES[t].role);
+      const n = Math.min(list.length, 2 + Math.ceil(H / 5)), made = [];
+      const pool = list.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = r.int(0, i); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+      for (const [apt, label, dur0] of pool.slice(0, n)) {
+        const reps = 1 + (H > 8 ? 1 : 0);
+        for (let k = 0; k < reps; k++) {
+          const typeId = humanTypes.length && r.random() < 0.7 ? r.pick(humanTypes) : r.pick(['A20N', 'A21N', 'B38M', 'E295', 'BCS3', 'A339', 'B789']), t = P.AIRCRAFT_TYPES[typeId];
+          const start = day + r.int(10, 30), dur = Math.max(2, Math.round(dur0 * r.range(0.7, 1.3)));
+          const o = { id: 'W' + (++this.offerCounter), client: `${label} (${ap(apt).name})`, type: typeId, start, end: start + dur, rate: Math.round(t.acmi_day * P.ACMI.rate * r.range(1.15, 1.35) * this.macro.cpi / 100) * 100, expires: start - 3, ev: `occ-${apt}-${Math.floor(day / 30)}-${k}`, evLabel: label, apt };
+          this.acmiOffers.push(o); made.push(label);
+        }
+      }
+      if (made.length) for (const h of this.humans) if (!h.removed && h.status !== 'insolvent' && h.fleet.some((a) => !P.AIRCRAFT_TYPES[a.type_id].role)) h.log(day, `Neue Anlass-Charter: ${[...new Set(made)].join(', ')} – mit Aufschlag, Flotte → Charter.`, 'deal');
     }
 
     // Auktionen: frühe Lieferpositionen für neue Muster und knappe Typen (verdeckte Gebote, Höchstbietende gewinnen)
@@ -5177,7 +5262,7 @@ const SM = (() => {
     resolveDecision(al, id, choice) {
       const dcs = al.decisions.find((x) => x.id === id); if (!dcs || dcs.resolved) return;
       dcs.resolved = choice;
-      if (dcs.type === 'auditpay') { const m = ['now', 'r6', 'r12', 'r24'].includes(choice) ? choice : P.AUDIT.pay.auto; auditPay(this, al, dcs.bill, m, { skonto: m === 'now' }); return; }
+      if (dcs.type === 'auditpay') { const m = ['now', 'r6', 'r12', 'r24'].includes(choice) ? choice : P.AUDIT.pay.auto; auditPay(this, al, dcs.bill, m, { skonto: m === 'now', how: dcs.auto ? 'auto' : 'self', asked: dcs.day, deadline: dcs.deadline }); return; }
       if (dcs.type === 'agm') {
         const A = P.PAYOUT, c = capState(al), k = ['yes', 'half', 'no'].includes(choice) ? choice : 'yes', eff = Math.round(dcs.rate * agmFactor(al, k) * 1000) / 1000;
         al.agm = { k, rate: eff, asked: dcs.rate, from: this.day, until: this.day + (k === 'no' ? A.noMonths : A.months) * 30 };
@@ -6131,13 +6216,26 @@ const SM = (() => {
     })[o.k] || { t: o.k, d: '' };
   }
   const perkOn = (al, k, day) => al.perks && al.perks[k] && (al.perks[k].until === undefined || al.perks[k].until > day) ? al.perks[k] : null;
+  /** 0.21.62: erste Farbe, die keine andere Spieler-Airline der Welt hat. */
+  function colorHolders(w, exceptId = null) { const m = {}; for (const h of w.humans) if (!h.removed && h.id !== exceptId && h.color) m[h.color] = h; return m; }
+  function freeColor(w, exceptId = null) { const used = colorHolders(w, exceptId); for (let i = 1; i <= P.AL_COLORS.length; i++) if (!used[i]) return i; return 1 + (w.humans.length % P.AL_COLORS.length); }
+  /** Doppelte Farben auflösen (ältere Welten vergaben reihum 8 Farben): wer zuerst da war, behält seine Farbe. */
+  function fixHumanColors(w) {
+    const seen = new Set(), hs = w.humans.filter((h) => !h.removed).sort((a, b) => (a.joinedDay || 0) - (b.joinedDay || 0) || (a.id < b.id ? -1 : 1));
+    for (const h of hs) { if (!h.color || h.color > P.AL_COLORS.length || seen.has(h.color)) { let c = 1; while (seen.has(c) && c <= P.AL_COLORS.length) c++; h.color = c; } seen.add(h.color); }
+  }
+  function setColor(w, al, c) {
+    c = Math.round(Number(c)); if (!(c >= 1 && c <= P.AL_COLORS.length)) return { ok: false, msg: 'Ungültige Farbe.' };
+    const h = colorHolders(w, al.id)[c]; if (h) return { ok: false, msg: `${P.AL_COLORS[c - 1].name} hat schon ${h.name}.` };
+    al.color = c; return { ok: true, msg: `Ihre Farbe ist jetzt ${P.AL_COLORS[c - 1].name}.` };
+  }
   function addHuman(w, { id = null, name = 'Hanse Air', code = 'HX', base = 'HAM', difficulty = null, owner = null, quiet = false } = {}) {
     if (!P.AIRPORTS[base]) throw new Error('Unbekannter Flughafen');
     { const bad = startBaseMsg(w, base); if (bad) throw new Error(bad); }
     const diff = DIFFICULTY[difficulty || w.difficulty] || DIFFICULTY.normal;
     if (!id) { id = HUMAN_IDS.find((x) => !w.airlines[x]); for (let n = 5; !id; n++) if (!w.airlines['P' + n]) id = 'P' + n; }
-    const humans = w.humans.length;
-    const al = w.add(new Airline(id, name, base, null, diff.equity, 99, (humans % 8) + 1));
+    const humans = w.humans.length, color = freeColor(w);
+    const al = w.add(new Airline(id, name, base, null, diff.equity, 99, color));
     al.code = code; al.difficulty = difficulty || w.difficulty || 'normal'; al.owner = owner; al.joinedDay = w.day;
     al.prog = { lv: 0, since: w.day, acq: [] };
     al.station(base);
@@ -7042,9 +7140,9 @@ const SM = (() => {
         const k = Math.min(au.strikes, A.fine.length) - 1, fine = Math.round(e.excess * A.fine[k] / 1e4) * 1e4, claw = e.excess, due = claw + fine;
         au.malus = A.malus[k]; au.until = day + 365; au.findings = [...(au.findings || []), { day, partner: e.partner, name: e.name, claw, fine }].slice(-6);
         const payee = e.state ? null : auditPayee(w, e.partner, e.first), to = payee ? payee.id : null;
-        const m = auditMode(mode || A.pay.mode || 'choice'), bill = { claw, fine, to, since: e.first, name: e.name };
+        const m = auditMode(mode || A.pay.mode || 'choice'), bill = { claw, fine, to, since: e.first, name: e.name, day, late: !!late, strike: au.strikes, fineRate: A.fine[k] };
         G.log(day, `${head}: Die Geschäfte mit ${e.name} haben Ihnen einen ungerechtfertigten Vorteil von ${mioTxt(claw)} gebracht. Rückzahlung ${mioTxt(claw)} ${to ? `an ${e.name}` : `an die Staatskasse (${e.state && !(e.manual && w.airlines[e.partner] && auditActive(w.airlines[e.partner])) ? `${e.name} ist nicht mehr am Markt` : e.state ? 'die Prüfer ordnen die Abführung an' : `${e.name} gibt es nicht mehr`})`}, Bußgeld ${mioTxt(fine)} (${Math.round(A.fine[k] * 100)} %${au.strikes > 1 ? `, ${au.strikes}. Beanstandung` : ''}), Prüfvermerk: Ansehen −${au.malus} für ein Jahr.${m === 'choice' ? ` Sie wählen bis ${A.pay.days} Tage, wie Sie zahlen (Cockpit → Entscheidungen) – sonst ${A.pay[A.pay.auto].n} Monatsraten.` : ''}`, 'crit');
-        const paid = m === 'choice' ? auditAsk(w, G, bill) : auditPay(w, G, bill, m);
+        const paid = m === 'choice' ? auditAsk(w, G, bill) : auditPay(w, G, bill, m, { how: 'set' });
         const now = paid.now || 0;
         if (payee) {
           const gf = Math.round(e.excess * A.giverFine / 1e4) * 1e4;
@@ -7118,20 +7216,29 @@ const SM = (() => {
   function auditDebts(au) { if (!au) return []; if (au.debt) { au.debts = [...(au.debts || []), au.debt]; delete au.debt; } return au.debts || (au.debts = []); }
   function auditDebtSum(au) { const ds = auditDebts(au); return { left: ds.reduce((x, d) => x + d.left, 0), monthly: ds.reduce((x, d) => x + Math.min(d.left, d.monthly), 0), n: ds.length }; }
   /** Bescheid bezahlen: sofort (fehlt Geld, Rest in 12 Raten) oder in Raten mit Aufschlag. Rückzahlung an den Partner geht vor. */
-  function auditPay(w, G, b, mode, { skonto = false } = {}) {
+  /**
+   * 0.21.61: Jeder Bescheid wird nachvollziehbar abgelegt (au.bills): Anlass, Rückzahlung, Bußgeld, Nachlass oder Aufschlag, gewählte Zahlungsweise,
+   * wer sie wann gewählt hat (selbst, automatisch nach Fristablauf, festgelegt), Rate, Zahl der Raten, bezahlt und offen.
+   */
+  function auditBill(au, b, rec) { au.bills = au.bills || []; au.bn = (au.bn || 0) + 1; const x = { id: 'B' + au.bn, day: b.day ?? rec.day, name: b.name, to: b.to || null, claw: b.claw, fine0: b.fine, strike: b.strike || null, fineRate: b.fineRate || null, late: !!b.late, ...rec }; au.bills.push(x); if (au.bills.length > 12) au.bills = au.bills.slice(-12); return x; }
+  function auditPay(w, G, b, mode, { skonto = false, how = 'set', asked = null, deadline = null } = {}) {
     const A = P.AUDIT, Y = A.pay, au = G.audit || (G.audit = { strikes: 0, findings: [] }), L = b.to ? w.airlines[b.to] : null;
     const fine = skonto ? Math.round(b.fine * (1 - Y.skonto) / 1e4) * 1e4 : b.fine;
+    const meta = { mode, how, chosen: w.day, asked, deadline, fine, skonto: skonto ? b.fine - fine : 0 };
     if (mode === 'now') {
       const due = b.claw + fine, cash = G.spendable(w.macro.bank ?? 1), now = cash >= due ? due : Math.max(0, Math.min(due, Math.round(cash * 0.5 / 1e4) * 1e4));
       if (now > 0) G.ledger.post('one_off', -now, true, 'Wirtschaftsprüfung: Rückzahlung und Bußgeld');
       const toPartner = Math.min(b.claw, now); if (L && toPartner > 0) L.ledger.post('one_off', toPartner, true, `Wirtschaftsprüfung: Rückzahlung erhalten › ${G.name}`);
-      if (due - now > 0) auditDebts(au).push({ left: due - now, monthly: Math.ceil((due - now) / A.months / 1e3) * 1e3, to: b.to, since: b.since, clawLeft: b.to ? Math.max(0, b.claw - toPartner) : 0, n: A.months });
+      const rest = due - now, monthly = rest > 0 ? Math.ceil(rest / A.months / 1e3) * 1e3 : 0;
+      const bill = auditBill(au, b, { ...meta, due, now, total: due, rest, n: rest > 0 ? A.months : 0, monthly, x: 1, paid: now, paidN: 0, short: rest > 0 });
+      if (rest > 0) auditDebts(au).push({ left: rest, monthly, to: b.to, since: b.since, clawLeft: b.to ? Math.max(0, b.claw - toPartner) : 0, n: A.months, bill: bill.id });
       G.log(w.day, `Prüfungsbescheid (${b.name}): ${now >= due ? `sofort bezahlt ${mioTxt(now)}` : `sofort ${mioTxt(now)}, der Rest von ${mioTxt(due - now)} in ${A.months} Monatsraten`}${skonto && fine < b.fine ? ` – ${mioTxt(b.fine - fine)} Nachlass aufs Bußgeld` : ''}.`, 'warn');
       return { now, rest: due - now, fine };
     }
-    const R = Y[mode] || Y.r12, total = Math.round((b.claw + fine) * R.x / 1e3) * 1e3;
-    auditDebts(au).push({ left: total, monthly: Math.ceil(total / R.n / 1e3) * 1e3, to: b.to, since: b.since, clawLeft: b.to ? b.claw : 0, n: R.n });
-    G.log(w.day, `Prüfungsbescheid (${b.name}): Ratenzahlung – ${R.n} Monatsraten zu ${mioTxt(Math.ceil(total / R.n / 1e3) * 1e3)}, zusammen ${mioTxt(total)}${R.x > 1 ? ` (${Math.round((R.x - 1) * 100)} % Aufschlag)` : ''}. Die erste Rate ist am Monatsende fällig.`, 'warn');
+    const R = Y[mode] || Y.r12, total = Math.round((b.claw + fine) * R.x / 1e3) * 1e3, monthly = Math.ceil(total / R.n / 1e3) * 1e3;
+    const bill = auditBill(au, b, { ...meta, due: b.claw + fine, now: 0, total, rest: total, n: R.n, monthly, x: R.x, paid: 0, paidN: 0 });
+    auditDebts(au).push({ left: total, monthly, to: b.to, since: b.since, clawLeft: b.to ? b.claw : 0, n: R.n, bill: bill.id });
+    G.log(w.day, `Prüfungsbescheid (${b.name}): Ratenzahlung – ${R.n} Monatsraten zu ${mioTxt(monthly)}, zusammen ${mioTxt(total)}${R.x > 1 ? ` (${Math.round((R.x - 1) * 100)} % Aufschlag)` : ''}${how === 'auto' ? ' – automatisch gewählt, weil bis zur Frist keine Antwort kam' : ''}. Die erste Rate ist am Monatsende fällig.`, 'warn');
     return { now: 0, rest: total, fine };
   }
   /** Die Airline wählt selbst, wie sie zahlt (Entscheidung, 7 Tage). */
@@ -7146,7 +7253,9 @@ const SM = (() => {
     for (const d of ds) {
       if (d.left <= 0) continue;
       const pay = Math.min(d.left, d.monthly), L = d.to ? auditPayee(w, d.to, d.since ?? 0) : null, toL = Math.min(pay, d.clawLeft || 0);
-      G.ledger.post('one_off', -pay, true, 'Wirtschaftsprüfung: Rate'); d.left -= pay;
+      const bl = d.bill && G.audit.bills ? G.audit.bills.find((x) => x.id === d.bill) : null;
+      G.ledger.post('one_off', -pay, true, `Wirtschaftsprüfung: Rate${bl ? ` ${(bl.paidN || 0) + 1}/${bl.n} (${bl.name})` : ''}`); d.left -= pay;
+      if (bl) { bl.paidN = (bl.paidN || 0) + 1; bl.paid = (bl.paid || 0) + pay; bl.rest = Math.max(0, d.left); bl.lastPay = w.day; }
       if (toL > 0) { d.clawLeft -= toL; if (L) L.ledger.post('one_off', toL, true, `Wirtschaftsprüfung: Rückzahlung erhalten › ${G.name}`); }   // Partner pleite oder neu gegründet: Rest geht an die Staatskasse
     }
     const open = ds.filter((d) => d.left > 0);
@@ -7932,6 +8041,10 @@ const SM = (() => {
       case 'cgOpen': return w.cgOpen(al, String(a.base || ''), String(a.dest || ''), String(a.typeId || ''), a.freq, a.rate);
       case 'cgEdit': return w.cgEdit(al, String(a.id || ''), a.freq, a.rate);
       case 'cgClose': return w.cgClose(al, String(a.id || ''));
+      case 'setColor': return setColor(w, al, a.color);
+      case 'cgPlanAdd': return w.cgPlanAdd(al, String(a.base || ''), String(a.dest || ''), String(a.typeId || ''), a.freq, a.rate);
+      case 'cgPlanEdit': return w.cgPlanEdit(al, String(a.id || ''), a.freq, a.rate);
+      case 'cgPlanDel': return w.cgPlanDel(al, String(a.id || ''));
       case 'antitrustAdjust': {   // 0.21.55: Vorschlag zur Wettbewerbsaufsicht übernehmen
         const c = String(a.apt || ''); if (!P.AIRPORTS[c]) return { ok: false, msg: 'Ungültig.' };
         const pa = w.antitrustPlan(al, c); if (pa.ok || !pa.cuts.length) return { ok: false, msg: 'Nichts anzupassen – Ihr Anteil liegt unter der Grenze.' };
@@ -8149,7 +8262,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, autoGrow: al.autoGrow || undefined, autoEq: al.autoEq ?? undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, cg: al.cg && (al.cg.routes.length || al.cg.n) ? al.cg : undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, autoGrow: al.autoGrow || undefined, autoEq: al.autoEq ?? undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, cg: al.cg && (al.cg.routes.length || al.cg.n || (al.cg.plans && al.cg.plans.length)) ? al.cg : undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -8293,16 +8406,17 @@ const SM = (() => {
     // ältere Stände: Airlines ohne Phase bekommen die Phase, die ihrer heutigen Größe entspricht
     w.mode = 'career';
     for (const al of w.list) if (al.isPlayer && !al.prog) careerMigrate(w, al);
+    fixHumanColors(w);
     return w;
   }
 
   return {
-    freightDemand, freightRef, cgPerAc, cgNeedAc, cgSlotN, isFreighter,
+    freightDemand, freightRef, freeColor, colorHolders, cgPerAc, cgNeedAc, cgSlotN, isFreighter,
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, GEO_ZONES, homeCountry, zoneExtraKm, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, routeUnits, mixOk, mixCheck, transferPlan, hubFlowsDaily, offerText, perkOn, minApt, dayDate, aiDealValue, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
     RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminAutopilot, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
-    rebaseHuman, hireQuote, baseSlotCost, baseExtraFee, baseOpensYear, baseSlotN, earnRecent, opResult, updateCap, divRate, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
+    rebaseHuman, hireQuote, baseSlotCost, baseExtraFee, baseOpensYear, baseSlotN, earnRecent, opResult, updateCap, divRate, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, auditDebts, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();
 if (typeof module !== 'undefined') module.exports = SM;

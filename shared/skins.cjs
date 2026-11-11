@@ -155,9 +155,11 @@
     starter: { key: 'starter', label: 'Starter Pack', packs: 10, price: '5', currency: 'TOKEN' },
     collector: { key: 'collector', label: 'Collector Pack', packs: 20, price: '10', currency: 'TOKEN' },
   };
-  /** 0.21.57: ein Exemplar eines Skins darf auf bis zu so vielen Flugzeugen gleichzeitig aktiv sein. */
-  const PER_COPY = 5;
-  const api = { PER_COPY, RARITIES, RARITY_ORDER, PACK_COUNT_ODDS, CATEGORIES, MODELS, MODEL_BY_ID, MODEL_BY_TYPE, DESIGNS, SKINS, SKIN_BY_ID, SKINS_BY_MODEL_RARITY, MILESTONES, OFFERS, drawPack, TOTAL: SKINS.length };
+  /** 0.21.61: Flugzeuge je Exemplar – Grün und Blau auf 2, ab Pink (Pink, Rot, Gold) auf 1. (0.21.57–0.21.60: 5 für alle.) */
+  const PER_COPY_BY_RARITY = { u: 2, r: 2, e: 1, m: 1, l: 1 };
+  const PER_COPY = 2;
+  const perCopy = (skinId) => { const s = SKIN_BY_ID[skinId]; return s ? PER_COPY_BY_RARITY[s.rarity] || 1 : 1; };
+  const api = { PER_COPY, PER_COPY_BY_RARITY, perCopy, RARITIES, RARITY_ORDER, PACK_COUNT_ODDS, CATEGORIES, MODELS, MODEL_BY_ID, MODEL_BY_TYPE, DESIGNS, SKINS, SKIN_BY_ID, SKINS_BY_MODEL_RARITY, MILESTONES, OFFERS, drawPack, TOTAL: SKINS.length };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.SKINS = api;
 })();

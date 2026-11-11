@@ -183,6 +183,26 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.62: Feste, wählbare Airline-Farben
+
+- 48 Farben (`P.AL_COLORS`, Hex und Name). Jede Spieler-Airline hat genau eine, keine doppelt in einer Welt (vorher reihum 8). Die Farbe steht im Spielstand – auf jedem Gerät gleich, auch die eigene (eigene Strecken über `--mine`, eigene Flugzeuge in der eigenen Farbe).
+- Wählen: Unternehmen → Profil & Logo → „Ihre Farbe auf der Karte“; vergebene Farben sind durchgestrichen und gesperrt (`setColor`). Neue Airlines bekommen die erste freie Farbe; ältere Welten werden beim Laden entdoppelt (wer zuerst da war, behält seine Farbe). Entfernte Airlines geben ihre Farbe frei.
+
+## Neu in 0.21.61: Nachvollziehbare Bescheide und Geldbewegungen, Skin-Grenzen, Airlines ausblenden
+
+- **Wirtschaftsprüfung:** Jeder Bescheid wird abgelegt (`audit.bills`): Anlass und Datum, Rückzahlung (an wen), Bußgeld (Satz, wievielte Beanstandung), Nachlass bei Sofortzahlung, Aufschlag bei Raten, Gesamtbetrag, Zahlungsweise und wer sie wann gewählt hat (selbst, automatisch nach Fristablauf, bei der Prüfung festgelegt), Raten bezahlt/offen und nächste Rate. Offene Wahl mit Frist und Knöpfen direkt in der Karte. Ratenbuchungen tragen „Rate k/n (Partner)“.
+- **Tagesverlauf:** Geldbewegungen ohne Ergebniswirkung je Tag (`dayHist.cf`: Flugzeugkäufe, Kautionen, Tilgung, Dividenden, Dispo …) in der Tagesansicht; die Tabelle zeigt den Kontostand netto (Guthaben minus Dispo, `nc`) und den größten Posten darunter.
+- **Collection:** ein Exemplar gilt für höchstens 2 Flugzeuge (Grün, Blau), ab Pink für 1 (`SKINS.perCopy`). Was darüber hinaus aktiv war, wird beim nächsten Laden zurückgesetzt, mit Hinweis.
+- **Karte:** Airlines in der Legende antippen blendet ihre Strecken und Flugzeuge aus (durchgestrichen, je Spiel im Browser gemerkt); „Konkurrenten“ schaltet die KI; „alle einblenden“.
+
+## Neu in 0.21.60: Cargo-Planung, Voraussetzungen, Frachterliste, mehr Charteranfragen
+
+- **Cargo-Bereich:** Reiter Frachtnetz, Planung, Ziele finden, Frachter, Frachtmarkt.
+- **Voraussetzungen auf einen Blick:** `w.cgCheck(al, base, dest, type, freq)` – eigene Basis, Reichweite, Startbahn, Frachter (frei an der Basis, frei an anderer Basis, fehlend), Slots (frei, zu kaufen mit Preis, voll mit Flughafen), Geld, schon beflogen. Jede Zielkarte zeigt das als Häkchen-Chips.
+- **Frachtplanung:** Strecken vormerken, auch ohne Frachter (`cgPlanAdd/cgPlanEdit/cgPlanDel`, höchstens 20, gespeichert in `al.cg.plans`). Die Planung zeigt Umsatz und Ergebnis aller geplanten Strecken, Slotkosten und welche Frachter je Basis fehlen; „Eröffnen“, sobald alles erfüllt ist. Eröffnete Strecken verschwinden aus der Planung.
+- **Frachter:** eigene Liste aller Frachter mit Basis, Einsatz (Frachtstrecke, Charter, ohne Einsatz, Auslieferung, C-Check), Kosten und Flugstunden; „Strecke finden“ springt mit Basis und Muster in die Zielsuche, „Frachter beschaffen“ öffnet die Beschaffung im Bereich Frachter.
+- **Charteranfragen:** wachsen mit der Zahl der Spielenden (Passagier-Charter 6 + 0,6 je Spieler, höchstens +18; Privatjet und Fracht je +1 pro 4 Spielende), werden jede Woche aufgefüllt (`refreshCharters`) statt nur monatlich. Neu: **Anlass-Charter** jeden Monat (Messen, Feste, Ferienspitzen, Sport – z. B. Oktoberfest, Buchmesse, Karneval, Filmfestspiele) mit 15–35 % Aufschlag.
+
 ## Neu in 0.21.59: Tägliches Gratis-Pack
 
 - Beim ersten Laden der Sammlung an einem Kalendertag (Berliner Zeit, also beim Öffnen eines Spiels) bekommt jedes angemeldete Konto ein Aircraft Mystery Pack (Herkunft `daily`). Die Gutschrift läuft atomar über das Register (ETag), gleichzeitige Aufrufe geben nur ein Pack. Tage in Folge werden mitgezählt (`streak`).
