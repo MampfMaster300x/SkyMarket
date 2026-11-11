@@ -39,10 +39,27 @@ const count = (arr) => arr.reduce((o, x) => ((o[x] = (o[x] || 0) + 1), o), {});
 async function logPay(store, e) { try { await updateJson(store, KEY.log, (l) => { l = l || []; l.push({ t: Date.now(), ...e }); return l.slice(-5000); }, [], 4); } catch (x) { console.error('Zahlungsprotokoll', x); } }
 
 /** Shop-Einstellungen. Spieler fragen Packs an (Angebote in Token), die Spielleitung gibt sie von Hand frei. */
+/** 0.21.63: Angebote – Standard aus dem Katalog, von Admins anpassbar (Blob shop/config, Feld offers). */
+const defaultOffers = () => Object.values(SKINS.OFFERS).map((o) => ({ ...o, active: true }));
+function cleanOffers(list) {
+  if (!Array.isArray(list)) return null;
+  const out = [], keys = new Set(); let single = false;
+  for (const x of list.slice(0, 12)) {
+    const perPack = !!x.perPack; if (perPack && single) continue;
+    const key = perPack ? 'single' : String(x.key || '').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) || `p${out.length + 1}`;
+    if (keys.has(key)) continue;
+    const price = Math.round(Math.max(0, Math.min(100000, Number(String(x.price).replace(',', '.')) || 0)) * 100) / 100;
+    const o = { key, label: String(x.label || (perPack ? 'Einzelne Packs' : 'Paket')).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 30) || 'Paket', packs: perPack ? 1 : Math.max(1, Math.min(200, Math.floor(Number(x.packs) || 1))), price: String(price), currency: 'TOKEN', active: x.active !== false };
+    if (perPack) { o.perPack = true; o.max = Math.max(1, Math.min(200, Math.floor(Number(x.max) || 50))); single = true; }
+    keys.add(key); out.push(o);
+  }
+  return out.length ? out : null;
+}
+const offersOf = (c) => (c && Array.isArray(c.offers) && c.offers.length ? c.offers : defaultOffers());
 export async function shopConfig(store) {
   // Freischaltung und Hinweistext pflegen Admins im Spiel (Blob shop/config); die Umgebungsvariablen gelten nur, solange dort nichts gespeichert ist
   const c = (await store.get(KEY.cfg, { type: 'json' })) || null;
-  return { enabled: c ? !!c.enabled : env('SHOP_ENABLED') === '1', daily: c ? c.daily !== false : env('DAILY_PACK') !== '0', offers: Object.values(SKINS.OFFERS), payInfo: c ? c.info || '' : env('SHOP_REQUEST_INFO') || '',
+  return { enabled: c ? !!c.enabled : env('SHOP_ENABLED') === '1', daily: c ? c.daily !== false : env('DAILY_PACK') !== '0', offers: offersOf(c).filter((o) => o.active !== false), offersAll: offersOf(c), payInfo: c ? c.info || '' : env('SHOP_REQUEST_INFO') || '',
     odds: { count: SKINS.PACK_COUNT_ODDS, rarity: SKINS.RARITY_ORDER.map((k) => [k, SKINS.RARITIES[k].odds]), models: SKINS.MODELS.length } };
 }
 /** 0.21.59: Kalendertag in Deutschland (Wechsel um Mitternacht Berliner Zeit). */
@@ -270,10 +287,12 @@ export async function handleCollection(req, ctx) {
     if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
     const b = await readJson(req);
     const prev = (await store.get(KEY.cfg, { type: 'json' })) || null;
+    const offers = b.offers === undefined || b.offers === null ? (prev && prev.offers) || null : b.offers === 'reset' ? null : cleanOffers(b.offers);
+    if (b.offers && b.offers !== 'reset' && !offers) return fail(400, 'Mindestens ein gültiges Angebot nötig.');
     const daily = b.daily === undefined || b.daily === null ? (prev ? prev.daily !== false : env('DAILY_PACK') !== '0') : !!b.daily;
     const enabled = b.enabled === undefined || b.enabled === null ? (prev ? !!prev.enabled : env('SHOP_ENABLED') === '1') : !!b.enabled;
     const info = b.info === undefined || b.info === null ? (prev ? prev.info || '' : '') : String(b.info).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 600);
-    await store.setJSON(KEY.cfg, { enabled, daily, info, by: user.key, at: Date.now() });
+    await store.setJSON(KEY.cfg, { enabled, daily, info, ...(offers ? { offers } : {}), by: user.key, at: Date.now() });
     return json({ ok: true, shop: await shopConfig(store) });
   }
   if (path === '/coll/admin/grant' && method === 'POST') {
@@ -296,7 +315,7 @@ export async function handleCollection(req, ctx) {
   if (path === '/shop/config' && method === 'GET') return json(await shopConfig(store));
   if (path === '/shop/request' && method === 'POST') {
     const sc = await shopConfig(store); if (!sc.enabled) return fail(503, 'Anfragen sind noch nicht freigeschaltet.');
-    const b = await readJson(req), of = SKINS.OFFERS[String(b.offer || '')];
+    const b = await readJson(req), cfg = (await store.get(KEY.cfg, { type: 'json' })) || null, of = offersOf(cfg).find((o) => o.key === String(b.offer || '') && o.active !== false);
     if (!of) return fail(400, 'Unbekanntes Angebot.');
     let made = null, err = null;
     await updateJson(store, KEY.reqs, (list) => {

@@ -1562,6 +1562,17 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
     const q3 = ok(await call('cleo', 'POST', '/shop/request', { offer: 'single', count: 0 }), 'null').request; assert.equal(q3.packs, 1); assert.equal(q3.amount, '0.5');
     for (const q of [q2, q3]) ok(await call('cleo', 'POST', `/shop/request/${q.id}/cancel`, {}), 'zurückziehen');
     const so = ok(await call('cleo', 'GET', '/shop/config'), 'Shop'); assert.deepStrictEqual(so.offers.map((o) => o.key), ['single', 'starter', 'collector'], 'Reihenfolge: einzeln, 10, 20'); }
+  // 0.21.63: Admins passen Angebote an – Preis, Anzahl, aus/an, neue Pakete; Standard wiederherstellen
+  { assert.equal((await call('cleo', 'POST', '/coll/admin/shop', { offers: [] })).status, 403, 'nur Admins');
+    const base = ok(await call('tim', 'GET', '/coll/admin'), 'adm').shop.offersAll;
+    const edited = base.map((o) => (o.key === 'starter' ? { ...o, packs: 12, price: '4,5', label: 'Starter Plus' } : o.key === 'collector' ? { ...o, active: false } : o)).concat([{ key: 'mega', label: 'Mega', packs: 50, price: '20', active: true }]);
+    ok(await call('tim', 'POST', '/coll/admin/shop', { offers: edited }), 'speichern');
+    const so2 = ok(await call('cleo', 'GET', '/shop/config'), 'S'); assert.deepStrictEqual(so2.offers.map((o) => o.key), ['single', 'starter', 'mega'], 'ausgeschaltetes Angebot fehlt im Shop');
+    const st = so2.offers.find((o) => o.key === 'starter'); assert.ok(st.packs === 12 && st.price === '4.5' && st.label === 'Starter Plus');
+    assert.equal((await call('cleo', 'POST', '/shop/request', { offer: 'collector' })).status, 400, 'ausgeschaltet nicht anfragbar');
+    const rq = ok(await call('cleo', 'POST', '/shop/request', { offer: 'mega' }), 'neu').request; assert.ok(rq.packs === 50 && rq.amount === '20'); ok(await call('cleo', 'POST', `/shop/request/${rq.id}/cancel`, {}), 'zurück');
+    assert.equal(ok(await call('tim', 'GET', '/coll'), 'T').shop.enabled, true, 'Freischaltung bleibt beim Speichern der Angebote');
+    ok(await call('tim', 'POST', '/coll/admin/shop', { offers: 'reset' }), 'Standard'); assert.deepStrictEqual(ok(await call('cleo', 'GET', '/shop/config'), 'S').offers.map((o) => o.key), ['single', 'starter', 'collector']); }
   // 0.21.59: tägliches Gratis-Pack – einmal je Konto und Berliner Kalendertag, auch bei gleichzeitigen Aufrufen; Admin schaltet an und aus
   { ok(await call('tim', 'POST', '/coll/admin/shop', { daily: true }), 'täglich an');
     const p0 = ok(await call('anna', 'GET', '/coll'), 'A').me.packs.length;

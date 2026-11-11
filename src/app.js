@@ -6673,7 +6673,7 @@ async function showLobby(tab = null) {
     <section class="mainworld" id="lbMain"><p class="small muted">Lade die Hauptwelt …</p></section>
     <div class="lobby">
       <section class="stack"><div class="spread"><h3>Meine Spiele</h3><button class="btn small primary" id="lbNew">Neues Spiel</button></div><div id="lbMine" class="glist"><p class="small muted">Lade …</p></div></section>
-      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3><span class="row" style="gap:6px"><button class="btn small" id="lbDiag">Fehlerprotokoll</button><button class="btn small" id="lbPlay">Spielzeit der Spieler</button></span></div><p class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</p><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
+      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3></div><div class="adm-bar"><button class="btn small primary" id="lbPlay">Spielzeit der Spieler</button><button class="btn small primary" id="lbPacks">Packs, Shop &amp; Angebote<span class="badge" id="lbPacksN" hidden></span></button><button class="btn small" id="lbMain">Hauptwelt verwalten</button><button class="btn small" id="lbDiag">Fehlerprotokoll</button></div><p class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</p><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
       <section class="stack"><h3>Spiel beitreten</h3>
         <form id="lbCodeForm" class="row"><input type="text" id="lbCode" maxlength="6" placeholder="Code, z. B. K7QF2M" style="text-transform:uppercase;flex:1;min-width:140px"><button class="btn" type="submit">Suchen</button></form>
         <form id="lbSearchForm" class="row"><input type="text" id="lbQ" maxlength="40" placeholder="Spielname suchen" style="flex:1;min-width:140px"><button class="btn" type="submit">Finden</button></form>
@@ -6686,6 +6686,8 @@ async function showLobby(tab = null) {
   $('#lbPw').addEventListener('click', () => showPwChange({ then: () => showLobby() }));
   if ($('#lbPlay')) $('#lbPlay').addEventListener('click', () => showPlaytime(() => showLobby()));
   if ($('#lbDiag')) $('#lbDiag').addEventListener('click', () => showDiag(() => showLobby()));
+  if ($('#lbPacks')) { $('#lbPacks').addEventListener('click', () => showPackAdmin()); api('/coll/admin', { timeout: 15000 }).then((d) => { const n = d.requests.filter((q) => q.status === 'open').length, el = $('#lbPacksN'); if (el && n) { el.textContent = n; el.hidden = false; el.title = `${n} offene Pack-Anfrage${n > 1 ? 'n' : ''}`; } }).catch(() => {}); }
+  if ($('#lbMain')) $('#lbMain').addEventListener('click', () => showAdmin('main', () => showLobby()));
   $('#lbNew').addEventListener('click', showCreate);
   $('#lbSolo').addEventListener('click', () => showStart(false));
   $('#lbGuide').addEventListener('click', () => showGuide(() => showLobby()));

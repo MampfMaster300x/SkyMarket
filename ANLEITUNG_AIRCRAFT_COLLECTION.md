@@ -1,6 +1,6 @@
 # Aircraft Collection – Anleitung zur Einrichtung und zum Betrieb
 
-Stand: Version 0.21.61. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
+Stand: Version 0.21.63. Das Feature ist fest in SKYMARKET Online eingebaut. Die Sammlung hängt am Konto und gilt in jedem Spiel: Hauptwelt, private Online-Spiele und Offline-Spiele, solange man angemeldet ist. Alles ist rein kosmetisch.
 
 ## 1. Bestandsaufnahme: So ist es eingebaut
 
@@ -41,13 +41,17 @@ Speicherorte in Netlify Blobs:
 
 ## 3. Pack-Anfragen freischalten
 
-Das Spiel kennt kein Geld und keine Bezahlung. Die Angebote sind in Token ausgezeichnet: einzelne Packs (Anzahl 1 bis 50 frei wählbar, je 0,5 Token), 10 Packs für 5 Token, 20 Packs für 10 Token. Token sind nur eine Angabe am Angebot; es gibt kein Token-Guthaben im Spiel. Ob und wofür jemand Packs bekommt, entscheidest du mit der Freigabe.
+Das Spiel kennt kein Geld und keine Bezahlung. Die Angebote sind in Token ausgezeichnet. Standard: einzelne Packs (Anzahl 1 bis 50 frei wählbar, je 0,5 Token), 10 Packs für 5 Token, 20 Packs für 10 Token. Du kannst sie selbst anpassen (siehe unten). Token sind nur eine Angabe am Angebot; es gibt kein Token-Guthaben im Spiel. Ob und wofür jemand Packs bekommt, entscheidest du mit der Freigabe.
 
 1. Der Spieler wählt im Shop eine Anzahl einzelner Packs oder eines der Pakete mit 10 oder 20 Packs und sendet die Anfrage. Er bekommt eine Anfragenummer.
 2. Du öffnest oben rechts das Menü → „Aircraft Pack Management“ und klickst bei der Anfrage auf „Freigeben“ (zweiter Klick bestätigt). Erst dann liegen die Packs im Inventar.
 3. Du kannst Anfragen ablehnen. Der Spieler kann offene Anfragen selbst zurückziehen.
 
 Freischalten: Menü oben rechts → „Aircraft Pack Management“ → „Anfragen freischalten“. Das gilt sofort für alle Spieler und lässt sich dort jederzeit wieder sperren. Im selben Feld kannst du einen Hinweistext für den Shop eintragen, zum Beispiel wie man Token bekommt. Ein Deploy ist dafür nicht nötig.
+
+Angebote anpassen (ab 0.21.63): im selben Fenster unter „Angebote im Shop“. Je Angebot änderst du Bezeichnung, Anzahl Packs (bei den Einzelpacks die Höchstmenge je Anfrage), Preis in Token und ob es im Shop erscheint. „Paket hinzufügen“ legt ein neues Paket an, „Entfernen“ löscht eines, „Angebote speichern“ übernimmt alles sofort, „Standard wiederherstellen“ setzt die drei Standardangebote zurück. Schon gestellte Anfragen behalten Anzahl und Preis von damals; ausgeschaltete Angebote können nicht mehr angefragt werden.
+
+Admin-Leiste in der Lobby (ab 0.21.63): Unter „Verwaltung · alle Spiele“ öffnest du direkt „Spielzeit der Spieler“, „Packs, Shop & Angebote“ (die Zahl am Knopf zeigt offene Pack-Anfragen), „Hauptwelt verwalten“ und das Fehlerprotokoll, ohne erst ein Spiel zu betreten.
 
 Regeln im Code: höchstens 3 offene Anfragen je Konto; eine Anfrage kann nur einmal freigegeben werden; Packs aus Anfragen und kostenlose Packs werden getrennt gezählt.
 

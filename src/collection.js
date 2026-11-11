@@ -429,20 +429,16 @@ VIEWS.shop = function viewShop() {
   const S = coll.shop || { enabled: false, offers: [], odds: { count: [], rarity: [] } }, m = coll.me, en = S.enabled;
   if (!ui.shReqs && !ui.shReqBusy) { ui.shReqBusy = true; api('/shop/requests').then((r) => { ui.shReqs = r.requests; ui.shReqBusy = false; if (ui.tab === 'shop') renderPane(true); }).catch(() => { ui.shReqBusy = false; ui.shReqs = []; }); }
   const tokS = (v) => `${Number(v).toLocaleString('de-DE')} Token`;
-  const icons = (n) => `<div class="sh-icons">${Array.from({ length: n }, () => '<i></i>').join('')}</div>`;
-  let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
+    let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
     <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus ${SK.TOTAL} Lackierungen für ${SK.MODELS.length} Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip">${n0(m.packs.length)} ungeöffnete Packs</span>${m.packs.length ? '<button class="btn primary small" data-act="accopen">Pack öffnen</button>' : ''}</div></div></div>`;
   if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten im Menü oben rechts → Aircraft Pack Management. Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
-  const q = ui.shQty = Math.max(1, Math.min(50, ui.shQty || 1));
-  html += `<div class="sh-offers">${S.offers.map((o) => o.perPack
-    ? `<div class="sh-offer ${o.key}"><span class="chip">frei wählbar</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(Math.min(q, 10))}
-      <div class="sh-qty"><button class="btn small" data-act="shqty" data-v="-1" ${q <= 1 ? 'disabled' : ''} aria-label="Ein Pack weniger">−</button><b class="sh-n">${q} ${q === 1 ? 'PACK' : 'PACKS'}</b><button class="btn small" data-act="shqty" data-v="1" ${q >= (o.max || 50) ? 'disabled' : ''} aria-label="Ein Pack mehr">+</button></div>
-      <span class="sh-price">${tokS(q * Number(o.price))}</span><span class="small">${String(o.price).replace('.', ',')} Token pro Pack</span>
-      <button class="btn primary" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${q} ${q === 1 ? 'Pack' : 'Packs'} anfragen</button></div>`
-    : `<div class="sh-offer ${o.key}"><span class="chip">Paket</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
-      <span class="sh-price">${tokS(o.price)}</span><span class="small">${String(Number(o.price) / o.packs).replace('.', ',')} Token pro Pack</span>
-      <button class="btn ${o.key === 'collector' ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${o.packs} Packs anfragen</button></div>`).join('')}</div>
+  const sMax = ((S.offers || []).find((o) => o.perPack) || {}).max || 50, q = ui.shQty = Math.max(1, Math.min(sMax, ui.shQty || 1));
+  html += `<div class="sh-offers">${S.offers.map((o) => { const big = !o.perPack && o.packs >= 20, n = o.perPack ? q : o.packs, pp = o.perPack ? Number(o.price) : Number(o.price) / o.packs;
+    return `<div class="sh-offer ${o.key}${big ? ' collector' : ''}${o.perPack ? ' single' : ''}"><div class="sh-o-l"><b>${esc(o.label)}</b><span class="small">${String(+pp.toFixed(2)).replace('.', ',')} Token pro Pack</span></div>
+      ${o.perPack ? `<div class="sh-qty"><button class="btn small" data-act="shqty" data-v="-1" ${q <= 1 ? 'disabled' : ''} aria-label="Ein Pack weniger">−</button><b class="sh-n">${q}</b><button class="btn small" data-act="shqty" data-v="1" ${q >= (o.max || 50) ? 'disabled' : ''} aria-label="Ein Pack mehr">+</button></div>` : `<b class="sh-n">${o.packs}×</b>`}
+      <span class="sh-price">${tokS(o.perPack ? q * Number(o.price) : o.price)}</span>
+      <button class="btn small ${big ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${n} ${n === 1 ? 'Pack' : 'Packs'} anfragen</button></div>`; }).join('')}</div>
     <p class="small" style="position:relative;color:#c3cde0">So läuft es ab: Sie fragen ein Angebot an. Die Spielleitung prüft die Anfrage und gibt die Packs frei – danach liegen sie in Ihrem Inventar. ${esc(S.payInfo || '')}</p>`;
   { const R = ui.shReqs || [], ST = { open: 'wartet auf Freigabe', approved: 'freigegeben', declined: 'abgelehnt', cancelled: 'zurückgezogen' };
     if (R.length) html += `<div class="card pad stack"><h3>Ihre Anfragen</h3>${R.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${new Date(q.created).toLocaleDateString('de-DE')} · ${q.packs} ${q.packs === 1 ? 'Pack' : 'Packs'} · ${tokS(q.amount)}</span><span><span class="chip ${q.status === 'approved' ? 'good' : q.status === 'open' ? 'warn' : ''}">${ST[q.status] || esc(q.status)}</span>${q.note ? ` <span class="muted">${esc(q.note)}</span>` : ''}${q.status === 'open' ? ` <button class="btn small" data-act="shcancel" data-id="${esc(q.id)}">Zurückziehen</button>` : ''}</span></div>`).join('')}
@@ -532,7 +528,7 @@ function collPaneClick(act, b) {
     case 'acdetail': showSkinDetail(b.dataset.id); return true;
     case 'skinpick': if (!coll.me) { loadColl(true).then(() => showSkinPicker(b.dataset.id)); } else showSkinPicker(b.dataset.id); return true;
     case 'shbuy': showBuy(b.dataset.v); return true;
-    case 'shqty': ui.shQty = Math.max(1, Math.min(50, (ui.shQty || 1) + Number(b.dataset.v))); renderPane(true); return true;
+    case 'shqty': ui.shQty = Math.max(1, Math.min(((coll.shop && coll.shop.offers || []).find((o) => o.perPack) || {}).max || 50, (ui.shQty || 1) + Number(b.dataset.v))); renderPane(true); return true;
     case 'shcancel': api(`/shop/request/${encodeURIComponent(b.dataset.id)}/cancel`, { body: {} }).then(() => { ui.shReqs = null; renderPane(true); }).catch((e) => toast(e.message)); return true;
     case 'trsearch': trSearch(); return true;
     case 'trpick': trPick(b.dataset.v); return true;
@@ -545,6 +541,14 @@ function collPaneClick(act, b) {
 }
 
 // ---------- Admin: kostenlose Packs, Protokoll, Statistik ----------
+/** 0.21.63: eine Zeile im Angebots-Editor. */
+function offerEditRow(o, i) {
+  const pp = !!o.perPack;
+  return `<div class="pa-of" data-key="${esc(o.key)}" data-pp="${pp ? '1' : ''}"><label class="f"><span>Bezeichnung</span><input data-f="label" maxlength="30" value="${esc(o.label)}"></label>
+    ${pp ? `<label class="f"><span>höchstens</span><input data-f="max" type="number" min="1" max="200" value="${o.max || 50}"></label>` : `<label class="f"><span>Packs</span><input data-f="packs" type="number" min="1" max="200" value="${o.packs}"></label>`}
+    <label class="f"><span>${pp ? 'Token je Pack' : 'Token gesamt'}</span><input data-f="price" inputmode="decimal" value="${esc(String(o.price).replace('.', ','))}"></label>
+    <label class="pa-on"><input type="checkbox" data-f="active" ${o.active !== false ? 'checked' : ''}><span>im Shop</span></label>${pp ? '<span class="small muted pa-x">Einzelpacks</span>' : `<button class="btn small ghost" data-pa="ofdel" aria-label="Paket entfernen">Entfernen</button>`}</div>`;
+}
 async function showPackAdmin() {
   const m = modal('<h1>Aircraft Pack Management</h1><p class="small muted">Lade …</p>');
   let d; try { d = await api('/coll/admin', { timeout: 20000 }); } catch (e) { toast(e.message); m.hidden = true; return; }
@@ -558,6 +562,10 @@ async function showPackAdmin() {
       <p class="small ${d.shop.enabled ? 'pos' : 'muted'}">${d.shop.enabled ? 'Freigeschaltet: Spieler können im Shop Packs anfragen.' : 'Gesperrt: Der Shop zeigt die Angebote, Anfragen sind aber nicht möglich. Kostenlose Vergabe geht trotzdem.'}</p>
       <label class="f"><span>Hinweistext im Shop (optional)</span><input id="pa-info" maxlength="600" value="${esc(d.shop.payInfo || '')}" placeholder="z. B. wie man Token bekommt"></label>
       <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ${d.shop.enabled ? '' : 'primary'}" data-pa="shop" data-on="${d.shop.enabled ? '' : '1'}">${d.shop.enabled ? 'Anfragen sperren' : 'Anfragen freischalten'}</button><button class="btn" data-pa="shop" data-on="${d.shop.enabled ? '1' : ''}">Nur Text speichern</button></div></section>
+    <section class="card pad stack"><h3>Angebote im Shop</h3>
+      <p class="small muted">Bezeichnung, Anzahl Packs und Preis in Token anpassen, Angebote aus- und einschalten oder neue Pakete anlegen. Gilt sofort für neue Anfragen; offene Anfragen behalten ihren Preis.</p>
+      <div class="pa-offers" id="pa-offers">${(d.shop.offersAll || d.shop.offers).map((o, i) => offerEditRow(o, i)).join('')}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small" data-pa="ofadd">Paket hinzufügen</button><button class="btn small primary" data-pa="ofsave">Angebote speichern</button><button class="btn small ghost" data-pa="ofreset">Standard wiederherstellen</button></div></section>
     <section class="card pad stack"><h3>Tägliches Gratis-Pack</h3>
       <p class="small ${d.shop.daily ? 'pos' : 'muted'}">${d.shop.daily ? 'An: Jeder angemeldete Spieler bekommt einmal pro Kalendertag (Berliner Zeit) ein Pack, sobald er das Spiel öffnet.' : 'Aus: Es gibt keine täglichen Gratis-Packs.'}${d.stats.dailyPacks ? ` Bisher verteilt: ${d.stats.dailyPacks}.` : ''}</p>
       <div class="row"><button class="btn ${d.shop.daily ? '' : 'primary'}" data-pa="daily" data-on="${d.shop.daily ? '' : '1'}">${d.shop.daily ? 'Ausschalten' : 'Einschalten'}</button></div></section>
@@ -576,6 +584,15 @@ async function showPackAdmin() {
     const b = e.target.closest('[data-pa]'); if (!b) return;
     const k = b.dataset.pa;
     if (k === 'close') { m.hidden = true; return; }
+    if (k === 'ofadd') { const box = $('#pa-offers'), i = box.children.length; box.insertAdjacentHTML('beforeend', offerEditRow({ key: `p${Date.now() % 100000}`, label: 'Neues Paket', packs: 5, price: '2.5', active: true }, i)); return; }
+    if (k === 'ofdel') { b.closest('.pa-of').remove(); return; }
+    if (k === 'ofsave' || k === 'ofreset') {
+      const offers = k === 'ofreset' ? 'reset' : [...document.querySelectorAll('#pa-offers .pa-of')].map((r) => ({ key: r.dataset.key, perPack: r.dataset.pp === '1', label: r.querySelector('[data-f=label]').value, packs: r.querySelector('[data-f=packs]') ? r.querySelector('[data-f=packs]').value : 1, max: r.querySelector('[data-f=max]') ? r.querySelector('[data-f=max]').value : undefined, price: r.querySelector('[data-f=price]').value, active: r.querySelector('[data-f=active]').checked }));
+      if (k === 'ofreset' && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Wirklich zurücksetzen?'; return; }
+      b.disabled = true;
+      try { await api('/coll/admin/shop', { body: { offers } }); coll.at = 0; await loadColl(true); toast(k === 'ofreset' ? 'Standardangebote wiederhergestellt.' : 'Angebote gespeichert.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; }
+      return;
+    }
     if (k === 'daily') { b.disabled = true; try { await api('/coll/admin/shop', { body: { daily: !!b.dataset.on } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Tägliches Gratis-Pack ist an.' : 'Tägliches Gratis-Pack ist aus.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'shop') { b.disabled = true; try { await api('/coll/admin/shop', { body: { enabled: !!b.dataset.on, info: $('#pa-info').value } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Pack-Anfragen sind freigeschaltet.' : 'Pack-Anfragen sind gesperrt.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'find') { try { const r = await api('/coll/players?q=' + encodeURIComponent($('#pa-q').value)); $('#pa-res').innerHTML = r.players.map((p) => `<button class="btn small" data-pa="pick" data-v="${esc(p.key)}">${esc(p.name)}</button>`).join('') || '<span class="small muted">Niemand gefunden.</span>'; } catch (err) { toast(err.message); } return; }

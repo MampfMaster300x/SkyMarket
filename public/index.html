@@ -6,7 +6,7 @@
 <meta name="description" content="SKYMARKET – Airline-Wirtschaftssimulation: Hauptwelt für alle und private Runden">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f2b400'/%3E%3Cpath d='M26 16 L20 14.5 L13 6 L10.5 6 L14 14.5 L8 14.5 L6 11.5 L4.5 11.5 L5.5 16 L4.5 20.5 L6 20.5 L8 17.5 L14 17.5 L10.5 26 L13 26 L20 17.5 L26 16Z' fill='%231a1400'/%3E%3C/svg%3E">
 <style>[hidden]{display:none!important}</style>
-<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.62";</script>
+<script>window.SKYMARKET_ONLINE = true; window.SKYMARKET_BUILD = "0.21.63";</script>
 <title>Skymarket</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -202,6 +202,9 @@ nav.main.ico button { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 .swc:hover { transform: scale(1.08); } .swc:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .swc.on { border-color: var(--ink); box-shadow: 0 0 0 3px var(--panel) inset, 0 0 12px var(--c); }
 .swc.taken { cursor: not-allowed; opacity: .35; } .swc.taken::after { content: ''; position: absolute; left: 12%; right: 12%; top: 50%; height: 2px; background: var(--ink); transform: rotate(-45deg); }
+.pa-offers { display: grid; gap: 6px; } .pa-of { display: grid; grid-template-columns: minmax(120px, 1fr) 84px 96px auto 92px; gap: 8px; align-items: end; padding: 8px; border: 1px solid var(--line); border-radius: 10px; } .pa-of input:not([type=checkbox]) { width: 100%; min-width: 0; }
+.pa-of .pa-on { display: flex; gap: 6px; align-items: center; min-height: 36px; white-space: nowrap; font-size: 13px; } .pa-of .pa-x, .pa-of [data-pa=ofdel] { align-self: center; } @media (max-width: 600px) { .pa-of { grid-template-columns: 1fr 1fr; } .pa-of label.f:first-child { grid-column: 1 / -1; } }
+.adm-bar { display: flex; flex-wrap: wrap; gap: 8px; } .adm-bar .badge { margin-left: 6px; background: var(--crit); color: #fff; border-radius: 999px; font-size: 11px; padding: 0 6px; min-width: 18px; text-align: center; }
 .chip.cgc { background: color-mix(in srgb, var(--c-cargo) 16%, transparent); color: var(--c-cargo); }
 .rt.cg { stroke: var(--c-cargo); stroke-dasharray: 5 4; fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; } .rt.cgai { stroke-dasharray: 3 4; opacity: .4; fill: none; stroke-width: .7; vector-effect: non-scaling-stroke; }
 .sechead { display: flex; align-items: center; gap: 12px; padding: 14px 16px 12px; background: linear-gradient(120deg, color-mix(in srgb, var(--sec) 26%, transparent), transparent 75%); border-bottom: 1px solid var(--line); }
@@ -1353,19 +1356,17 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .sh-dark .card { background: rgba(14,24,50,.82); border-color: #1f2d52; color: #e6edf7; }
 .sh-dark .t th, .sh-dark .t td { border-color: #1f2d52; }
 .sh-dark a { color: #67e8f9; }
-.sh-hero { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; align-items: center; position: relative; }
-.sh-hero h2 { margin: 0; font-size: 24px; } .sh-hero p { margin: 0; color: #c3cde0; }
+.sh-hero { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: center; position: relative; }
+.sh-hero h2 { margin: 0; font-size: 18px; } .sh-hero p { margin: 0; color: #c3cde0; font-size: 12.5px; }
 .sh-pack { animation: pkFloat 4s ease-in-out infinite; filter: drop-shadow(0 10px 24px rgba(34,211,238,.25)); }
 .pk-svg { width: 100%; display: block; }
-.sh-offers { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; position: relative; }
-.sh-offer { border-radius: 18px; padding: 16px; display: grid; gap: 8px; justify-items: start; background: linear-gradient(160deg, #10204a, #0a1330); border: 1.5px solid #1d4ed8; box-shadow: 0 0 24px rgba(37,99,235,.18); }
-.sh-offer.collector { background: linear-gradient(160deg, #24124a, #120a2a 60%, #2a1f06); border-color: transparent; background-clip: padding-box; position: relative; box-shadow: 0 0 30px rgba(168,85,247,.25); }
-.sh-offer.collector::before { content: ''; position: absolute; inset: -1.5px; border-radius: 19px; padding: 1.5px; background: linear-gradient(120deg, #a855f7, #f5b301, #a855f7); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
-.sh-offer h3 { margin: 4px 0 0; letter-spacing: .12em; font-size: 15px; }
-.sh-icons { display: flex; flex-wrap: wrap; gap: 4px; max-width: 260px; } .sh-icons i { width: 14px; height: 17px; border-radius: 3px; background: linear-gradient(160deg, #22d3ee, #1d4ed8); box-shadow: 0 0 6px rgba(34,211,238,.4); }
-.sh-offer.collector .sh-icons i { background: linear-gradient(160deg, #f5b301, #a855f7); box-shadow: 0 0 6px rgba(245,179,1,.4); }
-.sh-qty { display: flex; align-items: center; gap: 10px; } .sh-qty .btn { min-width: 36px; font-size: 18px; color: #e6edf7; border-color: #2b3c6a; } .sh-offer.single { border-color: #0891b2; box-shadow: 0 0 24px rgba(34,211,238,.18); }
-.sh-n { font: 800 22px var(--f-mono); letter-spacing: .06em; } .sh-price { font: 700 26px var(--f-body); }
+.sh-offers { display: grid; gap: 6px; position: relative; }
+.sh-offer { border-radius: 10px; padding: 7px 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; background: linear-gradient(160deg, #10204a, #0a1330); border: 1px solid #1d4ed8; }
+.sh-offer.collector { background: linear-gradient(160deg, #24124a, #120a2a 60%, #2a1f06); border-color: #a855f7; box-shadow: 0 0 14px rgba(168,85,247,.2); }
+.sh-o-l { display: grid; min-width: 0; } .sh-o-l b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sh-o-l .small { font-size: 11px; color: #9fb0cc; }
+.sh-qty { display: flex; align-items: center; gap: 4px; } .sh-qty .btn { min-width: 24px; min-height: 24px; padding: 0 5px; font-size: 13px; color: #e6edf7; border-color: #2b3c6a; } .sh-offer.single { border-color: #0891b2; }
+.sh-n { font: 800 13px var(--f-mono); min-width: 2.2em; text-align: center; } .sh-price { font: 700 14px var(--f-body); white-space: nowrap; min-width: 5.5em; text-align: right; } .sh-offer .btn:not(.sh-qty .btn) { font-size: 12px; padding: 3px 10px; min-height: 28px; min-width: 132px; white-space: nowrap; }
+@media (max-width: 600px) { .sh-offer { grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 8px; } .sh-offer .btn:not(.sh-qty .btn) { grid-column: 1 / -1; justify-self: stretch; } }
 .btn.gold { background: linear-gradient(90deg, #f5b301, #ffd86b); color: #1a1100; border-color: #f5b301; font-weight: 700; }
 .sh-dark .callout { position: relative; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
@@ -1473,7 +1474,7 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .tr-items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .tr-build { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
 .tr-pool { display: flex; flex-wrap: wrap; gap: 6px; max-height: 260px; overflow: auto; padding: 6px 0; }
-@media (max-width: 600px) { .sh-hero { grid-template-columns: 110px minmax(0, 1fr); gap: 12px; } .sh-hero h2 { font-size: 19px; } .ac-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; } .pk-stage { min-height: min(560px, 88vh); } .pk-box { width: min(270px, 70vw, 50vh); } .pk-card h2 { font-size: 22px; } .pk-back { min-height: 220px; } }
+@media (max-width: 600px) { .sh-hero { grid-template-columns: 72px minmax(0, 1fr); gap: 10px; } .sh-hero h2 { font-size: 16px; } .ac-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; } .pk-stage { min-height: min(560px, 88vh); } .pk-box { width: min(270px, 70vw, 50vh); } .pk-card h2 { font-size: 22px; } .pk-back { min-height: 220px; } }
 @media (prefers-reduced-motion: reduce) { .sh-dark::before, .sh-pack, .ac-card.rar-l, svg .sk-shine, .pk-bg i, .pk-bgrays, .pk-halo { animation: none !important; } }
 </style>
 </head>
@@ -16817,7 +16818,7 @@ async function showLobby(tab = null) {
     <section class="mainworld" id="lbMain"><p class="small muted">Lade die Hauptwelt …</p></section>
     <div class="lobby">
       <section class="stack"><div class="spread"><h3>Meine Spiele</h3><button class="btn small primary" id="lbNew">Neues Spiel</button></div><div id="lbMine" class="glist"><p class="small muted">Lade …</p></div></section>
-      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3><span class="row" style="gap:6px"><button class="btn small" id="lbDiag">Fehlerprotokoll</button><button class="btn small" id="lbPlay">Spielzeit der Spieler</button></span></div><p class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</p><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
+      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3></div><div class="adm-bar"><button class="btn small primary" id="lbPlay">Spielzeit der Spieler</button><button class="btn small primary" id="lbPacks">Packs, Shop &amp; Angebote<span class="badge" id="lbPacksN" hidden></span></button><button class="btn small" id="lbMain">Hauptwelt verwalten</button><button class="btn small" id="lbDiag">Fehlerprotokoll</button></div><p class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</p><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
       <section class="stack"><h3>Spiel beitreten</h3>
         <form id="lbCodeForm" class="row"><input type="text" id="lbCode" maxlength="6" placeholder="Code, z. B. K7QF2M" style="text-transform:uppercase;flex:1;min-width:140px"><button class="btn" type="submit">Suchen</button></form>
         <form id="lbSearchForm" class="row"><input type="text" id="lbQ" maxlength="40" placeholder="Spielname suchen" style="flex:1;min-width:140px"><button class="btn" type="submit">Finden</button></form>
@@ -16830,6 +16831,8 @@ async function showLobby(tab = null) {
   $('#lbPw').addEventListener('click', () => showPwChange({ then: () => showLobby() }));
   if ($('#lbPlay')) $('#lbPlay').addEventListener('click', () => showPlaytime(() => showLobby()));
   if ($('#lbDiag')) $('#lbDiag').addEventListener('click', () => showDiag(() => showLobby()));
+  if ($('#lbPacks')) { $('#lbPacks').addEventListener('click', () => showPackAdmin()); api('/coll/admin', { timeout: 15000 }).then((d) => { const n = d.requests.filter((q) => q.status === 'open').length, el = $('#lbPacksN'); if (el && n) { el.textContent = n; el.hidden = false; el.title = `${n} offene Pack-Anfrage${n > 1 ? 'n' : ''}`; } }).catch(() => {}); }
+  if ($('#lbMain')) $('#lbMain').addEventListener('click', () => showAdmin('main', () => showLobby()));
   $('#lbNew').addEventListener('click', showCreate);
   $('#lbSolo').addEventListener('click', () => showStart(false));
   $('#lbGuide').addEventListener('click', () => showGuide(() => showLobby()));
@@ -18019,20 +18022,16 @@ VIEWS.shop = function viewShop() {
   const S = coll.shop || { enabled: false, offers: [], odds: { count: [], rarity: [] } }, m = coll.me, en = S.enabled;
   if (!ui.shReqs && !ui.shReqBusy) { ui.shReqBusy = true; api('/shop/requests').then((r) => { ui.shReqs = r.requests; ui.shReqBusy = false; if (ui.tab === 'shop') renderPane(true); }).catch(() => { ui.shReqBusy = false; ui.shReqs = []; }); }
   const tokS = (v) => `${Number(v).toLocaleString('de-DE')} Token`;
-  const icons = (n) => `<div class="sh-icons">${Array.from({ length: n }, () => '<i></i>').join('')}</div>`;
-  let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
+    let html = `<div class="ac-wrap sh-dark"><div class="sh-hero"><div class="sh-pack">${packSvg()}</div><div class="stack"><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Aircraft Mystery Pack</h2>
     <p>Jedes Pack enthält 1 bis 3 zufällige Flugzeug-Skins aus ${SK.TOTAL} Lackierungen für ${SK.MODELS.length} Modelle. Rein kosmetisch – ohne Einfluss auf das Spiel.</p>
     <div class="row" style="gap:8px;flex-wrap:wrap"><span class="chip">${n0(m.packs.length)} ungeöffnete Packs</span>${m.packs.length ? '<button class="btn primary small" data-act="accopen">Pack öffnen</button>' : ''}</div></div></div>`;
   if (!en) html += `<div class="callout warn"><b>Anfragen sind noch nicht freigeschaltet.</b><span class="small">${coll.admin ? 'Freischalten im Menü oben rechts → Aircraft Pack Management. Kostenlose Packs können Sie schon jetzt vergeben.' : 'Packs gibt es bis dahin über Aktionen der Spielleitung und im Tausch.'}</span></div>`;
-  const q = ui.shQty = Math.max(1, Math.min(50, ui.shQty || 1));
-  html += `<div class="sh-offers">${S.offers.map((o) => o.perPack
-    ? `<div class="sh-offer ${o.key}"><span class="chip">frei wählbar</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(Math.min(q, 10))}
-      <div class="sh-qty"><button class="btn small" data-act="shqty" data-v="-1" ${q <= 1 ? 'disabled' : ''} aria-label="Ein Pack weniger">−</button><b class="sh-n">${q} ${q === 1 ? 'PACK' : 'PACKS'}</b><button class="btn small" data-act="shqty" data-v="1" ${q >= (o.max || 50) ? 'disabled' : ''} aria-label="Ein Pack mehr">+</button></div>
-      <span class="sh-price">${tokS(q * Number(o.price))}</span><span class="small">${String(o.price).replace('.', ',')} Token pro Pack</span>
-      <button class="btn primary" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${q} ${q === 1 ? 'Pack' : 'Packs'} anfragen</button></div>`
-    : `<div class="sh-offer ${o.key}"><span class="chip">Paket</span><h3>${esc(o.label.toUpperCase())}</h3>${icons(o.packs)}<b class="sh-n">${o.packs} PACKS</b>
-      <span class="sh-price">${tokS(o.price)}</span><span class="small">${String(Number(o.price) / o.packs).replace('.', ',')} Token pro Pack</span>
-      <button class="btn ${o.key === 'collector' ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${o.packs} Packs anfragen</button></div>`).join('')}</div>
+  const sMax = ((S.offers || []).find((o) => o.perPack) || {}).max || 50, q = ui.shQty = Math.max(1, Math.min(sMax, ui.shQty || 1));
+  html += `<div class="sh-offers">${S.offers.map((o) => { const big = !o.perPack && o.packs >= 20, n = o.perPack ? q : o.packs, pp = o.perPack ? Number(o.price) : Number(o.price) / o.packs;
+    return `<div class="sh-offer ${o.key}${big ? ' collector' : ''}${o.perPack ? ' single' : ''}"><div class="sh-o-l"><b>${esc(o.label)}</b><span class="small">${String(+pp.toFixed(2)).replace('.', ',')} Token pro Pack</span></div>
+      ${o.perPack ? `<div class="sh-qty"><button class="btn small" data-act="shqty" data-v="-1" ${q <= 1 ? 'disabled' : ''} aria-label="Ein Pack weniger">−</button><b class="sh-n">${q}</b><button class="btn small" data-act="shqty" data-v="1" ${q >= (o.max || 50) ? 'disabled' : ''} aria-label="Ein Pack mehr">+</button></div>` : `<b class="sh-n">${o.packs}×</b>`}
+      <span class="sh-price">${tokS(o.perPack ? q * Number(o.price) : o.price)}</span>
+      <button class="btn small ${big ? 'gold' : 'primary'}" data-act="shbuy" data-v="${o.key}" ${en ? '' : 'disabled'}>${n} ${n === 1 ? 'Pack' : 'Packs'} anfragen</button></div>`; }).join('')}</div>
     <p class="small" style="position:relative;color:#c3cde0">So läuft es ab: Sie fragen ein Angebot an. Die Spielleitung prüft die Anfrage und gibt die Packs frei – danach liegen sie in Ihrem Inventar. ${esc(S.payInfo || '')}</p>`;
   { const R = ui.shReqs || [], ST = { open: 'wartet auf Freigabe', approved: 'freigegeben', declined: 'abgelehnt', cancelled: 'zurückgezogen' };
     if (R.length) html += `<div class="card pad stack"><h3>Ihre Anfragen</h3>${R.map((q) => `<div class="spread small" style="gap:8px;flex-wrap:wrap"><span><b class="mono">${esc(q.id)}</b> · ${new Date(q.created).toLocaleDateString('de-DE')} · ${q.packs} ${q.packs === 1 ? 'Pack' : 'Packs'} · ${tokS(q.amount)}</span><span><span class="chip ${q.status === 'approved' ? 'good' : q.status === 'open' ? 'warn' : ''}">${ST[q.status] || esc(q.status)}</span>${q.note ? ` <span class="muted">${esc(q.note)}</span>` : ''}${q.status === 'open' ? ` <button class="btn small" data-act="shcancel" data-id="${esc(q.id)}">Zurückziehen</button>` : ''}</span></div>`).join('')}
@@ -18122,7 +18121,7 @@ function collPaneClick(act, b) {
     case 'acdetail': showSkinDetail(b.dataset.id); return true;
     case 'skinpick': if (!coll.me) { loadColl(true).then(() => showSkinPicker(b.dataset.id)); } else showSkinPicker(b.dataset.id); return true;
     case 'shbuy': showBuy(b.dataset.v); return true;
-    case 'shqty': ui.shQty = Math.max(1, Math.min(50, (ui.shQty || 1) + Number(b.dataset.v))); renderPane(true); return true;
+    case 'shqty': ui.shQty = Math.max(1, Math.min(((coll.shop && coll.shop.offers || []).find((o) => o.perPack) || {}).max || 50, (ui.shQty || 1) + Number(b.dataset.v))); renderPane(true); return true;
     case 'shcancel': api(`/shop/request/${encodeURIComponent(b.dataset.id)}/cancel`, { body: {} }).then(() => { ui.shReqs = null; renderPane(true); }).catch((e) => toast(e.message)); return true;
     case 'trsearch': trSearch(); return true;
     case 'trpick': trPick(b.dataset.v); return true;
@@ -18135,6 +18134,14 @@ function collPaneClick(act, b) {
 }
 
 // ---------- Admin: kostenlose Packs, Protokoll, Statistik ----------
+/** 0.21.63: eine Zeile im Angebots-Editor. */
+function offerEditRow(o, i) {
+  const pp = !!o.perPack;
+  return `<div class="pa-of" data-key="${esc(o.key)}" data-pp="${pp ? '1' : ''}"><label class="f"><span>Bezeichnung</span><input data-f="label" maxlength="30" value="${esc(o.label)}"></label>
+    ${pp ? `<label class="f"><span>höchstens</span><input data-f="max" type="number" min="1" max="200" value="${o.max || 50}"></label>` : `<label class="f"><span>Packs</span><input data-f="packs" type="number" min="1" max="200" value="${o.packs}"></label>`}
+    <label class="f"><span>${pp ? 'Token je Pack' : 'Token gesamt'}</span><input data-f="price" inputmode="decimal" value="${esc(String(o.price).replace('.', ','))}"></label>
+    <label class="pa-on"><input type="checkbox" data-f="active" ${o.active !== false ? 'checked' : ''}><span>im Shop</span></label>${pp ? '<span class="small muted pa-x">Einzelpacks</span>' : `<button class="btn small ghost" data-pa="ofdel" aria-label="Paket entfernen">Entfernen</button>`}</div>`;
+}
 async function showPackAdmin() {
   const m = modal('<h1>Aircraft Pack Management</h1><p class="small muted">Lade …</p>');
   let d; try { d = await api('/coll/admin', { timeout: 20000 }); } catch (e) { toast(e.message); m.hidden = true; return; }
@@ -18148,6 +18155,10 @@ async function showPackAdmin() {
       <p class="small ${d.shop.enabled ? 'pos' : 'muted'}">${d.shop.enabled ? 'Freigeschaltet: Spieler können im Shop Packs anfragen.' : 'Gesperrt: Der Shop zeigt die Angebote, Anfragen sind aber nicht möglich. Kostenlose Vergabe geht trotzdem.'}</p>
       <label class="f"><span>Hinweistext im Shop (optional)</span><input id="pa-info" maxlength="600" value="${esc(d.shop.payInfo || '')}" placeholder="z. B. wie man Token bekommt"></label>
       <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ${d.shop.enabled ? '' : 'primary'}" data-pa="shop" data-on="${d.shop.enabled ? '' : '1'}">${d.shop.enabled ? 'Anfragen sperren' : 'Anfragen freischalten'}</button><button class="btn" data-pa="shop" data-on="${d.shop.enabled ? '1' : ''}">Nur Text speichern</button></div></section>
+    <section class="card pad stack"><h3>Angebote im Shop</h3>
+      <p class="small muted">Bezeichnung, Anzahl Packs und Preis in Token anpassen, Angebote aus- und einschalten oder neue Pakete anlegen. Gilt sofort für neue Anfragen; offene Anfragen behalten ihren Preis.</p>
+      <div class="pa-offers" id="pa-offers">${(d.shop.offersAll || d.shop.offers).map((o, i) => offerEditRow(o, i)).join('')}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn small" data-pa="ofadd">Paket hinzufügen</button><button class="btn small primary" data-pa="ofsave">Angebote speichern</button><button class="btn small ghost" data-pa="ofreset">Standard wiederherstellen</button></div></section>
     <section class="card pad stack"><h3>Tägliches Gratis-Pack</h3>
       <p class="small ${d.shop.daily ? 'pos' : 'muted'}">${d.shop.daily ? 'An: Jeder angemeldete Spieler bekommt einmal pro Kalendertag (Berliner Zeit) ein Pack, sobald er das Spiel öffnet.' : 'Aus: Es gibt keine täglichen Gratis-Packs.'}${d.stats.dailyPacks ? ` Bisher verteilt: ${d.stats.dailyPacks}.` : ''}</p>
       <div class="row"><button class="btn ${d.shop.daily ? '' : 'primary'}" data-pa="daily" data-on="${d.shop.daily ? '' : '1'}">${d.shop.daily ? 'Ausschalten' : 'Einschalten'}</button></div></section>
@@ -18166,6 +18177,15 @@ async function showPackAdmin() {
     const b = e.target.closest('[data-pa]'); if (!b) return;
     const k = b.dataset.pa;
     if (k === 'close') { m.hidden = true; return; }
+    if (k === 'ofadd') { const box = $('#pa-offers'), i = box.children.length; box.insertAdjacentHTML('beforeend', offerEditRow({ key: `p${Date.now() % 100000}`, label: 'Neues Paket', packs: 5, price: '2.5', active: true }, i)); return; }
+    if (k === 'ofdel') { b.closest('.pa-of').remove(); return; }
+    if (k === 'ofsave' || k === 'ofreset') {
+      const offers = k === 'ofreset' ? 'reset' : [...document.querySelectorAll('#pa-offers .pa-of')].map((r) => ({ key: r.dataset.key, perPack: r.dataset.pp === '1', label: r.querySelector('[data-f=label]').value, packs: r.querySelector('[data-f=packs]') ? r.querySelector('[data-f=packs]').value : 1, max: r.querySelector('[data-f=max]') ? r.querySelector('[data-f=max]').value : undefined, price: r.querySelector('[data-f=price]').value, active: r.querySelector('[data-f=active]').checked }));
+      if (k === 'ofreset' && !b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Wirklich zurücksetzen?'; return; }
+      b.disabled = true;
+      try { await api('/coll/admin/shop', { body: { offers } }); coll.at = 0; await loadColl(true); toast(k === 'ofreset' ? 'Standardangebote wiederhergestellt.' : 'Angebote gespeichert.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; }
+      return;
+    }
     if (k === 'daily') { b.disabled = true; try { await api('/coll/admin/shop', { body: { daily: !!b.dataset.on } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Tägliches Gratis-Pack ist an.' : 'Tägliches Gratis-Pack ist aus.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'shop') { b.disabled = true; try { await api('/coll/admin/shop', { body: { enabled: !!b.dataset.on, info: $('#pa-info').value } }); coll.at = 0; await loadColl(true); toast(b.dataset.on ? 'Pack-Anfragen sind freigeschaltet.' : 'Pack-Anfragen sind gesperrt.'); showPackAdmin(); } catch (err) { toast(err.message); b.disabled = false; } return; }
     if (k === 'find') { try { const r = await api('/coll/players?q=' + encodeURIComponent($('#pa-q').value)); $('#pa-res').innerHTML = r.players.map((p) => `<button class="btn small" data-pa="pick" data-v="${esc(p.key)}">${esc(p.name)}</button>`).join('') || '<span class="small muted">Niemand gefunden.</span>'; } catch (err) { toast(err.message); } return; }

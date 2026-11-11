@@ -183,6 +183,12 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.63: Kompakter Shop, Angebote selbst einstellen, Admin-Leiste in der Lobby
+
+- **Shop kleiner:** Angebote als schmale Zeilen (Name, Preis je Pack, Anzahl, Gesamtpreis, Anfragen-Knopf) statt großer Karten; der Pack-Kopf ist deutlich kleiner. Auf dem Handy steht der Knopf unter der Zeile.
+- **Angebote einstellen (Admin):** Aircraft Pack Management → „Angebote im Shop“: Bezeichnung, Anzahl Packs (bei Einzelpacks die Höchstmenge), Preis in Token, im Shop an/aus, neue Pakete hinzufügen, Pakete entfernen, Standard wiederherstellen. Gespeichert im Shop-Konfig (`shop/config.offers`, geprüft mit `cleanOffers`), gilt sofort ohne Deploy. Anfragen werden gegen die gespeicherten Angebote geprüft; ausgeschaltete lassen sich nicht anfragen, offene Anfragen behalten ihren Preis. `POST /coll/admin/shop {offers}` ändert nur die Angebote, `{offers:'reset'}` stellt die Standardangebote her.
+- **Admin-Leiste in der Lobby:** „Spielzeit der Spieler“, „Packs, Shop & Angebote“ (mit Zahl der offenen Pack-Anfragen), „Hauptwelt verwalten“, „Fehlerprotokoll“ – ohne erst ein Spiel zu betreten.
+
 ## Neu in 0.21.62: Feste, wählbare Airline-Farben
 
 - 48 Farben (`P.AL_COLORS`, Hex und Name). Jede Spieler-Airline hat genau eine, keine doppelt in einer Welt (vorher reihum 8). Die Farbe steht im Spielstand – auf jedem Gerät gleich, auch die eigene (eigene Strecken über `--mine`, eigene Flugzeuge in der eigenen Farbe).
