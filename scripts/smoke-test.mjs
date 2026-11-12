@@ -1,7 +1,7 @@
 // Prüft den API-Ablauf ohne Netlify: Konten, Spiel mit Passwort, Suche, Beitritt per Code und Einladung, Zeit, Aktionen.
 import { handle, tickMain, _clock } from '../server/api.mjs';
 import { memStore } from '../server/memstore.mjs';
-import { fairNew, fairRecord, fairScore, fairDue, fairCalm, fairRebase, FAIR } from '../server/fairplay.mjs';
+import { fairNew, fairRecord, fairScore, fairDue, fairCalm, fairRebase, fairThink, FAIR } from '../server/fairplay.mjs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -1816,6 +1816,55 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'reset' }), 'Daten zurücksetzen');
   const rs = ok(await call('tim', 'POST', '/admin/fairplay', { cmd: 'conf', autoMax: 0 }), 'nur vorschlagen'); assert.ok(/nur noch vor/.test(rs.msg)); ok(await call('tim', 'POST', '/admin/fairplay', { cmd: 'conf', autoMax: 2 }), 'zurück');
   console.log(`0.21.78 ok: Luftfahrtaufsicht – Stufen 1–5, Stufe 1 automatisch (Score ${d1.score}), 12-h-Abstand, Stufe 3 auf Bestätigung, Bewährung, Bescheide ohne Admin-Namen`); }
+// 0.21.80: Spuren von KI-Agenten im normalen Browser – Mausweg fehlt, Klick exakt mittig, Text ohne Tasten, Tippen im Takt, Denkpausen, Herkunft
+{ const T0 = Date.UTC(2026, 10, 12, 9, 0, 0); let seed = 23; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const base = (i) => ({ gap: 300 + rnd() * 2000, tr: 2, ut: 0, g: i, wd: 0, hl: 0, dbg: 0, vis: 1, tz: 'Europe/Berlin', dv: 'Win32 · Chrome/141 · 1920×1080' });
+  // Mensch mit Maus: Mausweg vorhanden, Klickpunkt streut, normales Tippen, schnelle Folgeaktionen dazwischen
+  const hu = fairNew('h2', 'Mensch', T0); let t = T0;
+  for (let i = 0; i < 60; i++) { t += i % 4 ? 2500 + rnd() * 8000 : 400 + rnd() * 900; const mc = 1 + Math.floor(rnd() * 3); fairRecord(hu, { now: t, game: 'main', geo: 'DE', fp: { ...base(i), mc, tp: rnd() < 0.05 ? 1 : 0, ck: mc, cc: rnd() < 0.08 ? 1 : 0, ti: 0, kn: i % 10 ? 0 : 8, km: 160, kv: 0.45 } }); }
+  const hs = fairScore(hu); assert.ok(!hs.reasons.some((r) => ['teleport', 'center', 'synth', 'keys', 'think', 'origin'].includes(r.k)) && hs.score < 15, 'Mensch unauffällig: ' + JSON.stringify(hs.reasons));
+  assert.ok(hu.geo.DE === 60 && hu.tz['Europe/Berlin'] === 60 && Object.keys(hu.dev).length === 1, 'Herkunft gezählt');
+  // Agent im normalen Browser: echte Klicks, aber ohne Mausweg, exakt mittig, Text eingefügt, immer einige Sekunden Denkpause
+  const ag = fairNew('a2', 'Agent', T0); t = T0;
+  for (let i = 0; i < 30; i++) { t += 4000 + rnd() * 9000; fairRecord(ag, { now: t, game: 'main', geo: 'DE', fp: { ...base(i), gap: 200, mc: 1, tp: 1, ck: 1, cc: 1, ti: i % 6 ? 0 : 1, kn: 0 } }); }
+  const as = fairScore(ag), ks = as.reasons.map((r) => r.k);
+  assert.ok(['teleport', 'center', 'synth', 'think'].every((k) => ks.includes(k)) && as.score >= 60, 'Agent sehr verdächtig: ' + JSON.stringify(as.reasons.map((r) => r.k + ':' + r.w)));
+  assert.ok(fairDue(ag, t, 2) && fairDue(ag, t, 2).n === 1, 'Stufe 1 fällig');
+  const ty = fairNew('k2', 'Tipper', T0); for (let i = 0; i < 3; i++) fairRecord(ty, { now: T0 + i * 5000, game: 'main', fp: { ...base(i), kn: 12, km: 12, kv: 0.03 } });
+  assert.ok(fairScore(ty).reasons.some((r) => r.k === 'keys'), 'Tippen im Maschinentakt');
+  assert.equal(fairThink([T0, T0 + 500, T0 + 900]), null, 'Denkpausen erst ab genug Aktionen');
+  // Herkunft: erst üblich DE/Berlin, dann Aktionen aus US mit US-Zeitzone
+  const tr = fairNew('o2', 'Reise', T0); t = T0; for (let i = 0; i < 25; i++) fairRecord(tr, { now: (t += 3000 + rnd() * 5000), game: 'main', geo: 'DE', fp: base(i) });
+  for (let i = 0; i < 6; i++) fairRecord(tr, { now: (t += 4000), game: 'main', geo: 'US', fp: { ...base(30 + i), tz: 'America/New_York' } });
+  const os = fairScore(tr); assert.ok(os.reasons.some((r) => r.k === 'origin') && os.reasons.find((r) => r.k === 'origin').w <= 25, 'Herkunft weicht ab (allein unter der Stufen-Schwelle)');
+  assert.ok(tr.ev.some((e) => e.k === 'origin' && /US statt DE/.test(e.d) && /America\/New_York statt Europe\/Berlin/.test(e.d)), 'Beleg nennt Land und Zeitzone');
+  assert.ok(tr.ev.filter((e) => e.k === 'origin').length === 1, 'höchstens ein Beleg je Stunde und Art');
+  // Server: Land kommt vom Hosting (context.geo), nicht aus der Aktion
+  const req = (body, cc) => handle(new Request('http://localhost/api/games/main/action', { method: 'POST', headers: { 'content-type': 'application/json', cookie: jar.anna }, body: JSON.stringify(body) }), { store, geo: cc ? { country: { code: cc } } : null });
+  const r1 = await req({ action: { type: 'repay', id: 'nix' }, fp: { ...base(500), mc: 1, tp: 0, ck: 1, cc: 0 } }, 'DE'); assert.equal(r1.status, 200);
+  const fa = await store.get('fair/anna', { type: 'json' }); assert.ok(fa.geo && fa.geo.DE >= 1 && fa.tz['Europe/Berlin'] >= 1 && fa.sig.mclk >= 1, 'Server zählt Land, Zeitzone und Mausklicks');
+  const adm = ok(await call('tim', 'GET', '/admin/fairplay'), 'Ü').rows.find((r) => r.key === 'anna'); assert.ok(adm.trace && adm.trace.mclk >= 1 && adm.geo.DE >= 1 && Object.keys(adm.dev).length >= 1, 'Übersicht zeigt Spuren und Herkunft');
+  const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'); assert.ok(/mc: FPT\.mc, tp: FPT\.tp, ck: FPT\.ck, cc: FPT\.cc, ti: FPT\.ti/.test(src) && /pointermove/.test(src), 'Spiel misst Mausweg und Klickpunkt');
+  const fn = fs.readFileSync(new URL('../netlify/functions/api.mjs', import.meta.url), 'utf8'); assert.ok(/geo: \(context && context\.geo\)/.test(fn), 'Funktion reicht das Land weiter');
+  // Admin: zeitweise sperren mit freier Dauer und Teilsperren (Chat, Handel & Börse)
+  const SX = (kind, extra = {}) => call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'sanction', kind, reason: '', ...extra });
+  assert.equal((await SX('suspend', { scope: 'chat', minutes: 0 })).status, 400, 'Dauer nötig');
+  const c1 = ok(await SX('suspend', { scope: 'chat', minutes: 45 }), 'Chat 45 Minuten'); assert.ok(/Chat gesperrt/.test(c1.msg), c1.msg);
+  assert.equal((await call('anna', 'POST', '/games/main/chat', { text: 'hallo' })).status, 403, 'Chat gesperrt');
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: base(600) }), 'Spielen geht weiter');
+  ok(await SX('suspend', { scope: 'trade', minutes: 150 }), 'Handel 2 h 30 min');
+  const tb = await call('anna', 'POST', '/games/main/action', { action: { type: 'dealPropose', to: 'x', give: [], get: [] }, fp: base(601) }); assert.ok(tb.status === 403 && /Handel und Börse/.test(tb.data.error), 'Handel gesperrt');
+  assert.equal((await call('anna', 'POST', '/games/main/action', { action: { type: 'buyStake', id: 'x', pct: 1 }, fp: base(602) })).status, 403, 'Börse gesperrt');
+  assert.equal((await call('anna', 'POST', '/coll/trade', { act: 'propose' })).status, 403, 'Skin-Tausch gesperrt');
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: base(603) }), 'anderes geht');
+  const meB = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(meB.blk.chat > Date.now() + 44 * 60e3 && meB.blk.chat < Date.now() + 46 * 60e3 && meB.blk.trade > Date.now() + 149 * 60e3 && !meB.susp, 'Spielerin sieht beide Teilsperren mit Dauer');
+  assert.ok(/den Chat für Ihr Konto gesperrt/.test(meB.fairWarn.text) && /Luftfahrtaufsicht/.test(meB.fairWarn.text) && /2 Stunden 30 Minuten/.test(meB.fairWarn.text), 'Bescheid mit freier Dauer: ' + meB.fairWarn.text);
+  const rowB = ok(await call('tim', 'GET', '/admin/fairplay'), 'Ü').rows.find((r) => r.key === 'anna'); assert.ok(rowB.blk.chat && rowB.blk.trade && rowB.sanctions.some((x) => x.scope === 'trade' && x.minutes === 150), 'Übersicht zeigt Teilsperren');
+  ok(await SX('unsuspend', { scope: 'chat' }), 'Chat frei'); ok(await call('anna', 'POST', '/games/main/chat', { text: 'wieder da' }), 'Chat geht wieder');
+  ok(await SX('unsuspend', { scope: 'trade' }), 'Handel frei'); assert.ok(!ok(await call('anna', 'GET', '/me'), 'me').blk.trade, 'keine Teilsperre mehr');
+  ok(await call('anna', 'POST', '/fair/seen', {}), 'gelesen');
+  const s7 = ok(await SX('suspend', { scope: 'pack', minutes: 7 }), 'Packs 7 Minuten'); assert.ok(/7 Minuten/.test(s7.msg), s7.msg); ok(await SX('unsuspend', { scope: 'pack' }), 'Packs frei');
+  console.log(`0.21.80 ok: Agenten-Spuren – Mensch ${hs.score}, Agent ${as.score} (${ks.join(', ')}), Tippen, Denkpausen, Herkunft US statt DE; Sperren mit freier Dauer, nur Chat, nur Handel & Börse`); }
 // 0.21.79: Pack-Verläufe mit eigener ID je Pack (gleiche IDs ließen die Tüte durchsichtig werden, sobald ein verstecktes Pack zuerst im Dokument stand)
 { const src = fs.readFileSync(new URL('../src/collection.js', import.meta.url), 'utf8'), i = src.indexOf('const packSvg = '), body = src.slice(i, src.indexOf('</svg>`', i));
   assert.ok(i > 0 && !/id="pk[a-z]+"|url\(#pk[a-z]+\)/.test(body), 'keine festen Verlaufs-IDs im Pack'); assert.ok(/'pk' \+ \(\+\+packSeq\)/.test(body) && /url\(#\$\{u\}g\)/.test(body), 'IDs je Pack');

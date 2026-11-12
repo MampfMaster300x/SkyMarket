@@ -4457,6 +4457,7 @@ function toggleChat(open = !chat.open) {
 async function chatSend(text) {
   if (!ui.mp || !text.trim()) return;
   try {
+    if (blkOf('chat')) { toast(`Die Luftfahrtaufsicht hat den Chat für Ihr Konto bis ${fmtUntil(blkOf('chat'))} gesperrt.`); return; }
     const r = await api(`/games/${ui.mp.id}/chat`, { body: { text, to: chat.to || null } });
     if (r.message && r.message.seq > chat.seq) { chat.list.push(r.message); chat.seq = r.message.seq; }
     renderChat();
@@ -5486,7 +5487,9 @@ function assistantAfterDays(prev) {
 /** Alle Änderungen am Spiel laufen hierüber: lokal sofort, im Mehrspieler zusätzlich an den Server. */
 const fmtUntil = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
 const suspOf = () => (mpState.user && mpState.user.susp && mpState.user.susp.until > Date.now() && !mpState.user.admin ? mpState.user.susp : null);   // 0.21.75: zeitweise gesperrt
+const blkOf = (k) => (mpState.user && mpState.user.blk && mpState.user.blk[k] > Date.now() && !mpState.user.admin ? mpState.user.blk[k] : null);   // 0.21.80: Teilsperren (Chat, Handel & Börse)
 function doAction(act) {
+  if (ui.mp && blkOf('trade') && (SM.FAIR_TRADE_ACTS || []).includes(act.type)) { toast(`Die Luftfahrtaufsicht hat Handel und Börse für Ihr Konto bis ${fmtUntil(blkOf('trade'))} gesperrt.`); return { ok: false, msg: 'Gesperrt.' }; }
   if (ui.mp && suspOf()) { toast(`Die Luftfahrtaufsicht hat Ihren Leitstand bis ${fmtUntil(suspOf().until)} stillgelegt – Sie können zuschauen, aber nicht handeln.`); return { ok: false, msg: 'Gesperrt.' }; }
   if (!W || !W.player) { if (ui.mp) { toast('Der Spielstand wird neu geladen …'); enterGame(ui.mp.id); } return { ok: false, msg: 'Kein Spielstand geladen.' }; }
   const res = SM.applyAction(W, W.playerId, act);
@@ -6659,12 +6662,25 @@ async function showDiag(onBack) {
     else if (v === 'clear') { try { await api('/admin/diag?clear=1', { timeout: 20000 }); } catch (err) { toast(err.message); } showDiag(onBack); } };
 }
 /** 0.21.74 Fair-Play-Wächter: wer lässt eine KI oder ein Skript für sich spielen? Bewertung mit Belegen, Prüfen/Verwarnen/Zurücksetzen. */
+/** 0.21.80: Agenten-Spuren und Herkunft je Konto (Mausweg, Klickpunkt, Tippen, Land, Zeitzone, Gerät). */
+function fairTraceHtml(r) {
+  const t = r.trace || {}, pc = (a, b) => (b ? `${Math.round(a / b * 100)} %` : '–'), top = (m, n = 3) => Object.entries(m || {}).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${esc(k)} (${n0(v)})`).join(', ') || '–';
+  const warnT = (a, b, lim) => (b >= 10 && a / b >= lim ? ' class="neg"' : '');
+  return `<div class="small muted fp-trace"><span>Maus: <b>${n0(t.mclk)}</b> Klicks · ohne Mausweg <b${warnT(t.tele, t.mclk, 0.4)}>${pc(t.tele, t.mclk)}</b> · exakt mittig <b${warnT(t.ctr, t.cclk, 0.35)}>${pc(t.ctr, t.cclk)}</b>${t.synth ? ` · Text ohne Tasten <b class="neg">${n0(t.synth)}×</b>` : ''}${t.keys ? ` · Maschinen-Tippen <b class="neg">${n0(t.keys)}×</b>` : ''}</span>
+    <span>Land: ${top(r.geo)} · Zeitzone: ${top(r.tz, 2)}${t.origin ? ` · <b class="neg">${n0(t.origin)}× abweichend</b>` : ''}</span><span>Geräte: ${top(r.dev, 3)}</span></div>`;
+}
 /** 0.21.78: Stufe des Kontos, nächste Stufe verhängen, Stufe zurücknehmen. */
 function fairStageBox(r, d) {
   const k = esc(r.key), st = r.stage || 0, nx = d.ladder[st], cur = d.ladder[st - 1];
   return `<div class="fp-stage"><div><b>${st ? `Stufe ${st} von 5 · ${esc(cur.label)}` : 'Noch keine Stufe'}</b>${r.stageAt ? ` <span class="small muted">seit ${new Date(r.stageAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : ''}
     <div class="small muted">${r.due ? `Neue Belege seit der letzten Stufe: <b>${r.due.score}</b> – Stufe ${r.due.n} ${r.due.auto ? 'verhängt das Prüfsystem bei der nächsten Aktion' : 'ist fällig und wartet auf Bestätigung'}.` : nx ? `Nächste Stufe: ${esc(nx.label)} – ${esc(nx.what)}.` : 'Höchste Stufe erreicht.'}</div></div>
     <div class="row" style="gap:6px;flex-wrap:wrap">${nx ? `<button class="btn small ${r.due ? 'danger' : ''}" data-fp="stage" data-n="${st + 1}" data-k="${k}">Stufe ${st + 1} verhängen</button>` : ''}${st ? `<button class="btn small" data-fp="stageDown" data-n="${st}" data-k="${k}">Stufe ${st} zurücknehmen</button>` : ''}</div></div>`;
+}
+/** 0.21.80: laufende Sperren mit Knopf zum Aufheben (alles, Chat, Handel & Börse, Packs). */
+function fairLocksHtml(r) {
+  const tf = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const L = [['all', 'Leitstand stillgelegt', r.susp], ['chat', 'Chat gesperrt', r.blk && r.blk.chat], ['trade', 'Handel & Börse gesperrt', r.blk && r.blk.trade], ['pack', 'Packs gesperrt', r.pack]].filter((x) => x[2]);
+  return L.length ? `<div class="stack" style="gap:4px">${L.map(([k, l, x]) => `<div class="row small" style="gap:6px"><span class="chip ${k === 'all' ? 'crit' : 'warn'}">${l} bis ${tf(x.until)}</span><button class="btn small" data-fp="sx" data-v="unsuspend" data-scope="${k}">Aufheben</button></div>`).join('')}</div>` : '';
 }
 /** 0.21.75: Maßnahmen je Konto – Sperren (Konto), Pack-Sperre, Annullieren, Geldstrafe, Wertung aberkennen (je Spiel), Entfernen über die Spielverwaltung. */
 function fairActions(r) {
@@ -6676,16 +6692,18 @@ function fairActions(r) {
     <div class="fp-acts" data-k="${k}">
       <label class="f fp-wide"><span>Grund (sieht der Spieler im Bescheid der Luftfahrtaufsicht)</span><input type="text" data-fpf="reason" maxlength="140" placeholder="z. B. automatisierte Steuerung festgestellt"></label>
       <label class="f fp-wide"><span>Spiel für Strafen</span><select data-fpf="game" ${noGame}>${gOpts}</select></label>
-      <div class="fp-box"><b>Zeitweise sperren</b><span class="small muted">Kein Handeln, kein Chat. Die KI führt die Airline in allen Spielen weiter.</span>
-        ${r.susp ? `<button class="btn small" data-fp="sx" data-v="unsuspend">Sperre aufheben</button>` : `<div class="row">${dur('hoursS')}<button class="btn small danger" data-fp="sx" data-v="suspend">Sperren</button></div>`}</div>
+      <div class="fp-box fp-wide"><b>Zeitweise sperren</b><span class="small muted">Dauer frei wählbar. „Alles“ legt den Leitstand still (kein Handeln, kein Chat, die KI führt die Airline in allen Spielen). Teilsperren lassen den Rest spielbar.</span>
+        <div class="row"><select data-fpf="scope"><option value="all">Alles (Leitstand stilllegen)</option><option value="chat">Nur Chat</option><option value="trade">Nur Handel &amp; Börse (inkl. Skin-Tausch)</option><option value="pack">Nur Packs</option></select></div>
+        <div class="row fp-dur"><label><input type="number" data-fpf="dd" min="0" max="90" step="1" value="0"> Tage</label><label><input type="number" data-fpf="dh" min="0" max="23" step="1" value="1"> Std.</label><label><input type="number" data-fpf="dm" min="0" max="59" step="1" value="0"> Min.</label>
+          <span class="row" style="gap:4px">${[[15, '15 Min.'], [60, '1 Std.'], [360, '6 Std.'], [1440, '1 Tag']].map(([m, l]) => `<button type="button" class="btn small ghost" data-fpq="${m}">${l}</button>`).join('')}</span></div>
+        <button class="btn small danger" data-fp="sx" data-v="suspend">Sperren</button>
+        ${fairLocksHtml(r)}</div>
       <div class="fp-box"><b>Annullieren</b><span class="small muted">Gewinne des Zeitraums einziehen und dort erreichte Meilensteine aberkennen.</span>
         <div class="row"><select data-fpf="days">${[[1, 'letzter Spieltag'], [3, 'letzte 3 Spieltage'], [7, 'letzte 7 Spieltage'], [14, 'letzte 14 Spieltage'], [30, 'letzte 30 Spieltage'], [90, 'letzte 90 Spieltage'], [3650, 'ganzes Spiel']].map(([d, l]) => `<option value="${d}"${d === 7 ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
         <div class="row small"><label class="chk"><input type="checkbox" data-fpf="profits" checked> Gewinne einziehen</label><label class="chk"><input type="checkbox" data-fpf="milestones" checked> Meilensteine aberkennen</label></div>
         <button class="btn small danger" data-fp="sx" data-v="annul" ${noGame}>Annullieren</button></div>
       <div class="fp-box"><b>Geldstrafe</b><span class="small muted">Wird vom Eigenkapital abgezogen und im Logbuch vermerkt.</span><div class="row"><input type="number" data-fpf="amount" min="0.1" step="0.5" value="5" style="width:90px"> <span class="small">Mio. €</span><button class="btn small danger" data-fp="sx" data-v="fine" ${noGame}>Strafe buchen</button></div></div>
       <div class="fp-box"><b>Wertung aberkennen</b><span class="small muted">Airline steht ohne Punkte als „disqualifiziert“ am Ende der Rangliste.</span><div class="row"><button class="btn small danger" data-fp="sx" data-v="dq" ${noGame}>Aberkennen</button><button class="btn small" data-fp="sx" data-v="undq" ${noGame}>Wieder zulassen</button></div></div>
-      <div class="fp-box"><b>Pack-Sperre</b><span class="small muted">Keine Gratis-Packs und keine Pack-Anfragen.</span>
-        ${r.pack ? `<button class="btn small" data-fp="sx" data-v="unpackban">Pack-Sperre aufheben</button>` : `<div class="row">${dur('hoursP')}<button class="btn small danger" data-fp="sx" data-v="packban">Sperren</button></div>`}</div>
       <div class="fp-box"><b>Entfernen</b><span class="small muted">Airline aus dem Spiel nehmen und dauerhaft sperren – in der Spielverwaltung.</span>${r.games.map((g) => `<button class="btn small" data-fp="adm" data-g="${esc(g.id)}">${esc(g.name)} verwalten</button>`).join('') || '<span class="small muted">–</span>'}</div>
     </div>${hist}</details>`;
 }
@@ -6693,12 +6711,15 @@ async function fairSanctionClick(b) {
   const box = b.closest('.fp-acts'), f = (n) => box.querySelector(`[data-fpf="${n}"]`), kind = b.dataset.v;
   const game = f('game') ? f('game').value : '', gName = f('game') && f('game').selectedOptions[0] ? f('game').selectedOptions[0].textContent : '';
   const body = { key: box.dataset.k, cmd: 'sanction', kind, reason: f('reason').value, game };
-  if (kind === 'suspend') body.hours = Number(f('hoursS').value);
-  if (kind === 'packban') body.hours = Number(f('hoursP').value);
+  const mins = Math.max(0, Number(f('dd').value) || 0) * 1440 + Math.max(0, Number(f('dh').value) || 0) * 60 + Math.max(0, Number(f('dm').value) || 0);
+  const scopeL = { all: 'Leitstand stilllegen (alles)', chat: 'Chat sperren', trade: 'Handel & Börse sperren', pack: 'Packs sperren' };
+  const durL = (m) => [Math.floor(m / 1440) ? `${Math.floor(m / 1440)} Tg.` : '', Math.floor((m % 1440) / 60) ? `${Math.floor((m % 1440) / 60)} Std.` : '', m % 60 ? `${m % 60} Min.` : ''].filter(Boolean).join(' ');
+  if (kind === 'suspend') { body.scope = f('scope').value; body.minutes = mins; if (!(mins > 0)) { toast('Bitte eine Dauer eingeben.'); return; } }
+  if (kind === 'unsuspend') body.scope = b.dataset.scope || 'all';
   if (kind === 'annul') { body.days = Number(f('days').value); body.profits = f('profits').checked; body.milestones = f('milestones').checked; }
   if (kind === 'fine') body.amount = Number(f('amount').value);
-  const ask = { suspend: `Konto für ${f('hoursS') && f('hoursS').selectedOptions[0].textContent} sperren? Die KI führt so lange die Airline.`, annul: `In „${gName}“ annullieren: ${f('days').selectedOptions[0].textContent}${body.profits ? ', Gewinne einziehen' : ''}${body.milestones ? ', Meilensteine aberkennen' : ''}?`,
-    fine: `In „${gName}“ eine Geldstrafe von ${body.amount} Mio. € buchen?`, dq: `In „${gName}“ die Wertung aberkennen?`, packban: 'Pack-Sperre verhängen?' }[kind];
+  const ask = { suspend: `${scopeL[body.scope]} für ${durL(mins)}?${body.scope === 'all' ? ' Die KI führt so lange die Airline.' : ''}`, annul: `In „${gName}“ annullieren: ${f('days').selectedOptions[0].textContent}${body.profits ? ', Gewinne einziehen' : ''}${body.milestones ? ', Meilensteine aberkennen' : ''}?`,
+    fine: `In „${gName}“ eine Geldstrafe von ${body.amount} Mio. € buchen?`, dq: `In „${gName}“ die Wertung aberkennen?` }[kind];
   if (ask && !confirm(ask)) return;
   try { const r = await api('/admin/fairplay', { body, timeout: 30000 }); toast(r.msg || 'Erledigt.'); } catch (err) { toast(err.message); }
 }
@@ -6717,7 +6738,7 @@ async function showFairPlay(onBack) {
   const flt = ui.fairFlt || 'auff', rows = d.rows.filter((r) => flt === 'all' || r.score >= 15);
   const hoursBar = (r) => { const days = Object.keys(r.hours || {}).sort().slice(-7); if (!days.length) return '';
     return `<div class="fp-hours" title="Aktive Stunden je Tag (Berliner Zeit), letzte ${days.length} Tage">${days.map((k) => `<div class="fp-day"><span class="mono small">${k.slice(8, 10)}.${k.slice(5, 7)}.</span>${r.hours[k].map((v, h) => `<i class="${v ? (v > 20 ? 'h3' : v > 5 ? 'h2' : 'h1') : ''}" title="${h}–${h + 1} Uhr: ${v} Aktionen"></i>`).join('')}</div>`).join('')}</div>`; };
-  const card = (r) => `<details class="card pad fp-row ${r.tone}"${r.open ? ' open' : ''}><summary class="spread"><span><b>${esc(r.name)}</b>${r.admin ? ' <span class="chip">Admin</span>' : ''}${r.online ? ' <span class="chip good">online</span>' : ''}${r.susp ? ` <span class="chip crit">gesperrt bis ${tf(r.susp.until)}</span>` : ''}${r.pack ? ` <span class="chip warn">Pack-Sperre bis ${tf(r.pack.until)}</span>` : ''} <span class="small muted">${n0(r.n)} Aktionen · zuletzt ${tf(r.last)}</span></span>
+  const card = (r) => `<details class="card pad fp-row ${r.tone}"${r.open ? ' open' : ''}><summary class="spread"><span><b>${esc(r.name)}</b>${r.admin ? ' <span class="chip">Admin</span>' : ''}${r.online ? ' <span class="chip good">online</span>' : ''}${r.susp ? ` <span class="chip crit">gesperrt bis ${tf(r.susp.until)}</span>` : ''}${r.pack ? ` <span class="chip warn">Pack-Sperre bis ${tf(r.pack.until)}</span>` : ''}${r.blk && r.blk.chat ? ` <span class="chip warn">Chat gesperrt bis ${tf(r.blk.chat.until)}</span>` : ''}${r.blk && r.blk.trade ? ` <span class="chip warn">Handel gesperrt bis ${tf(r.blk.trade.until)}</span>` : ''} <span class="small muted">${n0(r.n)} Aktionen · zuletzt ${tf(r.last)}</span></span>
       <span class="row" style="gap:6px">${r.stage ? `<span class="chip ${r.stage >= 3 ? 'crit' : 'warn'}" title="${esc((d.ladder[r.stage - 1] || {}).what || '')}">Stufe ${r.stage} · ${esc((d.ladder[r.stage - 1] || {}).label || '')}</span>` : ''}${r.due && !r.due.auto ? `<span class="chip crit" title="Neue Belege seit der letzten Stufe: ${r.due.score}">Stufe ${r.due.n} fällig</span>` : ''}<span class="chip ${({ ok: 'good', warn: 'warn', bad: 'bad', crit: 'crit' })[r.tone]}">${esc(r.level)}</span><b class="mono fp-score">${r.score}</b></span></summary>
     <div class="fp-meter"><i style="width:${r.score}%"></i></div>
     ${r.reasons.length ? `<ul class="fp-why">${r.reasons.map((x) => `<li><b>${esc(x.label)}</b> <span class="small muted">· ${esc(x.why)} · ${n0(x.n)}×</span> <span class="mono small">+${x.w}</span></li>`).join('')}</ul>` : '<p class="small muted">Keine Auffälligkeiten.</p>'}
@@ -6725,12 +6746,13 @@ async function showFairPlay(onBack) {
     ${r.warn ? `<p class="small warn-t">Letzter Bescheid${r.warn.stage ? ` (Stufe ${r.warn.stage})` : ''} am ${tf(r.warn.at)}, ausgelöst von ${esc(r.warn.by)} · ${r.warn.seen ? `gelesen ${tf(r.warn.seen)}` : 'noch nicht gelesen'}</p>` : ''}
     ${fairStageBox(r, d)}
     <p class="small muted">Spiele: ${r.games.map((g) => `${esc(g.name)} (${n0(g.n)})`).join(', ') || '–'}</p>
+    ${fairTraceHtml(r)}
     ${hoursBar(r)}
     ${r.ev.length ? `<details class="small"><summary>Letzte Belege (${r.ev.length})</summary><table class="fp-ev"><tbody>${r.ev.map((e) => `<tr><td class="mono">${tf(e.t)}</td><td>${esc(e.label)}</td><td class="muted">${esc(e.d || '')}</td><td class="muted">${esc(e.type || '')} · ${esc(e.gameName || '')}</td></tr>`).join('')}</tbody></table></details>` : ''}
     <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn small" data-fp="ok" data-k="${esc(r.key)}" title="Bisherige Belege zählen für die nächste Stufe nicht mehr">Unbedenklich</button><button class="btn small" data-fp="reset" data-k="${esc(r.key)}">Daten zurücksetzen</button></div>
     ${fairActions(r)}</details>`;
   m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Fair Play</h1><span class="row" style="gap:6px"><button class="btn small" data-fp="reload">Aktualisieren</button><button class="btn small" data-fp="close">Zurück</button></span></div>
-    <p class="small muted">Der Wächter erkennt, wenn eine KI oder ein Skript selbst spielt: ferngesteuerte oder unsichtbare Browser, Klicks per Programm, Aktionen ohne Spieloberfläche oder ohne vorherige Bedienung (über ${Math.round(d.rules.noUiGap / 1000)} s), übermenschliches Tempo (unter ${d.rules.fastMs} ms), Maschinen-Takt, Dauerbetrieb rund um die Uhr und Aktionen aus verborgenen Tabs. Ob jemand nebenbei eine KI um Rat fragt, kann kein Spiel erkennen. Klickfluten (über ${d.rules.rateN} Aktionen in ${d.rules.rateMs / 1000} s) werden immer gebremst.</p>
+    <p class="small muted">Der Wächter erkennt, wenn eine KI oder ein Skript selbst spielt: ferngesteuerte oder unsichtbare Browser, Klicks per Programm, Aktionen ohne Spieloberfläche oder ohne vorherige Bedienung (über ${Math.round(d.rules.noUiGap / 1000)} s), übermenschliches Tempo (unter ${d.rules.fastMs} ms), Maschinen-Takt, Dauerbetrieb rund um die Uhr und Aktionen aus verborgenen Tabs. Dazu die Spuren von KI-Agenten, die einen normalen Browser per Screenshot bedienen: Mauszeiger springt ohne Weg auf die Knöpfe, Klicks exakt in der Knopfmitte, Text ohne Tastenanschläge oder in gleichem Takt, gleichförmige Denkpausen und Aktionen aus anderem Land oder anderer Zeitzone (Land vom Hosting, keine IP). Mausweg und Klickpunkt zählen nur bei Maus, nicht bei Touch. Ob jemand nebenbei eine KI um Rat fragt, kann kein Spiel erkennen. Klickfluten (über ${d.rules.rateN} Aktionen in ${d.rules.rateMs / 1000} s) werden immer gebremst.</p>
     <div class="callout info stack"><span><b>Luftfahrtaufsicht:</b> Für Spielende kommt jede Maßnahme vom Prüfsystem der Aufsicht – Ihr Name erscheint nirgends, auch nicht bei Einzelmaßnahmen. Die nächste Stufe ist fällig, wenn die <i>neuen</i> Belege seit der letzten Stufe (oder seit „Unbedenklich“) mindestens ${d.rules.stageScore} Punkte ergeben – frühestens ${d.rules.stageGapH} Stunden nach der letzten Stufe. Wer ${d.rules.calmDays} Tage unauffällig bleibt, rutscht eine Stufe zurück. Spielende sehen nur „automatisierte Steuerung festgestellt“, nicht woran.</span>
       <ol class="fa-ladder cmp small">${d.ladder.map((x) => `<li class="${x.n <= d.conf.autoMax ? 'auto' : ''}"><b>Stufe ${x.n} · ${esc(x.label)}</b><span>${esc(x.what)}</span><em>${x.n <= d.conf.autoMax ? 'automatisch' : 'auf Bestätigung'}</em></li>`).join('')}</ol>
       <div class="fp-conf small"><span>Das Prüfsystem verhängt selbst bis</span><select data-fpconf>${[0, 1, 2, 3, 4, 5].map((n) => `<option value="${n}"${n === d.conf.autoMax ? ' selected' : ''}>${n ? `Stufe ${n}` : 'keine (nur vorschlagen)'}</option>`).join('')}</select><span class="muted">Höhere Stufen erscheinen unten als „fällig“.</span></div></div>
@@ -6739,7 +6761,8 @@ async function showFairPlay(onBack) {
     <div class="stack" style="gap:6px">${rows.map(card).join('') || '<p class="small muted">Niemand auffällig. 👍</p>'}</div>
     <p class="small muted">Entfernen oder sperren: in der Verwaltung des jeweiligen Spiels („Hauptwelt verwalten“ bzw. Spielverwaltung).</p></div>`;
   const cs = m.querySelector('[data-fpconf]'); if (cs) cs.onchange = async () => { try { const r = await api('/admin/fairplay', { body: { cmd: 'conf', autoMax: Number(cs.value) } }); toast(r.msg); } catch (err) { toast(err.message); } showFairPlay(onBack); };
-  m.onclick = async (e) => { const b = e.target.closest('[data-fp]'); if (!b) return; const v = b.dataset.fp;
+  m.onclick = async (e) => { const q = e.target.closest('[data-fpq]'); if (q) { const box = q.closest('.fp-acts'), mm = Number(q.dataset.fpq), set = (n, v) => { box.querySelector(`[data-fpf="${n}"]`).value = v; }; set('dd', Math.floor(mm / 1440)); set('dh', Math.floor((mm % 1440) / 60)); set('dm', mm % 60); return; }
+    const b = e.target.closest('[data-fp]'); if (!b) return; const v = b.dataset.fp;
     if (v === 'close') { m.onclick = null; onBack(); return; }
     if (v === 'reload') { showFairPlay(onBack); return; }
     if (v === 'flt') { ui.fairFlt = b.dataset.v; showFairPlay(onBack); return; }
@@ -6820,6 +6843,7 @@ async function showLobby(tab = null) {
   setSpeed(0);
   if (mpState.pendingJoin) { const pj = mpState.pendingJoin; mpState.pendingJoin = null; return showJoin(pj.code, pj.token); }
   const m = modal(`<div class="spread"><h1>Sky<span>market</span></h1><div class="row small"><span class="muted">Angemeldet als <b>${esc(mpState.user.name)}</b>${mpState.user.admin ? ' <span class="chip me">Admin</span>' : ''}</span><button class="btn small" id="lbPw">Passwort ändern</button><button class="btn small" id="lbLogout">Abmelden</button></div></div>
+    ${!suspOf() && (blkOf('chat') || blkOf('trade')) ? `<div class="callout warn"><b>Luftfahrtaufsicht:</b><span class="small">${[blkOf('chat') ? `Chat gesperrt bis ${esc(fmtUntil(blkOf('chat')))}` : '', blkOf('trade') ? `Handel und Börse gesperrt bis ${esc(fmtUntil(blkOf('trade')))}` : ''].filter(Boolean).join(' · ')}. Alles andere können Sie wie gewohnt spielen.</span></div>` : ''}
     ${suspOf() ? `<div class="callout crit"><b>Luftfahrtaufsicht: Ihr Leitstand ist bis ${esc(fmtUntil(suspOf().until))} stillgelegt.</b><span class="small">${suspOf().reason ? `Grund: ${esc(suspOf().reason)} · ` : ''}Sie können zuschauen, aber nicht handeln oder schreiben. Die KI führt so lange Ihre Airline.</span></div>` : ''}
     <section class="mainworld" id="lbMain"><p class="small muted">Lade die Hauptwelt …</p></section>
     <div class="lobby">
@@ -7310,13 +7334,39 @@ function applyServerState(s, ver, first, sess = mpState.sess) {
   }
 }
 // 0.21.74 Fair-Play-Wächter: kleiner Bedien-Nachweis zu jeder Aktion (echte Eingaben, Skript-Klicks, ferngesteuerter Browser, sichtbarer Tab)
-const FPT = { lastIn: 0, tr: 0, ut: 0, g: 0 };
+// 0.21.80: dazu Spuren von KI-Agenten, die einen normalen Browser per Screenshot bedienen – Mauszeiger springt ohne Weg auf den Knopf,
+// Klick exakt in der Knopfmitte, Text ohne Tastenanschläge oder in gleichem Takt; außerdem Zeitzone und Gerät (Herkunft). Nur Zähler, keine Inhalte.
+const FPT = { lastIn: 0, tr: 0, ut: 0, g: 0, mv: [], pos: null, pt: '', mc: 0, tp: 0, ck: 0, cc: 0, kt: [], kd: -1e9, ti: 0 };
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, (e) => { if (e.isTrusted) { FPT.lastIn = Date.now(); FPT.tr++; FPT.g++; } }, true);
 document.addEventListener('click', (e) => { if (!e.isTrusted && e.target && e.target.closest && e.target.closest('[data-act],[data-pk],[data-adm],button')) FPT.ut++; }, true);
+document.addEventListener('pointermove', (e) => { if (!e.isTrusted || e.pointerType !== 'mouse') return; FPT.mv.push([performance.now(), e.clientX, e.clientY]); if (FPT.mv.length > 120) FPT.mv.splice(0, 60); }, { capture: true, passive: true });
+document.addEventListener('pointerdown', (e) => {
+  if (!e.isTrusted) return; FPT.pt = e.pointerType || '';
+  if (e.pointerType !== 'mouse' || e.button !== 0) return;
+  const t = performance.now(), n = FPT.mv.filter((m) => t - m[0] < 1500).length, from = FPT.mv.length > n ? FPT.mv[FPT.mv.length - n - 1] : FPT.pos;
+  const dist = from ? Math.hypot(e.clientX - from[1], e.clientY - from[2]) : Infinity;
+  FPT.mc++; if (n <= 1 && dist > 40) FPT.tp++;   // Mausweg fehlt: höchstens eine Bewegung, aber weit gesprungen
+  FPT.pos = [t, e.clientX, e.clientY];
+}, true);
+document.addEventListener('click', (e) => {
+  if (!e.isTrusted || e.detail === 0 || FPT.pt !== 'mouse' || !e.target || !e.target.closest) return;   // detail 0 = per Tastatur ausgelöst
+  const el = e.target.closest('button, a, [data-act], [role="button"], summary, select, label'); if (!el) return;
+  const r = el.getBoundingClientRect(); if (r.width < 16 || r.height < 12) return;
+  const d = Math.hypot((e.clientX - (r.left + r.width / 2)) / (r.width / 2), (e.clientY - (r.top + r.height / 2)) / (r.height / 2));
+  FPT.ck++; if (d < 0.1) FPT.cc++;
+}, true);
+document.addEventListener('keydown', (e) => { if (!e.isTrusted) return; FPT.kd = performance.now(); if (e.key && e.key.length === 1 && e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) { FPT.kt.push(FPT.kd); if (FPT.kt.length > 60) FPT.kt.splice(0, 30); } }, true);
+document.addEventListener('input', (e) => { if (e.isTrusted && e.inputType === 'insertText' && performance.now() - FPT.kd > 150) FPT.ti++; }, true);   // Text ohne vorherigen Tastenanschlag
+const fpDev = (() => { try { const ua = navigator.userAgent || '', b = (ua.match(/(Edg|OPR|Firefox|CriOS|FxiOS|Chrome|Version)\/(\d+)/) || [])[0] || '?';
+  return `${(navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '?'} · ${b.replace('Version', 'Safari')} · ${screen.width}×${screen.height}`.slice(0, 60); } catch (e) { return '?'; } })();
+const fpTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; } })();
 function fpStamp() {
+  const iv = []; for (let i = 1; i < FPT.kt.length; i++) { const d = FPT.kt[i] - FPT.kt[i - 1]; if (d > 0 && d < 1000) iv.push(d); }
+  const km = iv.length ? iv.reduce((a, b) => a + b, 0) / iv.length : 0, kv = iv.length && km ? Math.sqrt(iv.reduce((a, b) => a + (b - km) ** 2, 0) / iv.length) / km : 0;
   const o = { gap: FPT.lastIn ? Date.now() - FPT.lastIn : -1, tr: FPT.tr, ut: FPT.ut, g: FPT.g, wd: navigator.webdriver ? 1 : 0, hl: /HeadlessChrome|PhantomJS/i.test(navigator.userAgent || '') ? 1 : 0,
-    dbg: window.skymarketDebug ? 1 : 0, vis: document.visibilityState === 'hidden' ? 0 : 1, v: window.SKYMARKET_BUILD || '' };
-  FPT.tr = 0; FPT.ut = 0; return o;
+    dbg: window.skymarketDebug ? 1 : 0, vis: document.visibilityState === 'hidden' ? 0 : 1, v: window.SKYMARKET_BUILD || '',
+    mc: FPT.mc, tp: FPT.tp, ck: FPT.ck, cc: FPT.cc, ti: FPT.ti, kn: iv.length, km: Math.round(km), kv: Math.round(kv * 100) / 100, tz: fpTz, dv: fpDev };
+  Object.assign(FPT, { tr: 0, ut: 0, mc: 0, tp: 0, ck: 0, cc: 0, ti: 0, kt: [] }); return o;
 }
 async function mpSendAction(act) {
   if (!ui.mp) return;

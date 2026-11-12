@@ -1702,6 +1702,8 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .fa-ladder.cmp li { grid-template-columns: 190px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 4px 8px; }
 @media (max-width: 640px) { .fa-ladder.cmp li { grid-template-columns: minmax(0, 1fr); gap: 1px; } }
 .fp-conf { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } .fp-conf select { width: auto; min-width: 0; }
+.fp-dur { gap: 8px; } .fp-dur label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; } .fp-dur input { width: 64px; }
+.fp-trace { display: grid; gap: 2px; margin: 4px 0; } .fp-trace b { color: var(--ink-2); } .fp-trace b.neg { color: var(--crit); }
 .fp-stage { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 8px 10px; margin: 6px 0; border: 1px dashed var(--line); border-radius: 10px; } .fp-stage > div:first-child { min-width: 0; flex: 1 1 260px; }
 /* 0.21.69: Walkout-Hintergründe je Motto */
 .wk-theme { position: absolute; inset: 0; overflow: hidden; pointer-events: none; -webkit-mask-image: radial-gradient(150% 110% at 50% 50%, #000 45%, transparent 100%); mask-image: radial-gradient(150% 110% at 50% 50%, #000 45%, transparent 100%); }

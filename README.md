@@ -183,6 +183,43 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.80: KI-Agenten im normalen Browser erkennen, Sperren mit freier Dauer und Teilsperren
+
+- **Warum:** Moderne KI-Agenten bedienen einen ganz normalen Browser per Screenshot und mit echten Maus- und Tastatur-Ereignissen. Für die bisherigen Signale sahen sie aus wie ein Mensch.
+- **Neue Messung im Spiel** (`fpStamp`): nur Zähler, keine Inhalte, Koordinaten oder Texte. Zusammen mit jeder Aktion gehen mit:
+  - **Mausweg:** Klicks, vor denen der Zeiger in höchstens einer Bewegung mehr als 40 px auf den Knopf gesprungen ist (`tp` von `mc`). Menschen bewegen die Maus in vielen kleinen Schritten.
+  - **Klickpunkt:** Klicks innerhalb von 10 % des Halbmessers um die Knopfmitte (`cc` von `ck`). Nur echte Mausklicks zählen, keine Tastatur und kein Touch.
+  - **Tippen:** Text, der ohne Tastenanschlag eingefügt wurde (`ti`), sowie Anzahl, Mittel und Streuung der Tastenabstände (`kn`, `km`, `kv`).
+  - **Zeitzone und Gerät** des Browsers (`tz`, `dv`: Plattform, Browser, Bildschirm).
+- **Land der Verbindung:** Netlify liefert es mit (`context.geo`, wird an `handle(req, { store, geo })` übergeben). Eine IP wird nicht gespeichert.
+- **Neue Gründe in der Bewertung** (`fairScore`):
+
+  | Grund | Wann | Punkte |
+  |---|---|---|
+  | Mauszeiger springt ohne Weg auf die Knöpfe | ab 10 Mausklicks, ab 40 % | bis 45 |
+  | Klicks exakt in der Knopfmitte | ab 35 % | bis 30 |
+  | Text ohne Tastenanschläge | ab 3× | bis 25 |
+  | Tippen im Maschinen-Takt | gleichmäßiger als 12 % oder schneller als 25 ms je Taste | bis 20 |
+  | Gleichförmige Denkpause (`fairThink`) | 25 Abstände, nie unter 1,8 s, Median über 3 s | 15 |
+  | Herkunft | Land oder Zeitzone weicht vom Üblichen ab (ab 20 Aktionen, 60 %) | bis 25 |
+
+  Die Herkunft allein bleibt unter der Stufen-Schwelle, wegen Reisen.
+- **Belege:** Je Art höchstens einer pro Stunde, damit Dauer-Spuren die anderen nicht verdrängen.
+- **Übersicht je Konto:** Mausklicks mit den Anteilen „ohne Mausweg“ und „exakt mittig“, Text ohne Tasten, Maschinen-Tippen, Länder, Zeitzonen, Geräte.
+- **Geprüft im echten Browser:**
+  - Ein Agent-artiger Ablauf (Klicks direkt auf den Knopf) ergab 12 von 12 Klicks ohne Mausweg und mittig.
+  - Ein menschlicher Ablauf (Mausweg, Klickpunkt streut) ergab 0 Klicks ohne Mausweg und 1 von 6 mittig.
+- **Zeitweise sperren mit freier Dauer** (Einzelmaßnahmen):
+  - Dauer in Tagen, Stunden und Minuten (1 Minute bis 90 Tage), dazu Schnellwahl 15 Min., 1 Std., 6 Std., 1 Tag.
+  - Umfang:
+    - **Alles:** Der Leitstand wird stillgelegt, die KI führt die Airline.
+    - **Nur Chat**
+    - **Nur Handel & Börse:** Angebote machen und beantworten, Anteile kaufen und verkaufen, Übernahmen und Skin-Tausch. Eigene Angebote zurückziehen bleibt erlaubt (`SM.FAIR_TRADE_ACTS`).
+    - **Nur Packs**
+  - Laufende Sperren stehen einzeln mit „Aufheben“ in der Übersicht.
+  - Spielende sehen den Bescheid der Luftfahrtaufsicht mit der genauen Dauer und einen Hinweis in der Lobby. Gesperrte Knöpfe melden sich sofort.
+  - Alte Aufrufe mit `hours` und `packban` funktionieren weiter.
+
 ## Neu in 0.21.79: Tägliches Pack nicht mehr durchsichtig, Flugzeug im Logo umrandet
 
 - **Ursache:** Alle Packs nutzten dieselben Verlaufs-IDs (`pkg`, `pke`, `pks`).

@@ -223,6 +223,7 @@ export async function handleCollection(req, ctx) {
     return json({ trades: mine });
   }
   if (path === '/coll/trade' && method === 'POST') {
+    { const fs2 = ctx.fairState ? await ctx.fairState() : null, b2 = fs2 && fs2.blk && fs2.blk.trade; if (b2 && b2.until > Date.now() && !ctx.isAdmin(ctx.user)) return fail(403, `Die Luftfahrtaufsicht hat Handel und Tausch für Ihr Konto bis ${new Date(b2.until).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} Uhr gesperrt.`); }   // 0.21.80
     const b = await readJson(req), to = String(b.to || '').toLowerCase();
     const give = (Array.isArray(b.give) ? b.give : []).map(String).slice(0, 20), want = (Array.isArray(b.want) ? b.want : []).map(String).slice(0, 20);
     if (!to || to === me) return fail(400, 'Bitte einen anderen Spieler wählen.');
