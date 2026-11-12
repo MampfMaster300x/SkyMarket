@@ -1692,6 +1692,13 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .fp-acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 8px; } .fp-acts .fp-wide { grid-column: 1 / -1; }
 .fp-box { display: grid; gap: 6px; align-content: start; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); } .fp-box .row { gap: 6px; flex-wrap: wrap; align-items: center; }
 /* 0.21.78 Luftfahrtaufsicht: Bescheid mit Stufenleiter, Stufen-Kasten in der Fair-Play-Übersicht */
+/* 0.21.83 Bestätigung großer Investitionen */
+.inv-armed { background: var(--warn) !important; color: #1a1400 !important; border-color: var(--warn) !important; font-weight: 700; white-space: nowrap; }
+.invc { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 16px; background: rgba(5, 10, 25, .55); backdrop-filter: blur(2px); }
+.invc[hidden] { display: none; }
+.invc-box { width: min(420px, 100%); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; display: grid; gap: 10px; }
+.invc-box h2 { margin: 0; font-size: 19px; } .invc-k { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); }
+.invc-sum { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); } .invc-sum b { font-variant-numeric: tabular-nums; } .invc-sum b.neg { color: var(--crit); }
 .fa-head { display: flex; gap: 12px; align-items: center; } .fa-head h1 { margin: 0; }
 .fa-seal { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 700 22px/1 var(--f-body); color: var(--crit); background: var(--crit-soft); border: 2px solid var(--crit); }
 .fa-ladder { list-style: none; margin: 4px 0; padding: 0; display: grid; gap: 4px; }
@@ -1762,6 +1769,12 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .tr-items { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .tr-build { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
 .tr-pool { display: flex; flex-wrap: wrap; gap: 6px; max-height: 260px; overflow: auto; padding: 6px 0; }
+/* 0.21.81 Skin-Börse */
+.ac-mini.on { outline: 2px solid var(--accent); outline-offset: 1px; background: var(--accent-soft); }
+.mk-card .mk-bid { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 6px; background: var(--panel-2); }
+.mk-bid.won { border-color: var(--good); } .mk-bid.lost, .mk-bid.withdrawn, .mk-bid.void { opacity: .65; }
+.mb-game { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.mb-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; } .mb-row input { width: 96px; }
 @media (max-width: 600px) { .sh-hero { grid-template-columns: 72px minmax(0, 1fr); gap: 10px; } .sh-hero h2 { font-size: 16px; } .ac-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; } .pk-stage { min-height: min(560px, 88vh); } .pk-box { width: min(270px, 70vw, 50vh); } .pk-card h2 { font-size: 22px; } .pk-back { min-height: 220px; } }
 @media (prefers-reduced-motion: reduce) { .sh-dark::before, .sh-pack, .ac-card.rar-l, svg .sk-shine, .pk-bg i, .pk-bgrays, .pk-halo { animation: none !important; } }
 </style>

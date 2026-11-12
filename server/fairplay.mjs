@@ -131,7 +131,7 @@ export function fairScore(rec) {
   const add = (k, w, n, why) => { if (w > 0) R.push({ k, label: LABEL[k], n, w: Math.round(w), why }); };
   if (s.webdriver) add('webdriver', 45, s.webdriver, 'Browser meldet Fernsteuerung');
   if (s.headless) add('headless', 40, s.headless, 'Browser ohne Bildschirm');
-  if (s.api) { const r = s.api / (tot + (s.flood || 0)); if (s.api >= 3) add('api', Math.min(40, 10 + r * 40), s.api, `${Math.round(r * 100)} % der Aktionen`); }
+  if (s.api >= 3) add('api', Math.min(70, 45 + s.api), s.api, `${s.api} Aktionen ohne Spieloberfläche – wird abgewiesen`);   // 0.21.84: eindeutig, unabhängig vom Anteil (verdünnt sich nicht mehr)
   if (s.script) add('script', Math.min(30, 8 + s.script * 4), s.script, 'per Programm ausgelöste Klicks');
   if (s.debug) add('debug', Math.min(30, 15 + s.debug), s.debug, 'Entwicklerwerkzeug benutzt');
   if (s.noUi && tot >= 10) { const r = s.noUi / tot; if (r >= 0.3) add('noUi', r * 30, s.noUi, `${Math.round(r * 100)} % der Aktionen`); }

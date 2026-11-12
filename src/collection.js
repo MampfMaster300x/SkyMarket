@@ -242,12 +242,13 @@ function showSkinDetail(id) {
     ${acts.length > here.length ? `<p class="small muted">Außerdem aktiv in ${acts.length - here.length} Flugzeug(en) anderer Spiele.</p>` : ''}
     ${n && fits.length ? `<div class="stack" style="gap:6px"><b class="small">Flugzeuge wählen <span class="muted">(antippen zum An- und Abwählen, noch ${Math.max(0, freeSlots(s.id))} frei)</span></b><div class="row" style="gap:6px;flex-wrap:wrap">${fits.map((a) => { const cur = skinFor(pl, a.id), on = cur && cur.id === s.id; return `<button class="btn small${on ? ' primary' : ''}" data-sd="${on ? 'off' : 'on'}" data-ac="${a.id}" aria-pressed="${!!on}" ${!on && freeSlots(s.id) < 1 ? 'disabled' : ''}>${on ? '✓ ' : ''}${esc(acName(a.id))}${cur && !on ? ` <span class="small muted">(${esc(cur.name)})</span>` : ''}</button>`; }).join('')}</div></div>`
       : n && !fits.length ? `<p class="small muted">Sie haben keine ${esc(modelOf(s).name)} in Ihrer Flotte.</p>` : ''}
-    ${n && free > 0 ? '<div class="row"><button class="btn small" data-sd="trade">Zum Tausch anbieten</button></div>' : ''}</div>`);
+    ${n && free > 0 ? '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn small" data-sd="list">Gebote einholen</button><button class="btn small" data-sd="trade">Gezielt tauschen</button></div>' : ''}</div>`);
   md.onclick = async (e) => {
     const b = e.target.closest('[data-sd]'); if (!b) { if (e.target === md) md.hidden = true; return; }
     const k = b.dataset.sd;
     if (k === 'close') { md.hidden = true; return; }
     if (k === 'trade') { md.hidden = true; ui.tr = { ...(ui.tr || {}), give: [...((ui.tr && ui.tr.give) || []), s.id] }; setTab('trading'); return; }
+    if (k === 'list') { md.hidden = true; const M = mkState(); M.sel = [...M.sel, s.id]; setTab('trading'); return; }
     b.disabled = true;
     try { await activateSkin(b.dataset.ac, k === 'on' ? s.id : null); showSkinDetail(s.id); } catch (err) { toast(err.message); b.disabled = false; }
   };
@@ -640,7 +641,9 @@ VIEWS.trading = function viewTrading() {
         : `<span class="chip ${t.status === 'done' ? 'good' : ''}">${({ done: 'getauscht', declined: 'abgelehnt', cancelled: 'zurückgezogen', void: 'hinfällig' })[t.status] || t.status}${t.closed ? ' · ' + new Date(t.closed).toLocaleDateString('de-DE') : ''}</span>`}</div>`; };
   const inc = list.filter((t) => t.status === 'open' && t.to === me), outg = list.filter((t) => t.status === 'open' && t.from === me), hist = list.filter((t) => t.status !== 'open');
   let html = `<div class="ac-wrap"><div class="ac-head"><div><span class="ac-kicker">AIRCRAFT COLLECTION</span><h2>Trading</h2></div></div>
-    <p class="small muted">Tauschen Sie Skins mit anderen Spielern. Beide müssen ausdrücklich zustimmen: Sie mit dem Senden, die andere Seite mit „Annehmen“. Übertragen wird in einem Schritt auf dem Server. Skins lassen sich nur innerhalb des Spiels und nur gegen andere Skins tauschen.</p>`;
+    <p class="small muted">Zwei Wege: In der <b>Skin-Börse</b> bieten Sie Skins an und holen Gebote ein – Skins, Geld, Personal, Flugzeuge oder Slots. Beim <b>gezielten Tausch</b> schlagen Sie einer bestimmten Person Skins gegen Skins vor. Beide Seiten müssen ausdrücklich zustimmen; übertragen wird auf dem Server.</p>`;
+  html += mkHtml(mini);   // 0.21.81 Skin-Börse
+  html += `<h3 class="sec">Gezielt tauschen <small>Skins gegen Skins mit einer bestimmten Person</small></h3>`;
   html += `<section class="stack"><h3 class="sec sm">Eingehende Angebote <small>${inc.length}</small></h3>${inc.length ? inc.map(tradeCard).join('') : '<p class="small muted">Keine offenen Angebote an Sie.</p>'}</section>`;
   // Neues Angebot
   const myFree = SK.SKINS.filter((s) => freeCopies(s.id) > 0);
@@ -654,6 +657,75 @@ VIEWS.trading = function viewTrading() {
   html += `<section class="stack"><h3 class="sec sm">Verlauf</h3>${hist.length ? hist.slice(0, 20).map(tradeCard).join('') : '<p class="small muted">Noch keine abgeschlossenen Tausche.</p>'}</section></div>`;
   return html;
 };
+// ---------- 0.21.81 Skin-Börse: anbieten ohne feste Gegenleistung, Gebote einholen ----------
+const mkState = () => (ui.mk = ui.mk || { data: null, loading: false, sel: [], note: '', days: 7 });
+function mkLoad() {
+  const M = mkState(); if (M.loading) return; M.loading = true;
+  api('/coll/market?game=' + encodeURIComponent((ui.mp && ui.mp.id) || '')).then((r) => { M.data = r; M.loading = false; if (r.me) coll.me = r.me; if (ui.tab === 'trading') renderPane(true); }).catch((e) => { M.loading = false; toast(e.message); });
+}
+const leftTxtMk = (t) => { const h = Math.max(0, (t - Date.now()) / 36e5); return h >= 48 ? `noch ${Math.round(h / 24)} Tage` : h >= 1 ? `noch ${Math.round(h)} Std.` : `noch ${Math.max(1, Math.round(h * 60))} Min.`; };
+function mkHtml(mini) {
+  const M = mkState(); if (!M.data) mkLoad();
+  const D = M.data || { open: [], hist: [], days: [1, 3, 7, 14] }, mine = D.open.filter((l) => l.mine), other = D.open.filter((l) => !l.mine);
+  const bidLine = (b, l) => `<div class="mk-bid ${b.status}"><div class="spread"><b>${l.mine ? esc(b.byName) : 'Ihr Gebot'}</b><span class="small muted">${new Date(b.created).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${b.status !== 'open' ? ` · ${({ won: 'angenommen', lost: 'nicht genommen', withdrawn: 'zurückgezogen', void: 'hinfällig' })[b.status] || b.status}` : ''}</span></div>
+      ${b.skins.length ? mini(b.skins) : ''}${b.txt ? `<div class="small"><b>${esc(b.txt)}</b> <span class="muted">· in ${esc(b.gameName || b.game || '')}, von Airline zu Airline</span></div>` : ''}${b.note ? `<div class="small muted">„${esc(b.note)}“</div>` : ''}
+      ${b.status === 'open' ? (l.mine ? `<div class="row"><button class="btn small primary" data-act="mkacc" data-id="${l.id}" data-bid="${b.id}">Dieses Gebot annehmen</button></div>` : `<div class="row" style="gap:6px"><button class="btn small" data-act="mkbid" data-id="${l.id}">Gebot ändern</button><button class="btn small" data-act="mkwd" data-id="${l.id}">Gebot zurückziehen</button></div>`) : ''}</div>`;
+  const card = (l) => { const open = l.status === 'open' || l.status === 'settling', myBid = !l.mine && l.bids.find((b) => b.status === 'open');
+    return `<div class="card pad stack mk-card"><div class="spread"><b>${l.mine ? 'Ihr Angebot' : esc(l.fromName)}</b><span class="small muted">${open ? `${leftTxtMk(l.until)} · ${l.nBids} Gebot${l.nBids === 1 ? '' : 'e'}` : ({ done: 'abgeschlossen', expired: 'abgelaufen', cancelled: 'zurückgezogen' })[l.status] || l.status}</span></div>
+      ${mini(l.skins)}${l.note ? `<div class="small muted">„${esc(l.note)}“</div>` : ''}
+      ${l.mine ? (l.bids.length ? `<div class="stack" style="gap:6px">${l.bids.map((b) => bidLine(b, l)).join('')}</div>` : open ? '<span class="small muted">Noch keine Gebote.</span>' : '') : l.bids.length ? l.bids.map((b) => bidLine(b, l)).join('') : ''}
+      ${open ? (l.mine ? `<div class="row"><button class="btn small" data-act="mkcancel" data-id="${l.id}">Angebot zurückziehen</button></div>` : !myBid ? `<div class="row"><button class="btn small primary" data-act="mkbid" data-id="${l.id}">Gebot abgeben</button>${l.sameGame ? '' : '<span class="small muted">nur Skins – kein gemeinsames Spiel mit dieser Person</span>'}</div>` : '') : ''}</div>`; };
+  const myFree = SK.SKINS.filter((x) => freeCopies(x.id) > 0 || M.sel.includes(x.id));
+  return `<section class="card pad stack mk"><div class="spread"><h3>Skin-Börse</h3><button class="btn small ghost" data-act="mkreload">Aktualisieren</button></div>
+    <p class="small muted">Bieten Sie Skins an, ohne eine Gegenleistung festzulegen. Andere geben Gebote ab: Skins, Geld, Personal, Flugzeuge oder Slots. Sie nehmen das Gebot, das Ihnen am besten gefällt. Geld, Personal, Flugzeuge und Slots gehen von Airline zu Airline in einem Spiel, in dem Sie beide spielen. Angebotene und gebotene Skins sind bis zum Ende reserviert.</p>
+    <div class="stack" style="gap:6px"><b class="small">Skins anbieten</b>${M.sel.length ? mini(M.sel) : '<span class="small muted">Noch kein Skin gewählt.</span>'}
+      <details><summary class="small">Skin wählen (${myFree.length} frei)</summary><div class="tr-pool">${myFree.map((x) => `<button class="ac-mini rar-${x.rarity}${M.sel.includes(x.id) ? ' on' : ''}" data-act="mksel" data-id="${x.id}"><img src="${skinArt(x)}" alt=""><span>${esc(x.name)}<small>${esc(modelOf(x).name)} · ${freeCopies(x.id)} frei${M.sel.includes(x.id) ? ' · gewählt' : ''}</small></span></button>`).join('') || '<span class="small muted">Keine freien Skins.</span>'}</div></details>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><input id="mk-note" type="text" maxlength="160" placeholder="Hinweis, z. B. „suche Gold-Skins oder Piloten“" value="${esc(M.note)}" style="flex:1;min-width:180px"><select id="mk-days">${D.days.map((d) => `<option value="${d}"${d === M.days ? ' selected' : ''}>${d === 1 ? '1 Tag' : d + ' Tage'}</option>`).join('')}</select><button class="btn small primary" data-act="mklist" ${M.sel.length ? '' : 'disabled'}>Anbieten</button></div></div>
+    <h3 class="sec sm">Ihre Angebote <small>${mine.length}</small></h3>${mine.length ? mine.map(card).join('') : '<p class="small muted">Keine offenen Angebote.</p>'}
+    <h3 class="sec sm">Angebote anderer <small>${other.length}</small></h3>${M.data ? (other.length ? other.map(card).join('') : '<p class="small muted">Gerade bietet niemand etwas an.</p>') : '<p class="small muted">Lädt …</p>'}
+    ${D.hist.length ? `<details><summary class="small">Verlauf (${D.hist.length})</summary><div class="stack" style="gap:8px;margin-top:8px">${D.hist.map(card).join('')}</div></details>` : ''}</section>`;
+}
+/** Gebot abgeben: Skins aus der eigenen Sammlung, dazu (bei gemeinsamem Spiel) Geld, Personal, Flugzeuge und Slots der eigenen Airline. */
+function mkBidModal(id) {
+  const M = mkState(), l = ((M.data || {}).open || []).find((x) => x.id === id); if (!l) { toast('Angebot nicht mehr offen.'); return; }
+  const old = l.bids.find((b) => b.status === 'open') || null, pl = W && W.player, game = ui.mp && ui.mp.id, can = l.sameGame && pl;
+  const sel = old ? [...old.skins] : [], pre = {}; for (const it of (old && old.game === game ? old.items : [])) pre[it.k === 'staff' ? `st-${it.role}-${it.group || ''}` : it.k === 'ac' ? `ac-${it.id}` : it.k === 'slots' ? `sl-${it.apt}` : 'cash'] = it;
+  const myFree = SK.SKINS.filter((x) => freeCopies(x.id) + sel.filter((y) => y === x.id).length > 0);
+  const staffRows = can ? [...Object.entries(pl.staff.pil).filter(([, n]) => n > 0).map(([g, n]) => [`st-pilot-${g}`, `Piloten ${P.TYPE_GROUPS[g]}`, n]), ['st-cabin-', 'Flugbegleiterinnen', pl.staff.cab], ['st-tech-', 'Technik', pl.staff.tech]].filter((x) => x[2] > 0) : [];
+  const fleet = can ? pl.fleet.filter((a) => a.delivery_day <= W.day && !(a.acmi && a.acmi.end > W.day)) : [];
+  const slots = can ? Object.keys(pl.slotHold || {}).map((c) => [c, pl.heldAt(c, W.day)]).filter((x) => x[1] > 0) : [];
+  const md = modal(`<div class="spread"><h1 style="margin:0">Gebot abgeben</h1><button class="btn small" data-mb="close">Schließen</button></div>
+    <div class="small muted">Für ${esc(l.fromName)}: ${l.skins.map((x) => esc((SK.SKIN_BY_ID[x] || {}).name || x)).join(', ')}</div>
+    <div class="stack" style="gap:6px"><b class="small">Skins</b><div class="tr-pool mb-skins">${myFree.map((x) => `<button class="ac-mini rar-${x.rarity}${sel.includes(x.id) ? ' on' : ''}" data-mbs="${x.id}"><img src="${skinArt(x)}" alt=""><span>${esc(x.name)}<small>${esc(modelOf(x).name)}</small></span></button>`).join('') || '<span class="small muted">Keine freien Skins.</span>'}</div></div>
+    ${can ? `<div class="stack mb-game" style="gap:8px"><b class="small">Aus Ihrer Airline in ${esc(ui.mp.main ? 'der Hauptwelt' : (mpState.game && mpState.game.name) || 'diesem Spiel')} – geht an die Airline von ${esc(l.fromName)}</b>
+      <label class="mb-row"><span>Geld</span><span><input type="number" data-mbi="cash" min="0" step="0.1" value="${pre.cash ? pre.cash.amount / 1e6 : 0}"> Mio. €</span></label>
+      ${staffRows.map(([k, lab, max]) => `<label class="mb-row"><span>${esc(lab)} <small class="muted">(${n0(max)} da)</small></span><span><input type="number" data-mbi="${k}" min="0" max="${Math.min(60, max)}" step="1" value="${pre[k] ? pre[k].n : 0}"></span></label>`).join('')}
+      ${fleet.length ? `<details${Object.keys(pre).some((k) => k.startsWith('ac-')) ? ' open' : ''}><summary class="small">Flugzeuge (${fleet.length})</summary><div class="stack" style="gap:2px;margin-top:6px">${fleet.map((a) => `<label class="chk small"><input type="checkbox" data-mbi="ac-${esc(a.id)}"${pre['ac-' + a.id] ? ' checked' : ''}> ${esc(P.AIRCRAFT_TYPES[a.type_id].label)} <span class="muted">${esc(a.id)} · ${a.owned ? 'Eigentum' : 'Leasing'}</span></label>`).join('')}</div></details>` : ''}
+      ${slots.length ? `<details${Object.keys(pre).some((k) => k.startsWith('sl-')) ? ' open' : ''}><summary class="small">Freie Slots (${slots.length} Flughäfen)</summary><div class="stack" style="gap:4px;margin-top:6px">${slots.map(([c, n]) => `<label class="mb-row"><span>${esc(c)} <small class="muted">(${n} frei)</small></span><span><input type="number" data-mbi="sl-${esc(c)}" min="0" max="${Math.min(8, n)}" step="1" value="${pre['sl-' + c] ? pre['sl-' + c].n : 0}"></span></label>`).join('')}</div></details>` : ''}</div>`
+      : `<p class="small muted">${l.sameGame ? '' : `Geld, Personal, Flugzeuge und Slots gehen nur in einem Spiel, in dem Sie beide eine Airline haben – ${esc(l.fromName)} spielt hier nicht mit. Bieten Sie Skins oder öffnen Sie ein gemeinsames Spiel.`}</p>`}
+    <input type="text" data-mbi="note" maxlength="160" placeholder="Nachricht (optional)" value="${esc((old && old.note) || '')}">
+    <div class="row" style="gap:8px"><button class="btn primary" data-mb="send">${old ? 'Gebot ersetzen' : 'Gebot abgeben'}</button><span class="small muted">Erst wenn ${esc(l.fromName)} annimmt, wird übertragen.</span></div>`);
+  md.onclick = async (e) => {
+    const sk = e.target.closest('[data-mbs]'); if (sk) { const x = sk.dataset.mbs, i = sel.indexOf(x); if (i >= 0) sel.splice(i, 1); else sel.push(x); sk.classList.toggle('on', sel.includes(x)); return; }
+    const b = e.target.closest('[data-mb]'); if (!b) { if (e.target === md) md.hidden = true; return; }
+    if (b.dataset.mb === 'close') { md.hidden = true; return; }
+    const items = [], v = (k) => md.querySelector(`[data-mbi="${k}"]`);
+    if (can) {
+      const cash = Math.round((Number(v('cash').value) || 0) * 1e6); if (cash > 0) items.push({ k: 'cash', amount: cash });
+      for (const [k] of staffRows) { const n = Math.round(Number(v(k).value) || 0); if (n > 0) { const [, role, group] = k.split('-'); items.push({ k: 'staff', role, group: group || null, n }); } }
+      for (const a of fleet) if (v('ac-' + a.id) && v('ac-' + a.id).checked) items.push({ k: 'ac', id: a.id });
+      for (const [c] of slots) { const n = Math.round(Number(v('sl-' + c).value) || 0); if (n > 0) items.push({ k: 'slots', apt: c, n }); }
+    }
+    if (!sel.length && !items.length) { toast('Bitte etwas bieten.'); return; }
+    b.disabled = true;
+    try { const r = await api(`/coll/list/${encodeURIComponent(id)}/bid`, { body: { skins: sel, items, game, note: v('note').value } }); if (r.me) coll.me = r.me; md.hidden = true; toast('Gebot abgegeben – Sie hören, sobald entschieden ist.'); M.data = null; renderPane(true); }
+    catch (err) { toast(err.message); b.disabled = false; }
+  };
+}
+async function mkPost(url, body, ok) {
+  try { const r = await api(url, { body, timeout: 30000 }); if (r.me) coll.me = r.me; if (ok) toast(ok); } catch (e) { toast(e.message); }
+  mkState().data = null; renderPane(true);
+}
 async function trSearch() {
   const T = ui.tr; T.q = ($('#tr-q') || {}).value || '';
   try { const r = await api('/coll/players?q=' + encodeURIComponent(T.q)); T.players = r.players; } catch (e) { toast(e.message); }
@@ -692,6 +764,14 @@ function collPaneClick(act, b) {
     case 'trclear': ui.tr.give = []; ui.tr.want = []; renderPane(true); return true;
     case 'trsend': trSend(); return true;
     case 'trx': trAct(b.dataset.id, b.dataset.k); return true;
+    case 'mkreload': mkState().data = null; renderPane(true); return true;
+    case 'mksel': { const M = mkState(), id = b.dataset.id, i = M.sel.indexOf(id); M.note = ($('#mk-note') || {}).value ?? M.note; M.days = Number(($('#mk-days') || {}).value) || M.days; if (i >= 0) M.sel.splice(i, 1); else if (M.sel.length >= 5) toast('Höchstens 5 Skins je Angebot.'); else M.sel.push(id); renderPane(true); return true; }
+    case 'mklist': { const M = mkState(); M.note = ($('#mk-note') || {}).value || ''; M.days = Number(($('#mk-days') || {}).value) || 7;
+      mkPost('/coll/list', { skins: M.sel, note: M.note, days: M.days }, 'Angeboten – Gebote sehen Sie hier.').then(() => { M.sel = []; M.note = ''; renderPane(true); }); return true; }
+    case 'mkcancel': if (confirm('Angebot zurückziehen? Alle Gebote darauf werden frei.')) mkPost(`/coll/list/${encodeURIComponent(b.dataset.id)}/cancel`, {}, 'Zurückgezogen.'); return true;
+    case 'mkwd': mkPost(`/coll/list/${encodeURIComponent(b.dataset.id)}/withdraw`, {}, 'Gebot zurückgezogen.'); return true;
+    case 'mkbid': mkBidModal(b.dataset.id); return true;
+    case 'mkacc': if (confirm('Dieses Gebot annehmen? Alle anderen Gebote werden frei, und es wird sofort übertragen.')) { b.disabled = true; mkPost(`/coll/list/${encodeURIComponent(b.dataset.id)}/accept`, { bid: b.dataset.bid }, 'Angenommen – übertragen.').then(() => { if (ui.mp) mpPoll(false).catch(() => {}); }); } return true;
     default: return false;
   }
 }

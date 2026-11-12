@@ -145,6 +145,9 @@ async function stateView(store, id, etag, buf) {
 /** Kontext für die Aircraft Collection (server/collection.mjs). */
 function collCtx(store, url, path, method, user) {
   return { store, url, path, method, user, json, fail, readJson, isAdmin, loadMeta, fairState: () => store.get(K.fair(user.key), { type: 'json' }).catch(() => null),
+    // 0.21.81 Skin-Börse: Spielstand lesen (ohne zu speichern) bzw. ändern
+    readWorld: async (id) => { const r = await mutateState(store, id, null); return unpackWorld(r.buf); },
+    mutateGame: (id, fn) => mutateState(store, id, (w) => fn(w)),
     loadGameView: async (id) => { const r = await mutateState(store, id, null); const vb = await stateView(store, id, r.etag || String(r.md.ver), r.buf); return JSON.parse(gunzipSync(Buffer.from(vb)).toString()); } };
 }
 function packSized(w) {
@@ -746,7 +749,8 @@ export async function handle(req, { store, geo = null }) {
           players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
             return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
               status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null, auto: al && al.auto ? al.auto : 0, autoForced: !!(al && al.autoForced) }; }),
-          banned: meta.banned || [], events: SM.adminEvents(w), audit: SM.adminAudit(w) });
+          banned: meta.banned || [], events: SM.adminEvents(w), audit: SM.adminAudit(w),
+          fleets: Object.fromEntries(meta.players.map((p) => { const al = w.airlines[p.airlineId]; return [p.airlineId, al ? al.fleet.filter((a) => a.delivery_day <= w.day).slice(0, 300).map((a) => ({ id: a.id, t: SM.P.AIRCRAFT_TYPES[a.type_id].label, aog: a.status === 'aog' })) : []]; })) });   // 0.21.82: für „Ereignis auslösen“
       }
       if (op === 'admin' && method === 'POST') {
         if (!canManage(meta, user)) return fail(403, 'Nur für Admins und die Spielleitung.');
@@ -789,6 +793,13 @@ export async function handle(req, { store, geo = null }) {
           if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
           console.log(`${user.key} hat in ${id} eine Nachprüfung angeordnet: ${res.msg}`);
           return json({ ok: true, msg: 'Nachprüfung angeordnet – ' + res.msg, ver: r.etag });
+        }
+        if (cmd === 'incident') {   // 0.21.82: Ereignis für eine Airline (Unfall, Skandal, Streik …) – im Spiel wie ein gewöhnliches Ereignis
+          const r = await mutateState(store, id, (w) => SM.adminIncident(w, String(body.airlineId || ''), { kind: String(body.kind || ''), sev: Number(body.sev), acId: body.acId ? String(body.acId) : null }));
+          const res = r.result || { ok: false };
+          if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
+          console.log(`${user.key} hat in ${id} ein Ereignis ausgelöst: ${res.msg}`);
+          return json({ ok: true, msg: res.msg, ver: r.etag });
         }
         if (cmd === 'cancelEvent' || cmd === 'grant') {
           const r = await mutateState(store, id, (w) => (cmd === 'grant' ? SM.adminGrant(w, String(body.airlineId || ''), Number(body.amount), by) : w.cancelEvent(String(body.eventId || ''), by)));
@@ -913,6 +924,7 @@ export async function handle(req, { store, geo = null }) {
           if (conf) { fairCalm(rec, Date.now()); const d = fairDue(rec, Date.now(), conf.autoMax); if (d && d.auto) due = d; }   // 0.21.78: Bewährung, fällige Stufe
           return rec; }); } catch (e) { /* Wächter darf das Spielen nie blockieren */ }
         if (susp) return fail(403, `Die Luftfahrtaufsicht hat Ihren Leitstand bis ${fmtBerlin(susp.until)} stillgelegt${susp.reason ? ` (${susp.reason})` : ''}. Bis dahin führt die KI Ihre Airline.`);
+        if ((!abody.fp || typeof abody.fp !== 'object') && !isAdmin(user)) return fail(400, 'Aktionen gehen nur über die Spieloberfläche. Bitte die Seite neu laden.');   // 0.21.84: direkte Schnittstellen-Aufrufe (Skripte, Bots) abweisen – Beleg ist oben schon erfasst
         if (tradeBlk) return fail(403, `Die Luftfahrtaufsicht hat Handel und Börse für Ihr Konto bis ${fmtBerlin(tradeBlk.until)} gesperrt.`);
         if (fair && fair.tooFast) return fail(429, 'Zu viele Aktionen in kurzer Zeit – bitte etwas langsamer.');
         if (due) { try { const st = await fairApplyStage(store, user.key, due.n, { auto: true, score: due.score });   // Prüfsystem verhängt selbst (bis zur eingestellten Stufe)

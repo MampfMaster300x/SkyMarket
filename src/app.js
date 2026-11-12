@@ -1952,6 +1952,18 @@ function suggestPrice() {
 function openNewRoute() {
   readPlanner();
   const p = ui.planner, base = p.base, kit = ui.plannerKit || {}, done = [];
+  // 0.21.83: ganze Eröffnung (Flugzeuge + Strecke) vorab prüfen – über 10 Mio. € einmal bestätigen
+  if (!ui.investOk) {
+    const acts = [];
+    if (kit.n && p.acq && p.acq !== 'none') { if (p.acq === 'lease' || p.acq === 'buy') for (let i = 0; i < kit.n; i++) acts.push({ type: 'acquire', typeId: p.type, mode: p.acq, base }); else acts.push({ type: 'acquire', offerId: p.acq.slice(5), base }); }
+    acts.push({ type: 'openRoute', base, dest: p.dest, typeId: p.type, freq: p.wk && p.wk < 7 ? 1 : p.freq, wk: p.wk && p.wk < 7 ? p.wk : undefined, role: p.role && p.role !== 'mixed' ? p.role : undefined, fo: p.fo, fi: p.fi, service: p.service, buffer: p.buffer, term: p.term });
+    let ic = null; try { ic = SM.investCost(W, W.playerId, acts); } catch (e) { ic = null; }
+    if (ic && ic.ok && ic.cost > P.INVEST_CONFIRM && !investGate('r:' + JSON.stringify(acts), ic, `Neue Strecke ${base}–${p.dest}${acts.length > 1 ? ` mit ${acts.length - 1 > 1 ? acts.length - 1 + ' × ' : ''}${tl(p.type)} (${p.acq === 'buy' ? 'Kauf' : p.acq === 'lease' ? 'Leasing' : 'Gebrauchtmarkt'})` : ''}`, () => { ui.investOk = true; try { openNewRoute(); } finally { ui.investOk = false; } })) { toast(`Investition ${eur(ic.cost)} – zum Bestätigen noch einmal tippen.`); return; }
+    ui.investOk = true; try { return openNewRoute2(p, base, kit, done); } finally { ui.investOk = false; }
+  }
+  return openNewRoute2(p, base, kit, done);
+}
+function openNewRoute2(p, base, kit, done) {
   // 1. Flugzeug beschaffen (falls gewählt)
   if (kit.n && p.acq && p.acq !== 'none') {
     if (p.acq === 'lease' || p.acq === 'buy') {
@@ -5488,10 +5500,64 @@ function assistantAfterDays(prev) {
 const fmtUntil = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
 const suspOf = () => (mpState.user && mpState.user.susp && mpState.user.susp.until > Date.now() && !mpState.user.admin ? mpState.user.susp : null);   // 0.21.75: zeitweise gesperrt
 const blkOf = (k) => (mpState.user && mpState.user.blk && mpState.user.blk[k] > Date.now() && !mpState.user.admin ? mpState.user.blk[k] : null);   // 0.21.80: Teilsperren (Chat, Handel & Börse)
+/** 0.21.83: Bestätigung für große Investitionen (über P.INVEST_CONFIRM) – eigenes Fenster über allem, gegen Fehlklicks. */
+function investLabel(a) {
+  const T = (t) => (t && P.AIRCRAFT_TYPES[t] ? tl(t) : 'Flugzeug'), A = (id) => (W.airlines[id] ? W.airlines[id].name : id), apName = (c) => (P.AIRPORTS[c] ? P.AIRPORTS[c].name : c || '–');
+  switch (a.type) {
+    case 'acquire': { const o = a.offerId ? (W.acMarket || []).find((x) => x.id === a.offerId) : null; return o ? `${T(o.type)} vom Gebrauchtmarkt übernehmen` : `${T(a.typeId)} ${({ buy: 'kaufen', factory: 'beim Hersteller bestellen', lease: 'leasen', flex: 'flexibel leasen' })[a.mode] || 'beschaffen'}`; }
+    case 'openBase': return `Basis ${apName(a.apt || a.base || '')} eröffnen`;
+    case 'buySlots': return `${a.n || ''} Slots in ${apName(a.apt || '')} kaufen`;
+    case 'buyStake': return `Anteile an ${A(a.target || a.id || a.airline)} kaufen`;
+    case 'takeover': return `${A(a.target || a.id || a.airline)} übernehmen`;
+    case 'gateLock': return `Exklusivvertrag (alle Gates) in ${apName(a.apt || '')}`;
+    case 'openRoute': return `Strecke ${a.base}–${a.dest} eröffnen`;
+    case 'editRoute': return 'Strecke ausbauen (zusätzliche Slots)';
+    case 'runPlan': return 'Plan ausführen';
+    case 'leaseBuy': return 'Leasingflugzeug kaufen';
+    case 'setCabin': return 'Kabinen umbauen';
+    default: return ({ aptInvest: 'Flughafen-Investition', hangar: 'Hangar bauen', terminal: 'Terminal-Investition', hubLevel: 'Drehkreuz ausbauen', academy: 'Akademie ausbauen', buyback: 'Aktienrückkauf', cgOpen: 'Frachtsparte', cargo: 'Frachtsparte', dealRespond: 'Handel annehmen' })[a.type] || 'Investition';
+  }
+}
+function investConfirm(what, ic, onYes) {
+  let ov = document.getElementById('invc'); if (!ov) { ov = document.createElement('div'); ov.id = 'invc'; ov.className = 'invc'; document.body.appendChild(ov); }
+  ov.innerHTML = `<div class="invc-box" role="dialog" aria-modal="true" aria-labelledby="invc-h"><span class="invc-k">Große Investition</span><h2 id="invc-h">${esc(what)}</h2>
+    <div class="invc-sum"><span>Kosten (Konto und neue Kredite)</span><b>${eur(ic.cost)}</b></div><div class="invc-sum"><span>Kontostand danach</span><b class="${ic.cashAfter < 0 ? 'neg' : ''}">${eur(ic.cashAfter)}</b></div>
+    <div class="row" style="gap:8px;margin-top:4px"><button class="btn primary" data-ic="yes">Ja, investieren</button><button class="btn" data-ic="no">Abbrechen</button></div>
+    <p class="small muted">Ab ${eur(P.INVEST_CONFIRM)} fragt das Spiel zur Sicherheit nach.</p></div>`;
+  ov.hidden = false; const yes = ov.querySelector('[data-ic="yes"]'); setTimeout(() => yes && yes.focus(), 30);
+  const close = () => { ov.hidden = true; ov.onclick = null; document.removeEventListener('keydown', esc1, true); };
+  const esc1 = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
+  document.addEventListener('keydown', esc1, true);
+  ov.onclick = (e) => { const b = e.target.closest('[data-ic]'); if (!b && e.target !== ov) return; close(); if (b && b.dataset.ic === 'yes') onYes(); };
+}
+// 0.21.83: Bestätigung direkt am Knopf – erster Klick macht aus dem Knopf „Kauf bestätigen · Betrag“, zweiter Klick auf denselben Knopf führt aus
+document.addEventListener('click', (e) => { const b = e.target && e.target.closest && e.target.closest('button, [data-act], a'); if (b) ui.lastBtn = { el: b, t: Date.now() }; }, true);
+const btnSig = (el) => { const a = [...el.attributes].filter((x) => x.name.startsWith('data-') || x.name === 'id').map((x) => `[${x.name}="${CSS.escape(x.value)}"]`).join(''); return a ? el.tagName.toLowerCase() + a : null; };
+/** true = bestätigt (zweiter Klick), false = Knopf ist jetzt scharf bzw. Fenster offen. */
+function investGate(key, ic, label, onYes) {
+  const A = ui.investArm;
+  if (A && A.key === key && Date.now() < A.until) { clearTimeout(A.h); ui.investArm = null; return true; }
+  const lb = ui.lastBtn && Date.now() - ui.lastBtn.t < 1500 ? ui.lastBtn.el : null, sig = lb ? btnSig(lb) : null;
+  if (!lb || !sig) { investConfirm(label, ic, onYes); return false; }   // ohne Knopf (z. B. Tastatur): kleines Fenster
+  if (A) { clearTimeout(A.h); }
+  const txt = `Kauf bestätigen · ${eur(ic.cost)}`, arm = () => { const el = document.querySelector(sig) || (lb.isConnected ? lb : null); if (!el) return; if (!el.dataset.invOrig) el.dataset.invOrig = el.innerHTML; el.textContent = txt; el.classList.add('inv-armed'); el.title = `${label} – Kontostand danach ${eur(ic.cashAfter)}`; };
+  ui.investArm = { key, until: Date.now() + 8000, h: setTimeout(() => { const el = document.querySelector(sig); if (el && el.dataset.invOrig) { el.innerHTML = el.dataset.invOrig; delete el.dataset.invOrig; el.classList.remove('inv-armed'); } ui.investArm = null; }, 8000) };
+  arm(); setTimeout(arm, 0); setTimeout(arm, 60);   // falls die Ansicht nach dem Klick neu gezeichnet wird
+  return false;
+}
 function doAction(act) {
   if (ui.mp && blkOf('trade') && (SM.FAIR_TRADE_ACTS || []).includes(act.type)) { toast(`Die Luftfahrtaufsicht hat Handel und Börse für Ihr Konto bis ${fmtUntil(blkOf('trade'))} gesperrt.`); return { ok: false, msg: 'Gesperrt.' }; }
   if (ui.mp && suspOf()) { toast(`Die Luftfahrtaufsicht hat Ihren Leitstand bis ${fmtUntil(suspOf().until)} stillgelegt – Sie können zuschauen, aber nicht handeln.`); return { ok: false, msg: 'Gesperrt.' }; }
   if (!W || !W.player) { if (ui.mp) { toast('Der Spielstand wird neu geladen …'); enterGame(ui.mp.id); } return { ok: false, msg: 'Kein Spielstand geladen.' }; }
+  if (!ui.investOk && P.INVEST_CONFIRM) {   // 0.21.83: große Investition erst nach Bestätigung
+    let ic = null; try { ic = SM.investCost(W, W.playerId, act); } catch (e) { ic = null; }
+    if (ic && ic.ok && ic.cost > P.INVEST_CONFIRM) {
+      const md = $('#modal'), hadModal = md && !md.hidden;
+      const ok = investGate('a:' + JSON.stringify(act), ic, investLabel(act), () => { ui.investOk = true; let r = null; try { r = doAction(act); } finally { ui.investOk = false; }
+        if (r && r.ok) { if (hadModal && md) md.hidden = true; toast(`Erledigt: ${investLabel(act)} (${eur(ic.cost)}).`); refreshAll(); } });
+      if (!ok) return { ok: false, pending: true, msg: `${investLabel(act)}: ${eur(ic.cost)} – zum Bestätigen noch einmal tippen.` };
+    }
+  }
   const res = SM.applyAction(W, W.playerId, act);
   if (!res.ok) { toast(res.msg || 'Nicht möglich.'); return res; }
   if (ui.mp) mpSendAction(act);
@@ -6438,7 +6504,7 @@ document.addEventListener('change', (e) => {
   if (e.target.matches('[data-bpopt]')) { st[e.target.dataset.bpopt] = e.target.checked; bpUpdate(root); }
   if (e.target.matches('[data-bpsort]')) { st.sort = e.target.value; bpUpdate(root); }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-bpq]')) { e.preventDefault(); const root = e.target.closest('.bp'), first = root && root.querySelector('[data-bpa]'); if (first) first.click(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-bpq]')) { e.preventDefault(); const root = e.target.closest('.bp'), first = root && root.querySelector('[data-bpa]'); if (first) selfClick(first); } });
 const readAirline = (prefix) => ({ name: ($('#' + prefix + 'Name').value || '').trim(), code: ($('#' + prefix + 'Code').value || '').trim().toUpperCase(), base: $('#' + prefix + 'Base').value });
 function modal(html, wide = true) {
   const m = $('#modal');
@@ -6947,7 +7013,22 @@ const dateShortY = (day) => { const p = dateParts(day); return `${p.d}. ${MONTHS
 const EV_TYPE = { downturn: 'Branchenkrise', oil_glut: 'Ölschwemme', mega: 'Großereignis (Kalender)', storm: 'Unwetter', volcano: 'Vulkanasche', airspace: 'Luftraum', atc_strike: 'Lotsenstreik', airport_strike: 'Flughafenstreik', big_event: 'Großereignis', recession: 'Rezession', boom: 'Aufschwung', trade_war: 'Handelskrieg', trade_deal: 'Handelsabkommen', carbon: 'CO₂-Abgabe', fee_hike: 'Entgelte', tax_change: 'Ticketsteuer', rate_change: 'Leitzins', health: 'Gesundheitskrise', pilot_shortage: 'Pilotenmangel', fx_shock: 'Wechselkurs', fuel_spike: 'Kerosin', fuel_drop: 'Kerosin', own_strike: 'Streik (Airline)', strike: 'Streik (Airline)', sickness: 'Krankheitswelle', it_outage: 'IT-Ausfall',
   conflict: 'Konflikt', flight_ban: 'Flugverbot', sanctions: 'Sanktionen', carrier_ban: 'Landerechte', unrest: 'Unruhen', entry_ban: 'Einreisestopp', open_skies: 'Open Skies', visa_free: 'Visafreiheit',
   shorthaul_ban: 'Kurzstreckenverbot', foreign_fee: 'Sonderabgabe', domestic_aid: 'Inlandsförderung', epidemic: 'Krankheitsausbruch', solar: 'Sonnensturm', heatwave: 'Hitzewelle', sandstorm: 'Sandsturm',
-  monsoon: 'Monsun', blizzard: 'Blizzard', wildfire: 'Waldbrände', quake: 'Erdbeben' };
+  monsoon: 'Monsun', blizzard: 'Blizzard', wildfire: 'Waldbrände', quake: 'Erdbeben', trust: 'Vertrauenskrise', own_strike: 'Streik', it_outage: 'IT-Ausfall', sickness: 'Krankheitswelle' };
+/** 0.21.82: Ereignis für eine Airline auslösen – sieht im Spiel aus wie ein gewöhnliches Ereignis. */
+function adminIncidentHtml(d) {
+  const ps = d.players.filter((p) => p.status !== 'insolvent' && p.status !== 'fehlt'); if (!ps.length) return '';
+  const K = SM.INCIDENTS, st = ui.admInc || (ui.admInc = { al: ps[0].airlineId, kind: 'crash', sev: 2, ac: '' });
+  if (!ps.some((p) => p.airlineId === st.al)) st.al = ps[0].airlineId;
+  const k = K[st.kind] || K.crash, fl = (d.fleets || {})[st.al] || [];
+  return `<section class="stack adm-inc"><h3>Ereignis auslösen</h3>
+    <div class="grid2"><label class="f"><span>Airline</span><select id="adm-ia">${ps.map((p) => `<option value="${esc(p.airlineId)}"${p.airlineId === st.al ? ' selected' : ''}>${esc(p.airlineName)} (${esc(p.name)})</option>`).join('')}</select></label>
+      <label class="f"><span>Ereignis</span><select id="adm-ik">${Object.entries(K).map(([key, x]) => `<option value="${key}"${key === st.kind ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
+      <label class="f"><span>Schwere</span><select id="adm-is">${[[1, 'leicht'], [2, 'mittel'], [3, 'schwer']].map(([v, l]) => `<option value="${v}"${v === st.sev ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      ${k.ac ? `<label class="f"><span>Flugzeug</span><select id="adm-iac"><option value="">zufällig</option>${fl.map((a) => `<option value="${esc(a.id)}"${a.id === st.ac ? ' selected' : ''}>${esc(a.id)} · ${esc(a.t)}${a.aog ? ' (am Boden)' : ''}</option>`).join('')}</select></label>` : '<span></span>'}</div>
+    <p class="small"><b>${esc(k.label)}:</b> ${esc(k.desc)}.</p>
+    <div class="row"><button class="btn small danger" data-adm="incident">Ereignis auslösen</button></div>
+    <p class="small muted">Für alle sieht das aus wie ein gewöhnliches Ereignis: Logbuch, Nachrichten, Kurs und Ansehen nennen die Spielleitung nicht. Unten unter „Ereignisse“ lässt sich eine Vertrauenskrise annullieren (endet samt Stilllegungen der Untersuchung). Geld, Bußgelder und verlorene Flugzeuge bleiben weg.</p></section>`;
+}
 async function showAdmin(id, onBack) {
   const m = modal('<h1>Verwaltung</h1><p class="small muted">Lade …</p>');
   let d;
@@ -6965,6 +7046,7 @@ async function showAdmin(id, onBack) {
     <p class="small muted">Spieltag ${n0(day + 1)} · ${d.players.length} Airlines. Alles, was Sie hier tun, sehen alle Mitspielenden als Meldung.</p>
     <section class="stack"><h3>Airlines</h3><div class="adm-list">${d.players.map(pRow).join('') || '<p class="small muted">Niemand spielt mit.</p>'}</div>
       <p class="small muted">„Entfernen“ beendet die Airline sofort: Strecken enden, Leasingflugzeuge gehen zurück, Slots, Gates und offene Angebote verfallen. Die Person kann danach neu beitreten – außer mit „sperren“. Kapital buchen: positiver Betrag schießt zu, negativer zieht ab (z. B. zum Ausgleich eines Fehlers).</p></section>
+    ${adminIncidentHtml(d)}
     ${d.audit ? adminAuditHtml(d.audit) : ''}
     ${d.banned.length ? `<section class="stack"><h3>Gesperrt</h3><div class="adm-list">${d.banned.map((b) => `<div class="adm-p"><div><b>${esc(b.name)}</b> <span class="small muted">zuletzt ${esc(b.airlineName || '')} · seit ${new Date(b.at).toLocaleDateString('de-DE')}</span></div><button class="btn small" data-adm="unban" data-u="${esc(b.u)}">Sperre aufheben</button></div>`).join('')}</div></section>` : ''}
     ${d.admin ? `<section class="stack"><h3>Konto zurücksetzen</h3><div class="row"><input type="text" id="adm-pwu" maxlength="20" placeholder="Benutzername" style="flex:1;min-width:160px" autocomplete="off"><button class="btn small" data-adm="pw">Vorläufiges Passwort erzeugen</button></div>
@@ -6981,6 +7063,11 @@ async function showAdmin(id, onBack) {
       <div class="row"><button class="btn small danger" data-adm="reset">Welt neu starten</button></div></div></section>
     <section class="stack"><h3>Ereignisse</h3><div class="adm-list">${d.events.map(eRow).join('') || '<p class="small muted">Gerade keine Ereignisse.</p>'}</div>
       <p class="small muted">Annullieren: Angekündigte Ereignisse fallen aus, laufende enden sofort. Steuern, Entgelte, CO₂-Abgabe, Zins, Wechselkurs und Kerosinsprung werden zurückgenommen; die Konjunktur erholt sich nach einer Rezession entsprechend schneller. Bereits ausgefallene Flüge bleiben ausgefallen.</p></section></div>`;
+  m.addEventListener('change', (e) => {   // 0.21.82: Ereignis-Auswahl – Abschnitt neu zeichnen (Flugzeugliste je Airline)
+    const st = ui.admInc, t = e.target; if (!st || !['adm-ia', 'adm-ik', 'adm-is', 'adm-iac'].includes(t.id)) return;
+    if (t.id === 'adm-ia') { st.al = t.value; st.ac = ''; } else if (t.id === 'adm-ik') st.kind = t.value; else if (t.id === 'adm-is') st.sev = Number(t.value); else st.ac = t.value;
+    const sec = m.querySelector('.adm-inc'); if (sec) sec.outerHTML = adminIncidentHtml(d);
+  });
   m.onchange = (e) => { if (e.target.id === 'adm-aa') { const nw = m.querySelector('#adm-anw'); if (nw) nw.hidden = e.target.value !== 'x:'; } };
   m.onclick = async (e) => {
     const b = e.target.closest('[data-adm]'); if (!b) return;
@@ -7012,6 +7099,13 @@ async function showAdmin(id, onBack) {
     if (cmd === 'reset') { b.disabled = true; const sv = ($('#adm-start') || {}).value, startAt = sv ? new Date(sv).getTime() : 0;
       if (sv && !isFinite(startAt)) { toast('Ungültiger Starttermin.'); b.disabled = false; return; }
       try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'resetWorld', keep: !!(m.querySelector('#adm-keep') || {}).checked, startAt: startAt || null, speed: ($('#adm-speed') || {}).value } }); toast(r.msg || 'Neu gestartet.'); if (ui.mp && ui.mp.id === id) { ui.mpLastDay = null; await mpPoll(true); } } catch (err) { toast(err.message); } showAdmin(id, onBack); return; }
+    if (cmd === 'incident') {
+      const st = ui.admInc, K = SM.INCIDENTS[st.kind]; st.ac = (m.querySelector('#adm-iac') || {}).value || '';
+      if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = `Wirklich: ${K.label} (${['', 'leicht', 'mittel', 'schwer'][st.sev]}) für ${alName(st.al)}?`; return; }
+      b.disabled = true;
+      try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'incident', airlineId: st.al, kind: st.kind, sev: st.sev, acId: K.ac ? st.ac || null : null } }); toast(r.msg || 'Ausgelöst.'); if (ui.mp && ui.mp.id === id) await mpPoll(true); } catch (err) { toast(err.message); }
+      showAdmin(id, onBack); return;
+    }
     if (cmd === 'audit') {
       const q = (s) => (m.querySelector(s) || {}).value || '', pv = q('#adm-aa'), ex = pv.startsWith('x:'), name = ex ? (pv.slice(2) || q('#adm-an').trim()) : '';
       const body = { cmd: 'auditOrder', b: q('#adm-ab'), a: ex ? '' : pv, name, amount: Number(String(q('#adm-av')).replace(',', '.')) * 1e6, state: ex || !!(m.querySelector('#adm-as') || {}).checked, mode: q('#adm-am') || 'choice' };
@@ -7336,9 +7430,11 @@ function applyServerState(s, ver, first, sess = mpState.sess) {
 // 0.21.74 Fair-Play-Wächter: kleiner Bedien-Nachweis zu jeder Aktion (echte Eingaben, Skript-Klicks, ferngesteuerter Browser, sichtbarer Tab)
 // 0.21.80: dazu Spuren von KI-Agenten, die einen normalen Browser per Screenshot bedienen – Mauszeiger springt ohne Weg auf den Knopf,
 // Klick exakt in der Knopfmitte, Text ohne Tastenanschläge oder in gleichem Takt; außerdem Zeitzone und Gerät (Herkunft). Nur Zähler, keine Inhalte.
-const FPT = { lastIn: 0, tr: 0, ut: 0, g: 0, mv: [], pos: null, pt: '', mc: 0, tp: 0, ck: 0, cc: 0, kt: [], kd: -1e9, ti: 0 };
+const FPT = { self: false, lastIn: 0, tr: 0, ut: 0, g: 0, mv: [], pos: null, pt: '', mc: 0, tp: 0, ck: 0, cc: 0, kt: [], kd: -1e9, ti: 0 };
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, (e) => { if (e.isTrusted) { FPT.lastIn = Date.now(); FPT.tr++; FPT.g++; } }, true);
-document.addEventListener('click', (e) => { if (!e.isTrusted && e.target && e.target.closest && e.target.closest('[data-act],[data-pk],[data-adm],button')) FPT.ut++; }, true);
+document.addEventListener('click', (e) => { if (!e.isTrusted && !FPT.self && e.target && e.target.closest && e.target.closest('[data-act],[data-pk],[data-adm],button')) FPT.ut++; }, true);
+/** 0.21.84: Klicks, die das Spiel selbst auslöst (Enter in der Flughafensuche, Rundgang per Tastatur), zählen nicht als Skript-Klick. */
+function selfClick(el) { if (!el) return; FPT.self = true; FPT.lastIn = Date.now(); try { el.click(); } finally { FPT.self = false; } }
 document.addEventListener('pointermove', (e) => { if (!e.isTrusted || e.pointerType !== 'mouse') return; FPT.mv.push([performance.now(), e.clientX, e.clientY]); if (FPT.mv.length > 120) FPT.mv.splice(0, 60); }, { capture: true, passive: true });
 document.addEventListener('pointerdown', (e) => {
   if (!e.isTrusted) return; FPT.pt = e.pointerType || '';
@@ -7678,7 +7774,7 @@ function boot(hotData) {
   $('#bubble').addEventListener('click', onBubbleClick);
   $('#tour').addEventListener('click', onTourClick);
   window.addEventListener('resize', placeTour);
-  document.addEventListener('keydown', (e) => { if (!ui.tour) return; if (e.key === 'Escape') endTour(); else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); $('#tour [data-tour="next"]').click(); } else if (e.key === 'ArrowLeft' && ui.tour.i) { ui.tour.i--; showTourStep(); } }, true);
+  document.addEventListener('keydown', (e) => { if (!ui.tour) return; if (e.key === 'Escape') endTour(); else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); selfClick($('#tour [data-tour="next"]')); } else if (e.key === 'ArrowLeft' && ui.tour.i) { ui.tour.i--; showTourStep(); } }, true);
   $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
   initResizer();
   $('#nav').addEventListener('click', (e) => {
@@ -7737,7 +7833,7 @@ function boot(hotData) {
   requestAnimationFrame(frame);
   // Vorschau-Seite für das Pack-Öffnen (nur wenn ausdrücklich eingeschaltet, z. B. in der Demo-Seite)
   if (window.SKYMARKET_PACKDEMO) window.skyPackDemo = (ids) => { const ov = packOverlay(); playReveal(ov, { res: ids, fresh: ids.map(() => true) }); };
-  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), fairWarn: (x) => showFairWarn(x), coll: () => coll, reveal: async (res, quick) => { await loadColl(true); const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
+  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), fairWarn: (x) => showFairWarn(x), act: (a) => doAction(a), coll: () => coll, reveal: async (res, quick) => { await loadColl(true); const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
 }
 if (window.claude?.hot?.ready) window.claude.hot.ready(boot); else boot(window.claude?.hot?.data ?? {});
 })();

@@ -183,6 +183,87 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.84: Schnittstellen-Bots abweisen, Fehlalarme vermeiden
+
+- **Aktionen ohne Bedien-Nachweis werden abgewiesen**, also Skripte und Bots, die direkt mit dem Server reden. Die Meldung lautet „Aktionen gehen nur über die Spieloberfläche. Bitte die Seite neu laden.“
+  - Der Versuch wird trotzdem als Beleg erfasst.
+  - Admins sind ausgenommen (Werkzeuge).
+- **Bewertung „Schnittstelle“ verdünnt sich nicht mehr:**
+  - Ab 3 solchen Aktionen gibt es 45 bis 70 Punkte, unabhängig davon, wie viele normale Aktionen danach kommen.
+  - Vorher zählte der Anteil an allen Aktionen. Wer danach normal klickte, rutschte wieder nach unten (z. B. von 100 auf 66).
+- **Spieleigene Klicks sind keine Skript-Klicks:**
+  - Enter in der Flughafensuche und der Rundgang per Tastatur lösen intern einen Klick aus.
+  - Das läuft jetzt über `selfClick` und zählt weder als Skript-Klick noch als Aktion ohne Bedienung.
+- **Test-Helfer:** Der Smoke-Test schickt wie die Spieloberfläche einen Bedien-Nachweis mit.
+
+## Neu in 0.21.83: Große Investitionen bestätigen
+
+- **Ab 10 Mio. €** (`P.INVEST_CONFIRM`) fragt das Spiel nach, bevor eine Investition ausgeführt wird. Das schützt vor Fehlklicks.
+- **Direkt am Knopf:** Der erste Klick macht aus dem Knopf „Kauf bestätigen · Betrag“, der Tooltip nennt den Kontostand danach. Ein zweiter Klick auf denselben Knopf innerhalb von 8 Sekunden führt aus, danach wird der Knopf wieder normal (`investGate`).
+  - Kosten = Abfluss vom Konto plus neue Kredite.
+  - Ohne geklickten Knopf (z. B. Tastatur) erscheint ein kleines Fenster.
+- **Berechnung** (`SM.investCost`):
+  - Ein Probelauf auf einer Kopie der Welt, die echte Welt bleibt unberührt.
+  - Das gilt für alle Aktionsarten, die Geld binden: Flugzeuge kaufen oder bestellen, Gebrauchtmarkt, Basen, Slots, Anteile, Übernahmen, Exklusivverträge, Hangar, Terminal, Drehkreuz, Akademie, Pläne, Kabinenumbau, Handel annehmen und mehr. Außerdem Streckenänderungen, die zusätzliche Slots kaufen.
+  - Leasing zählt nur mit der Kaution. Einen Kredit aufzunehmen ist keine Investition.
+- **Neue Strecke mit Flugzeugen** (Planer): Das ganze Paket wird vorab zusammengerechnet und einmal bestätigt, nicht jedes Flugzeug einzeln.
+- **Nur im Spiel:** Der Server führt Aktionen weiter ohne Rückfrage aus, die KI-Vertretung ist also nicht betroffen.
+
+## Neu in 0.21.82: Ereignisse für einzelne Airlines auslösen (Spielverwaltung)
+
+- **Wo:** Spielverwaltung → „Ereignis auslösen“. Airline, Ereignis und Schwere (leicht, mittel, schwer) wählen, bei Flugunfall und Triebwerksschäden auch das Flugzeug (oder zufällig). Ausgelöst wird mit zweimal Klicken.
+- **Für alle Spielenden ein gewöhnliches Ereignis** (`SM.adminIncident`, Katalog `SM.INCIDENTS`):
+  - Logbuch, Nachrichten, Kurs und Ansehen nennen die Spielleitung nicht.
+  - Ein eigener Zufall wählt Flugzeuge aus. Der Weltzufall bleibt unberührt.
+- **Flugunfall (Totalverlust):**
+  - Das Flugzeug ist weg.
+    - Eigenes Flugzeug: Die Versicherung zahlt den Zeitwert (Basis 90 %, Komfort 100 %) minus Selbstbehalt, die Bank bekommt ihren Kredit zurück.
+    - Geleast: Der Vertrag endet, die Kaution kommt zurück, der Selbstbehalt wird fällig.
+  - Entschädigungen und Untersuchung kosten 8, 25 oder 60 Mio. € × Größe der Maschine. Davon trägt die Airline je nach Tarif und Schwere 15–70 %.
+  - Alle Flugzeuge desselben Musters bleiben 3, 10 oder 21 Tage am Boden.
+  - Vertrauenskrise 45, 90 oder 150 Tage: Die Marke im Angebot sinkt um 0,15, 0,30 oder 0,45 und klingt ab.
+  - Außerdem sinken Marke, Börsenkurs (−8, −15 oder −30 %) und Crew-Moral. Das Ansehen sinkt um 4, 8 oder 15 Punkte für 4 bis 12 Monate.
+- **Wartungsskandal:** Bußgeld, ein Teil der Flotte zur Nachprüfung am Boden, Vertrauenskrise, Marke, Ansehen.
+- **Bestechungsskandal:** Bußgeld, Kurs, Marke, leichte Vertrauenskrise, Ansehen.
+- **Datenleck:** Entschädigungen (je nach Passagierzahl), IT-Störung, Vertrauenskrise, Marke.
+- **Bilanzskandal:** Kurssturz (−10, −25 oder −45 %), Bußgeld, Ansehen lange belastet (bis 18 Monate), Marke.
+- **Gezielt wie im normalen Spiel:**
+  - Streikdrohung mit Entscheidung im Cockpit
+  - IT-Ausfall (1, 3 oder 7 Tage)
+  - Krankheitswelle (7, 14 oder 30 Tage)
+  - Triebwerksschäden an 1, 2 oder 4 Flugzeugen (Reparatur, Selbstbehalt)
+- **Vertrauenskrise:** neuer Ereignistyp `trust`. Sie senkt die Marke im Angebot (`trustMalus`) und steht in der Ereignisliste der Verwaltung.
+  - Annullieren beendet sie samt den Stilllegungen der Untersuchung. Im Spiel erscheint das als „Untersuchung abgeschlossen“.
+  - Geld, Bußgelder und verlorene Flugzeuge bleiben weg.
+- **Ansehen:** Laufende Vorfälle mindern die Zuverlässigkeit (`al.incidents`) und stehen in der Begründung, z. B. „Flugunfall in Untersuchung (−8)“.
+
+## Neu in 0.21.81: Skin-Börse – Skins anbieten und Gebote einholen
+
+- **Anbieten ohne feste Gegenleistung** (Collection → Trading → Skin-Börse, oder im Skin-Fenster „Gebote einholen“):
+  - 1–5 freie Skins, ein Hinweis (z. B. „suche Gold-Skins oder Piloten“), Laufzeit 1, 3, 7 oder 14 Tage.
+  - Höchstens 5 offene Angebote je Konto.
+  - Angebotene Skins sind bis zum Ende reserviert. Sie lassen sich weder aktivieren noch woanders anbieten.
+- **Gebote:**
+  - Skins aus der eigenen Sammlung und dazu Geld, Personal (Piloten je Familie, Flugbegleiter, Technik), Flugzeuge und freie Slots.
+  - Die Spielgüter kommen aus der eigenen Airline in einem Spiel, in dem beide eine Airline haben (dem gerade offenen Spiel), und gehen an die Airline der anbietenden Person.
+  - Beim Bieten wird geprüft, ob alles verfügbar ist. Eine Wertgrenze gibt es nicht, auch keine Fairness-Prüfung wie beim normalen Handel.
+  - Ein neues Gebot ersetzt das eigene alte. Gebotene Skins sind reserviert, solange das Gebot offen ist.
+- **Sichtbarkeit:** Gebote sehen nur die anbietende Person und die jeweils Bietenden, alle anderen nur die Zahl der Gebote.
+- **Annehmen** läuft in drei Schritten:
+  1. Das Angebot wird gesperrt, und es wird geprüft, ob beide Seiten ihre Skins noch frei haben.
+  2. Die Spielgüter werden übertragen (`SM.skinDeal`, alles oder nichts, Logbuch „Skin-Börse“ bei beiden Airlines).
+  3. Die Skins wandern.
+  - Fehlt zu diesem Zeitpunkt etwas, wird das Gebot hinfällig, und das Angebot ist wieder offen.
+  - Bricht etwas nach dem Bezahlen ab, setzt ein erneutes „Annehmen“ an derselben Stelle fort.
+  - Alle anderen Gebote werden frei. Alle Beteiligten bekommen eine Nachricht.
+- **Ablauf:** Abgelaufene Angebote schließen automatisch. Beide Seiten werden benachrichtigt, und reservierte Skins werden frei.
+- **Teilsperre „Handel & Börse“** der Luftfahrtaufsicht sperrt auch Anbieten und Bieten.
+- **Server:**
+  - `GET /coll/market?game=…`
+  - `POST /coll/list`
+  - `POST /coll/list/<id>/bid|withdraw|cancel|accept`
+  - Daten in `coll/registry` unter `lists`.
+
 ## Neu in 0.21.80: KI-Agenten im normalen Browser erkennen, Sperren mit freier Dauer und Teilsperren
 
 - **Warum:** Moderne KI-Agenten bedienen einen ganz normalen Browser per Screenshot und mit echten Maus- und Tastatur-Ereignissen. Für die bisherigen Signale sahen sie aus wie ein Mensch.

@@ -6,6 +6,7 @@
 // Zufall: ausschließlich crypto.randomInt. Ergebnisse werden gespeichert, bevor der Browser die Animation zeigt.
 import { randomInt, randomUUID } from 'node:crypto';
 import SKINS from '../shared/skins.cjs';
+import SM from '../shared/engine.cjs';
 
 const KEY = { reg: 'coll/registry', hist: (u) => `coll/hist/${u}`, grants: 'coll/grants', reqs: 'shop/requests', log: 'shop/log', cfg: 'shop/config' };
 const HIST_KEEP = 40, NOTES_KEEP = 30, TRADES_KEEP = 300, MAX_PACKS_GRANT = 100, MAX_OPEN_REQ = 3;
@@ -22,11 +23,22 @@ async function updateJson(store, key, fn, init = null, tries = 8) {
   }
   throw Object.assign(new Error('Gerade viel Betrieb, bitte noch einmal versuchen.'), { status: 409 });
 }
-const emptyReg = () => ({ v: 1, users: {}, trades: {}, credited: {}, stats: { paidPacks: 0, adminPacks: 0, opened: 0, skinsOut: 0, rarity: { u: 0, r: 0, e: 0, m: 0, l: 0 }, trades: 0, revenueCents: 0, donationCents: 0, donations: 0, orders: 0 }, seq: 0 });
+const emptyReg = () => ({ v: 1, users: {}, trades: {}, lists: {}, credited: {}, stats: { paidPacks: 0, adminPacks: 0, opened: 0, skinsOut: 0, rarity: { u: 0, r: 0, e: 0, m: 0, l: 0 }, trades: 0, revenueCents: 0, donationCents: 0, donations: 0, orders: 0 }, seq: 0 });
 const userOf = (reg, key, name) => { const u = reg.users[key] || (reg.users[key] = { name: name || key, inv: {}, packs: [], opened: [], active: {}, notes: [], ms: [], openedTotal: 0 }); if (name) u.name = name; return u; };
 const uniqOf = (u) => Object.values(u.inv).filter((n) => n > 0).length;
 const activeCount = (u, skinId) => Object.values(u.active).filter((s) => s === skinId).length;
-const reservedOf = (reg, key, skinId, except = null) => Object.values(reg.trades).filter((t) => t.status === 'open' && t.from === key && t.id !== except).reduce((s, t) => s + t.give.filter((x) => x === skinId).length, 0);
+// 0.21.81 Skin-Börse: Angebote ohne feste Gegenleistung (reg.lists), Gebote darauf. Angebotene und gebotene Skins sind reserviert.
+const LIST = { maxOpen: 5, maxSkins: 5, maxBidSkins: 10, days: [1, 3, 7, 14], keep: 200 };
+const listLive = (l, now = Date.now()) => l.status === 'settling' || (l.status === 'open' && l.until > now);
+function reservedMap(reg, key, except = null) {
+  const m = {}, add = (arr) => { for (const s of arr) m[s] = (m[s] || 0) + 1; };
+  for (const t of Object.values(reg.trades)) if (t.status === 'open' && t.from === key && t.id !== except) add(t.give);
+  for (const l of Object.values(reg.lists || {})) { if (!listLive(l)) continue;
+    if (l.from === key && l.id !== except) add(l.skins);
+    for (const b of Object.values(l.bids || {})) if (b.by === key && b.status === 'open' && b.id !== except) add(b.skins); }
+  return m;
+}
+const reservedOf = (reg, key, skinId, except = null) => reservedMap(reg, key, except)[skinId] || 0;
 // 0.21.61: ein Exemplar deckt SKINS.perCopy(skin) Flugzeuge (Grün/Blau 2, ab Pink 1). freeOf = frei für Tausch (Exemplare ohne aktives Flugzeug), slotsOf = weitere Flugzeuge, die noch gehen.
 const freeOf = (reg, key, skinId, except = null) => { const u = reg.users[key]; if (!u) return 0; return (u.inv[skinId] || 0) - Math.ceil(activeCount(u, skinId) / SKINS.perCopy(skinId)) - reservedOf(reg, key, skinId, except); };
 const slotsOf = (reg, key, skinId) => { const u = reg.users[key]; if (!u) return 0; return ((u.inv[skinId] || 0) - reservedOf(reg, key, skinId)) * SKINS.perCopy(skinId) - activeCount(u, skinId); };
@@ -66,7 +78,7 @@ export async function shopConfig(store) {
 export const berlinDay = (t = Date.now()) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
 function meView(reg, key) {
   const u = reg.users[key] || { inv: {}, packs: [], opened: [], active: {}, notes: [], ms: [], openedTotal: 0 };
-  const reserved = {}; for (const t of Object.values(reg.trades)) if (t.status === 'open' && t.from === key) for (const s of t.give) reserved[s] = (reserved[s] || 0) + 1;
+  const reserved = reservedMap(reg, key);
   return { inv: u.inv, packs: u.packs, opened: u.opened, active: u.active, notes: u.notes, ms: u.ms, openedTotal: u.openedTotal || 0, uniq: uniqOf(u), total: SKINS.TOTAL, reserved, dailyDay: u.daily || null, today: berlinDay() };
 }
 function tradeView(t, reg) { return { ...t, fromName: (reg.users[t.from] || {}).name || t.from, toName: (reg.users[t.to] || {}).name || t.to }; }
@@ -273,6 +285,134 @@ export async function handleCollection(req, ctx) {
       }, null);
       if (err) return fail(err[0], err[1]);
       return json({ ok: true, trade: tradeView(out, r.value), me: meView(r.value, me) });
+    }
+  }
+  // ---- 0.21.81 Skin-Börse: Skins anbieten und Gebote einholen (Skins, Geld, Personal, Flugzeuge, Slots aus einem gemeinsamen Spiel) ----
+  const skinName = (s) => { const k = SKINS.SKIN_BY_ID[s]; return k ? `${k.name} (${SKINS.MODEL_BY_ID[k.model].name})` : s; };
+  const skinsTxt = (arr) => Object.entries(count(arr)).map(([s, n]) => `${n > 1 ? n + '× ' : ''}${skinName(s)}`).join(', ');
+  const tradeBlocked = async () => { const fs3 = ctx.fairState ? await ctx.fairState() : null, b3 = fs3 && fs3.blk && fs3.blk.trade; return b3 && b3.until > Date.now() && !isAdmin(user) ? fail(403, `Die Luftfahrtaufsicht hat Handel und Tausch für Ihr Konto bis ${new Date(b3.until).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} Uhr gesperrt.`) : null; };
+  const expire = (reg) => { const now = Date.now(); let ch = false;   // abgelaufene Angebote schließen, Bietende benachrichtigen, alte ausdünnen
+    for (const l of Object.values(reg.lists || {})) if (l.status === 'open' && l.until <= now) { l.status = 'expired'; l.closed = now; ch = true;
+      for (const b of Object.values(l.bids || {})) if (b.status === 'open') { b.status = 'lost'; note(userOf(reg, b.by), `Das Angebot ${skinsTxt(l.skins)} von ${(reg.users[l.from] || {}).name || l.from} ist abgelaufen – Ihr Gebot ist frei.`, 'info'); }
+      note(userOf(reg, l.from), `Ihr Angebot ${skinsTxt(l.skins)} ist abgelaufen${Object.keys(l.bids || {}).length ? ' – kein Gebot angenommen' : ''}.`, 'info'); }
+    const closed = Object.values(reg.lists || {}).filter((x) => !listLive(x)).sort((a, b) => (b.closed || 0) - (a.closed || 0));
+    for (const x of closed.slice(LIST.keep)) { delete reg.lists[x.id]; ch = true; }
+    return ch; };
+  const listView = (l, reg) => { const mine = l.from === me, nm = (k) => (reg.users[k] || {}).name || k;
+    const bids = Object.values(l.bids || {}).filter((b) => mine || b.by === me).sort((a, b) => b.created - a.created).map((b) => ({ ...b, byName: nm(b.by) }));
+    return { id: l.id, from: l.from, fromName: nm(l.from), skins: l.skins, note: l.note || '', status: l.status, created: l.created, until: l.until, closed: l.closed || null, winner: l.winner || null,
+      nBids: Object.values(l.bids || {}).filter((b) => b.status === 'open').length, bids, mine }; };
+  if (path === '/coll/market' && method === 'GET') {
+    const r = await updateJson(store, KEY.reg, (reg) => { reg = reg || emptyReg(); reg.lists = reg.lists || {}; return expire(reg) ? reg : undefined; }, null);
+    const reg = r.value || emptyReg(), all = Object.values(reg.lists || {}), game = String(url.searchParams.get('game') || '');
+    const meta = game ? await loadMeta(store, game) : null, inGame = new Set(meta ? meta.players.map((p) => p.u) : []);
+    const open = all.filter((l) => listLive(l)).sort((a, b) => a.until - b.until).map((l) => ({ ...listView(l, reg), sameGame: inGame.has(l.from) && inGame.has(me) }));
+    const hist = all.filter((l) => !listLive(l) && (l.from === me || Object.values(l.bids || {}).some((b) => b.by === me))).sort((a, b) => (b.closed || 0) - (a.closed || 0)).slice(0, 30).map((l) => listView(l, reg));
+    return json({ open, hist, me: meView(reg, me), days: LIST.days });
+  }
+  if (path === '/coll/list' && method === 'POST') {
+    const blk = await tradeBlocked(); if (blk) return blk;
+    const b = await readJson(req), skins = (Array.isArray(b.skins) ? b.skins : []).map(String).slice(0, LIST.maxSkins), days = LIST.days.includes(Number(b.days)) ? Number(b.days) : 7;
+    const noteTxt = String(b.note || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, 160);
+    if (!skins.length) return fail(400, 'Bitte mindestens einen Skin wählen.');
+    if (skins.some((s) => !SKINS.SKIN_BY_ID[s] || !SKINS.SKIN_BY_ID[s].isTradable)) return fail(400, 'Unbekannter oder nicht tauschbarer Skin.');
+    let err = null, made = null;
+    await updateJson(store, KEY.reg, (reg) => {
+      reg = reg || emptyReg(); reg.lists = reg.lists || {}; expire(reg); userOf(reg, me, user.name);
+      if (Object.values(reg.lists).filter((l) => l.from === me && listLive(l)).length >= LIST.maxOpen) { err = `Höchstens ${LIST.maxOpen} offene Angebote gleichzeitig.`; return undefined; }
+      for (const [s, n] of Object.entries(count(skins))) if (freeOf(reg, me, s) < n) { err = `Sie haben nicht genug freie Exemplare von ${skinName(s)} – auf Flugzeugen aktiv oder schon angeboten.`; return undefined; }
+      made = { id: randomUUID().slice(0, 12), from: me, skins, note: noteTxt, status: 'open', created: Date.now(), until: Date.now() + days * 864e5, bids: {} };
+      reg.lists[made.id] = made; return reg;
+    }, null);
+    if (err) return fail(409, err);
+    return json({ ok: true, list: made });
+  }
+  { const p = parts(path);
+    if (p[0] === 'coll' && p[1] === 'list' && p[2] && method === 'POST' && ['cancel', 'bid', 'withdraw', 'accept'].includes(p[3])) {
+      const id = p[2], act = p[3];
+      if (act === 'bid' || act === 'accept') { const blk = await tradeBlocked(); if (blk) return blk; }
+      const b = await readJson(req);
+      if (act === 'cancel' || act === 'withdraw') {
+        let err = null;
+        const r = await updateJson(store, KEY.reg, (reg) => {
+          reg = reg || emptyReg(); reg.lists = reg.lists || {}; expire(reg); const l = reg.lists[id];
+          if (!l) { err = [404, 'Angebot nicht gefunden.']; return undefined; }
+          if (l.status !== 'open') { err = [409, 'Dieses Angebot ist nicht mehr offen.']; return undefined; }
+          if (act === 'cancel') { if (l.from !== me) { err = [403, 'Nur wer anbietet, kann zurückziehen.']; return undefined; }
+            l.status = 'cancelled'; l.closed = Date.now();
+            for (const x of Object.values(l.bids)) if (x.status === 'open') { x.status = 'lost'; note(userOf(reg, x.by), `${user.name} hat das Angebot ${skinsTxt(l.skins)} zurückgezogen – Ihr Gebot ist frei.`, 'info'); } }
+          else { const x = Object.values(l.bids).find((y) => y.by === me && y.status === 'open'); if (!x) { err = [404, 'Kein offenes Gebot von Ihnen.']; return undefined; } x.status = 'withdrawn'; x.closed = Date.now(); }
+          return reg; }, null);
+        if (err) return fail(err[0], err[1]);
+        return json({ ok: true, me: meView(r.value, me) });
+      }
+      if (act === 'bid') {
+        const skins = (Array.isArray(b.skins) ? b.skins : []).map(String).slice(0, LIST.maxBidSkins), items = SM.skinDealItems(b.items), game = String(b.game || '');
+        const noteTxt = String(b.note || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, 160);
+        if (!skins.length && !items.length) return fail(400, 'Das Gebot ist leer.');
+        if (skins.some((s) => !SKINS.SKIN_BY_ID[s] || !SKINS.SKIN_BY_ID[s].isTradable)) return fail(400, 'Unbekannter oder nicht tauschbarer Skin.');
+        const reg0 = (await store.get(KEY.reg, { type: 'json' })) || emptyReg(), l0 = (reg0.lists || {})[id];
+        if (!l0 || l0.status !== 'open' || l0.until <= Date.now()) return fail(409, 'Dieses Angebot ist nicht mehr offen.');
+        if (l0.from === me) return fail(400, 'Auf eigene Angebote kann man nicht bieten.');
+        let txt = '', from = null, to = null, gName = null;
+        if (items.length) {   // Gegenleistung im Spiel: beide brauchen dort eine Airline, und sie muss jetzt verfügbar sein
+          const meta = game ? await loadMeta(store, game) : null, pa = meta && meta.players.find((x) => x.u === me), pb = meta && meta.players.find((x) => x.u === l0.from);
+          if (!pa || !pb) return fail(400, 'Geld, Personal, Flugzeuge und Slots gehen nur in einem Spiel, in dem Sie beide eine Airline haben.');
+          const w = await ctx.readWorld(game), chk = SM.skinDeal(w, pa.airlineId, pb.airlineId, items, '', true);
+          if (!chk.ok) return fail(409, chk.msg); txt = chk.txt; from = pa.airlineId; to = pb.airlineId; gName = meta.main ? 'Hauptwelt' : meta.name;
+        }
+        let err = null, made = null;
+        const r = await updateJson(store, KEY.reg, (reg) => {
+          reg = reg || emptyReg(); reg.lists = reg.lists || {}; expire(reg); userOf(reg, me, user.name); const l = reg.lists[id];
+          if (!l || l.status !== 'open') { err = [409, 'Dieses Angebot ist nicht mehr offen.']; return undefined; }
+          const old = Object.values(l.bids).find((y) => y.by === me && y.status === 'open');
+          for (const [s, n] of Object.entries(count(skins))) if (freeOf(reg, me, s, old ? old.id : null) < n) { err = [409, `Sie haben nicht genug freie Exemplare von ${skinName(s)}.`]; return undefined; }
+          if (old) { old.status = 'withdrawn'; old.closed = Date.now(); }   // neues Gebot ersetzt das alte
+          made = { id: randomUUID().slice(0, 10), by: me, skins, items, txt, game: items.length ? game : null, gameName: gName, from, to, note: noteTxt, status: 'open', created: Date.now() };
+          l.bids[made.id] = made;
+          note(userOf(reg, l.from), `${user.name} bietet für ${skinsTxt(l.skins)}: ${[skinsTxt(skins), txt].filter(Boolean).join(' + ')}.`, 'info');
+          return reg; }, null);
+        if (err) return fail(err[0], err[1]);
+        return json({ ok: true, bid: made, me: meView(r.value, me) });
+      }
+      // annehmen: 1. Angebot sperren und alles prüfen, 2. Gegenleistung im Spiel übertragen, 3. Skins übertragen
+      const bidId = String(b.bid || ''); let err = null, bid = null, lst = null;
+      await updateJson(store, KEY.reg, (reg) => {
+        reg = reg || emptyReg(); reg.lists = reg.lists || {}; expire(reg); const l = reg.lists[id];
+        if (!l) { err = [404, 'Angebot nicht gefunden.']; return undefined; }
+        if (l.from !== me) { err = [403, 'Nur wer anbietet, kann ein Gebot annehmen.']; return undefined; }
+        const x = l.bids[bidId];
+        if (l.status === 'settling' && l.settle && l.settle.bid === bidId) { bid = x; lst = l; return undefined; }   // Wiederholung nach Abbruch
+        if (l.status !== 'open') { err = [409, 'Dieses Angebot ist nicht mehr offen.']; return undefined; }
+        if (!x || x.status !== 'open') { err = [409, 'Dieses Gebot ist nicht mehr offen.']; return undefined; }
+        for (const [s, n] of Object.entries(count(l.skins))) if (freeOf(reg, me, s, l.id) < n) { err = [409, 'Sie besitzen die angebotenen Skins nicht mehr frei.']; return undefined; }
+        for (const [s, n] of Object.entries(count(x.skins))) if (freeOf(reg, x.by, s, x.id) < n) { x.status = 'void'; x.closed = Date.now(); err = [409, `${(reg.users[x.by] || {}).name || x.by} besitzt die gebotenen Skins nicht mehr frei – das Gebot ist hinfällig.`]; return reg; }
+        l.status = 'settling'; l.settle = { bid: bidId, at: Date.now(), paid: !x.items.length }; bid = x; lst = l; return reg; }, null);
+      if (err) return fail(err[0], err[1]);
+      if (!lst.settle.paid) {
+        let res = null;
+        try { const r = await ctx.mutateGame(bid.game, (w) => SM.skinDeal(w, bid.from, bid.to, bid.items, skinsTxt(lst.skins))); res = r.result || { ok: false, msg: 'Nicht möglich.' }; }
+        catch (e) { res = { ok: false, msg: e.message || 'Spiel gerade beschäftigt.' }; }
+        if (!res.ok) {   // Gegenleistung nicht verfügbar: Gebot hinfällig, Angebot wieder offen
+          await updateJson(store, KEY.reg, (reg) => { const l = reg.lists[id]; if (!l || l.status !== 'settling') return undefined; l.status = 'open'; delete l.settle; const x = l.bids[bidId]; if (x) { x.status = 'void'; x.closed = Date.now(); note(userOf(reg, x.by), `Ihr Gebot für ${skinsTxt(l.skins)} ist hinfällig: ${res.msg}`, 'bad'); } return reg; }, null);
+          return fail(409, `Gebot hinfällig: ${res.msg}`);
+        }
+        await updateJson(store, KEY.reg, (reg) => { const l = reg.lists[id]; if (!l || !l.settle) return undefined; l.settle.paid = true; return reg; }, null);
+      }
+      let out = null;
+      const r = await updateJson(store, KEY.reg, (reg) => {
+        const l = reg.lists[id]; if (!l || l.status !== 'settling') return undefined;
+        const x = l.bids[bidId], A = userOf(reg, l.from), B = userOf(reg, x.by);
+        for (const s of l.skins) { A.inv[s]--; B.inv[s] = (B.inv[s] || 0) + 1; }
+        for (const s of x.skins) { B.inv[s]--; A.inv[s] = (A.inv[s] || 0) + 1; }
+        for (const U of [A, B]) for (const s of Object.keys(U.inv)) if (U.inv[s] <= 0) delete U.inv[s];
+        l.status = 'done'; l.closed = Date.now(); l.winner = bidId; delete l.settle; x.status = 'won'; x.closed = l.closed;
+        for (const y of Object.values(l.bids)) if (y.status === 'open') { y.status = 'lost'; y.closed = l.closed; note(userOf(reg, y.by), `${A.name} hat für ${skinsTxt(l.skins)} ein anderes Gebot angenommen – Ihr Gebot ist frei.`, 'info'); }
+        reg.stats.trades++; milestones(A); milestones(B);
+        note(B, `${A.name} hat Ihr Gebot angenommen: ${skinsTxt(l.skins)} gehört jetzt Ihnen${x.txt ? ` (Sie haben ${x.txt} gegeben)` : ''}.`, 'good');
+        out = listView(l, reg); return reg; }, null);
+      if (!out) return fail(409, 'Gerade viel Betrieb, bitte noch einmal „Annehmen“ drücken – bezahlt ist schon, die Skins folgen.');
+      return json({ ok: true, list: out, me: meView(r.value, me) });
     }
   }
   // ---- Admin: kostenlose Packs, Protokoll, Statistik ----

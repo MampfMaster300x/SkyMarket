@@ -10,9 +10,11 @@ import fs from 'node:fs';
 
 const store = memStore();
 const jar = {};
+let fpSeq = 0;
 async function call(who, method, path, body) {
   const headers = { 'content-type': 'application/json' };
   if (jar[who]) headers.cookie = jar[who];
+  if (body && /\/action$/.test(path) && !('fp' in body)) body = { ...body, fp: { gap: 400, tr: 1, ut: 0, g: ++fpSeq, vis: 1 } };   // wie die Spieloberfläche: Bedien-Nachweis mitschicken
   const r = await handle(new Request('http://localhost/api' + path, { method, headers, body: body ? JSON.stringify(body) : undefined }), { store });
   const sc = r.headers.get('set-cookie'); if (sc) jar[who] = sc.split(';')[0];
   const ct = r.headers.get('content-type') || '';
@@ -1865,6 +1867,117 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   ok(await call('anna', 'POST', '/fair/seen', {}), 'gelesen');
   const s7 = ok(await SX('suspend', { scope: 'pack', minutes: 7 }), 'Packs 7 Minuten'); assert.ok(/7 Minuten/.test(s7.msg), s7.msg); ok(await SX('unsuspend', { scope: 'pack' }), 'Packs frei');
   console.log(`0.21.80 ok: Agenten-Spuren – Mensch ${hs.score}, Agent ${as.score} (${ks.join(', ')}), Tippen, Denkpausen, Herkunft US statt DE; Sperren mit freier Dauer, nur Chat, nur Handel & Börse`); }
+// 0.21.81 Skin-Börse: Skins anbieten ohne feste Gegenleistung, Gebote mit Skins, Geld, Personal, Flugzeugen, Slots; Annahme überträgt im Spiel und in der Sammlung
+{ const SK = (await import('../shared/skins.cjs')).default, SMx = (await import('../shared/engine.cjs')).default;
+  const loadW = async () => SMx.deserialize(JSON.parse(gunzipSync(Buffer.from((await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' })).data)).toString()));
+  const tr = SK.SKINS.filter((x) => x.isTradable), A1 = tr[3].id, A2 = tr[7].id, B1 = tr[11].id;
+  { const rg = await store.get('coll/registry', { type: 'json' }); for (const k of ['anna', 'ben']) rg.users[k] = rg.users[k] || { name: k, inv: {}, packs: [], opened: [], active: {}, notes: [], ms: [], openedTotal: 0 };
+    for (const k of ['anna', 'ben']) { rg.users[k].active = {}; rg.users[k].inv = {}; } rg.users.anna.inv[A1] = 1; rg.users.anna.inv[A2] = 1; rg.users.ben.inv[B1] = 1; rg.trades = {}; rg.lists = {}; await store.setJSON('coll/registry', rg); }
+  const L1 = ok(await call('anna', 'POST', '/coll/list', { skins: [A1], note: 'suche Piloten', days: 3 }), 'anbieten').list;
+  assert.ok(L1.until > Date.now() + 2.9 * 864e5 && L1.until < Date.now() + 3.1 * 864e5, '3 Tage');
+  assert.equal((await call('anna', 'POST', '/coll/list', { skins: [A1] })).status, 409, 'angebotener Skin ist reserviert');
+  const mk0 = ok(await call('ben', 'GET', '/coll/market?game=main'), 'Börse'); const v0 = mk0.open.find((l) => l.id === L1.id);
+  assert.ok(v0 && !v0.mine && v0.sameGame && v0.fromName && v0.note === 'suche Piloten' && v0.bids.length === 0, 'Ben sieht das Angebot, gemeinsames Spiel');
+  assert.equal((await call('anna', 'POST', `/coll/list/${L1.id}/bid`, { skins: [A2] })).status, 400, 'nicht auf eigenes Angebot');
+  const w0 = await loadW(), alA = w0.humans.find((h) => h.owner === 'anna' && h.status !== 'insolvent'), alB = w0.humans.find((h) => h.owner === 'ben' && h.status !== 'insolvent');
+  const cashA0 = alA.ledger.cash, cashB0 = alB.ledger.cash, pg = Object.keys(alB.staff.pil).find((g) => alB.staff.pil[g] >= 2) || null;
+  assert.equal((await call('ben', 'POST', `/coll/list/${L1.id}/bid`, { skins: [], items: [{ k: 'cash', amount: 4e8 }], game: 'main' })).status, 409, 'nicht genug Geld: schon beim Bieten abgelehnt');
+  assert.equal((await call('ben', 'POST', `/coll/list/${L1.id}/bid`, { skins: [], items: [{ k: 'cash', amount: 1e6 }], game: 'gibtsnicht' })).status, 400, 'Geld nur in einem gemeinsamen Spiel');
+  ok(await call('ben', 'POST', `/coll/list/${L1.id}/bid`, { skins: [B1], items: [], note: 'nur Skin' }), 'erstes Gebot');
+  const items = [{ k: 'cash', amount: 1500000 }, ...(pg ? [{ k: 'staff', role: 'pilot', group: pg, n: 2 }] : [])];
+  const b2 = ok(await call('ben', 'POST', `/coll/list/${L1.id}/bid`, { skins: [B1], items, game: 'main', note: 'besser' }), 'Gebot ersetzt').bid;
+  assert.ok(/1\.500\.000 EUR/.test(b2.txt) && b2.gameName === 'Hauptwelt' && (!pg || /2 Piloten/.test(b2.txt)), 'Gebot mit Text: ' + b2.txt);
+  const mkA = ok(await call('anna', 'GET', '/coll/market?game=main'), 'Börse Anna'), vA = mkA.open.find((l) => l.id === L1.id);
+  assert.ok(vA.mine && vA.nBids === 1 && vA.bids.length === 2 && vA.bids.some((x) => x.status === 'withdrawn'), 'Anna sieht das aktuelle und das ersetzte Gebot');
+  assert.ok(ok(await call('anna', 'GET', '/coll'), 'me').me.notes.some((n) => /bietet für/.test(n.msg)), 'Anna wird benachrichtigt');
+  assert.equal((await call('ben', 'POST', '/coll/trade', { to: 'cleo', give: [B1], want: [] })).status, 409, 'gebotener Skin ist reserviert');
+  assert.equal((await call('ben', 'POST', `/coll/list/${L1.id}/accept`, { bid: b2.id })).status, 403, 'nur die Anbieterin nimmt an');
+  const ac = ok(await call('anna', 'POST', `/coll/list/${L1.id}/accept`, { bid: b2.id }), 'annehmen'); assert.equal(ac.list.status, 'done');
+  const rg = await store.get('coll/registry', { type: 'json' });
+  assert.ok(rg.users.ben.inv[A1] === 1 && rg.users.anna.inv[B1] === 1 && !rg.users.anna.inv[A1] && !rg.users.ben.inv[B1], 'Skins getauscht');
+  const w1 = await loadW(), a1 = w1.airlines[alA.id], b1 = w1.airlines[alB.id];
+  assert.ok(Math.abs((a1.ledger.cash - cashA0) - 1500000 * 100) < 1e4 * 100 && Math.abs((cashB0 - b1.ledger.cash) - 1500000 * 100) < 1e4 * 100, 'Geld von Bens an Annas Airline');
+  if (pg) assert.ok(b1.staff.pil[pg] === alB.staff.pil[pg] - 2 && a1.staff.pil[pg] === alA.staff.pil[pg] + 2, 'Piloten gewechselt');
+  assert.ok(a1.events.some((e) => /Skin-Börse: Ben/.test(e.msg) || /Skin-Börse: .* gibt Ihnen/.test(e.msg)) && b1.events.some((e) => /Skin-Börse: Sie geben/.test(e.msg)), 'Logbuch beider Airlines');
+  assert.ok(rg.users.ben.notes.some((n) => /hat Ihr Gebot angenommen/.test(n.msg)), 'Ben wird benachrichtigt');
+  // Ablauf: abgelaufene Angebote schließen, Gebote werden frei
+  const L2 = ok(await call('ben', 'POST', '/coll/list', { skins: [A1], days: 1 }), 'Ben bietet an').list;
+  ok(await call('anna', 'POST', `/coll/list/${L2.id}/bid`, { skins: [B1] }), 'Anna bietet');
+  { const r2 = await store.get('coll/registry', { type: 'json' }); r2.lists[L2.id].until = Date.now() - 1000; await store.setJSON('coll/registry', r2); }
+  const mk2 = ok(await call('anna', 'GET', '/coll/market'), 'Börse'); assert.ok(!mk2.open.some((l) => l.id === L2.id) && mk2.hist.some((l) => l.id === L2.id && l.status === 'expired'), 'abgelaufen');
+  assert.ok(!(mk2.me.reserved || {})[B1], 'Annas Gebot-Skin ist wieder frei');
+  // Teilsperre Handel gilt auch hier
+  const L3 = ok(await call('anna', 'POST', '/coll/list', { skins: [B1], days: 1 }), 'Anna bietet an').list;
+  ok(await call('ben', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: { gap: 300, tr: 1, ut: 0, g: 1, vis: 1 } }), 'Ben spielt');
+  ok(await call('tim', 'POST', '/admin/fairplay', { key: 'ben', cmd: 'sanction', kind: 'suspend', scope: 'trade', minutes: 10 }), 'Ben: Handel gesperrt');
+  assert.equal((await call('ben', 'POST', `/coll/list/${L3.id}/bid`, { skins: [A1] })).status, 403, 'gesperrt: kein Gebot');
+  ok(await call('tim', 'POST', '/admin/fairplay', { key: 'ben', cmd: 'sanction', kind: 'unsuspend', scope: 'trade' }), 'frei');
+  ok(await call('anna', 'POST', `/coll/list/${L3.id}/cancel`, {}), 'zurückziehen');
+  // Engine: Personal, Flugzeuge und Slots wandern ohne Wertprüfung, alles oder nichts
+  { SMx.setFuelX(0); const w = SMx.newWorld({ seed: 81 }), X = SMx.addHuman(w, { id: 'P1', name: 'Xa', code: 'XA', base: 'HAJ' }), Y = SMx.addHuman(w, { id: 'P2', name: 'Yb', code: 'YB', base: 'MUC' });
+    X.ledger.equityFlow(5e8, 't'); SMx.applyAction(w, 'P1', { type: 'acquire', typeId: 'A320', base: 'HAJ', mode: 'buy' }); while (w.day <= X.fleet[0].delivery_day) w.step();
+    const grp = Object.keys(X.staff.pil)[0]; X.staff.pil[grp] = 6; X.hold('HAJ', 2, 0, true); const acId = X.fleet[0].id, nY = Y.fleet.length;
+    const it = [{ k: 'ac', id: acId }, { k: 'staff', role: 'pilot', group: grp, n: 4 }, { k: 'slots', apt: 'HAJ', n: 1 }, { k: 'cash', amount: 3e7 }];
+    const chk = SMx.skinDeal(w, 'P1', 'P2', it, 'Test', true); assert.ok(chk.ok && /A320/.test(chk.txt) && /4 Piloten/.test(chk.txt) && /1 Slot in HAJ/.test(chk.txt), 'Prüfung: ' + chk.txt);
+    assert.equal(SMx.skinDeal(w, 'P1', 'P2', [{ k: 'staff', role: 'pilot', group: grp, n: 99 }], 'x').ok, false, 'zu wenig Personal: nichts passiert');
+    const r = SMx.skinDeal(w, 'P1', 'P2', it, '„Testskin“'); assert.ok(r.ok, r.msg);
+    assert.ok(Y.fleet.length === nY + 1 && !X.fleet.some((a) => a.id === acId) && X.staff.pil[grp] === 2 && Y.staff.pil[grp] >= 4 && Y.heldAt('HAJ', w.day) >= 1, 'Flugzeug, Piloten, Slot gewechselt');
+    assert.ok(Y.events.some((e) => /Skin-Börse: Xa gibt Ihnen .* – für „Testskin“/.test(e.msg)), 'Logbuch'); }
+  console.log(`0.21.81 ok: Skin-Börse – anbieten, Gebot ersetzen, Annahme überträgt Skins und ${b2.txt} in der Hauptwelt, Ablauf, Reservierung, Handelssperre`); }
+// 0.21.82: Ereignisse der Spielleitung für einzelne Airlines – Flugunfall, Skandale, Streik, IT, Krankheit, Triebwerksschäden; im Spiel wie gewöhnliche Ereignisse
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 82 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAJ' }), b = SMx.addHuman(w, { id: 'P2', name: 'Beta', code: 'BB', base: 'MUC' }); w.playerId = 'P1';
+  a.ledger.equityFlow(5e8, 't'); for (let i = 0; i < 4; i++) SMx.applyAction(w, 'P1', { type: 'acquire', typeId: 'A320', base: 'HAJ', mode: i ? 'lease' : 'buy' });
+  while (w.day <= Math.max(...a.fleet.map((x) => x.delivery_day))) w.step();
+  const dest = SMx.AP_CODES.find((c) => c !== 'HAJ' && SMx.gcDistanceKm('HAJ', c) > 400 && SMx.gcDistanceKm('HAJ', c) < 900 && SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HAJ', dest: c, typeId: 'A320', freq: 2 }).ok);
+  for (let i = 0; i < 10; i++) w.step();
+  const rng0 = JSON.stringify(w.rng), eq0 = SMx.balanceSheet(a).equity, st0 = SMx.standingOf(a, w.day).v, br0 = a.brand, own = a.fleet.find((x) => x.owned), n0 = a.fleet.length, ex0 = w.offerExtra(a, 'HAJ', dest).brand;
+  assert.equal(SMx.adminIncident(w, 'P1', { kind: 'gibtsnicht' }).ok, false); assert.equal(SMx.adminIncident(w, 'XX', { kind: 'crash' }).ok, false);
+  const cr = SMx.adminIncident(w, 'P1', { kind: 'crash', sev: 2, acId: own.id }); assert.ok(cr.ok, cr.msg);
+  assert.ok(a.fleet.length === n0 - 1 && !a.fleet.includes(own), 'Flugzeug verloren');
+  assert.ok(a.fleet.filter((x) => x.type_id === own.type_id).every((x) => x.status === 'aog' && x.until === w.day + 10), 'gleiches Muster 10 Tage am Boden');
+  assert.ok(SMx.balanceSheet(a).equity < eq0 - 5e6 && a.brand < br0 && SMx.standingOf(a, w.day).v < st0, 'Geld, Marke und Ansehen leiden');
+  assert.ok(w.trustMalus(a) > 0.25 && w.offerExtra(a, 'HAJ', dest).brand < ex0 - 0.2 && w.trustMalus(b) === 0, 'Vertrauenskrise nur bei Alpha');
+  const log = a.events.slice(-1)[0].msg; assert.ok(/^Flugunfall: Ihre .* Totalverlust/.test(log) && !/Spielleitung|Admin/.test(log), 'Logbuch wie ein normales Ereignis: ' + log);
+  assert.ok(w.news.some((n) => /Flugunfall: Eine .* von Alpha/.test(n.msg)), 'Nachricht für alle');
+  assert.equal(JSON.stringify(w.rng), rng0, 'Weltzufall unberührt');
+  for (const k of ['maint', 'bribe', 'data', 'books', 'strike', 'it', 'sick', 'aog']) { const r = SMx.adminIncident(w, 'P1', { kind: k, sev: 1 }); assert.ok(r.ok, k + ': ' + r.msg); }
+  assert.ok(a.decisions.some((d) => d.type === 'strike') && w.events.some((e) => e.type === 'it_outage' && e.airline === 'P1') && w.events.some((e) => e.type === 'sickness' && e.airline === 'P1'), 'Streik mit Entscheidung, IT, Krankheit');
+  assert.ok((a.incidents || []).length === 4 && SMx.standingOf(a, w.day).parts.find((p) => p[0] === 'Zuverlässigkeit')[3].includes('Flugunfall in Untersuchung'), 'Ansehen nennt die Vorfälle');
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.equal(w2.airlines.P1.incidents.length, 4, 'Vorfälle gespeichert');
+  const tr = w.events.find((e) => e.type === 'trust' && /Flugunfall/.test(e.text)); assert.ok(w.cancelEvent(tr.id, 'x').ok);
+  assert.ok(a.fleet.filter((x) => x.grounded === tr.id).every((x) => x.until <= w.day) && a.events.slice(-1)[0].msg.includes('Untersuchung ist abgeschlossen'), 'Annullieren beendet Stilllegung und Krise – als Entwarnung');
+  for (let i = 0; i < 200; i++) w.step(); assert.equal(w.trustMalus(a), 0, 'Krisen enden'); assert.ok(SMx.standingOf(a, w.day).v > 0);
+  // Server: nur Admins/Spielleitung; Hauptwelt
+  const st = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung'); const pA = st.players.find((p) => p.u === 'anna');
+  assert.ok(st.fleets && Array.isArray(st.fleets[pA.airlineId]), 'Flotten für die Auswahl');
+  assert.equal((await call('ben', 'POST', '/games/main/admin', { cmd: 'incident', airlineId: pA.airlineId, kind: 'it', sev: 1 })).status, 403, 'nur Admins');
+  const ri = ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'incident', airlineId: pA.airlineId, kind: 'it', sev: 2 }), 'IT-Ausfall für Anna'); assert.ok(/IT-Ausfall 3 Tage/.test(ri.msg), ri.msg);
+  assert.equal((await call('tim', 'POST', '/games/main/admin', { cmd: 'incident', airlineId: pA.airlineId, kind: 'quatsch' })).status, 400);
+  console.log(`0.21.82 ok: Ereignisse für einzelne Airlines – Flugunfall (${cr.msg.split('–')[1].trim().slice(0, 80)} …), Skandale, Streik, IT, Krankheit, Triebwerke; wie normale Ereignisse, annullierbar`); }
+// 0.21.83: Investitionen über 10 Mio. € muss man bestätigen – Probelauf auf einer Kopie (Konto + neue Kredite), Welt bleibt unberührt
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 83 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAJ' }); a.ledger.equityFlow(5e8, 't');
+  assert.equal(SMx.P.INVEST_CONFIRM, 10e6, 'Schwelle 10 Mio. €');
+  const cash0 = a.ledger.cash, buy = SMx.investCost(w, 'P1', { type: 'acquire', typeId: 'A320', base: 'HAJ', mode: 'buy' });
+  assert.ok(buy.ok && buy.cost > 10e6 && a.fleet.length === 0 && a.ledger.cash === cash0, 'Kauf A320 über 10 Mio. (Konto + Kredit), Welt unverändert: ' + Math.round(buy.cost));
+  const lease = SMx.investCost(w, 'P1', { type: 'acquire', typeId: 'A320', base: 'HAJ', mode: 'lease' }); assert.ok(lease.ok && lease.cost < 10e6, 'Leasing nur mit Kaution');
+  assert.equal(SMx.investCost(w, 'P1', { type: 'setColor', color: 3 }).cost, 0, 'keine Investition'); assert.equal(SMx.investCost(w, 'P1', { type: 'loan', amount: 3e7 }).cost, 0, 'Kredit aufnehmen ist keine Investition');
+  const kit = SMx.investCost(w, 'P1', [{ type: 'acquire', typeId: 'DH8D', base: 'HAJ', mode: 'buy' }, { type: 'acquire', typeId: 'DH8D', base: 'HAJ', mode: 'buy' }]);
+  const one = SMx.investCost(w, 'P1', { type: 'acquire', typeId: 'DH8D', base: 'HAJ', mode: 'buy' }); assert.ok(Math.abs(kit.cost - 2 * one.cost) < 0.05 * kit.cost, 'Folge von Aktionen zählt zusammen');
+  assert.equal(SMx.investCost(w, 'P1', { type: 'acquire', typeId: 'GIBTSNICHT', base: 'HAJ', mode: 'buy' }).ok, false, 'ungültig: keine Nachfrage, normale Fehlermeldung');
+  const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.ok(/if \(!ui\.investOk && P\.INVEST_CONFIRM\)/.test(src) && /function investGate/.test(src) && /Kauf bestätigen · /.test(src) && /SM\.investCost\(W, W\.playerId, acts\)/.test(src), 'Spiel fragt bei doAction und bei der Streckeneröffnung nach');
+  console.log(`0.21.83 ok: Bestätigung ab 10 Mio. € – A320-Kauf ${Math.round(buy.cost / 1e5) / 10} Mio., Leasing ${Math.round(lease.cost / 1e5) / 10} Mio., Paket zusammen`); }
+// 0.21.84: Aktionen ohne Bedien-Nachweis (direkt über die Schnittstelle) werden abgewiesen und zählen sofort stark; spieleigene Klicks sind keine Skript-Klicks
+{ const before = (await store.get('fair/ben', { type: 'json' })) || { sig: {} };
+  for (let i = 0; i < 4; i++) { const r = await call('ben', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: null }); assert.ok(r.status === 400 && /Spieloberfläche/.test(r.data.error), 'abgewiesen'); }
+  const fb = await store.get('fair/ben', { type: 'json' }); assert.ok((fb.sig.api || 0) - (before.sig.api || 0) === 4, 'trotzdem als Beleg erfasst');
+  const sc = fairScore(fb), api = sc.reasons.find((r) => r.k === 'api'); assert.ok(api && api.w >= 45, 'Schnittstelle zählt stark: ' + JSON.stringify(api));
+  const mix = fairNew('m', 'Mix', Date.UTC(2026, 10, 12)); for (let i = 0; i < 5; i++) fairRecord(mix, { now: Date.UTC(2026, 10, 12) + i * 4000, game: 'main', fp: null }); for (let i = 0; i < 200; i++) fairRecord(mix, { now: Date.UTC(2026, 10, 12) + 1e5 + i * 7000 + (i % 7) * 900, game: 'main', fp: { gap: 300, tr: 1, ut: 0, g: i, vis: 1 } });
+  assert.ok(fairScore(mix).reasons.find((r) => r.k === 'api').w >= 45, 'verdünnt sich nicht durch spätere normale Aktionen');
+  const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'); assert.ok(src.split('.click()').length === 2 && /selfClick\(first\)/.test(src), 'eigene Klicks nur über selfClick');
+  console.log(`0.21.84 ok: Schnittstelle abgewiesen und mit ${api.w} Punkten bewertet, verdünnt sich nicht; spieleigene Klicks zählen nicht`); }
 // 0.21.79: Pack-Verläufe mit eigener ID je Pack (gleiche IDs ließen die Tüte durchsichtig werden, sobald ein verstecktes Pack zuerst im Dokument stand)
 { const src = fs.readFileSync(new URL('../src/collection.js', import.meta.url), 'utf8'), i = src.indexOf('const packSvg = '), body = src.slice(i, src.indexOf('</svg>`', i));
   assert.ok(i > 0 && !/id="pk[a-z]+"|url\(#pk[a-z]+\)/.test(body), 'keine festen Verlaufs-IDs im Pack'); assert.ok(/'pk' \+ \(\+\+packSeq\)/.test(body) && /url\(#\$\{u\}g\)/.test(body), 'IDs je Pack');
