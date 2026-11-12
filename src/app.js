@@ -2156,7 +2156,8 @@ VIEWS.fleetAcmi = function viewFleetAcmi() {
       ${show.length ? `<div class="stack" style="gap:6px">${show.slice(0, 4).map((a) => { const g = acmiGain(pl, o, a); return `<div class="acmi-c"><span class="small"><b>${acName(a.id)}</b> · ${a.type_id}${a.type_id !== o.type ? ' (Familie)' : ''} · ${acMode(a) === 'charter' ? '<span class="pos">Charter-Pool, frei</span>' : a.used_hours > 0 ? n1(a.used_hours) + ' h/Tag im Linienflug' : '<span class="pos">frei</span>'}<br><span class="muted">${eur(g.rate)}/Tag · netto <b class="${sgn(g.net)}">${eur(g.net, { plus: true })}</b>/Tag${g.lost > 0 ? ' nach entgangenem Streckenbeitrag' : ''} · gesamt ${eur(g.total, { plus: true })}</span></span><button class="btn small primary" data-act="acmi" data-id="${o.id}" data-ac="${a.id}">Verchartern · ${eurB(g.rate * days)}</button></div>`; }).join('')}${show.length > 4 ? `<span class="small muted">und ${show.length - 4} weitere passende Flugzeuge</span>` : ''}</div>`
         : `<span class="small muted">${cands.length ? 'Das gewählte Flugzeug ist in dem Zeitraum nicht frei.' : `Kein Flugzeug der Familie ${esc(P.TYPE_GROUPS[t.group])} in dem Zeitraum frei.`}</span>`}
       <span class="small muted">Angebot gilt bis ${dateShort(o.expires)}</span></div>`;
-  }).join('') : `<p class="small muted">${W.acmiOffers.length ? 'Keine Anfrage passt zu den Filtern.' + (F.fit || F.gap ? ' Tipp: „passt in freie Zeiträume“ ausschalten zeigt alle.' : '') : 'Gerade keine Anfragen. Neue kommen zum Monatswechsel und vor Großereignissen.'}</p>`;
+  }).join('') : W.acmiOffers.length ? `<div class="callout info"><span>Keine der ${W.acmiOffers.length} Anfragen passt zu den Filtern${F.fit || F.gap ? ' – „passt in freie Zeiträume“ zeigt nur Anfragen, die eines Ihrer Flugzeuge im passenden Zeitraum übernehmen kann' : ''}.</span><button class="btn small" data-act="acfall">Alle ${W.acmiOffers.length} Anfragen zeigen</button></div>`
+    : `<p class="small muted">Gerade keine Anfragen. Neue kommen jede Woche, zum Monatswechsel und vor Großereignissen.</p>`;
   html += '</div>';
   return html;
 };
@@ -2425,6 +2426,43 @@ VIEWS.cargoPlan = function viewCargoPlan() {
   html += `<p class="small muted">Prognose mit der heutigen Konkurrenz. Slotpreise und freie Frachter ändern sich – die Häkchen zeigen den Stand von heute.</p>`;
   return html + '</div>';
 };
+/** 0.21.76: Streckenvorschlag für einen Frachter – sucht über alle eigenen Basen die besten Ziele für sein Muster,
+ * jeweils mit der besten Frequenz, die dieser eine Frachter allein fliegen kann. Andere Basis = vorher verlegen. */
+function cgSuggest(pl, a) {
+  const key = `${W.day}|${a.id}|${a.base}|${pl.bases.join()}|${pl.cgRoutes().length}`;
+  if (ui._cgSug && ui._cgSug.key === key) return ui._cgSug.list;
+  const t = a.type_id, out = [];
+  for (const base of pl.bases) {
+    const cands = SM.AP_CODES.filter((c) => c !== base && SM.rangeOk(base, c, t) && !pl.cgRoutes().some((x) => x.type_id === t && [x.base, x.dest].sort().join() === [base, c].sort().join()))
+      .map((c) => [c, SM.freightDemand(base, c) * SM.freightRef(base, c)]).sort((x, y) => y[1] - x[1]).slice(0, 40);
+    for (const [c] of cands) {
+      let best = null;
+      for (const f of [1, 2, 3, 4, 5, 7, 10, 14, 21, 28]) { if (f > P.FREIGHT.maxWeek) break; const q = W.freightQuote(pl, base, c, t, f, 1); if (q.need > 1) break; if (!best || q.res > best.res + 1) best = q; }
+      if (best && best.res > 0) out.push(best);
+    }
+  }
+  out.sort((x, y) => y.res - x.res);
+  // machbare zuerst (Slots frei oder kaufbar, Flughafen geeignet), dann der Rest – jeweils nach Ergebnis
+  const top = out.slice(0, 30).map((q) => { const c = W.cgCheck(pl, q.base, q.dest, q.typeId, q.freq); q._ok = c.slots.ok && c.apt ? 1 : 0; return q; });
+  top.sort((x, y) => y._ok - x._ok || y.res - x.res); out.splice(0, top.length, ...top);
+  const list = []; const perBase = {};
+  for (const q of out) { if ((perBase[q.base] || 0) >= 3) continue; perBase[q.base] = (perBase[q.base] || 0) + 1; list.push(q); if (list.length >= 6) break; }
+  ui._cgSug = { key, list }; return list;
+}
+function cgSuggestHtml(pl, a) {
+  const t = P.AIRCRAFT_TYPES[a.type_id], list = cgSuggest(pl, a), mv = 12000 * cpi();
+  const rows = list.map((q, i) => { const chk = W.cgCheck(pl, q.base, q.dest, q.typeId, q.freq), here = q.base === a.base;
+    const slotChip = !chk.slots.ok ? `<span class="chip bad">✗ keine Slots frei in ${chk.slots.short.join(' und ')}</span>` : chk.slots.cost > 0 ? `<span class="chip warn">! Slots ${eur(chk.slots.cost)}</span>` : '<span class="chip good">✓ Slots frei</span>';
+    const aptChip = chk.apt ? '' : `<span class="chip bad">✗ ${esc(chk.aptWhy || 'Startbahn zu kurz')}</span>`;
+    const btn = !chk.slots.ok || !chk.apt ? '' : here ? `<button class="btn small${i === 0 ? ' primary' : ''}" data-act="cgopen" data-b="${q.base}" data-v="${q.dest}" data-t="${q.typeId}" data-f="${q.freq}">Eröffnen</button>`
+      : `<button class="btn small${i === 0 ? ' primary' : ''}" data-act="cgsugopen" data-id="${a.id}" data-b="${q.base}" data-v="${q.dest}" data-t="${q.typeId}" data-f="${q.freq}" title="Verlegen kostet ${eur(mv)}">Nach ${q.base} verlegen und eröffnen</button>`;
+    return cgRow(`${q.base} → ${q.dest} <span class="m">${esc(apName(q.dest))}</span>${here ? '' : ` <span class="chip">ab ${q.base} – verlegen</span>`}`, `${n0(q.km)} km · Bedarf ${tKg(2 * q.dem)}/Tag${q.rivals ? ` · Konkurrenz ${q.rivals}` : ' · keine Konkurrenz'}`,
+      [`<b>${q.freq}× pro Woche</b>`, `Fracht ${tKg(2 * q.kg)}/Tag`, `Auslastung ${pct(q.lf)}`, `<b class="${sgn(q.res)}">${eur(q.res, { plus: true })}/Tag</b>`, `<span class="cgreq">${slotChip}${aptChip}</span>`], btn); }).join('');
+  return `<div class="card pad stack cg-sug"><div class="spread"><h3 style="margin:0">Vorschläge für ${esc(acName(a.id))} <small>${esc(t.label)} · ${n0(t.cargo_kg / 1000)} t · ${n0(t.range_km)} km</small></h3><button class="btn small" data-act="cgsug" data-id="${a.id}">Schließen</button></div>
+    <p class="small muted">Über alle Ihre Basen (${pl.bases.join(', ')}): die Ziele, die dieser Frachter allein am besten bedient – je Basis höchstens drei, mit der besten Frequenz für ein Flugzeug. Ab einer anderen Basis wird er vorher verlegt (${eur(mv)}).</p>
+    ${rows ? `<div class="cgl">${rows}</div>` : `<div class="callout warn"><span>Mit der ${esc(t.label)} rechnet sich ab Ihren Basen gerade keine Frachtstrecke – zu wenig Frachtbedarf oder zu viel Konkurrenz. Eine Basis an einem großen Frachtdrehkreuz (FRA, LHR, CDG, AMS, DXB, HKG, MEM, LEJ) hilft.</span></div>`}
+    <div class="row small"><a href="#" data-act="cgfind" data-b="${a.base}" data-t="${a.type_id}">Selbst Ziele ab ${a.base} durchsuchen ›</a></div></div>`;
+}
 VIEWS.cargoFleet = function viewCargoFleet() {
   const pl = W.player, frs = pl.fleet.filter((a) => SM.isFreighter(a.type_id)), qs = pl.cgRoutes();
   let html = `<div class="stack"><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center"><span class="small muted">${frs.length ? `${frs.length} Frachter · ${frs.filter((a) => a.cg).length} auf Frachtstrecken · ${frs.filter((a) => !a.cg && SM.acmiList(a, W.day).length).length} im Charter` : 'Noch keine Frachter in der Flotte.'}</span><button class="btn small primary" data-act="cgbuy">Frachter beschaffen</button></div>`;
@@ -2433,8 +2471,8 @@ VIEWS.cargoFleet = function viewCargoFleet() {
     const t = P.AIRCRAFT_TYPES[a.type_id], q = a.cg && qs.find((x) => x.id === a.cg), ch = SM.acmiList(a, W.day)[0];
     const st = a.delivery_day > W.day ? `<span class="chip">Auslieferung ${dateShort(a.delivery_day)}</span>` : a.status === 'ccheck' ? '<span class="chip warn">C-Check</span>' : a.status === 'aog' ? '<span class="chip bad">am Boden (AOG)</span>' : q ? `<span class="chip cgc">Fracht ${q.base}–${q.dest} · ${q.freq}× pro Woche</span>` : ch ? `<span class="chip">Charter bis ${dateShort(ch.end)}</span>` : '<span class="chip warn">ohne Einsatz</span>';
     const cost = a.owned ? `Eigentum · Buchwert ${eur(a.nbv || 0)}` : `Leasing ${eur((a.leaseMonth || t.lease_month) * 1)} pro Monat`;
-    const act = q ? `<button class="btn small" data-act="tab" data-tab="cargo">Strecke</button>` : !ch && a.delivery_day <= W.day + 30 ? `<button class="btn small primary" data-act="cgfind" data-b="${a.base}" data-t="${a.type_id}">Strecke finden</button>` : '';
-    return cgRow(`${acName(a.id)} <span class="m">${esc(t.label)}</span>`, `Basis ${a.base} · ${n0(t.cargo_kg / 1000)} t · ${cost}`, [st, a.fh ? `${n0(a.fh)} Flugstunden` : ''], act);
+    const act = q ? `<button class="btn small" data-act="tab" data-tab="cargo">Strecke</button>` : !ch && a.delivery_day <= W.day + 30 ? `<button class="btn small primary" data-act="cgsug" data-id="${a.id}" aria-expanded="${ui.cgSugFor === a.id}">${ui.cgSugFor === a.id ? 'Vorschlag schließen' : 'Strecke vorschlagen'}</button>` : '';
+    return cgRow(`${acName(a.id)} <span class="m">${esc(t.label)}</span>`, `Basis ${a.base} · ${n0(t.cargo_kg / 1000)} t · ${cost}`, [st, a.fh ? `${n0(a.fh)} Flugstunden` : ''], act) + (ui.cgSugFor === a.id && !q ? cgSuggestHtml(pl, a) : '');
   }).join('')}</div></div>`;
   return html;
 };
@@ -4576,8 +4614,8 @@ VIEWS.milestones = function viewMilestones() {
   const total = SM.MILESTONES.reduce((s, m) => s + m.pts, 0);
   let html = careerHtml(pl, false) + `<h2 class="sec">Meilensteine <small>${pts(pl)} von ${total} Punkten</small></h2>`;
   if (visHumans().length > 1) {
-    const rank = visHumans().slice().sort((a, b) => pts(b) - pts(a));
-    html += `<div class="stack"><h3>Rangliste</h3><table class="t"><thead><tr><th>#</th><th>Airline</th><th class="r">Punkte</th><th class="r">Eigenkapital</th><th class="r">Passagiere</th><th class="r">Flotte</th></tr></thead><tbody>${rank.map((h, i) => `<tr><td>${i + 1}</td><td><span class="lgi">${logoSvg(h, 18)}</span> ${esc(h.name)}${h.id === pl.id ? ' <span class="chip me">Sie</span>' : ''}${h.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}</td><td class="r"><b>${pts(h)}</b></td><td class="r">${eur(SM.balanceSheet(h).equity)}</td><td class="r">${n0(h.paxTotal || 0)}</td><td class="r">${h.fleet.length}</td></tr>`).join('')}</tbody></table></div>`;
+    const rank = visHumans().slice().sort((a, b) => (!!a.dq - !!b.dq) || (pts(b) - pts(a)));   // 0.21.75: aberkannte Wertung am Ende, ohne Punkte
+    html += `<div class="stack"><h3>Rangliste</h3><table class="t"><thead><tr><th>#</th><th>Airline</th><th class="r">Punkte</th><th class="r">Eigenkapital</th><th class="r">Passagiere</th><th class="r">Flotte</th></tr></thead><tbody>${rank.map((h, i) => `<tr><td>${h.dq ? '–' : i + 1}</td><td><span class="lgi">${logoSvg(h, 18)}</span> ${esc(h.name)}${h.id === pl.id ? ' <span class="chip me">Sie</span>' : ''}${h.status === 'insolvent' ? ' <span class="chip crit">insolvent</span>' : ''}${h.dq ? ' <span class="chip crit" title="Wertung von der Luftfahrtaufsicht aberkannt">disqualifiziert</span>' : ''}</td><td class="r"><b>${h.dq ? '–' : pts(h)}</b></td><td class="r">${eur(SM.balanceSheet(h).equity)}</td><td class="r">${n0(h.paxTotal || 0)}</td><td class="r">${h.fleet.length}</td></tr>`).join('')}</tbody></table></div>`;
   }
   html += `<div class="ms-grid">${SM.MILESTONES.map((m) => { const d = got[m.id]; return `<div class="ms ${d !== undefined ? 'done' : ''}"><div class="ms-ic">${d !== undefined ? '★' : '☆'}</div><div><b>${esc(m.label)}</b><span>${esc(m.desc)}</span><em>${m.pts} Punkte${m.brand ? ` · Marke +${Math.round(m.brand * 100)}` : ''}${d !== undefined ? ` · erreicht ${dateShort(d)}` : ''}</em></div></div>`; }).join('')}</div>`;
   return html;
@@ -5131,23 +5169,24 @@ function lossTip(routes) {
   let w = null; for (const r of routes) { const s = rstats(r, 30); if (s.n >= 14 && s.db1 < 0 && (!w || s.db1 / s.n < w.d)) w = { r, d: s.db1 / s.n }; }
   return w ? ` Größter Verlustbringer: ${w.r.base}–${w.r.dest} (${eur(w.d, { plus: true })} pro Tag) – schließen spart rund ${eur(-w.d * 30)} im Monat.` : '';
 }
-/** 0.21.55: Vorschlag zur Wettbewerbsaufsicht in einem Satz (konkrete Zahlen). */
+/** 0.21.55/0.21.77: Vorschlag zur Wettbewerbsaufsicht in einem Satz (konkrete Zahlen, Slot-Anteil). */
 function antiAdvice(pa) {
-  if (pa.ok) return `Grenze: unter ${n1(pa.limit)} eigene Abflüge am Tag – das ist schon erreicht, zum Monatsende endet das Verfahren.`;
+  if (pa.ok) return `Grenze: unter ${n0(Math.ceil(pa.limit))} Slots – das ist schon erreicht, zum Monatsende endet das Verfahren.`;
   const cuts = pa.cuts.map((r) => r.close ? `<b>${r.base}–${r.dest}</b> schließen` : `<b>${r.base}–${r.dest}</b> ${r.freq}× → ${r.to}×`);
-  return `Vorschlag: höchstens <b>${n0(Math.ceil(pa.limit) - 1)} Abflüge am Tag</b> (−${n1(pa.own - pa.after)}): ${cuts.slice(0, 4).join(', ')}${cuts.length > 4 ? ` und ${cuts.length - 4} weitere` : ''} – danach ${pa.bySize ? `${n1(pa.after)} Abflüge, unter der Prüfschwelle von ${P.ANTITRUST.minDeps}` : pct(pa.afterShare)}.${pa.lock ? ` Alternative: Exklusivvertrag für ${eur(pa.lock)}.` : ''}`;
+  const steps = [pa.giveRes ? `<b>${n0(pa.giveRes)} ungenutzte Reserve-Slots</b> zurückgeben` : '', cuts.length ? `${cuts.slice(0, 4).join(', ')}${cuts.length > 4 ? ` und ${cuts.length - 4} weitere` : ''} und die frei werdenden ${n0(pa.cutSlots)} Slots zurückgeben` : ''].filter(Boolean).join('; ');
+  return `Vorschlag: höchstens <b>${n0(Math.ceil(pa.limit) - 1)} Slots</b> halten (−${n0(pa.own - pa.after)}): ${steps} – danach ${pa.bySize ? `${n0(pa.after)} Slots, unter der Prüfschwelle von ${P.ANTITRUST.minDeps} Slots` : pct(pa.afterShare)}. Nur Flüge kürzen reicht nicht: Die Slots blieben als Ihre Reserve und zählen weiter.${pa.lock ? ` Alternative: Exklusivvertrag für ${eur(pa.lock)}.` : ''}`;
 }
 /** Alle eigenen Strecken an einem Flughafen mit Wettbewerbsaufsicht (oder knapp davor), mit Vorschlag je Strecke. */
 function antiHtml(c) {
   const pl = W.player, A = P.ANTITRUST, on = pl.antitrust && pl.antitrust[c];
   if (!on && (SM.paxEff(c) < A.minPax || (pl.gateLock && pl.gateLock[c]))) return '';
   const pa = W.antitrustPlan(pl, c);
-  if (!on && (pa.share < A.share - 0.1 || pa.own < A.minDeps * 0.8)) return '';
+  if (!pa.slots || (!on && (pa.share < A.share - 0.1 || pa.own < A.minDeps * 0.8))) return '';
   const riv = Object.entries(pa.rivals).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, n]) => `${esc(W.airlines[id] ? W.airlines[id].name : id)} ${n1(n)}`).join(', ');
   const rows = pa.routes.slice().sort((a, b) => b.perDay - a.perDay).map((r) => `<tr class="${r.close || r.to < r.freq ? 'warn' : ''}"><td style="white-space:nowrap"><a href="#" data-act="openroute" data-id="${r.id}">${r.base}–${r.dest}</a></td><td class="num" style="white-space:nowrap">${r.wk < 7 ? `${r.wk}× pro Woche` : `${r.freq}× täglich`}</td><td class="num ${r.dayRes < 0 ? 'neg' : ''}">${eur(r.dayRes, { plus: true })}</td><td style="white-space:nowrap">${on || !pa.ok ? (r.close ? '<b>schließen</b>' : r.to < r.freq ? `<b>→ ${r.to}× täglich</b>` : '–') : ''}</td></tr>`).join('');
-  return `<div class="callout ${on ? (W.day - on.since >= A.grace ? 'crit' : 'warn') : 'info'} stack"><span>${on ? `<b>Kartellverfahren:</b> ` : '<b>Wettbewerbsaufsicht – knapp unter der Grenze:</b> '}${pct(pa.share)} aller Abflüge in ${apName(c)} – Sie ${n1(pa.own)}, alle anderen ${n1(pa.other)} am Tag${riv ? ` (${riv})` : ''}. ${on ? ` ${antiAdvice(pa)}` : ` Grenze ${pct(A.share)}: höchstens ${n0(Math.ceil(pa.limit) - 1)} eigene Abflüge am Tag.`}</span>
+  return `<div class="callout ${on ? (W.day - on.since >= A.grace ? 'crit' : 'warn') : 'info'} stack"><span>${on ? `<b>Kartellverfahren:</b> ` : '<b>Wettbewerbsaufsicht – knapp unter der Grenze:</b> '}Sie halten ${pct(pa.share)} der Slots in ${apName(c)}: ${n0(pa.own)} von ${n0(pa.cap)} am Tag (${n0(pa.used)} genutzt, ${n0(pa.held)} Reserve${pa.sellable ? `, davon ${n0(pa.sellable)} zurückgebbar` : ''})${riv ? `. Andere: ${riv}` : ''}. ${on ? ` ${antiAdvice(pa)}` : ` Grenze ${pct(A.share)}: höchstens ${n0(Math.ceil(pa.limit) - 1)} Slots.`}</span>
     <div class="tw"><table class="t"><thead><tr><th>Strecke</th><th class="num">Flüge</th><th class="num">Ergebnis/Tag</th><th>${on || !pa.ok ? 'Vorschlag' : ''}</th></tr></thead><tbody>${rows}</tbody></table></div>
-    ${on && pa.cuts.length ? `<div class="row"><button class="btn small primary" data-act="antiadj" data-apt="${c}">Vorschlag übernehmen</button></div>` : ''}</div>`;
+    ${on && pa.sell ? `<div class="row"><button class="btn small primary" data-act="antiadj" data-apt="${c}">Vorschlag übernehmen (${pa.cuts.length ? 'kürzen und ' : ''}${n0(pa.sell)} Slots zurückgeben)</button></div>` : ''}</div>`;
 }
 /** Regelbasierte Hinweise. cat: ops, fin, net, strat – die Assistenz zieht ihr Fachgebiet nach vorn. */
 function assistantHints() {
@@ -5161,7 +5200,7 @@ function assistantHints() {
   else if (isFinite(pl.runway) && pl.runway < 60 && routes.length) add('runway', 'warn', 'fin', `Das Geld reicht beim jetzigen Abfluss noch etwa <b>${n0(pl.runway)} Tage</b> (${eur(burnPerDay(pl))} weniger pro Tag).${loanTip(pl, Math.max(0, 90 - pl.runway) * burnPerDay(pl))}${lossTip(routes)}`, 'credit');
   if (ui.mp) { const fl = SM.auditPreview(W, pl).filter((e) => e.flagged); if (fl.length) add('audit', 'warn', 'fin', `Die Wirtschaftsprüfer würden zum Jahresabschluss die Geschäfte mit <b>${esc(fl[0].name)}</b> beanstanden: ${eur(fl[0].excess)} Vorteil über Marktwert. Freiwillig zurückzahlen erspart Bußgeld und Prüfvermerk.`, 'credit'); }
   if (pl.antitrust) for (const [c, x] of Object.entries(pl.antitrust)) { const late = W.day - x.since >= P.ANTITRUST.grace, pa = W.antitrustPlan(pl, c);
-    add('anti' + c, late ? 'crit' : 'warn', 'strat', `<b>Kartellverfahren ${apName(c)}:</b> ${pct(pa.share)} aller Abflüge (${n1(pa.own)} von ${n1(pa.total)} am Tag). Neue Strecken dort sind untersagt${late ? `, jeden Monat kommen etwa <b>${eur(pa.fine)}</b> Bußgeld` : `, ab ${dateShort(x.since + P.ANTITRUST.grace)} etwa <b>${eur(pa.fine)}</b> Bußgeld pro Monat`}. ${antiAdvice(pa)}`, 'stations', { anti: c, antiOk: pa.cuts.length > 0 }); }
+    add('anti' + c, late ? 'crit' : 'warn', 'strat', `<b>Kartellverfahren ${apName(c)}:</b> ${pct(pa.share)} der Slots (${n1(pa.own)} von ${n1(pa.cap)} am Tag). Neue Strecken dort sind untersagt${late ? `, jeden Monat kommen etwa <b>${eur(pa.fine)}</b> Bußgeld` : `, ab ${dateShort(x.since + P.ANTITRUST.grace)} etwa <b>${eur(pa.fine)}</b> Bußgeld pro Monat`}. ${antiAdvice(pa)}`, 'stations', { anti: c, antiOk: pa.sell > 0 }); }
   { const n = pl.fleet.length; if (n >= 90 && n < 100) add('hq100', 'info', 'strat', `Ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte: Bei 200 Flugzeugen kostet die Zentrale rund ${eur(200000 * cpi())} am Tag. Wachstum lohnt sich dann nur noch mit guten Strecken.`, 'finance'); }
   if (!pl.fleet.length) { const ok = ['A20N', 'E295', 'AT76', 'DH8D'].map((t) => [t, SM.riskTerms(pl, t)]), free = ok.find(([, r]) => !r.reject && !r.cond), a320 = ok[0][1];
     add('nofleet', 'info', 'strat', `Wir brauchen zuerst ein Flugzeug. Als junge Airline (Ansehen ${a320.st}) geben uns die Leasinggeber ${free ? `<b>${tl(free[0])}</b> und kleinere ohne Auflagen` : 'nur Turboprops ohne Auflagen'}${a320.reject ? ', die A320neo noch gar nicht' : a320.cond ? `, die A320neo nur unter Auflagen (+${pct(a320.lease - 1)} Rate, ${a320.dep} Monatsraten Kaution)` : ''}. Zwei ${free ? tl(free[0]) : 'Turboprops'} im Leasing sind ein solider Start – das kostet nur die Kaution. Mit Erfahrung, Pünktlichkeit und soliden Finanzen steigt das Ansehen.`, 'fleetBuy'); }
@@ -5445,7 +5484,10 @@ function assistantAfterDays(prev) {
 // Aktionen
 // ---------------------------------------------------------------------------
 /** Alle Änderungen am Spiel laufen hierüber: lokal sofort, im Mehrspieler zusätzlich an den Server. */
+const fmtUntil = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+const suspOf = () => (mpState.user && mpState.user.susp && mpState.user.susp.until > Date.now() && !mpState.user.admin ? mpState.user.susp : null);   // 0.21.75: zeitweise gesperrt
 function doAction(act) {
+  if (ui.mp && suspOf()) { toast(`Die Luftfahrtaufsicht hat Ihren Leitstand bis ${fmtUntil(suspOf().until)} stillgelegt – Sie können zuschauen, aber nicht handeln.`); return { ok: false, msg: 'Gesperrt.' }; }
   if (!W || !W.player) { if (ui.mp) { toast('Der Spielstand wird neu geladen …'); enterGame(ui.mp.id); } return { ok: false, msg: 'Kein Spielstand geladen.' }; }
   const res = SM.applyAction(W, W.playerId, act);
   if (!res.ok) { toast(res.msg || 'Nicht möglich.'); return res; }
@@ -5470,6 +5512,7 @@ function onPaneClick(e) {
   e.preventDefault();
   const act = b.dataset.act, pl = W.player;
   if (collPaneClick(act, b)) return;   // Aircraft Collection
+  if (act === 'acfall') { Object.assign(ui.acf, { fit: false, gap: null, fam: '', kind: '', ev: false, ac: '' }); renderPane(true); return; }   // 0.21.76: alle Charteranfragen zeigen
   if (act === 'chbase') { const v = b.dataset.v, h = new Set(ui.chHide || []); if (h.has(v)) h.delete(v); else if (h.size + 1 < W.player.bases.length) h.add(v); else { toast('Mindestens eine Basis bleibt eingeblendet.'); return; } ui.chHide = [...h]; renderPane(true); return; }
   if (act === 'dealcashq') { const i = $(`#dl-cash-${b.dataset.side}`); if (i) { i.value = b.dataset.v; i.dispatchEvent(new Event('input', { bubbles: true })); } return; }
   if (act === 'pltype') { const sel = $('#pl-type'); if (sel) { sel.value = b.dataset.t; sel.dispatchEvent(new Event('change', { bubbles: true })); } return; }
@@ -5523,6 +5566,10 @@ function onPaneClick(e) {
     case 'cgplandel': { const r = doAction({ type: 'cgPlanDel', id: b.dataset.id }); if (!r.ok) toast(r.msg); refreshAll(); break; }
     case 'cgpfreq': { const x = ((W.player.cg && W.player.cg.plans) || []).find((y) => y.id === b.dataset.id); if (x) { doAction({ type: 'cgPlanEdit', id: x.id, freq: x.freq + Number(b.dataset.v) }); refreshAll(); } break; }
     case 'cgbuy': ui.buySeg = 'cargo'; setTab('fleetBuy'); break;
+    case 'cgsug': ui.cgSugFor = ui.cgSugFor === b.dataset.id ? null : b.dataset.id; renderPane(true); break;
+    case 'cgsugopen': { const a = W.player.fleet.find((x) => x.id === b.dataset.id); if (!a) break;
+      if (a.base !== b.dataset.b) { const mv = doAction({ type: 'move', acId: a.id, base: b.dataset.b }); if (!mv.ok) { toast(mv.msg || 'Verlegen nicht möglich.'); break; } }
+      const r = doAction({ type: 'cgOpen', base: b.dataset.b, dest: b.dataset.v, typeId: b.dataset.t, freq: Number(b.dataset.f), rate: 1 }); if (r.ok) { toast(`${acName(a.id)} nach ${b.dataset.b} verlegt – ${r.msg}`); ui.cgSugFor = null; setTab('cargo'); } refreshAll(); break; }
     case 'cgfind': ui.cgNew = { ...(ui.cgNew || { rate: 1 }), base: b.dataset.b, type: b.dataset.t }; setTab('cargoNew'); break;
     case 'cgnbase': ui.cgNew = { ...(ui.cgNew || {}), base: b.dataset.v, type: null }; renderPane(true); break;
     case 'cgntype': ui.cgNew = { ...(ui.cgNew || {}), type: b.dataset.v }; renderPane(true); break;
@@ -6611,6 +6658,104 @@ async function showDiag(onBack) {
     if (v === 'close') { m.onclick = null; onBack(); } else if (v === 'reload') showDiag(onBack);
     else if (v === 'clear') { try { await api('/admin/diag?clear=1', { timeout: 20000 }); } catch (err) { toast(err.message); } showDiag(onBack); } };
 }
+/** 0.21.74 Fair-Play-Wächter: wer lässt eine KI oder ein Skript für sich spielen? Bewertung mit Belegen, Prüfen/Verwarnen/Zurücksetzen. */
+/** 0.21.78: Stufe des Kontos, nächste Stufe verhängen, Stufe zurücknehmen. */
+function fairStageBox(r, d) {
+  const k = esc(r.key), st = r.stage || 0, nx = d.ladder[st], cur = d.ladder[st - 1];
+  return `<div class="fp-stage"><div><b>${st ? `Stufe ${st} von 5 · ${esc(cur.label)}` : 'Noch keine Stufe'}</b>${r.stageAt ? ` <span class="small muted">seit ${new Date(r.stageAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : ''}
+    <div class="small muted">${r.due ? `Neue Belege seit der letzten Stufe: <b>${r.due.score}</b> – Stufe ${r.due.n} ${r.due.auto ? 'verhängt das Prüfsystem bei der nächsten Aktion' : 'ist fällig und wartet auf Bestätigung'}.` : nx ? `Nächste Stufe: ${esc(nx.label)} – ${esc(nx.what)}.` : 'Höchste Stufe erreicht.'}</div></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap">${nx ? `<button class="btn small ${r.due ? 'danger' : ''}" data-fp="stage" data-n="${st + 1}" data-k="${k}">Stufe ${st + 1} verhängen</button>` : ''}${st ? `<button class="btn small" data-fp="stageDown" data-n="${st}" data-k="${k}">Stufe ${st} zurücknehmen</button>` : ''}</div></div>`;
+}
+/** 0.21.75: Maßnahmen je Konto – Sperren (Konto), Pack-Sperre, Annullieren, Geldstrafe, Wertung aberkennen (je Spiel), Entfernen über die Spielverwaltung. */
+function fairActions(r) {
+  const k = esc(r.key), gOpts = r.games.map((g) => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('');
+  const dur = (name) => `<select data-fpf="${name}">${[[1, '1 Stunde'], [6, '6 Stunden'], [24, '1 Tag'], [72, '3 Tage'], [168, '7 Tage'], [720, '30 Tage']].map(([h, l]) => `<option value="${h}"${h === 24 ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  const noGame = !r.games.length ? 'disabled title="Keine Airline mit Aktionen bekannt"' : '';
+  const hist = (r.sanctions || []).length ? `<details class="small"><summary>Bisherige Maßnahmen (${r.sanctions.length})</summary><ul class="fp-why">${r.sanctions.map((x) => `<li><span class="mono">${new Date(x.at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span> ${esc(x.msg || x.kind)}${x.reason ? ` <span class="muted">· ${esc(x.reason)}</span>` : ''} <span class="muted">· ${esc(x.by)}</span></li>`).join('')}</ul></details>` : '';
+  return `<details class="fp-act"><summary><b>Einzelmaßnahmen</b> <span class="small muted">außerhalb der Stufen – Spielende sehen sie ebenfalls als Luftfahrtaufsicht</span></summary>
+    <div class="fp-acts" data-k="${k}">
+      <label class="f fp-wide"><span>Grund (sieht der Spieler im Bescheid der Luftfahrtaufsicht)</span><input type="text" data-fpf="reason" maxlength="140" placeholder="z. B. automatisierte Steuerung festgestellt"></label>
+      <label class="f fp-wide"><span>Spiel für Strafen</span><select data-fpf="game" ${noGame}>${gOpts}</select></label>
+      <div class="fp-box"><b>Zeitweise sperren</b><span class="small muted">Kein Handeln, kein Chat. Die KI führt die Airline in allen Spielen weiter.</span>
+        ${r.susp ? `<button class="btn small" data-fp="sx" data-v="unsuspend">Sperre aufheben</button>` : `<div class="row">${dur('hoursS')}<button class="btn small danger" data-fp="sx" data-v="suspend">Sperren</button></div>`}</div>
+      <div class="fp-box"><b>Annullieren</b><span class="small muted">Gewinne des Zeitraums einziehen und dort erreichte Meilensteine aberkennen.</span>
+        <div class="row"><select data-fpf="days">${[[1, 'letzter Spieltag'], [3, 'letzte 3 Spieltage'], [7, 'letzte 7 Spieltage'], [14, 'letzte 14 Spieltage'], [30, 'letzte 30 Spieltage'], [90, 'letzte 90 Spieltage'], [3650, 'ganzes Spiel']].map(([d, l]) => `<option value="${d}"${d === 7 ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="row small"><label class="chk"><input type="checkbox" data-fpf="profits" checked> Gewinne einziehen</label><label class="chk"><input type="checkbox" data-fpf="milestones" checked> Meilensteine aberkennen</label></div>
+        <button class="btn small danger" data-fp="sx" data-v="annul" ${noGame}>Annullieren</button></div>
+      <div class="fp-box"><b>Geldstrafe</b><span class="small muted">Wird vom Eigenkapital abgezogen und im Logbuch vermerkt.</span><div class="row"><input type="number" data-fpf="amount" min="0.1" step="0.5" value="5" style="width:90px"> <span class="small">Mio. €</span><button class="btn small danger" data-fp="sx" data-v="fine" ${noGame}>Strafe buchen</button></div></div>
+      <div class="fp-box"><b>Wertung aberkennen</b><span class="small muted">Airline steht ohne Punkte als „disqualifiziert“ am Ende der Rangliste.</span><div class="row"><button class="btn small danger" data-fp="sx" data-v="dq" ${noGame}>Aberkennen</button><button class="btn small" data-fp="sx" data-v="undq" ${noGame}>Wieder zulassen</button></div></div>
+      <div class="fp-box"><b>Pack-Sperre</b><span class="small muted">Keine Gratis-Packs und keine Pack-Anfragen.</span>
+        ${r.pack ? `<button class="btn small" data-fp="sx" data-v="unpackban">Pack-Sperre aufheben</button>` : `<div class="row">${dur('hoursP')}<button class="btn small danger" data-fp="sx" data-v="packban">Sperren</button></div>`}</div>
+      <div class="fp-box"><b>Entfernen</b><span class="small muted">Airline aus dem Spiel nehmen und dauerhaft sperren – in der Spielverwaltung.</span>${r.games.map((g) => `<button class="btn small" data-fp="adm" data-g="${esc(g.id)}">${esc(g.name)} verwalten</button>`).join('') || '<span class="small muted">–</span>'}</div>
+    </div>${hist}</details>`;
+}
+async function fairSanctionClick(b) {
+  const box = b.closest('.fp-acts'), f = (n) => box.querySelector(`[data-fpf="${n}"]`), kind = b.dataset.v;
+  const game = f('game') ? f('game').value : '', gName = f('game') && f('game').selectedOptions[0] ? f('game').selectedOptions[0].textContent : '';
+  const body = { key: box.dataset.k, cmd: 'sanction', kind, reason: f('reason').value, game };
+  if (kind === 'suspend') body.hours = Number(f('hoursS').value);
+  if (kind === 'packban') body.hours = Number(f('hoursP').value);
+  if (kind === 'annul') { body.days = Number(f('days').value); body.profits = f('profits').checked; body.milestones = f('milestones').checked; }
+  if (kind === 'fine') body.amount = Number(f('amount').value);
+  const ask = { suspend: `Konto für ${f('hoursS') && f('hoursS').selectedOptions[0].textContent} sperren? Die KI führt so lange die Airline.`, annul: `In „${gName}“ annullieren: ${f('days').selectedOptions[0].textContent}${body.profits ? ', Gewinne einziehen' : ''}${body.milestones ? ', Meilensteine aberkennen' : ''}?`,
+    fine: `In „${gName}“ eine Geldstrafe von ${body.amount} Mio. € buchen?`, dq: `In „${gName}“ die Wertung aberkennen?`, packban: 'Pack-Sperre verhängen?' }[kind];
+  if (ask && !confirm(ask)) return;
+  try { const r = await api('/admin/fairplay', { body, timeout: 30000 }); toast(r.msg || 'Erledigt.'); } catch (err) { toast(err.message); }
+}
+/** 0.21.78: Bescheid der Luftfahrtaufsicht (Stufe, Text, Stufenleiter). Wer die Maßnahme ausgelöst hat, steht nirgends – für Spielende erkennt sie das Prüfsystem. */
+function showFairWarn(w) {
+  const st = w.stage || 0, lad = w.ladder || (SM.FAIR_STAGES || []).slice(1).map((S) => ({ n: S.n, label: S.label, what: SM.fairStageWhat(S.n) }));
+  const ladder = st ? `<ol class="fa-ladder">${lad.map((x) => `<li class="${x.n < st ? 'past' : x.n === st ? 'now' : ''}"><b>Stufe ${x.n} · ${esc(x.label)}</b><span class="small">${esc(x.what)}</span></li>`).join('')}</ol>` : '';
+  const m = modal(`<div class="fa-head"><span class="fa-seal" aria-hidden="true">§</span><div><h1>Luftfahrtaufsicht</h1><span class="small muted">Bescheid vom ${esc(new Date(w.at || Date.now()).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }))} Uhr${st ? ` · <b class="${st >= 3 ? 'neg' : 'warnc'}">Stufe ${st} von 5</b>` : ''}</span></div></div>
+    <p style="white-space:pre-line">${esc(w.text)}</p>${ladder}<p class="small muted">Erlaubt ist, sich Rat zu holen – auch bei einer KI. Nicht erlaubt ist, eine KI, einen Bot oder ein Skript selbst spielen zu lassen.</p><div class="row"><button class="btn primary" data-fw="ok">Verstanden</button></div>`, false);
+  m.onclick = async (e) => { if (!e.target.closest('[data-fw]')) return; m.onclick = null; m.hidden = true; try { await api('/fair/seen', { body: {} }); } catch (err) { /* später erneut */ } if (mpState.user) mpState.user.fairWarn = null; };
+}
+async function showFairPlay(onBack) {
+  const m = modal('<h1>Fair Play</h1><p class="small muted">Lade …</p>');
+  let d; try { d = await api('/admin/fairplay', { timeout: 20000 }); } catch (e) { toast(e.message); onBack(); return; }
+  const tf = (t) => (t ? new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '–');
+  const flt = ui.fairFlt || 'auff', rows = d.rows.filter((r) => flt === 'all' || r.score >= 15);
+  const hoursBar = (r) => { const days = Object.keys(r.hours || {}).sort().slice(-7); if (!days.length) return '';
+    return `<div class="fp-hours" title="Aktive Stunden je Tag (Berliner Zeit), letzte ${days.length} Tage">${days.map((k) => `<div class="fp-day"><span class="mono small">${k.slice(8, 10)}.${k.slice(5, 7)}.</span>${r.hours[k].map((v, h) => `<i class="${v ? (v > 20 ? 'h3' : v > 5 ? 'h2' : 'h1') : ''}" title="${h}–${h + 1} Uhr: ${v} Aktionen"></i>`).join('')}</div>`).join('')}</div>`; };
+  const card = (r) => `<details class="card pad fp-row ${r.tone}"${r.open ? ' open' : ''}><summary class="spread"><span><b>${esc(r.name)}</b>${r.admin ? ' <span class="chip">Admin</span>' : ''}${r.online ? ' <span class="chip good">online</span>' : ''}${r.susp ? ` <span class="chip crit">gesperrt bis ${tf(r.susp.until)}</span>` : ''}${r.pack ? ` <span class="chip warn">Pack-Sperre bis ${tf(r.pack.until)}</span>` : ''} <span class="small muted">${n0(r.n)} Aktionen · zuletzt ${tf(r.last)}</span></span>
+      <span class="row" style="gap:6px">${r.stage ? `<span class="chip ${r.stage >= 3 ? 'crit' : 'warn'}" title="${esc((d.ladder[r.stage - 1] || {}).what || '')}">Stufe ${r.stage} · ${esc((d.ladder[r.stage - 1] || {}).label || '')}</span>` : ''}${r.due && !r.due.auto ? `<span class="chip crit" title="Neue Belege seit der letzten Stufe: ${r.due.score}">Stufe ${r.due.n} fällig</span>` : ''}<span class="chip ${({ ok: 'good', warn: 'warn', bad: 'bad', crit: 'crit' })[r.tone]}">${esc(r.level)}</span><b class="mono fp-score">${r.score}</b></span></summary>
+    <div class="fp-meter"><i style="width:${r.score}%"></i></div>
+    ${r.reasons.length ? `<ul class="fp-why">${r.reasons.map((x) => `<li><b>${esc(x.label)}</b> <span class="small muted">· ${esc(x.why)} · ${n0(x.n)}×</span> <span class="mono small">+${x.w}</span></li>`).join('')}</ul>` : '<p class="small muted">Keine Auffälligkeiten.</p>'}
+    ${r.review ? `<p class="small ok-t">Geprüft und für unbedenklich befunden von ${esc(r.review.by)} am ${tf(r.review.at)} (Bewertung damals ${r.review.score}).</p>` : ''}
+    ${r.warn ? `<p class="small warn-t">Letzter Bescheid${r.warn.stage ? ` (Stufe ${r.warn.stage})` : ''} am ${tf(r.warn.at)}, ausgelöst von ${esc(r.warn.by)} · ${r.warn.seen ? `gelesen ${tf(r.warn.seen)}` : 'noch nicht gelesen'}</p>` : ''}
+    ${fairStageBox(r, d)}
+    <p class="small muted">Spiele: ${r.games.map((g) => `${esc(g.name)} (${n0(g.n)})`).join(', ') || '–'}</p>
+    ${hoursBar(r)}
+    ${r.ev.length ? `<details class="small"><summary>Letzte Belege (${r.ev.length})</summary><table class="fp-ev"><tbody>${r.ev.map((e) => `<tr><td class="mono">${tf(e.t)}</td><td>${esc(e.label)}</td><td class="muted">${esc(e.d || '')}</td><td class="muted">${esc(e.type || '')} · ${esc(e.gameName || '')}</td></tr>`).join('')}</tbody></table></details>` : ''}
+    <div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn small" data-fp="ok" data-k="${esc(r.key)}" title="Bisherige Belege zählen für die nächste Stufe nicht mehr">Unbedenklich</button><button class="btn small" data-fp="reset" data-k="${esc(r.key)}">Daten zurücksetzen</button></div>
+    ${fairActions(r)}</details>`;
+  m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Fair Play</h1><span class="row" style="gap:6px"><button class="btn small" data-fp="reload">Aktualisieren</button><button class="btn small" data-fp="close">Zurück</button></span></div>
+    <p class="small muted">Der Wächter erkennt, wenn eine KI oder ein Skript selbst spielt: ferngesteuerte oder unsichtbare Browser, Klicks per Programm, Aktionen ohne Spieloberfläche oder ohne vorherige Bedienung (über ${Math.round(d.rules.noUiGap / 1000)} s), übermenschliches Tempo (unter ${d.rules.fastMs} ms), Maschinen-Takt, Dauerbetrieb rund um die Uhr und Aktionen aus verborgenen Tabs. Ob jemand nebenbei eine KI um Rat fragt, kann kein Spiel erkennen. Klickfluten (über ${d.rules.rateN} Aktionen in ${d.rules.rateMs / 1000} s) werden immer gebremst.</p>
+    <div class="callout info stack"><span><b>Luftfahrtaufsicht:</b> Für Spielende kommt jede Maßnahme vom Prüfsystem der Aufsicht – Ihr Name erscheint nirgends, auch nicht bei Einzelmaßnahmen. Die nächste Stufe ist fällig, wenn die <i>neuen</i> Belege seit der letzten Stufe (oder seit „Unbedenklich“) mindestens ${d.rules.stageScore} Punkte ergeben – frühestens ${d.rules.stageGapH} Stunden nach der letzten Stufe. Wer ${d.rules.calmDays} Tage unauffällig bleibt, rutscht eine Stufe zurück. Spielende sehen nur „automatisierte Steuerung festgestellt“, nicht woran.</span>
+      <ol class="fa-ladder cmp small">${d.ladder.map((x) => `<li class="${x.n <= d.conf.autoMax ? 'auto' : ''}"><b>Stufe ${x.n} · ${esc(x.label)}</b><span>${esc(x.what)}</span><em>${x.n <= d.conf.autoMax ? 'automatisch' : 'auf Bestätigung'}</em></li>`).join('')}</ol>
+      <div class="fp-conf small"><span>Das Prüfsystem verhängt selbst bis</span><select data-fpconf>${[0, 1, 2, 3, 4, 5].map((n) => `<option value="${n}"${n === d.conf.autoMax ? ' selected' : ''}>${n ? `Stufe ${n}` : 'keine (nur vorschlagen)'}</option>`).join('')}</select><span class="muted">Höhere Stufen erscheinen unten als „fällig“.</span></div></div>
+    <div class="tiles"><div class="tile"><span class="k">Offen</span><b class="v">${n0(d.open)}</b><span class="s">Stufe fällig oder ungeprüft verdächtig</span></div><div class="tile"><span class="k">Beobachtet</span><b class="v">${n0(d.rows.filter((r) => r.score >= 15).length)}</b><span class="s">von ${n0(d.rows.length)} Konten</span></div><div class="tile"><span class="k">Mit Stufe</span><b class="v">${n0(d.rows.filter((r) => r.stage > 0).length)}</b><span class="s">${n0(d.rows.filter((r) => r.warn && !r.warn.seen).length)} Bescheide ungelesen</span></div></div>
+    <div class="row small" style="gap:6px"><button class="btn small ${flt === 'auff' ? 'primary' : ''}" data-fp="flt" data-v="auff">Nur auffällige</button><button class="btn small ${flt === 'all' ? 'primary' : ''}" data-fp="flt" data-v="all">Alle Konten</button></div>
+    <div class="stack" style="gap:6px">${rows.map(card).join('') || '<p class="small muted">Niemand auffällig. 👍</p>'}</div>
+    <p class="small muted">Entfernen oder sperren: in der Verwaltung des jeweiligen Spiels („Hauptwelt verwalten“ bzw. Spielverwaltung).</p></div>`;
+  const cs = m.querySelector('[data-fpconf]'); if (cs) cs.onchange = async () => { try { const r = await api('/admin/fairplay', { body: { cmd: 'conf', autoMax: Number(cs.value) } }); toast(r.msg); } catch (err) { toast(err.message); } showFairPlay(onBack); };
+  m.onclick = async (e) => { const b = e.target.closest('[data-fp]'); if (!b) return; const v = b.dataset.fp;
+    if (v === 'close') { m.onclick = null; onBack(); return; }
+    if (v === 'reload') { showFairPlay(onBack); return; }
+    if (v === 'flt') { ui.fairFlt = b.dataset.v; showFairPlay(onBack); return; }
+    if (v === 'sx') { await fairSanctionClick(b); showFairPlay(onBack); return; }
+    if (v === 'stage' || v === 'stageDown') {
+      const n = Number(b.dataset.n), L = d.ladder[n - 1] || {};
+      if (!confirm(v === 'stage' ? `Stufe ${n} (${L.label}) verhängen?\n\n${L.what}.\n\nDer Spieler sieht einen Bescheid der Luftfahrtaufsicht.` : `Stufe ${n} zurücknehmen? Laufende Sperren dieser Stufe enden; Bußgeld und Annullierung bleiben.`)) return;
+      try { const r = await api('/admin/fairplay', { body: { key: b.dataset.k, cmd: v }, timeout: 60000 }); toast(r.msg || 'Erledigt.'); } catch (err) { toast(err.message); }
+      showFairPlay(onBack); return; }
+    if (v === 'adm') { m.onclick = null; showAdmin(b.dataset.g, () => showFairPlay(onBack)); return; }
+    let text = '';
+    if (v === 'warn') { text = prompt('Nachricht an den Spieler (leer = Standardtext):', '') ?? null; if (text === null) return; }
+    if (v === 'reset' && !confirm('Alle gesammelten Fair-Play-Daten dieses Kontos löschen? (Die alte Bewertung wird archiviert.)')) return;
+    try { await api('/admin/fairplay', { body: { key: b.dataset.k, cmd: v, text } }); toast(v === 'ok' ? 'Als unbedenklich markiert.' : v === 'warn' ? 'Verwarnung gesendet – der Spieler sieht sie beim nächsten Laden.' : 'Daten zurückgesetzt.'); } catch (err) { toast(err.message); }
+    showFairPlay(onBack); };
+}
 async function showPlaytime(onBack) {
   const m = modal('<h1>Spielzeit</h1><p class="small muted">Lade …</p>');
   let d; try { d = await api('/admin/playtime'); } catch (e) { toast(e.message); onBack(); return; }
@@ -6675,10 +6820,11 @@ async function showLobby(tab = null) {
   setSpeed(0);
   if (mpState.pendingJoin) { const pj = mpState.pendingJoin; mpState.pendingJoin = null; return showJoin(pj.code, pj.token); }
   const m = modal(`<div class="spread"><h1>Sky<span>market</span></h1><div class="row small"><span class="muted">Angemeldet als <b>${esc(mpState.user.name)}</b>${mpState.user.admin ? ' <span class="chip me">Admin</span>' : ''}</span><button class="btn small" id="lbPw">Passwort ändern</button><button class="btn small" id="lbLogout">Abmelden</button></div></div>
+    ${suspOf() ? `<div class="callout crit"><b>Luftfahrtaufsicht: Ihr Leitstand ist bis ${esc(fmtUntil(suspOf().until))} stillgelegt.</b><span class="small">${suspOf().reason ? `Grund: ${esc(suspOf().reason)} · ` : ''}Sie können zuschauen, aber nicht handeln oder schreiben. Die KI führt so lange Ihre Airline.</span></div>` : ''}
     <section class="mainworld" id="lbMain"><p class="small muted">Lade die Hauptwelt …</p></section>
     <div class="lobby">
       <section class="stack"><div class="spread"><h3>Meine Spiele</h3><button class="btn small primary" id="lbNew">Neues Spiel</button></div><div id="lbMine" class="glist"><p class="small muted">Lade …</p></div></section>
-      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3></div><div class="adm-bar"><button class="btn small primary" id="lbPlay">Spielzeit der Spieler</button><button class="btn small primary" id="lbPacks">Packs, Shop &amp; Angebote<span class="badge" id="lbPacksN" hidden></span></button><button class="btn small" id="lbMainAdm">Hauptwelt verwalten</button><button class="btn small" id="lbDiag">Fehlerprotokoll</button></div><p class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</p><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
+      ${mpState.user.admin ? `<section class="stack" style="grid-column:1/-1"><div class="spread"><h3>Verwaltung · alle Spiele</h3></div><div class="adm-bar"><button class="btn small primary" id="lbPlay">Spielzeit der Spieler</button><button class="btn small primary" id="lbPacks">Packs, Shop &amp; Angebote<span class="badge" id="lbPacksN" hidden></span></button><button class="btn small" id="lbMainAdm">Hauptwelt verwalten</button><button class="btn small" id="lbDiag">Fehlerprotokoll</button><button class="btn small" id="lbFair">Fair Play<span class="badge" id="lbFairN" hidden></span></button></div><p class="small muted">Als Admin sehen Sie alle Spiele – auch passwortgeschützte –, treten ohne Passwort bei und können jedes Spiel löschen.</p><div id="lbAdmin" class="glist"><p class="small muted">Lade …</p></div></section>` : ''}
       <section class="stack"><h3>Spiel beitreten</h3>
         <form id="lbCodeForm" class="row"><input type="text" id="lbCode" maxlength="6" placeholder="Code, z. B. K7QF2M" style="text-transform:uppercase;flex:1;min-width:140px"><button class="btn" type="submit">Suchen</button></form>
         <form id="lbSearchForm" class="row"><input type="text" id="lbQ" maxlength="40" placeholder="Spielname suchen" style="flex:1;min-width:140px"><button class="btn" type="submit">Finden</button></form>
@@ -6693,6 +6839,7 @@ async function showLobby(tab = null) {
   if ($('#lbDiag')) $('#lbDiag').addEventListener('click', () => showDiag(() => showLobby()));
   if ($('#lbPacks')) { $('#lbPacks').addEventListener('click', () => showPackAdmin()); api('/coll/admin', { timeout: 15000 }).then((d) => { const n = d.requests.filter((q) => q.status === 'open').length, el = $('#lbPacksN'); if (el && n) { el.textContent = n; el.hidden = false; el.title = `${n} offene Pack-Anfrage${n > 1 ? 'n' : ''}`; } }).catch(() => {}); }
   if ($('#lbMainAdm')) $('#lbMainAdm').addEventListener('click', () => showAdmin('main', () => showLobby()));
+  if ($('#lbFair')) { $('#lbFair').addEventListener('click', () => showFairPlay(() => showLobby())); api('/admin/fairplay', { timeout: 15000 }).then((d) => { const el = $('#lbFairN'); if (el && d.open) { el.textContent = d.open; el.hidden = false; el.title = `${d.open} auffällige${d.open > 1 ? '' : 's'} Konto${d.open > 1 ? 'en' : ''} ungeprüft`; } }).catch(() => {}); }
   $('#lbNew').addEventListener('click', showCreate);
   $('#lbSolo').addEventListener('click', () => showStart(false));
   $('#lbGuide').addEventListener('click', () => showGuide(() => showLobby()));
@@ -7162,13 +7309,22 @@ function applyServerState(s, ver, first, sess = mpState.sess) {
     else { const crit = pl.events.slice(prev.ev).filter((e) => e.kind === 'crit' || e.kind === 'deal').pop(); if (crit) toast(crit.msg); }
   }
 }
+// 0.21.74 Fair-Play-Wächter: kleiner Bedien-Nachweis zu jeder Aktion (echte Eingaben, Skript-Klicks, ferngesteuerter Browser, sichtbarer Tab)
+const FPT = { lastIn: 0, tr: 0, ut: 0, g: 0 };
+for (const ev of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(ev, (e) => { if (e.isTrusted) { FPT.lastIn = Date.now(); FPT.tr++; FPT.g++; } }, true);
+document.addEventListener('click', (e) => { if (!e.isTrusted && e.target && e.target.closest && e.target.closest('[data-act],[data-pk],[data-adm],button')) FPT.ut++; }, true);
+function fpStamp() {
+  const o = { gap: FPT.lastIn ? Date.now() - FPT.lastIn : -1, tr: FPT.tr, ut: FPT.ut, g: FPT.g, wd: navigator.webdriver ? 1 : 0, hl: /HeadlessChrome|PhantomJS/i.test(navigator.userAgent || '') ? 1 : 0,
+    dbg: window.skymarketDebug ? 1 : 0, vis: document.visibilityState === 'hidden' ? 0 : 1, v: window.SKYMARKET_BUILD || '' };
+  FPT.tr = 0; FPT.ut = 0; return o;
+}
 async function mpSendAction(act) {
   if (!ui.mp) return;
   const id = ui.mp.id;
   try {
-    const r = await api(`/games/${id}/action`, { body: { action: act } });
+    const r = await api(`/games/${id}/action`, { body: { action: act, fp: fpStamp() } });
     if (r && r.ok === false && r.msg) toast(r.msg);
-  } catch (e) { toast(e.status === 409 ? 'Der Server war beschäftigt, bitte noch einmal versuchen.' : e.message); }
+  } catch (e) { toast(e.status === 409 ? 'Der Server war beschäftigt, bitte noch einmal versuchen.' : e.status === 429 ? 'Zu viele Aktionen in kurzer Zeit – bitte etwas langsamer. Der Spielstand wird neu geladen.' : e.message); if (e.status === 429) setTimeout(() => mpPoll(true), 1200); }
   setTimeout(() => mpPoll(false), 150);
 }
 async function mpSetSpeed(k) {
@@ -7312,6 +7468,7 @@ async function onlineBoot() {
   const q = new URLSearchParams(location.search);
   if (q.get('join')) mpState.pendingJoin = { code: q.get('join').toUpperCase(), token: q.get('t') };
   try { mpState.user = await api('/me', { timeout: 20000 }); } catch (e) { mpState.user = null; }
+  if (mpState.user && mpState.user.fairWarn) setTimeout(() => showFairWarn(mpState.user.fairWarn), 900);   // 0.21.74: Verwarnung der Spielleitung
   if (mpState.user) checkLoadMark();
   if (mpState.user && mpState.user.mustChange) showPwChange({ forced: true, then: () => showLobby() });
   else if (mpState.user) { showLobby(); showPatch(); } else showAuth(mpState.pendingJoin ? 'register' : 'login');
@@ -7530,7 +7687,7 @@ function boot(hotData) {
   requestAnimationFrame(frame);
   // Vorschau-Seite für das Pack-Öffnen (nur wenn ausdrücklich eingeschaltet, z. B. in der Demo-Seite)
   if (window.SKYMARKET_PACKDEMO) window.skyPackDemo = (ids) => { const ov = packOverlay(); playReveal(ov, { res: ids, fresh: ids.map(() => true) }); };
-  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), coll: () => coll, reveal: async (res, quick) => { await loadColl(true); const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
+  if (location.hash === '#debug') window.skymarketDebug = { poll: () => mpPoll(false), fairWarn: (x) => showFairWarn(x), coll: () => coll, reveal: async (res, quick) => { await loadColl(true); const ov = packOverlay(); playReveal(ov, { res, fresh: res.map(() => true) }); if (quick) ov._skip(); return true; }, planeHits: () => planeCv.hits, view: () => ({ ...view }), world: () => W, days: (n) => { for (let i = 0; i < n; i++) stepDay(); }, ui, setTab, enterGame, snapOf, mpState, playerRoutesHtml, render: () => renderPane(true), soft: () => renderPane(), planes: () => { const a = performance.now(); for (let i = 0; i < 10; i++) renderPlanes(); return (performance.now() - a) / 10; }, nSched: () => schedules.length, box: () => { const a = performance.now(); for (let i = 0; i < 10; i++) { renderActiveBox(); applyTheme(); } return (performance.now() - a) / 10; }, timing: () => { const t = {}, w = W; let a = performance.now(); w.step(); t.engine = performance.now() - a; a = performance.now(); buildSchedules(); t.sched = performance.now() - a; a = performance.now(); renderHeader(); renderTabs(); t.head = performance.now() - a; a = performance.now(); renderMapRoutes(); t.map = performance.now() - a; a = performance.now(); renderPane(); t.pane = performance.now() - a; return t; } };
 }
 if (window.claude?.hot?.ready) window.claude.hot.ready(boot); else boot(window.claude?.hot?.data ?? {});
 })();

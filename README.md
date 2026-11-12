@@ -183,6 +183,125 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.79: Tägliches Pack nicht mehr durchsichtig, Flugzeug im Logo umrandet
+
+- **Ursache:** Alle Packs nutzten dieselben Verlaufs-IDs (`pkg`, `pke`, `pks`).
+  - Das Fenster „Tägliches Gratis-Pack“ bleibt nach dem Öffnen versteckt im Dokument und steht vor dem Pack-Overlay.
+  - Der Browser nahm die Verläufe aus diesem versteckten Pack. Tüte, Lasche und Leuchtkante blieben deshalb leer.
+  - Man sah nur Text, Reißkante und das Logo mit seinem Glühen.
+- **Lösung:** `packSvg()` vergibt je Pack eigene IDs (`pk1g`, `pk2g` …), wie es die Skins schon tun.
+- **Fokusrahmen:** Der blaue Fokusrahmen ums Pack ist weg (`.pk-box:focus-visible`). Die Leuchtkante zeigt den Fokus.
+- **Logo auf dem Pack:**
+  - Eine leichte helle Kontur liegt genau um das Flugzeug: Nase, Rumpf-Oberkante, Flügel mit Spitze und Hinterkante, Rumpf-Unterkante (`.pk-plane`).
+  - Zum Schweif hin bleibt die Kontur offen. Der Schweif selbst bekommt keine Kontur.
+  - Das Logobild bleibt unverändert, die Kontur liegt als Vektorlinie darüber.
+
+## Neu in 0.21.78: Luftfahrtaufsicht – gestufte Fair-Play-Maßnahmen, vom Spiel erkannt
+
+- **Für Spielende kommt alles von der Luftfahrtaufsicht:**
+  - Jede Fair-Play-Maßnahme erscheint als Bescheid ihres Prüfsystems: Hinweis beim Laden, Logbuch, Sperr-Banner, Chat- und Pack-Sperre.
+  - Das gilt auch für Einzelmaßnahmen, die ein Admin auslöst. Admin oder Spielleitung werden nie genannt.
+  - Der Bescheid sagt nur „automatisierte Steuerung festgestellt (Bot, Skript oder KI-Agent, der selbst klickt)“, nicht woran es erkannt wurde. So lässt sich die Erkennung nicht gezielt umgehen.
+- **Fünf Stufen** (`SM.FAIR_STAGES`, angewendet je Spiel mit `fairStageApply`). Der Bescheid zeigt die ganze Leiter und die aktuelle Stufe.
+  1. Hinweis, noch ohne Folgen.
+  2. Bußgeld 3 % des Eigenkapitals (mindestens 2 Mio. €), 1 Tag keine Packs.
+  3. Betriebsauflage:
+     - Bußgeld 5 % (mindestens 5 Mio. €)
+     - Gewinne und Meilensteine der letzten 7 Spieltage aberkannt
+     - Leitstand 24 h stillgelegt (die KI führt die Airline)
+     - 3 Tage keine Packs
+  4. Betriebsuntersagung:
+     - Bußgeld 10 % (mindestens 10 Mio. €)
+     - Gewinne und Meilensteine der letzten 30 Spieltage aberkannt
+     - Leitstand 7 Tage stillgelegt
+     - 14 Tage keine Packs
+  5. Lizenzentzug: Wertung aberkannt, Leitstand 30 Tage stillgelegt, 30 Tage keine Packs.
+- **Wann die nächste Stufe fällig ist** (`fairDue`):
+  - Es zählen nur neue Belege seit der letzten Stufe oder seit „Unbedenklich“ (`fairRebase`). Die müssen mindestens 35 Punkte ergeben („verdächtig“).
+  - Seitdem sind mindestens 10 Aktionen nötig, und frühestens 12 Stunden nach der letzten Stufe.
+  - Bewährung (`fairCalm`): 30 Tage ohne neue Stufe und ohne neue Auffälligkeiten senken die Stufe um eins.
+- **Automatisch oder auf Bestätigung:**
+  - Das Prüfsystem verhängt fällige Stufen bei der nächsten Aktion selbst, bis zur eingestellten Stufe. Voreinstellung ist Stufe 2, einstellbar von „keine“ bis 5 (Fair Play → „Das Prüfsystem verhängt selbst bis …“, gespeichert unter `fairconf`).
+  - Höhere Stufen stehen in der Übersicht als „Stufe N fällig“.
+  - Admin-Konten werden nie automatisch eingestuft.
+- **Fair-Play-Übersicht:** Stufe je Konto, „Stufe N verhängen“ und „Stufe N zurücknehmen“. Zurücknehmen ist für Fehlalarme gedacht: Es hebt die Sperren dieser Stufe auf, Bußgeld und Annullierung bleiben. „Verwarnen“ ist durch Stufe 1 ersetzt. Die bisherigen Einzelmaßnahmen bleiben unter „Einzelmaßnahmen“.
+- **Gleichzeitige Aktionen:** Eine Stufe wird je Konto nur einmal verhängt, auch wenn zwei Aktionen sie gleichzeitig auslösen.
+- **Welche Spiele betroffen sind:** Bußgeld und Annullierung treffen die Spiele mit Belegen seit der letzten Stufe. Die Stilllegung gilt für alle Spiele des Kontos.
+
+## Neu in 0.21.77: Wettbewerbsaufsicht nach Slot-Anteil
+
+- **Maßstab sind jetzt die Slots, nicht die Abflüge:**
+  - Ein Verfahren läuft, wenn eine Airline an einem Flughafen mit mindestens 8 Mio. Passagieren 60 % oder mehr der Slot-Kapazität hält (`slotShare`).
+  - Gezählt werden genutzte Slots (Strecken, Fracht) plus eigene Reserve.
+  - Prüfschwelle: mindestens 8 Slots am Tag (`ANTITRUST.minDeps`, vorher 25 Abflüge).
+- **Warum Kürzen vorher nichts brachte:**
+  - Der Abflug-Anteil bewegte sich kaum, wenn dort sonst wenig geflogen wurde.
+  - Gekürzte Flüge blieben als Reserve-Slots bei der Airline. Die Konkurrenz kam also nie an die Slots.
+  - Jetzt zählt die Reserve mit. Nur Kürzen reicht deshalb nicht, die Slots müssen zurück.
+- **Vorschlag (`antitrustPlan`):**
+  - Gibt zuerst ungenutzte gekaufte Reserve-Slots zurück.
+  - Senkt dann Frequenzen (schwächster Ertrag je Flug zuerst) und gibt die frei werdenden Slots ebenfalls zurück.
+  - Zuletzt schließt er Strecken, falls nötig.
+  - Ziel: 5 % unter der Grenze.
+- **„Vorschlag übernehmen“** kürzt und verkauft die Slots in einem Schritt (Erlös wie beim normalen Slot-Verkauf). Das Verfahren endet zum Monatsende, egal ob die Konkurrenz die Slots nutzt.
+- **Texte:** Meldungen, Bußgeld, Kartell-Hinweis und Streckensperre nennen den Slot-Anteil („X % der Slots, N von M am Tag, davon K Reserve“).
+- **Unverändert:** Exklusivvertrag (kein Verfahren während der Laufzeit) und Preisaufsicht (weiter nach Abflügen und Preis).
+
+## Neu in 0.21.76: Charter für alle Muster, Streckenvorschlag für Frachter
+
+- **Charteranfragen je Airline** (`ownCharters`):
+  - Die Erzeugung lief auch 2029 und später durchgehend (rund 50 offene Anfragen). In großen Welten verteilten sie sich aber auf die Muster aller Spielenden. Wer seltene Muster flog (ATR, Embraer, Großraumjets), sah mit dem Standardfilter „passt in freie Zeiträume“ oft keine einzige.
+  - Jetzt hat jede aktive Airline immer 3–6 Passagier-Anfragen für die eigenen Familien, je nach Flottengröße. Aufgefüllt wird wöchentlich und monatlich.
+  - Die Anfragen nutzen eine eigene Zufallsquelle, der Weltzufall bleibt gleich.
+- **Leerer Filter:** Passt nichts zum Filter, zeigt die Charter-Seite die Gesamtzahl und den Knopf „Alle N Anfragen zeigen“.
+- **Streckenvorschlag für Frachter** (Cargo → Frachter → „Strecke vorschlagen“):
+  - Sucht für genau diesen Frachter über alle eigenen Basen die besten Ziele für sein Muster. Gerechnet wird mit der besten Frequenz, die ein Flugzeug allein fliegt, höchstens drei Ziele je Basis.
+  - Machbare Ziele (Slots frei oder kaufbar, Flughafen geeignet) stehen zuerst, mit Ergebnis pro Tag, Auslastung, Konkurrenz und Slot-Hinweis.
+  - Gleiche Basis: „Eröffnen“. Andere Basis: „Nach X verlegen und eröffnen“ (Verlegen kostet wie gewohnt).
+
+## Neu in 0.21.75: Fair Play – Maßnahmen (Sperren, Annullieren, Strafen)
+
+Unter „Fair Play“ hat jedes Konto den Bereich „Maßnahmen“. Ein gemeinsamer Grund geht an den Spieler, ein Spiel wird für die spielbezogenen Strafen gewählt.
+- **Zeitweise sperren** (1 Stunde bis 30 Tage, ganzes Konto):
+  - Aktionen und Chat werden abgewiesen (403). Die Lobby zeigt einen Hinweis mit Ende und Grund. Zuschauen bleibt möglich.
+  - Die KI-Vertretung startet in allen Spielen des Kontos. Nach dem Ende übernimmt der Spieler mit seiner ersten Aktion wieder.
+  - Die Sperre lässt sich aufheben.
+- **Annullieren** (letzter Spieltag bis ganzes Spiel):
+  - zieht die Netto-Gewinne des Zeitraums aus `dayHist` ein, wenn sie positiv sind
+  - erkennt dort erreichte Meilensteine samt Markenbonus ab; aberkannte Meilensteine werden nicht neu vergeben (`msRev`)
+  - beide Teile sind einzeln abwählbar
+- **Geldstrafe** in Mio. €: wird vom Eigenkapital abgezogen und im Logbuch vermerkt.
+- **Wertung aberkennen:** Die Airline steht ohne Punkte als „disqualifiziert“ am Ende der Rangliste (`al.dq`). Wieder zulassen ist möglich.
+- **Pack-Sperre** (1 Stunde bis 30 Tage): keine Gratis-Packs und keine Pack-Anfragen.
+- **Entfernen:** Ein Knopf führt in die Verwaltung des jeweiligen Spiels (entfernen und dauerhaft sperren).
+- **Verlauf und Hinweis:** Jede Maßnahme landet im Verlauf des Kontos („Bisherige Maßnahmen“). Der Spieler sieht beim nächsten Laden einen Hinweis; mehrere Maßnahmen eines Tages werden zusammengefasst.
+- Engine: `adminPenalty(w, id, { kind: 'fine' | 'annul' | 'dq' | 'undq', … })`. Server: `POST /admin/fairplay { cmd: 'sanction', kind, key, game, hours | amount | days, reason }`.
+
+## Neu in 0.21.74: Fair-Play-Wächter (KI und Skripte erkennen)
+
+- **Was erkannt wird:** ob eine KI, ein Bot oder ein Skript selbst spielt. Ob jemand nebenbei eine KI um Rat fragt, kann kein Spiel sehen – das ist erlaubt.
+- **Bedien-Nachweis:** Jede eigene Aktion bringt einen kleinen Bedien-Nachweis mit (`fp`):
+  - Zeit seit der letzten echten Eingabe und Zahl der echten Eingaben (`isTrusted`)
+  - Klicks per Programm
+  - `navigator.webdriver` und Headless-Browser
+  - Debug-Modus
+  - ob der Tab sichtbar war
+- **Auswertung** (`server/fairplay.mjs`): Der Server speichert je Konto (`fair/<konto>`) die Zeiten der letzten Aktionen, ein Stundenraster der letzten 7 Tage und Belege. Bewertet wird mit 0–100 Punkten:
+  - automatisierter Browser +45, Headless +40
+  - Aktionen ohne Spieloberfläche bis +40, Skript-Klicks bis +30, Debug ohne Admin bis +30
+  - Aktionen ohne Bedienung (ab 30 % der Aktionen) bis +30
+  - übermenschliches Tempo (<150 ms zwischen zwei Eingaben) bis +25, Maschinen-Takt (Variationskoeffizient <12 % über 24+ Abstände) +25
+  - Dauerbetrieb (18 von 24 Stunden an einem Tag oder 3 Tage mit 14+ Stunden) +20
+  - verborgener Tab bis +20
+  - Stufen: unauffällig, beobachten (ab 15), verdächtig (ab 35), sehr verdächtig (ab 60)
+- **Keine automatische Sperre:** Gebremst werden nur Klickfluten. Mehr als 40 Aktionen in 3 s werden mit HTTP 429 abgewiesen, und der Spielstand lädt neu.
+- **Admin:** In der Lobby gibt es den Knopf „Fair Play“ mit der Zahl ungeprüfter auffälliger Konten. Je Konto zeigt die Übersicht Bewertung, Begründungen, Spiele, aktive Stunden und Belege. Aktionen:
+  - **Unbedenklich:** gilt als geprüft, bis die Bewertung um 10 Punkte steigt.
+  - **Verwarnen:** Der Spieler sieht beim nächsten Laden einen Hinweis.
+  - **Daten zurücksetzen:** Die alte Bewertung wird archiviert.
+  - Entfernen bzw. Sperren läuft weiter über die Spielverwaltung.
+- **Grenzen:** Ein Agent, der den Bildschirm über das Betriebssystem bedient, erzeugt echte Eingaben. Er fällt nur über Tempo, Takt und Dauerbetrieb auf.
+
 ## Neu in 0.21.73: Neues Logo
 
 - **Neues Skymarket-Logo:** das Logo der Nutzerin 1:1 als Bild mit seinem Leuchten. Der dunkle Hintergrund ist durchsichtig gemacht (WebP mit Alpha, einmal im Seitenkopf eingebettet). Es ersetzt den alten Papierflieger im Kopf der Seite, ist das Tab-Symbol und sitzt statt des Flugzeugs in der Mitte des Mystery Packs (`packLogo()` nutzt das Bild aus dem Kopf).

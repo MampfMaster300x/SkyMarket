@@ -1,6 +1,7 @@
 // Prüft den API-Ablauf ohne Netlify: Konten, Spiel mit Passwort, Suche, Beitritt per Code und Einladung, Zeit, Aktionen.
 import { handle, tickMain, _clock } from '../server/api.mjs';
 import { memStore } from '../server/memstore.mjs';
+import { fairNew, fairRecord, fairScore, fairDue, fairCalm, fairRebase, FAIR } from '../server/fairplay.mjs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -1602,7 +1603,7 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   let n = 0; for (const c of SMx.AP_CODES) { if (n >= 3) break; if (c === 'HAJ' || SMx.gcDistanceKm('HAJ', c) < 300 || SMx.gcDistanceKm('HAJ', c) > 900) continue; if (SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HAJ', dest: c, typeId: 'A320', freq: 3 }).ok) n++; }
   for (let i = 0; i < 20; i++) w.step(); w.antitrustCheck(); assert.ok(a.antitrust && a.antitrust.HAJ, 'Verfahren');
   const pa = w.antitrustPlan(a, 'HAJ'); assert.ok(!pa.ok && pa.cuts.length && pa.after < pa.limit && pa.routes.length === n, 'Vorschlag mit Strecken: ' + pa.adviceTxt);
-  assert.ok(/höchstens \d+ eigene Abflüge am Tag/.test(pa.adviceTxt) && /→ \d+× täglich|schließen/.test(pa.adviceTxt), 'konkrete Zahlen: ' + pa.adviceTxt);
+  assert.ok(/höchstens \d+ Slots halten/.test(pa.adviceTxt) && /→ \d+× täglich|schließen/.test(pa.adviceTxt) && pa.sell > 0, 'konkrete Zahlen: ' + pa.adviceTxt);
   assert.ok(a.events.some((e) => /Wettbewerbsaufsicht: Hannover/.test(e.msg) && /Vorschlag: höchstens/.test(e.msg)), 'Meldung nennt Zahlen');
   const fine0 = w.antitrustFine(a, 0.9); assert.ok(fine0 >= 0);
   const r = SMx.applyAction(w, 'P1', { type: 'antitrustAdjust', apt: 'HAJ' }); assert.ok(r.ok, r.msg);
@@ -1610,6 +1611,31 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.equal(SMx.applyAction(w, 'P1', { type: 'antitrustAdjust', apt: 'HAJ' }).ok, false, 'nichts mehr anzupassen');
   Object.assign(P.ANTITRUST, A0);
   console.log('0.21.55 ok: Wettbewerbsaufsicht mit Grenze in Flügen, Streckenliste und Vorschlag zum Übernehmen');
+}
+// 0.21.77: Wettbewerbsaufsicht nach Slot-Anteil – nur Flüge kürzen hilft nicht (Slots bleiben als Reserve), Rückgabe schon; Flughäfen ohne Slot-Begrenzung frei
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0); const P = SMx.P, A0 = { ...P.ANTITRUST };
+  assert.equal(A0.share, 0.6, '60 % der Slots');
+  const w = SMx.newWorld({ seed: 78 }), a = SMx.addHuman(w, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAJ' }); w.playerId = 'P1';
+  a.ledger.equityFlow(2e9, 't'); Object.assign(P.ANTITRUST, { minDeps: 4, minPax: 0 });
+  for (let i = 0; i < 8; i++) SMx.applyAction(w, 'P1', { type: 'acquire', typeId: 'A320', base: 'HAJ', mode: 'lease' });
+  while (w.day <= Math.max(...a.fleet.map((x) => x.delivery_day))) w.step();
+  let n = 0; for (const c of SMx.AP_CODES) { if (n >= 3) break; if (c === 'HAJ' || SMx.gcDistanceKm('HAJ', c) < 300 || SMx.gcDistanceKm('HAJ', c) > 900) continue; if (SMx.applyAction(w, 'P1', { type: 'openRoute', base: 'HAJ', dest: c, typeId: 'A320', freq: 3 }).ok) n++; }
+  for (let i = 0; i < 5; i++) w.step(); w.antitrustCheck(); assert.ok(a.antitrust && a.antitrust.HAJ, 'Verfahren über 60 % der Slots');
+  const s0 = w.slotShare(a, 'HAJ'); assert.ok(s0.share >= 0.6 && s0.own === s0.used, 'Anteil aus genutzten Slots: ' + JSON.stringify(s0));
+  const r0 = a.activeRoutes().find((r) => r.base === 'HAJ' && r.freq === 3); assert.ok(SMx.applyAction(w, 'P1', { type: 'editRoute', id: r0.id, freq: 1 }).ok, 'nur Flüge kürzen');
+  const s1 = w.slotShare(a, 'HAJ'); assert.equal(s1.own, s0.own, 'gekürzte Flüge bleiben als eigene Reserve-Slots'); assert.ok(s1.held >= 2 && s1.sell >= 2, 'Reserve zählt und ist rückgebbar');
+  w.antitrustCheck(); assert.ok(a.antitrust && a.antitrust.HAJ, 'nur Kürzen: Verfahren läuft weiter');
+  const pa = w.antitrustPlan(a, 'HAJ'); assert.ok(!pa.ok && pa.giveRes >= 2 && pa.sell >= pa.giveRes, 'Vorschlag gibt zuerst die Reserve zurück: ' + pa.adviceTxt);
+  assert.ok(/ungenutzte Reserve-Slots zurückgeben/.test(pa.adviceTxt), pa.adviceTxt);
+  const r = SMx.applyAction(w, 'P1', { type: 'antitrustAdjust', apt: 'HAJ' }); assert.ok(r.ok && /Slots zurückgegeben/.test(r.msg), r.msg);
+  const s2 = w.slotShare(a, 'HAJ'); assert.ok(s2.share < 0.6 && s2.own < s1.own, 'nach Rückgabe unter 60 %: ' + JSON.stringify(s2));
+  w.antitrustCheck(); assert.ok(!(a.antitrust && a.antitrust.HAJ), 'Verfahren eingestellt');
+  assert.ok(a.events.some((e) => /Verfahren in Hannover eingestellt/.test(e.msg) && /Slot-Anteil/.test(e.msg)), 'Meldung zum Ende');
+  Object.assign(P.ANTITRUST, A0); const w3 = SMx.newWorld({ seed: 79 }), b = SMx.addHuman(w3, { id: 'P2', name: 'Beta', code: 'BB', base: 'HAJ' });
+  b.hold('STR', 7, 0, true); w3.antitrustCheck(); assert.ok(!(b.antitrust && b.antitrust.STR), 'unter der Prüfschwelle von ' + A0.minDeps + ' Slots kein Verfahren');
+  b.hold('STR', Math.ceil(0.6 * w3.slotCap.STR) - 7, 0, true); w3.antitrustCheck(); assert.ok(b.antitrust && b.antitrust.STR, 'auch reine Reserve-Slots zählen (' + w3.slotShare(b, 'STR').own + ' von ' + w3.slotShare(b, 'STR').cap + ')');
+  Object.assign(P.ANTITRUST, A0);
+  console.log('0.21.77 ok: Wettbewerbsaufsicht nach Slot-Anteil (inkl. Reserve), Kürzen allein reicht nicht, Vorschlag gibt Slots zurück, Verfahren endet, Prüfschwelle in Slots');
 }
 // 0.21.56: Frachtsparte – eigene Frachtstrecken, Markt, Rate, Frachter, Slots, Speichern
 { const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0); const P = SMx.P;
@@ -1681,4 +1707,133 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.deepStrictEqual(dup, [], 'doppelte Lobby-IDs: ' + dup.join(', '));
   for (const id of new Set([...src.matchAll(/\$\('#(lb[A-Za-z]+)'\)\.addEventListener/g)].map((m) => m[1]))) assert.ok(ids.includes(id), 'Handler ohne Element: ' + id);
   console.log('0.21.64 ok: ' + ids.length + ' Lobby-IDs eindeutig'); }
+// 0.21.74 Fair-Play-Wächter: Mensch unauffällig; Webdriver, Schnittstelle ohne Oberfläche, Maschinen-Takt, Dauerbetrieb und Klickflut fallen auf; Admin-Übersicht, Verwarnung, Prüfen, Zurücksetzen
+{ const T0 = Date.UTC(2026, 10, 12, 8, 0, 0); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const human = fairNew('h', 'Mensch', T0); let t = T0, g = 0;
+  for (let i = 0; i < 80; i++) { t += 900 + rnd() * 9000; g++; fairRecord(human, { now: t, game: 'main', fp: { gap: 300 + rnd() * 3000, tr: 1 + Math.floor(rnd() * 3), ut: 0, g, wd: 0, hl: 0, dbg: 0, vis: 1 } }); }
+  const hs = fairScore(human); assert.ok(hs.score < 15 && hs.level === 'unauffällig', 'Mensch unauffällig: ' + JSON.stringify(hs.reasons));
+  const wd = fairNew('w', 'Agent', T0); t = T0; for (let i = 0; i < 12; i++) { t += 1500 + rnd() * 3000; fairRecord(wd, { now: t, game: 'main', fp: { gap: 400, tr: 1, ut: 0, g: i, wd: 1, hl: 0, dbg: 0, vis: 1 } }); }
+  const ws = fairScore(wd); assert.ok(ws.score >= 35 && ws.reasons[0].k === 'webdriver', 'Webdriver verdächtig');
+  const api = fairNew('a', 'Skript', T0); t = T0; for (let i = 0; i < 20; i++) { t += 700 + rnd() * 5000; fairRecord(api, { now: t, game: 'main', fp: null }); }
+  assert.ok(fairScore(api).reasons.some((r) => r.k === 'api') && fairScore(api).score >= 35, 'Schnittstelle ohne Oberfläche');
+  const tick = fairNew('r', 'Takt', T0); t = T0; for (let i = 0; i < 40; i++) { t += 2000 + (i % 2 ? 20 : -20); fairRecord(tick, { now: t, game: 'main', fp: { gap: 300, tr: 1, ut: 0, g: i, wd: 0, hl: 0, dbg: 0, vis: 1 } }); }
+  assert.ok(fairScore(tick).reasons.some((r) => r.k === 'rhythm'), 'Maschinen-Takt');
+  const sc = fairNew('s', 'Klicker', T0); t = T0; for (let i = 0; i < 8; i++) { t += 1500 + rnd() * 2000; fairRecord(sc, { now: t, game: 'main', fp: { gap: 60000, tr: 0, ut: 1, g: 3, wd: 0, hl: 0, dbg: 1, vis: 1 } }); }
+  const ss = fairScore(sc); assert.ok(['script', 'debug'].every((k) => ss.reasons.some((r) => r.k === k)), 'Skript-Klicks und Debug');
+  assert.ok(!fairScore(Object.assign(fairNew('ad', 'Admin', T0), {})).reasons.length, 'leer');
+  const adm = fairNew('ad', 'Admin', T0); fairRecord(adm, { now: T0 + 1000, game: 'main', admin: true, fp: { gap: 200, tr: 1, ut: 0, g: 1, dbg: 1, vis: 1 } }); assert.ok(!adm.sig.debug, 'Admins dürfen den Debug-Modus nutzen');
+  const night = fairNew('n', 'Nachtschicht', T0); for (let hh = 0; hh < 22; hh++) fairRecord(night, { now: T0 - 8 * 3600e3 + hh * 3600e3 + 60e3 * (1 + rnd() * 30), game: 'main', fp: { gap: 400, tr: 1, ut: 0, g: hh, vis: 1 } });
+  assert.ok(fairScore(night).reasons.some((r) => r.k === 'clock'), 'Dauerbetrieb rund um die Uhr');
+  const fl = fairNew('f', 'Flut', T0); let blocked = 0; for (let i = 0; i < FAIR.rateN + 10; i++) if (fairRecord(fl, { now: T0 + i * 20, game: 'main', fp: { gap: 50, tr: 1, ut: 0, g: i, vis: 1 } }).tooFast) blocked++;
+  assert.equal(blocked, 10, 'Klickflut: alles über dem Limit abgewiesen'); assert.ok(fl.sig.fast > 0 && fairScore(fl).reasons.some((r) => r.k === 'flood'), 'übermenschlich + Flut');
+  // Server: Aktion mit Bedien-Nachweis, Admin-Übersicht, Verwarnen, gelesen, prüfen, zurücksetzen
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: { gap: 300, tr: 1, ut: 0, g: 1, wd: 1, hl: 0, dbg: 0, vis: 1 } }), 'Aktion mit Nachweis');
+  assert.equal((await call('anna', 'GET', '/admin/fairplay')).status, 403, 'Übersicht nur für Admins');
+  const fp = ok(await call('tim', 'GET', '/admin/fairplay'), 'Übersicht'); const ar = fp.rows.find((r) => r.key === 'anna');
+  assert.ok(ar && ar.sig.webdriver === 1 && ar.reasons.some((r) => r.k === 'webdriver') && ar.games[0].name === 'Hauptwelt', 'Anna mit Webdriver-Beleg');
+  ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'warn', text: 'Bitte selbst spielen.' }), 'verwarnen');
+  const me1 = ok(await call('anna', 'GET', '/me'), 'me'); assert.equal(me1.fairWarn && me1.fairWarn.text, 'Bitte selbst spielen.', 'Spielerin sieht die Verwarnung');
+  ok(await call('anna', 'POST', '/fair/seen', {}), 'gelesen'); assert.equal(ok(await call('anna', 'GET', '/me'), 'me').fairWarn, null, 'nur einmal');
+  ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'ok' }), 'geprüft'); const ar2 = ok(await call('tim', 'GET', '/admin/fairplay'), 'Ü').rows.find((r) => r.key === 'anna');
+  assert.ok(ar2.review && !ar2.open && ar2.warn.seen, 'geprüft, nicht mehr offen, Verwarnung gelesen');
+  ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'reset' }), 'zurücksetzen'); assert.equal(ok(await call('tim', 'GET', '/admin/fairplay'), 'Ü').rows.find((r) => r.key === 'anna').score, 0, 'nach Zurücksetzen 0');
+  assert.equal((await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'sperren' })).status, 400, 'unbekannter Befehl');
+  console.log(`0.21.74 ok: Fair Play – Mensch ${hs.score}, Webdriver ${ws.score}, Schnittstelle ${fairScore(api).score}, Takt ${fairScore(tick).score}, Flut gebremst`); }
+// 0.21.75 Fair Play – Maßnahmen: Geldstrafe, Annullieren (Gewinne + Meilensteine), Wertung aberkennen, zeitweise Sperre (KI vertritt), Pack-Sperre; nur Admins
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const loadW = async () => SMx.deserialize(JSON.parse(gunzipSync(Buffer.from((await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' })).data)).toString()));
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: { gap: 200, tr: 1, ut: 0, g: 9, vis: 1 } }), 'Aktion legt Fair-Play-Daten an');
+  let w0 = await loadW(); const al0 = w0.humans.find((h) => h.owner === 'anna' && h.status !== 'insolvent'), eq0 = SMx.balanceSheet(al0).equity;
+  const S = (kind, extra = {}) => call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'sanction', kind, reason: 'Test', game: 'main', ...extra });
+  assert.equal((await call('ben', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'sanction', kind: 'fine', game: 'main', amount: 1 })).status, 403, 'nur Admins');
+  ok(await S('fine', { amount: 2 }), 'Geldstrafe'); let w1 = await loadW(), a1 = w1.airlines[al0.id];
+  assert.ok(Math.abs(SMx.balanceSheet(a1).equity - (eq0 - 2e6)) < 1e3, 'Eigenkapital −2 Mio.'); assert.ok(a1.events.some((e) => /Geldstrafe 2 Mio/.test(e.msg)), 'im Logbuch');
+  // Annullieren: künstlich Gewinn-Tage und einen frischen Meilenstein setzen, dann ganzes Spiel annullieren
+  { const raw = await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' }); const o = SMx.deserialize(JSON.parse(gunzipSync(Buffer.from(raw.data)).toString())), A = o.airlines[al0.id];
+    A.dayHist = [...(A.dayHist || []), { d: o.day, net: 3e6 }]; A.milestones = { ...(A.milestones || {}), [SMx.MILESTONES[0].id]: o.day };
+    const buf = gzipSync(Buffer.from(JSON.stringify(SMx.serialize(o)))); await store.set('games/main/state', buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), { metadata: raw.metadata }); }
+  const an = ok(await S('annul', { days: 1 }), 'Annullieren'); assert.ok(/Meilenstein/.test(an.msg), an.msg);
+  let w2 = await loadW(), a2 = w2.airlines[al0.id]; assert.ok(!(SMx.MILESTONES[0].id in (a2.milestones || {})) && a2.msRev && a2.msRev[SMx.MILESTONES[0].id] !== undefined, 'Meilenstein aberkannt und gesperrt');
+  w2.checkMilestones(a2); assert.ok(!(SMx.MILESTONES[0].id in a2.milestones), 'kommt nicht wieder');
+  ok(await S('dq'), 'Wertung aberkennen'); assert.ok((await loadW()).airlines[al0.id].dq, 'dq gesetzt'); ok(await S('undq'), 'wieder zulassen'); assert.ok(!(await loadW()).airlines[al0.id].dq, 'dq weg');
+  // Sperre: keine Aktionen, kein Chat, KI vertritt; Hinweis beim Laden; aufheben
+  ok(await S('suspend', { hours: 1 }), 'sperren');
+  const blocked = await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: { gap: 200, tr: 1, g: 10, vis: 1 } }); assert.equal(blocked.status, 403, 'gesperrt: keine Aktionen');
+  assert.equal((await call('anna', 'POST', '/games/main/chat', { text: 'hallo' })).status, 403, 'gesperrt: kein Chat');
+  assert.ok((await loadW()).airlines[al0.id].auto, 'KI vertritt während der Sperre');
+  const me = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(me.susp && me.susp.until > Date.now() && /Luftfahrtaufsicht hat Ihren Leitstand/.test(me.fairWarn.text) && /Bußgeld/.test(me.fairWarn.text) && !/Spielleitung|Admin/.test(me.fairWarn.text), 'Spielerin sieht Stilllegung und Bußgeld – als Luftfahrtaufsicht');
+  const fl = ok(await call('tim', 'GET', '/admin/fairplay'), 'Ü').rows.find((r) => r.key === 'anna'); assert.ok(fl.susp && fl.sanctions.length >= 5, 'Übersicht zeigt Sperre und Verlauf');
+  ok(await S('unsuspend'), 'aufheben'); ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'resume' }, fp: { gap: 200, tr: 1, g: 11, vis: 1 } }), 'wieder spielen');
+  // Pack-Sperre
+  ok(await S('packban', { hours: 24 }), 'Pack-Sperre'); assert.equal((await call('anna', 'POST', '/shop/request', { offer: 'starter' })).status, 403, 'keine Pack-Anfragen'); ok(await S('unpackban'), 'Pack-Sperre aufheben');
+  assert.equal((await S('suspend', { hours: 0 })).status, 400, 'Dauer nötig'); assert.equal((await S('fine', { game: 'gibtsnicht', amount: 1 })).status, 404, 'Spiel ohne Airline');
+  console.log('0.21.75 ok: Maßnahmen – Strafe, Annullieren, Aberkennen, Sperre mit KI-Vertretung, Pack-Sperre'); }
+// 0.21.78 Luftfahrtaufsicht: gestufte Maßnahmen (Hinweis → Lizenzentzug), vom Prüfsystem verhängt (bis zur eingestellten Stufe), sonst „fällig“ zur Bestätigung; Bewährung
+{ const SMx = (await import('../shared/engine.cjs')).default, T0 = Date.UTC(2026, 10, 12, 8, 0, 0); let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  assert.equal(SMx.FAIR_STAGES.length, 6, 'fünf Stufen'); assert.ok(SMx.FAIR_STAGES.slice(1).every((S, i) => S.n === i + 1 && SMx.fairStageWhat(S.n)), 'jede Stufe beschrieben');
+  const fp = (i, wd = 1) => ({ gap: 400, tr: 1, ut: 0, g: i, wd, hl: 0, dbg: 0, vis: 1 });
+  const hum = fairNew('h', 'Mensch', T0); let t = T0; for (let i = 0; i < 40; i++) { t += 900 + rnd() * 9000; fairRecord(hum, { now: t, game: 'main', fp: { ...fp(i, 0), gap: 300 + rnd() * 3000 } }); }
+  assert.equal(fairDue(hum, t), null, 'Mensch: keine Stufe');
+  const ag = fairNew('a', 'Agent', T0); t = T0; for (let i = 0; i < 9; i++) { t += 2000 + rnd() * 3000; fairRecord(ag, { now: t, game: 'main', fp: fp(i) }); }
+  assert.equal(fairDue(ag, t), null, 'unter 10 Aktionen noch nicht'); t += 3000; fairRecord(ag, { now: t, game: 'main', fp: fp(9) });
+  const d1 = fairDue(ag, t, 2); assert.ok(d1 && d1.n === 1 && d1.auto && d1.score >= FAIR.stageScore, 'Stufe 1 fällig, automatisch');
+  ag.stage = 1; ag.stageAt = t; fairRebase(ag, t); assert.equal(fairDue(ag, t + 1000), null, 'alte Belege zählen nicht mehr');
+  for (let i = 0; i < 12; i++) { t += 2500; fairRecord(ag, { now: t, game: 'main', fp: fp(20 + i) }); }
+  assert.equal(fairDue(ag, t, 2), null, 'frühestens nach ' + FAIR.stageGap / 3600e3 + ' Stunden');
+  const d2 = fairDue(ag, ag.stageAt + FAIR.stageGap + 1, 2); assert.ok(d2 && d2.n === 2 && d2.auto, 'Stufe 2 automatisch');
+  ag.stage = 2; ag.stageAt = t; fairRebase(ag, t); for (let i = 0; i < 12; i++) { t += 2500; fairRecord(ag, { now: t, game: 'main', fp: fp(40 + i) }); }
+  const d3 = fairDue(ag, t + FAIR.stageGap, 2); assert.ok(d3 && d3.n === 3 && !d3.auto, 'Stufe 3 nur auf Bestätigung (Voreinstellung bis Stufe 2)');
+  const calm = { ...ag, sanctions: [] }; fairRebase(calm, t); assert.equal(fairCalm(calm, t + 10 * 864e5), false, 'Bewährung braucht ' + FAIR.calmDays + ' Tage');
+  assert.ok(fairCalm(calm, t + (FAIR.calmDays + 1) * 864e5) && calm.stage === 1, 'nach Bewährung eine Stufe zurück');
+  const rv = fairNew('r', 'Geprüft', T0); t = T0; for (let i = 0; i < 12; i++) { t += 3000; fairRecord(rv, { now: t, game: 'main', fp: fp(i) }); } rv.review = { at: t, by: 'x', score: fairScore(rv).score };
+  assert.equal(fairDue(rv, t + 1), null, 'als unbedenklich geprüft (alter Stand ohne Ausgangspunkt): keine Stufe');
+  // Server: Einstellung nur für Admins; Prüfsystem verhängt Stufe 1 selbst; Stufe 2 und 3 von Hand – für die Spielerin alles „Luftfahrtaufsicht“
+  assert.equal((await call('anna', 'POST', '/admin/fairplay', { cmd: 'conf', autoMax: 5 })).status, 403, 'Einstellung nur Admins');
+  ok(await call('tim', 'POST', '/admin/fairplay', { cmd: 'conf', autoMax: 2 }), 'bis Stufe 2 automatisch');
+  { const r0 = await store.get('fair/anna', { type: 'json' }); r0.stage = 0; delete r0.stageAt; fairRebase(r0, Date.now()); await store.setJSON('fair/anna', r0); }   // frühere Testaktionen ohne Nachweis können schon Stufe 1 ausgelöst haben
+  ok(await call('anna', 'POST', '/fair/seen', {}), 'alte Hinweise gelesen');
+  for (let i = 0; i < 12; i++) ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: fp(100 + i) }), 'Aktion ' + i);
+  const loadW = async () => SMx.deserialize(JSON.parse(gunzipSync(Buffer.from((await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' })).data)).toString()));
+  const me1 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(me1.fairWarn && me1.fairWarn.stage === 1 && me1.fairWarn.ladder.length === 5, 'Bescheid Stufe 1 mit Stufenleiter');
+  assert.ok(/Prüfsystem der Luftfahrtaufsicht/.test(me1.fairWarn.text) && !/Spielleitung|Admin|Webdriver|Takt/.test(me1.fairWarn.text), 'vom Spiel erkannt, ohne Admin und ohne Erkennungsdetails: ' + me1.fairWarn.text);
+  const al = (await loadW()).humans.find((h) => h.owner === 'anna' && h.status !== 'insolvent'); assert.ok(al.events.some((e) => /Luftfahrtaufsicht – Stufe 1 von 5/.test(e.msg)), 'Logbuch: Stufe 1');
+  let row = ok(await call('tim', 'GET', '/admin/fairplay'), 'Ü').rows.find((r) => r.key === 'anna'); assert.ok(row.stage === 1 && row.sanctions.some((x) => x.kind === 'stage' && x.auto), 'Übersicht: Stufe 1, automatisch');
+  const eq0 = SMx.balanceSheet(al).equity;
+  const s2 = ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'stage' }), 'Stufe 2 von Hand'); assert.ok(/Stufe 2/.test(s2.msg), s2.msg);
+  const a2 = (await loadW()).airlines[al.id]; assert.ok(SMx.balanceSheet(a2).equity < eq0 - 1e6 && a2.events.some((e) => /Luftfahrtaufsicht – Stufe 2 von 5 \(Bußgeld\)/.test(e.msg)), 'Bußgeld gebucht');
+  assert.ok(!a2.events.slice(-3).some((e) => /Spielleitung|tim/i.test(e.msg)), 'kein Hinweis auf die Spielleitung');
+  const me2 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(me2.packBan && me2.fairWarn.stage === 2 && /Keine Packs bis/.test(me2.fairWarn.text), 'Stufe 2: keine Packs');
+  const pr = await call('anna', 'POST', '/shop/request', { offer: 'starter' }); assert.ok(pr.status === 403 && /Luftfahrtaufsicht/.test(pr.data.error || pr.data.msg || JSON.stringify(pr.data)), 'Pack-Anfrage gesperrt (Luftfahrtaufsicht)');
+  ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'stage' }), 'Stufe 3 von Hand');
+  const bl = await call('anna', 'POST', '/games/main/action', { action: { type: 'repay', id: 'nix' }, fp: fp(200, 0) }); assert.equal(bl.status, 403, 'Stufe 3: Leitstand stillgelegt');
+  assert.ok((await loadW()).airlines[al.id].auto, 'KI führt die Airline');
+  row = ok(await call('tim', 'GET', '/admin/fairplay'), 'Ü').rows.find((r) => r.key === 'anna'); assert.ok(row.stage === 3 && row.susp && row.susp.stage === 3, 'Übersicht: Stufe 3 mit Sperre');
+  // Fehlalarm: zurücknehmen hebt die Sperren dieser Stufe auf
+  for (const n of [3, 2, 1]) { const r = ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'stageDown' }), 'zurück von ' + n); assert.ok(r.msg.includes(`Stufe ${n} zurückgenommen`), r.msg); }
+  assert.equal((await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'stageDown' })).status, 400, 'unter 0 geht nicht');
+  const me3 = ok(await call('anna', 'GET', '/me'), 'me'); assert.ok(!me3.susp && !me3.packBan && me3.fairWarn.stage === 0 && /zurückgenommen/.test(me3.fairWarn.text), 'Sperren aufgehoben, Bescheid über die Rücknahme');
+  ok(await call('anna', 'POST', '/games/main/action', { action: { type: 'resume' }, fp: fp(300, 0) }), 'wieder selbst spielen'); ok(await call('anna', 'POST', '/fair/seen', {}), 'gelesen');
+  ok(await call('tim', 'POST', '/admin/fairplay', { key: 'anna', cmd: 'reset' }), 'Daten zurücksetzen');
+  const rs = ok(await call('tim', 'POST', '/admin/fairplay', { cmd: 'conf', autoMax: 0 }), 'nur vorschlagen'); assert.ok(/nur noch vor/.test(rs.msg)); ok(await call('tim', 'POST', '/admin/fairplay', { cmd: 'conf', autoMax: 2 }), 'zurück');
+  console.log(`0.21.78 ok: Luftfahrtaufsicht – Stufen 1–5, Stufe 1 automatisch (Score ${d1.score}), 12-h-Abstand, Stufe 3 auf Bestätigung, Bewährung, Bescheide ohne Admin-Namen`); }
+// 0.21.79: Pack-Verläufe mit eigener ID je Pack (gleiche IDs ließen die Tüte durchsichtig werden, sobald ein verstecktes Pack zuerst im Dokument stand)
+{ const src = fs.readFileSync(new URL('../src/collection.js', import.meta.url), 'utf8'), i = src.indexOf('const packSvg = '), body = src.slice(i, src.indexOf('</svg>`', i));
+  assert.ok(i > 0 && !/id="pk[a-z]+"|url\(#pk[a-z]+\)/.test(body), 'keine festen Verlaufs-IDs im Pack'); assert.ok(/'pk' \+ \(\+\+packSeq\)/.test(body) && /url\(#\$\{u\}g\)/.test(body), 'IDs je Pack');
+  const css = fs.readFileSync(new URL('../src/shell.html', import.meta.url), 'utf8'); assert.ok(/\.pk-box:focus-visible \{ outline: none; \}/.test(css), 'kein Fokusrahmen ums Pack');
+  assert.ok(/class="pk-plane"/.test(body) && !/filter="url\(#\$\{u\}l\)"/.test(body), 'Flugzeug im Logo leicht umrandet, Logobild ohne Filter');
+  console.log('0.21.79 ok: Pack-Verläufe je Pack eindeutig, kein Fokusrahmen, Flugzeug-Kontur'); }
+// 0.21.76: jede Airline bekommt Charteranfragen für die eigenen Muster (vorher gingen seltene Muster in großen Welten leer aus); Weltzufall unberührt
+{ const SMx = (await import('../shared/engine.cjs')).default;
+  const w = SMx.deserialize(JSON.parse(gunzipSync(Buffer.from((await store.getWithMetadata('games/main/state', { type: 'arrayBuffer' })).data)).toString()));
+  // zwei Airlines mit Flotte herrichten: eine fliegt nur ATR (seltenes Muster), eine A320neo
+  const donor = w.list.find((x) => x.archetype && x.fleet.length >= 3), hs = w.humans.filter((h) => !h.removed).slice(0, 2);
+  assert.ok(donor && hs.length >= 1, 'Testwelt mit Spender-Flotte und Spielenden');
+  hs.forEach((h, i) => { h.status = 'active'; h.fleet = donor.fleet.slice(0, 3).map((a, k) => ({ ...JSON.parse(JSON.stringify(a)), id: `T${i}${k}`, type_id: i ? 'A20N' : 'AT76', cg: undefined, delivery_day: w.day - 1 })); });
+  const h0 = hs[0];
+  w.acmiOffers = []; const rng0 = w.rng.s; w.refreshCharters(false);
+  for (const h of hs) { const g = new Set(h.fleet.filter((a) => !SMx.P.AIRCRAFT_TYPES[a.type_id].role).map((a) => SMx.P.AIRCRAFT_TYPES[a.type_id].group));
+    const n = w.acmiOffers.filter((o) => !o.kind && g.has(SMx.P.AIRCRAFT_TYPES[o.type].group)).length; assert.ok(n >= 3, `${h.name}: ${n} passende Anfragen`); }
+  assert.ok(w.acmiOffers.filter((o) => !o.kind && SMx.P.AIRCRAFT_TYPES[o.type].group === SMx.P.AIRCRAFT_TYPES.AT76.group).length >= 3, 'ATR-Airline bekommt ATR-Anfragen');
+  const before = w.acmiOffers.length; w.refreshCharters(false); assert.equal(w.acmiOffers.length, before, 'kein Aufblähen beim zweiten Durchlauf');
+  console.log(`0.21.76 ok: eigene Charteranfragen für ${hs.length} Airlines (${w.acmiOffers.filter((o) => o.own).length} zusätzlich)`); }
 console.log('Alle Prüfungen bestanden.');

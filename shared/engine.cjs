@@ -415,7 +415,7 @@ const SM = (() => {
     // Hohe Streckenmargen locken Konkurrenz: andere Airlines senken dort Preise und legen Sitze nach, wo niemand fliegt, steigt jemand ein
     MARGIN_PRESSURE: { margin: 0.25, minDays: 60, p: 0.4, max: 6, days: 120, x: 0.8, cap: 1.25, sizeRef: 25 },
     HQ_CURVE: [[0, 800], [5, 3000], [15, 10000], [30, 26000], [100, 80000], [200, 200000], [400, 520000]],   // ab 100 Flugzeugen wächst die Verwaltung schneller als die Flotte (Konzernstrukturen)
-    ANTITRUST: { share: 0.6, minDeps: 25, minPax: 8, grace: 90, fine: 0.005 },
+    ANTITRUST: { share: 0.6, minDeps: 8, minPax: 8, grace: 90, fine: 0.005 },   // 0.21.77: Anteil an der Slot-Kapazität (inkl. eigener Reserve); minDeps = Mindestzahl gehaltener Slots am Tag
     // 0.20: Handel zwischen Spielenden nur in realistischer Spanne; Wirtschaftsprüfer prüfen zum Jahresende
     TRADE_FAIR: { free: 1000000 },   // Spielraum: Abweichung bis 1 Mio. € (Preisindex) ist frei – unabhängig von der Größe des Geschäfts
     // 0.21: Dominanz einhegen – Gesellschafter verlangen Ausschüttung, Druck auf Marktführer (nie zwei Dinge gleichzeitig), Hilfe für Kleine
@@ -4188,25 +4188,36 @@ const SM = (() => {
       this.aptObs = out; setFuelX(this);
       for (const c of grown) this.pushNews(this.day, `${ap(c).name} baut aus: über 25 Mio. Passagiere im Jahr – jetzt auch für A380 und andere Code-F-Flugzeuge zugelassen`, 'info');
     }
-    /** Wettbewerbsaufsicht: Wer an einem größeren Flughafen über 60 % der Abflüge hat, bekommt Auflagen (keine neuen Strecken dort) und nach einer Frist monatliche Bußgelder. */
+    /** 0.21.77 Wettbewerbsaufsicht nach Slot-Anteil: Wer an einem größeren, koordinierten Flughafen über 60 % der Slot-Kapazität hält
+     *  (genutzte Slots + eigene Reserve + Fracht), bekommt Auflagen (keine neuen Strecken dort) und nach einer Frist monatliche Bußgelder.
+     *  Vorher zählten die geflogenen Abflüge – flog sonst kaum jemand, half Kürzen nichts, und gekürzte Flüge blieben als Reserve-Slots beim Spieler. */
+    slotShare(al, c) {
+      if (!P.AIRPORTS[c] || apx(c).slots === null) return null;   // ohne Slot-Begrenzung kann jeder dazukommen – keine Marktbeherrschung über Slots
+      let used = al.cg ? al.cgSlotsAt(c) : 0; for (const r of al.activeRoutes()) if (r.base === c || r.dest === c) used += r.freq;
+      const held = al.heldAt(c, this.day), sell = (al.slotHold[c] || []).filter((h) => h.buy && h.until > this.day).reduce((x, h) => x + h.n, 0);
+      const own = used + held, cap = Math.max(1, this.slotCap[c] ?? 0, this.slotUse(c));
+      return { used, held, sell, own, cap, share: own / cap };
+    }
     antitrustCheck() {
-      const A = P.ANTITRUST, day = this.day, deps = {}, own = {};
-      for (const al of this.list) { if (al.status === 'insolvent') continue; for (const r of al.activeRoutes()) { if (r.opened_day > day) continue; const f = r.freq * (r.wk ? r.wk / 7 : 1); for (const c of [r.base, r.dest]) { deps[c] = (deps[c] || 0) + f; if (al.isPlayer) { own[al.id] = own[al.id] || {}; own[al.id][c] = (own[al.id][c] || 0) + f; } } } }
+      const A = P.ANTITRUST, day = this.day;
       for (const al of this.humans) {
         if (al.status === 'insolvent' || al.removed) continue;
-        const prev = al.antitrust || {}, now = {};
-        for (const [c, f] of Object.entries(own[al.id] || {})) {
-          const sh = f / Math.max(1, deps[c]);
+        const prev = al.antitrust || {}, now = {}, seen = {};
+        const apts = new Set([...al.activeRoutes().flatMap((r) => [r.base, r.dest]), ...Object.keys(al.slotHold || {}), ...Object.keys(prev)]);
+        for (const c of apts) {
+          const S = this.slotShare(al, c); if (!S) continue; seen[c] = S;
           if (al.gateLock && al.gateLock[c]) continue;   // genehmigter Exklusivvertrag: kein Verfahren für die Laufzeit
-          if (f < A.minDeps || paxEff(c) < A.minPax || sh < A.share) continue;
-          now[c] = { since: prev[c] ? prev[c].since : day, share: Math.round(sh * 100) / 100 };
-          if (!prev[c]) { const pa = this.antitrustPlan(al, c); al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie haben ${Math.round(sh * 100)} % aller Abflüge (${fmtF(pa.own)} von ${fmtF(pa.total)} am Tag). Neue Strecken dort sind untersagt; liegt Ihr Anteil in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder${pa.fine > 0 ? ` (etwa ${mioTxt(pa.fine)})` : ''}. ${pa.adviceTxt}`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Abflüge`, 'warn', al.id); }
+          if (S.own < A.minDeps || paxEff(c) < A.minPax || S.share < A.share) continue;
+          const sh = S.share;
+          now[c] = { since: prev[c] ? prev[c].since : day, share: Math.round(sh * 100) / 100, slots: S.own, cap: S.cap };
+          if (!prev[c]) { const pa = this.antitrustPlan(al, c); al.log(day, `Wettbewerbsaufsicht: ${ap(c).name} – Sie halten ${Math.round(sh * 100)} % der Slots (${fmtF(S.own)} von ${fmtF(S.cap)} am Tag, davon ${fmtF(S.held)} ungenutzte Reserve). Neue Strecken dort sind untersagt; halten Sie in ${A.grace} Tagen noch über ${Math.round(A.share * 100)} %, folgen monatliche Bußgelder${pa.fine > 0 ? ` (etwa ${mioTxt(pa.fine)})` : ''}. ${pa.adviceTxt}`, 'crit'); this.pushNews(day, `Wettbewerbsaufsicht prüft ${al.name} in ${ap(c).name}: ${Math.round(sh * 100)} % der Slots`, 'warn', al.id); }
           else if (day - now[c].since >= A.grace) {
             const fine = this.antitrustFine(al, sh);
-            if (fine > 0) { al.ledger.post('one_off', -fine, true, `Bußgeld Wettbewerbsaufsicht › ${aTag(c)}`); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (Anteil ${Math.round(sh * 100)} %). ${this.antitrustPlan(al, c).adviceTxt}`, 'crit'); }
+            if (fine > 0) { al.ledger.post('one_off', -fine, true, `Bußgeld Wettbewerbsaufsicht › ${aTag(c)}`); al.log(day, `Bußgeld der Wettbewerbsaufsicht für ${ap(c).name}: ${Math.round(fine / 1e5) / 10} Mio. EUR (${Math.round(sh * 100)} % der Slots). ${this.antitrustPlan(al, c).adviceTxt}`, 'crit'); }
           }
         }
-        for (const c of Object.keys(prev)) if (!now[c]) al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – ${al.gateLock && al.gateLock[c] ? 'der Exklusivvertrag ist genehmigt' : (own[al.id] || {})[c] < A.minDeps ? `Sie haben dort weniger als ${A.minDeps} Abflüge am Tag` : `Ihr Anteil liegt wieder unter ${Math.round(A.share * 100)} %`}.`, 'good');
+        for (const c of Object.keys(prev)) if (!now[c]) { const S = seen[c];
+          al.log(day, `Wettbewerbsaufsicht: Verfahren in ${ap(c).name} eingestellt – ${al.gateLock && al.gateLock[c] ? 'der Exklusivvertrag ist genehmigt' : !S ? 'dort gibt es keine Slot-Begrenzung' : S.own < A.minDeps ? `Sie halten dort weniger als ${A.minDeps} Slots am Tag` : `Ihr Slot-Anteil liegt wieder unter ${Math.round(A.share * 100)} %`}.`, 'good'); }
         al.antitrust = Object.keys(now).length ? now : undefined;
       }
     }
@@ -4215,31 +4226,33 @@ const SM = (() => {
       const A = P.ANTITRUST, rev = al.ledger.months.slice(-12).reduce((x, m) => x + (m.acc.rev_ticket || 0) + (m.acc.rev_ancillary || 0), 0) / 100 * 12 / Math.max(1, Math.min(12, al.ledger.months.length));
       return Math.round(A.fine * rev * Math.min(2, Math.max(sh, A.share) / A.share) / 1e4) * 1e4;
     }
-    /** 0.21.55: Konkreter Vorschlag zur Wettbewerbsaufsicht an einem Flughafen: alle eigenen Strecken dort, die Grenze in Flügen am Tag
-     *  und welche Frequenzen sinken müssen (schwächster Ertrag je Flug zuerst, mit 5 % Puffer). Liest nur, ändert nichts. */
+    /** 0.21.55/0.21.77: Konkreter Vorschlag zur Wettbewerbsaufsicht an einem Flughafen (Slot-Anteil): erst ungenutzte gekaufte Reserve-Slots
+     *  zurückgeben, dann Frequenzen senken (schwächster Ertrag je Flug zuerst, 5 % Puffer) und die frei werdenden Slots ebenfalls zurückgeben.
+     *  Liest nur, ändert nichts. */
     antitrustPlan(al, c) {
       const A = P.ANTITRUST, day = this.day, fq = (r) => r.freq * (r.wk ? r.wk / 7 : 1);
-      let total = 0, own = 0; const mine = [], rivals = {};
-      for (const x of this.list) { if (x.status === 'insolvent') continue; for (const r of x.activeRoutes()) { if (r.opened_day > day || (r.base !== c && r.dest !== c)) continue; const q = fq(r); total += q; if (x === al) { own += q; mine.push(r); } else rivals[x.id] = (rivals[x.id] || 0) + q; } }
-      const other = total - own, share = own / Math.max(1, total);
-      const byShare = A.share * other / (1 - A.share), bySize = A.minDeps > byShare, limit = Math.max(byShare, A.minDeps), target = limit * 0.95;
+      const S = this.slotShare(al, c) || { used: 0, held: 0, sell: 0, own: 0, cap: 1, share: 0 };
+      const rivals = {}; for (const h of this.slotHolders(c)) if (h.id !== al.id && h.n > 0) rivals[h.id] = h.n;
+      const mine = al.activeRoutes().filter((r) => r.base === c || r.dest === c);
+      const byShare = A.share * S.cap, bySize = A.minDeps > byShare, limit = Math.max(byShare, A.minDeps), target = limit * 0.95;
       const routes = mine.map((r) => { const st = autoRouteStats(al, r); return { id: r.id, base: r.base, dest: r.dest, freq: r.freq, wk: r.wk || 7, perDay: fq(r), dayRes: st.n ? st.db1 / st.n : 0, perFlight: st.n ? st.db1 / st.n / Math.max(0.15, fq(r)) : 0, to: r.freq, close: false }; })
         .sort((a, b) => a.perFlight - b.perFlight || (a.id < b.id ? -1 : 1));
-      let after = own;
-      if (own >= limit) {
-        // erst Frequenzen senken (täglich geflogene Strecken, min. 1 Flug), dann schwächste Strecken schließen
-        for (let guard = 0; after > target && guard < 400; guard++) {
-          const r = routes.filter((x) => !x.close && x.wk >= 7 && x.to > 1).sort((a, b) => a.perFlight - b.perFlight || (a.id < b.id ? -1 : 1))[0];
-          if (!r) break; r.to--; after -= 1;
+      let after = S.own, giveRes = 0, cutSlots = 0;
+      if (S.own >= limit) {
+        giveRes = Math.min(S.sell, Math.ceil(S.own - target)); after -= giveRes;   // 1. ungenutzte, gekaufte Reserve zurückgeben
+        for (let guard = 0; after > target && guard < 400; guard++) {                 // 2. Frequenzen senken (min. 1 Flug), Slot jeweils zurückgeben
+          const r = routes.filter((x) => !x.close && x.to > 1).sort((a, b) => a.perFlight - b.perFlight || (a.id < b.id ? -1 : 1))[0];
+          if (!r) break; r.to--; after -= 1; cutSlots++;
         }
-        for (const r of routes) { if (after <= target) break; if (r.close) continue; after -= r.wk >= 7 ? r.to : r.perDay; r.close = true; }
+        for (const r of routes) { if (after <= target) break; if (r.close) continue; after -= r.to; cutSlots += r.to; r.close = true; }   // 3. schwächste Strecken schließen
       }
-      const cuts = routes.filter((r) => r.close || r.to < r.freq);
-      const afterShare = after / Math.max(1, other + after), fine = this.antitrustFine(al, share);
+      const cuts = routes.filter((r) => r.close || r.to < r.freq), sell = giveRes + cutSlots;
+      const afterShare = after / Math.max(1, S.cap), fine = this.antitrustFine(al, S.share);
       const lockOk = !(al.gateLock && al.gateLock[c]) && !this.lockOwner(c), lock = lockOk ? this.gateLockPrice(c) : 0;
       const cutTxt = cuts.map((r) => r.close ? `${r.base}–${r.dest} schließen` : `${r.base}–${r.dest} ${r.freq}× → ${r.to}× täglich`).join(', ');
-      const adviceTxt = own < limit ? '' : `Vorschlag: höchstens ${fmtF(Math.ceil(limit) - 1)} eigene Abflüge am Tag (jetzt ${fmtF(own)}) – ${cutTxt || 'Frequenzen senken'} (danach ${bySize ? `${fmtF(after)} Abflüge, unter der Prüfschwelle von ${A.minDeps}` : `${Math.round(afterShare * 100)} %`}).${lock ? ` Alternative: Exklusivvertrag für ${mioTxt(lock)}, dann ${P.GATE_LOCK.years} Jahre kein Verfahren.` : ''}`;
-      return { apt: c, own, total, other, share, limit, bySize, target, after, afterShare, routes, cuts, fine, lock, rivals, adviceTxt, ok: own < limit };
+      const steps = [giveRes ? `${fmtF(giveRes)} ungenutzte Reserve-Slots zurückgeben` : '', cutTxt ? `${cutTxt} und die frei werdenden ${fmtF(cutSlots)} Slots zurückgeben` : ''].filter(Boolean).join('; ');
+      const adviceTxt = S.own < limit ? '' : `Vorschlag: höchstens ${fmtF(Math.ceil(limit) - 1)} Slots halten (jetzt ${fmtF(S.own)} von ${fmtF(S.cap)}) – ${steps || 'Slots zurückgeben'} (danach ${bySize ? `${fmtF(after)} Slots, unter der Prüfschwelle von ${A.minDeps}` : `${Math.round(afterShare * 100)} %`}).${lock ? ` Alternative: Exklusivvertrag für ${mioTxt(lock)}.` : ''}`;
+      return { apt: c, own: S.own, used: S.used, held: S.held, sellable: S.sell, total: S.cap, cap: S.cap, other: S.cap - S.own, share: S.share, limit, bySize, target, after, afterShare, routes, cuts, giveRes, cutSlots, sell, fine, lock, rivals, adviceTxt, ok: S.own < limit, slots: true };
     }
     monthEnd() {
       const m = monthOf(this.day), y = Math.floor(this.day / 365);
@@ -4380,7 +4393,7 @@ const SM = (() => {
       const got = al.milestones || (al.milestones = {}), day = this.day;
       const ctx = milestoneCtx(this, al);
       for (const m of MILESTONES) {
-        if (got[m.id] !== undefined) continue;
+        if (got[m.id] !== undefined || (al.msRev && al.msRev[m.id])) continue;   // 0.21.75: aberkannte Meilensteine kommen nicht wieder
         let ok = false; try { ok = m.test(ctx); } catch (e) { ok = false; }
         if (!ok) continue;
         got[m.id] = day;
@@ -4496,7 +4509,27 @@ const SM = (() => {
         const short = dur <= 14 ? 1.12 : 1;
         this.acmiOffers.push({ id: 'W' + (++this.offerCounter), client, type: typeId, start, end: start + dur, rate: Math.round(t.acmi_day * P.ACMI.rate * short * r.range(0.9, 1.2) * this.macro.cpi / 100) * 100, expires: start - 3 });
       }
+      this.ownCharters();   // 0.21.76: jede Airline bekommt Anfragen für die eigenen Muster
       if (monthly) this.occasionCharters(H);
+    }
+    /** 0.21.76: Bei vielen Spielenden verteilten sich die Anfragen auf alle Muster – seltene Muster gingen leer aus.
+     * Jetzt hat jede aktive Airline immer einige Passagier-Anfragen für ihre eigenen Familien (eigene Zufallsquelle, der Weltzufall bleibt unberührt). */
+    ownCharters() {
+      const day = this.day, C = P.ACMI.own || { base: 2, perAc: 6, max: 6 };
+      for (const h of this.humans) {
+        if (h.removed || h.status === 'insolvent') continue;
+        const own = [...new Set(h.fleet.filter((a) => !P.AIRCRAFT_TYPES[a.type_id].role && a.delivery_day <= day + 30).map((a) => a.type_id))];
+        if (!own.length) continue;
+        const grps = new Set(own.map((t) => P.AIRCRAFT_TYPES[t].group)), want = Math.min(C.max, C.base + Math.ceil(h.fleet.length / C.perAc));
+        let have = this.acmiOffers.filter((o) => !o.kind && grps.has(P.AIRCRAFT_TYPES[o.type].group) && o.expires > day).length;
+        for (let k = 0; have < want && k < 12; k++) {
+          const u = (x) => hashU(`own|${h.id}|${day}|${k}|${x}`), pickH = (arr, x) => arr[Math.min(arr.length - 1, Math.floor(u(x) * arr.length))];
+          const typeId = pickH(own, 't'), t = P.AIRCRAFT_TYPES[typeId], dur = pickH([7, 14, 21, 30, 45, 60, 90], 'd'), start = day + 8 + Math.floor(u('s') * 28);
+          const client = pickH(['Reiseveranstalter SunTours', 'Netzwerkcarrier mit Flugzeugmangel', 'Sportverband für Mannschaftsflüge', 'Kreuzfahrtreederei', 'Ferienairline in der Hochsaison', 'Airline nach Triebwerksschaden', 'Konzern mit Werksverkehr', 'Studienreise-Veranstalter', 'Wet-Lease für eine Partner-Airline'], 'c');
+          this.acmiOffers.push({ id: 'W' + (++this.offerCounter), client, type: typeId, start, end: start + dur, rate: Math.round(t.acmi_day * P.ACMI.rate * (dur <= 14 ? 1.12 : 1) * (0.9 + 0.3 * u('r')) * this.macro.cpi / 100) * 100, expires: start - 3, own: h.id });
+          have++;
+        }
+      }
     }
     /** 0.21.60: Anlass-Charter – Messen, Feste, Ferienspitzen, Sport: jeden Monat einige Anfragen mit Aufschlag zu einem Ort. */
     occasionCharters(H) {
@@ -6279,14 +6312,75 @@ const SM = (() => {
   }
   /** Spielleitung: Kapital zuschießen oder abziehen (Korrektur), als Eigenkapitalbewegung gebucht. */
   /** 0.21.47: Spielleitung startet oder beendet die KI-Vertretung einer Spieler-Airline (gilt, bis die Person wieder spielt). */
-  function adminAutopilot(w, id, on, now) {
+  function adminAutopilot(w, id, on, now, note = null) {
     const al = w.airlines[id];
     if (!al || !al.isPlayer || al.removed) return { ok: false, msg: 'Airline nicht gefunden.' };
     if (al.status === 'insolvent') return { ok: false, msg: `${al.name} ist insolvent.` };
-    if (on) { al.auto = now; al.autoForced = now; al.log(w.day, 'Die Spielleitung hat die KI-Vertretung gestartet: Die KI führt Ihre Airline (Preise, Personal, Entscheidungen, freie Flugzeuge), bis Sie wieder spielen.', 'warn'); return { ok: true, msg: `Die KI vertritt jetzt ${al.name} – bis die Person wieder spielt.` }; }
+    if (on) { al.auto = now; al.autoForced = now; if (note !== '') al.log(w.day, note || 'Die Spielleitung hat die KI-Vertretung gestartet: Die KI führt Ihre Airline (Preise, Personal, Entscheidungen, freie Flugzeuge), bis Sie wieder spielen.', 'warn'); return { ok: true, msg: `Die KI vertritt jetzt ${al.name} – bis die Person wieder spielt.` }; }
     if (!al.auto && !al.autoForced) return { ok: true, msg: `${al.name} wird gerade nicht vertreten.` };
     al.auto = 0; delete al.autoForced; al.lastAct = now; al.log(w.day, 'Die Spielleitung hat die KI-Vertretung beendet.', 'info');
     return { ok: true, msg: `KI-Vertretung für ${al.name} beendet.` };
+  }
+  /** 0.21.75 Fair Play: Strafen der Spielleitung – Geldstrafe, Annullierung (Gewinne einziehen, Meilensteine aberkennen), Wertung aberkennen. */
+  function adminPenalty(w, id, o = {}, by = 'Luftfahrtaufsicht') {
+    const al = w.airlines[id];
+    if (!al || !al.isPlayer || al.removed) return { ok: false, msg: 'Unbekannte Airline.' };
+    const why = String(o.reason || 'Verstoß gegen die Fair-Play-Regeln').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 140), mio = (x) => `${(Math.round(x / 1e4) / 100).toLocaleString('de-DE')} Mio. EUR`;
+    const take = (amt) => { al.ledger.equityFlow(-amt, 'admin'); if (typeof capState(al).mc === 'number') capShift(w, al, -amt); };
+    if (o.kind === 'fine') {
+      const amt = Math.round(clamp(Number(o.amount) || 0, 0, 999e6) / 1e4) * 1e4;
+      if (!amt) return { ok: false, msg: 'Bitte einen Betrag angeben.' };
+      take(amt); al.fair = { ...(al.fair || {}), fines: ((al.fair || {}).fines || 0) + amt };
+      if (!o.quiet) al.log(w.day, `${by}: Geldstrafe ${mio(amt)} – ${why}`, 'bad');
+      return { ok: true, msg: `Geldstrafe von ${mio(amt)} gebucht.`, amount: amt };
+    }
+    if (o.kind === 'annul') {
+      const days = clamp(Math.round(Number(o.days) || 0), 1, 3650), from = w.day - days + 1;
+      const net = (al.dayHist || []).filter((h) => h.d >= from).reduce((a, h) => a + (h.net || 0), 0), gain = o.profits === false ? 0 : Math.max(0, Math.round(net / 1e4) * 1e4);
+      if (gain) take(gain);
+      const lost = [];
+      if (o.milestones !== false) for (const m of MILESTONES) { const d = (al.milestones || {})[m.id]; if (d !== undefined && d >= from) { delete al.milestones[m.id]; (al.msRev = al.msRev || {})[m.id] = w.day; al.brand = clamp(al.brand - (m.brand || 0), 0.05, 0.95); lost.push(m.label); } }
+      al.fair = { ...(al.fair || {}), annul: [...((al.fair || {}).annul || []), { day: w.day, days, gain, ms: lost.length }].slice(-10) };
+      const parts = [gain ? `Gewinne von ${mio(gain)} eingezogen` : (o.profits === false ? '' : 'kein Gewinn im Zeitraum'), lost.length ? `${lost.length} Meilenstein${lost.length > 1 ? 'e' : ''} aberkannt (${lost.join(', ')})` : ''].filter(Boolean);
+      if (!o.quiet) al.log(w.day, `${by}: Annullierung der letzten ${days} Spieltage – ${parts.join('; ') || 'nichts einzuziehen'} – ${why}`, 'bad');
+      return { ok: true, msg: `Annulliert (${days} Spieltage): ${parts.join('; ') || 'nichts einzuziehen'}.`, gain, milestones: lost.length };
+    }
+    if (o.kind === 'dq') { al.dq = { day: w.day, by, reason: why }; if (!o.quiet) al.log(w.day, `${by}: Wertung aberkannt – ${why}. Ihre Airline erscheint in der Rangliste ohne Punkte.`, 'bad'); return { ok: true, msg: `${al.name}: Wertung aberkannt.` }; }
+    if (o.kind === 'undq') { if (!al.dq) return { ok: true, msg: 'Keine Aberkennung aktiv.' }; delete al.dq; al.log(w.day, `${by}: Die Wertung gilt wieder.`, 'info'); return { ok: true, msg: `${al.name}: Wertung wieder hergestellt.` }; }
+    return { ok: false, msg: 'Unbekannte Maßnahme.' };
+  }
+  /** 0.21.78 Luftfahrtaufsicht: gestufte Maßnahmen gegen automatisiertes Spielen (Bot, Skript oder KI-Agent, der selbst klickt).
+   *  Für Spielende kommt alles vom Prüfsystem der Aufsicht – nie sichtbar von Hand. Konto-Teile (Sperre, Packs) setzt der Server, Spiel-Teile fairStageApply. */
+  const FAIR_STAGES = [null,
+    { n: 1, label: 'Hinweis' },
+    { n: 2, label: 'Bußgeld', fine: 0.03, fineMin: 2e6, pack: 24 },
+    { n: 3, label: 'Betriebsauflage', fine: 0.05, fineMin: 5e6, annul: 7, susp: 24, pack: 72 },
+    { n: 4, label: 'Betriebsuntersagung', fine: 0.1, fineMin: 10e6, annul: 30, susp: 168, pack: 336 },
+    { n: 5, label: 'Lizenzentzug', dq: true, susp: 720, pack: 720 },
+  ];
+  const durTxt = (h) => h < 24 ? `${h} Stunden` : h % 24 ? `${h} Stunden` : h === 24 ? '1 Tag' : `${h / 24} Tage`;
+  /** Was eine Stufe bewirkt, in einer Zeile (für Hinweis, Leiter und Verwaltung). */
+  function fairStageWhat(n) {
+    const S = FAIR_STAGES[n]; if (!S) return '';
+    if (n === 1) return 'Hinweis, noch ohne Folgen';
+    return [S.fine ? `Bußgeld ${Math.round(S.fine * 100)} % des Eigenkapitals (mindestens ${S.fineMin / 1e6} Mio. €)` : '', S.annul ? `Gewinne und Meilensteine der letzten ${S.annul} Spieltage aberkannt` : '',
+      S.dq ? 'Wertung aberkannt' : '', S.susp ? `Leitstand ${durTxt(S.susp)} stillgelegt (die KI führt die Airline)` : '', S.pack ? `${durTxt(S.pack)} keine Packs` : ''].filter(Boolean).join(', ');
+  }
+  function fairStageApply(w, id, n, o = {}) {
+    const S = FAIR_STAGES[n], al = w.airlines[id];
+    if (!S) return { ok: false, msg: 'Unbekannte Stufe.' };
+    if (!al || !al.isPlayer || al.removed) return { ok: false, msg: 'Unbekannte Airline.' };
+    const why = 'automatisierte Steuerung festgestellt', parts = [], mio = (x) => `${(Math.round(x / 1e4) / 100).toLocaleString('de-DE')} Mio. EUR`;
+    if (S.fine) { const eq = Math.max(0, balanceSheet(al).equity), amt = Math.max(S.fineMin * ((w.macro && w.macro.cpi) || 1), eq * S.fine);
+      const r = adminPenalty(w, id, { kind: 'fine', amount: amt, reason: why, quiet: true }); if (r.ok) parts.push(`Bußgeld ${mio(r.amount)}`); }
+    if (S.annul) { const r = adminPenalty(w, id, { kind: 'annul', days: S.annul, reason: why, quiet: true }); if (r.ok) parts.push(`${r.gain ? `Gewinne der letzten ${S.annul} Spieltage (${mio(r.gain)}) eingezogen` : `in den letzten ${S.annul} Spieltagen kein Gewinn einzuziehen`}${r.milestones ? `, ${r.milestones} Meilenstein${r.milestones > 1 ? 'e' : ''} aberkannt` : ''}`); }
+    if (S.dq) { adminPenalty(w, id, { kind: 'dq', reason: 'Lizenzentzug wegen automatisierter Steuerung', quiet: true }); parts.push('Wertung aberkannt – Ihre Airline steht ohne Punkte am Ende der Rangliste'); }
+    if (S.susp) parts.push(`Leitstand für ${durTxt(S.susp)} stillgelegt – die KI führt so lange Ihre Airline`);
+    if (S.pack) parts.push(`${durTxt(S.pack)} keine Packs`);
+    al.fair = { ...(al.fair || {}), stage: n, stages: [...((al.fair || {}).stages || []), { day: w.day, n }].slice(-10) };
+    const next = FAIR_STAGES[n + 1];
+    al.log(w.day, `Luftfahrtaufsicht – Stufe ${n} von 5 (${S.label}): Das Prüfsystem hat automatisierte Steuerung Ihres Leitstands festgestellt (Bot, Skript oder KI-Agent, der selbst klickt). ${parts.length ? parts.join('; ') + '.' : 'Diesmal noch ohne Folgen.'}${next ? ` Bei weiteren Verstößen folgt Stufe ${n + 1} (${next.label}).` : ''}`, n >= 3 ? 'crit' : 'bad');
+    return { ok: true, n, parts, msg: `Stufe ${n} (${S.label}): ${parts.join('; ') || 'Hinweis'}.` };
   }
   function adminGrant(w, id, amount, by = 'Spielleitung') {
     const al = w.airlines[id], amt = Math.round(clamp(Number(amount) || 0, -999e6, 999e6) / 1e4) * 1e4;
@@ -7866,7 +7960,7 @@ const SM = (() => {
       case 'openRoute': {
         const { base, dest } = a, type = a.typeId, wk = a.wk !== undefined && a.wk !== null ? clamp(Math.round(num(a.wk, 7)), 1, 7) : 7, freq = wk < 7 ? 1 : clamp(Math.round(num(a.freq, 1)), 1, 8);
         if (!al.bases.includes(base) || !P.AIRPORTS[dest] || !P.AIRCRAFT_TYPES[type] || base === dest) return { ok: false, msg: 'Ungültige Strecke.' };
-        { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie haben dort ${Math.round(al.antitrust[at].share * 100)} % aller Abflüge (Grenze ${Math.round(P.ANTITRUST.share * 100)} %). ${w.antitrustPlan(al, at).adviceTxt}` }; }
+        { const at = al.antitrust && [base, dest].find((c) => al.antitrust[c]); if (at) return { ok: false, msg: `Die Wettbewerbsaufsicht untersagt neue Strecken ab ${ap(at).name}: Sie halten dort ${Math.round(al.antitrust[at].share * 100)} % der Slots (Grenze ${Math.round(P.ANTITRUST.share * 100)} %). ${w.antitrustPlan(al, at).adviceTxt}` }; }
         if (P.AIRCRAFT_TYPES[type].role) return { ok: false, msg: `${P.AIRCRAFT_TYPES[type].label} fliegt keine Linie – ${P.AIRCRAFT_TYPES[type].role === 'cargo' ? 'Frachter fliegen eigene Frachtstrecken (Cargo → Neue Frachtstrecke) oder Charter (Flotte → Charter).' : 'Privatjets arbeiten im Charter-Pool (Flotte → Charter).'}` };
         if (!routeKmOk(base, dest)) return { ok: false, msg: `Unter ${P.MIN_ROUTE_KM} km gibt es keine Linienflüge.` };
         if (!aptOk(base, dest, type)) return { ok: false, msg: aptWhy(base, dest, type) };
@@ -8045,9 +8139,9 @@ const SM = (() => {
       case 'cgPlanAdd': return w.cgPlanAdd(al, String(a.base || ''), String(a.dest || ''), String(a.typeId || ''), a.freq, a.rate);
       case 'cgPlanEdit': return w.cgPlanEdit(al, String(a.id || ''), a.freq, a.rate);
       case 'cgPlanDel': return w.cgPlanDel(al, String(a.id || ''));
-      case 'antitrustAdjust': {   // 0.21.55: Vorschlag zur Wettbewerbsaufsicht übernehmen
+      case 'antitrustAdjust': {   // 0.21.55/0.21.77: Vorschlag zur Wettbewerbsaufsicht übernehmen – Frequenzen senken und Slots zurückgeben
         const c = String(a.apt || ''); if (!P.AIRPORTS[c]) return { ok: false, msg: 'Ungültig.' };
-        const pa = w.antitrustPlan(al, c); if (pa.ok || !pa.cuts.length) return { ok: false, msg: 'Nichts anzupassen – Ihr Anteil liegt unter der Grenze.' };
+        const pa = w.antitrustPlan(al, c); if (pa.ok || !pa.sell) return { ok: false, msg: 'Nichts anzupassen – Ihr Slot-Anteil liegt unter der Grenze.' };
         const done = [], miss = [];
         for (const x of pa.cuts) {
           const r = route(x.id); if (!r) continue;
@@ -8056,7 +8150,9 @@ const SM = (() => {
           if (res.ok && r.freq === x.to) done.push(`${r.base}–${r.dest} ${old}× → ${x.to}×`); else miss.push(`${r.base}–${r.dest}`);
         }
         w.operableFreq(al);
-        const now = w.antitrustPlan(al, c), msg = `Wettbewerbsaufsicht ${ap(c).name}: ${done.join(', ')}. Ihr Anteil liegt jetzt bei ${Math.round(now.share * 100)} % (${fmtF(now.own)} von ${fmtF(now.total)} Abflügen am Tag)${miss.length ? `; nicht geändert: ${miss.join(', ')}` : ''}. Das Verfahren endet zum Monatsende, wenn ${now.bySize ? `es bei weniger als ${P.ANTITRUST.minDeps} Abflügen am Tag bleibt` : `der Anteil unter ${Math.round(P.ANTITRUST.share * 100)} % bleibt`}.`;
+        const can = (al.slotHold[c] || []).filter((h) => h.buy && h.until > day).reduce((s2, h) => s2 + h.n, 0), n = Math.min(can, pa.sell);
+        if (n > 0) { const sr = w.sellSlots(al, c, n); if (sr.ok) done.push(`${sr.n} Slots zurückgegeben (${Math.round(sr.back / 1000)} Tsd. EUR)`); }
+        const now = w.antitrustPlan(al, c), msg = `Wettbewerbsaufsicht ${ap(c).name}: ${done.join(', ') || 'nichts geändert'}. Sie halten jetzt ${Math.round(now.share * 100)} % der Slots (${fmtF(now.own)} von ${fmtF(now.cap)})${miss.length ? `; nicht geändert: ${miss.join(', ')}` : ''}. ${now.ok ? 'Das Verfahren endet zum Monatsende.' : now.adviceTxt}`;
         al.log(day, msg, 'route'); return { ok: done.length > 0, msg };
       }
       case 'crisisSkip': { const e = w.events.find((x) => x.id === a.event); if (!e) return { ok: false, msg: 'Ereignis nicht gefunden.' }; al.crisisDone = { ...(al.crisisDone || {}), [e.id]: day }; return { ok: true }; }
@@ -8262,7 +8358,7 @@ const SM = (() => {
         distressDays: al.distressDays, status: al.status, events: al.events.slice(al.isPlayer ? -150 : -10), otpHist: al.otpHist,
         maxFleet: al.maxFleet, warnLevel: al.warnLevel, acCounter: al.acCounter, routeCounter: al.routeCounter, rngF: al.rngForecast.s,
         assistant: al.assistant || null, logo: al.logo || null, brand: al.brand, marketing: al.marketing, mktPct: al.mktPct || 0, apDefault: al.apDefault || 0, apLf: al.apLf || undefined, apCfg: al.apCfg || null, cabin: al.cabin || null, loyalty: al.loyalty || null, hubs: al.hubs || null, gateLock: al.gateLock || null, cargo: al.cargo, loans: al.loans, rating: al.rating, insurance: al.insurance, hedge: al.hedge,
-        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, autoGrow: al.autoGrow || undefined, autoEq: al.autoEq ?? undefined, lastAct: al.lastAct || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, cg: al.cg && (al.cg.routes.length || al.cg.n || (al.cg.plans && al.cg.plans.length)) ? al.cg : undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
+        experts: al.experts, studies: al.studies, stations: al.stations, hangars: al.hangars, slotHold: al.slotHold, slotBook: al.slotBook || undefined, hubSlots: al.hubSlots || undefined, prog: al.prog || undefined, mk: al.mk || undefined, cap: al.cap || undefined, stakes: al.stakes && Object.keys(al.stakes).length ? al.stakes : undefined, group: al.group || undefined, auto: al.auto || undefined, autoForced: al.autoForced || undefined, autoGrow: al.autoGrow || undefined, autoEq: al.autoEq ?? undefined, lastAct: al.lastAct || undefined, dq: al.dq || undefined, msRev: al.msRev || undefined, fair: al.fair || undefined, hubFlows: al.isPlayer && al.hubFlows ? hubFlowsOut(al.hubFlows) : undefined, crisisDone: al.crisisDone && Object.keys(al.crisisDone).length ? al.crisisDone : undefined, aptRebate: al.aptRebate && Object.keys(al.aptRebate).length ? al.aptRebate : undefined, offers: al.offers && al.offers.length ? al.offers : undefined, perks: al.perks && Object.keys(al.perks).length ? al.perks : undefined, baseOpens: al.baseOpens && al.baseOpens.length ? al.baseOpens : undefined, bonds: al.bonds && al.bonds.length ? al.bonds : undefined, defer: al.defer || undefined, rescueLoan: al.rescueLoan || undefined, liquidated: al.liquidated || undefined, liq: al.liq || undefined, corp: al.corp || undefined, antitrust: al.antitrust || undefined, cg: al.cg && (al.cg.routes.length || al.cg.n || (al.cg.plans && al.cg.plans.length)) ? al.cg : undefined, audit: al.audit || undefined, divOut: al.divOut || undefined, payoutFrom: al.payoutFrom || undefined, agm: al.agm || undefined, secDep: al.secDep || undefined, shocks: al.shocks && al.shocks.length ? al.shocks : undefined, press: al.press || undefined, profitShare: al.profitShare || undefined, corpLog: al.corpLog || undefined, expGen: al.expGen || undefined, mergedInto: al.mergedInto || undefined, stageLv: al.stageLv ?? undefined, acqLog: al.acqLog || undefined, pixLogo: al.pixLogo || undefined, plans: al.plans && al.plans.length ? al.plans : undefined, poachLog: al.poachLog || null, grudge: al.grudge || null, rescued: !!al.rescued, academy: al.academy || null, past: al.past || null, reports: al.isPlayer && al.reports && al.reports.length ? al.reports : null, paxTotal: Math.round(al.paxTotal || 0), lineCut: !!al.lineCut, removed: al.removed ? true : undefined, removedDay: al.removed ? al.removedDay : undefined, netHist: al.isPlayer ? (al.netHist || []).slice(-400) : null, dayHist: al.isPlayer ? (al.dayHist || []).slice(-90) : null, decisions: al.decisions.slice(-20), milestones: al.milestones,
         staff: al.staff ? { ...al.staff, cov: al.isPlayer && al.staff.cov ? { ...al.staff.cov, need: { pil: al.staff.cov.need.pil, cab: al.staff.cov.need.cab } } : null } : null, runway: isFinite(al.runway) ? al.runway : null,
         ledger: { pnl: al.ledger.pnl, cash: al.ledger.cash, equityContrib: al.ledger.equityContrib, month: al.ledger.month, lastDay: al.ledger.lastDay || 0, det: al.isPlayer && al.ledger.det ? al.ledger.det : undefined, fx: al.isPlayer && al.ledger.fx ? al.ledger.fx : undefined,
           months: al.ledger.months.slice(al.isPlayer ? -24 : -6), cashHist: al.ledger.cashHist.slice(al.isPlayer ? -400 : -30).map((x) => Math.round(x)) },
@@ -8415,7 +8511,7 @@ const SM = (() => {
     P, AP_CODES, MONTH_STARTS, COUNTRIES, COUNTRY_NAMES, STAFF_GROUPS, EVENT_TYPES, GEO_ZONES, homeCountry, zoneExtraKm, Rng, ap, apx, gcDistanceKm, blockHours, refPrice, railShare, railTime, accessibility,
     qBase, qPot, seasonFactor, offer, withIndirect, choiceProbs, allocate, legCosts, sumCosts, aircraftDayFixedGeneric, rotationHours, turnHours, rangeOk, aptOk, aptWhy, sstBonus,
     ovhAc, incentiveAt, evaluateRoute, routeUnits, mixOk, mixCheck, transferPlan, hubFlowsDaily, offerText, perkOn, minApt, dayDate, aiDealValue, monthOf, Ledger, Route, Airline, World, routeDb, routeLf, opSeats, priceFloor, aiRulePrice, destFits, newGame, newWorld, addHuman, restartHuman, crewFor, applyAction, acquireCost, staffPlanOf, balanceSheet, serialize, deserialize,
-    RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminAutopilot, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
+    RIVALS, setRivals, MARKET, potSum, studyFocus, focusLabel, acMatches, resolveItems, ACADEMY, MILESTONES, stockCap, laborPool, hireLead, LOGO_SHAPES, LOGO_SYMBOLS, logoTaken, DAY_GROUPS, dayGroupsOf, capOf, apCfgOf, kOf, setFuelX, kickHuman, adminGrant, adminPenalty, adminAutopilot, FAIR_STAGES, fairStageWhat, fairStageApply, adminEvents, expertPerf, expertTalent, rescueOptions, liquidate, capState, stakeOf, holdersOf, floatOf, fundCap, mktCap, annualResult, opResult, buybackPrice, stakeBuyPrice, stakeSellPrice, issueQuote, bondRate, softX, careerMigrate, PIX, pixValid, maValue, maBlock, riskTerms, baseSetupCost, baseDayCost, CAREER, careerLv, careerOf, careerChecks, careerUnlockTxt, careerAcqLeft, careerTypeMsg, typeLevel, typeAllowed, needTxt, startBaseMsg, licenceFee, stationFee, haulOf, cabinSeats, cabinRevenue, cabClone, slotValue, blocOf, blocName, makerBloc, tariffBetween, acTariff, leaseDelivery, EU, aiDealValue, dealText, itemText, acFairValue, acDealValue, acBookValue, slotValue, exitLoss, exitGain, barred, checkSide, cleanItems, EXIT_DAYS, DEAL_DAYS,
     rebaseHuman, hireQuote, baseSlotCost, baseExtraFee, baseOpensYear, baseSlotN, earnRecent, opResult, updateCap, divRate, standingOf, leaseRoom, leaseOutlook, attackEligible, themeOn, alShock, monopolyRoutes, dominatedAirport, payoutRate, agmFactor, leaseSecurity, marketLeader, dominanceMonth, ownersCapital, ratingInfo, baseApproval, aptClass, expertTeam, expertOffer, tradeFairness, limitsLifted, acadList, acadLv, acadAll, auditDebtSum, auditDebts, AUDIT_MODE_LABEL, leaseBuyQuote, leaseEnd, academyMax, ACADEMY_MAX, homeShares, laborCrisis, releaseStaff, auditPreview, auditYear, auditCatchUp, auditOrder, adminAudit, fareLv, paxEff, anchorAis, basesFree, basesFreeAt, shockX, GROUNDING_SETS, parentOf, groupSpecialQuote, groupFreeCash, acmiList, acmiGaps, threatOf, wageX, incomeX, MEGA, megaStart, acmiRateFor, nextSlotDay, PNL_ACCOUNTS, COST_KEYS, DIFFICULTY, AI_SETUP, SPEEDS, speedKey, COUNTRY_LABEL, COUNTRY_DATA, REGION_ORDER, winOf, acShareOf, pilotsFor, routeKmOk, sumObj, INDIRECT_ID, INCUMBENT_ID, pairKey, roleLabel, cargoDemand, cargoYield, clamp, lv3,
   };
 })();

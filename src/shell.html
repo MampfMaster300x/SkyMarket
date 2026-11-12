@@ -1378,7 +1378,7 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 .pk-skip { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); z-index: 8; color: #e6edf7; background: rgba(10, 18, 40, .65); border-color: #3b4f86; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .pk-stage { position: relative; z-index: 2; width: min(640px, 100%); min-height: min(620px, 90vh); display: grid; place-items: center; align-content: center; gap: 16px; }
 .pk-box { width: min(320px, 72vw, 54vh); position: relative; z-index: 3; filter: drop-shadow(0 0 16px rgba(34,211,238,.5)) drop-shadow(0 18px 40px rgba(0,0,0,.55)); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
-.pk-box:active { cursor: grabbing; }
+.pk-box:active { cursor: grabbing; } .pk-box:focus-visible { outline: none; }   /* 0.21.79: kein Fokusrahmen ums Pack (die Leuchtkante zeigt den Fokus) */
 .pk-strip { transform-box: view-box; transform-origin: 210px 40px; transform: translateY(calc(var(--tear, 0) * -12px)) rotate(calc(var(--tear, 0) * 7deg)); }   /* 0.21.73: hebt sich nach oben ab, überlappt die Tüte nie */
 .pk-edge, .pk-fib { opacity: min(.9, calc(var(--tear, 0) * 4)); }   /* 0.21.72: Reißkante erst sichtbar, wenn der Spalt aufgeht – nichts vorgezeichnet */
 .pk-box.torn .pk-edge, .pk-box.torn .pk-fib { opacity: .85; }
@@ -1677,6 +1677,32 @@ svg .sk-shine { animation: skShine 5s ease-in-out infinite; } @keyframes skShine
 @keyframes wkTwistB { from { transform: scaleX(1) translateY(10px); } to { transform: scaleX(-1) translateY(18px); } }
 @keyframes wkTwistU { from { transform: rotate(10deg); } to { transform: rotate(-10deg); } }
 @keyframes wkTwistL { from { transform: rotate(-22deg); } to { transform: rotate(10deg); } }
+.cgl .cg-sug { margin: 2px 0 12px; border-color: var(--accent); }   /* 0.21.76: Streckenvorschlag für einen Frachter */
+/* 0.21.74 Fair-Play-Wächter */
+.fp-row > summary { cursor: pointer; list-style: none; gap: 8px; } .fp-row > summary::-webkit-details-marker { display: none; }
+.fp-row.crit { border-color: #ef4444; } .fp-row.bad { border-color: #f97316; } .fp-row.warn { border-color: #eab308; }
+.fp-score { font-size: 18px; min-width: 2.2em; text-align: right; }
+.fp-meter { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; margin: 6px 0; } .fp-meter i { display: block; height: 100%; background: linear-gradient(90deg, #22c55e, #eab308 35%, #f97316 55%, #ef4444 80%); background-size: 100vw 100%; }
+.fp-why { margin: 4px 0; padding-left: 18px; display: grid; gap: 3px; } .fp-why li { font-size: 13px; }
+.fp-hours { display: grid; gap: 2px; margin: 6px 0; overflow-x: auto; } .fp-day { display: grid; grid-template-columns: 52px repeat(24, minmax(6px, 1fr)); gap: 1px; align-items: center; }
+.fp-day i { height: 10px; border-radius: 2px; background: var(--panel-2); } .fp-day i.h1 { background: #3b82f6; opacity: .5; } .fp-day i.h2 { background: #3b82f6; } .fp-day i.h3 { background: #f97316; }
+.fp-ev { width: 100%; border-collapse: collapse; } .fp-ev td { padding: 2px 6px 2px 0; vertical-align: top; }
+.ok-t { color: #16a34a; } .warn-t { color: #d97706; }
+.fp-act { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; } .fp-act > summary { cursor: pointer; }
+.fp-acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-top: 8px; } .fp-acts .fp-wide { grid-column: 1 / -1; }
+.fp-box { display: grid; gap: 6px; align-content: start; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); } .fp-box .row { gap: 6px; flex-wrap: wrap; align-items: center; }
+/* 0.21.78 Luftfahrtaufsicht: Bescheid mit Stufenleiter, Stufen-Kasten in der Fair-Play-Übersicht */
+.fa-head { display: flex; gap: 12px; align-items: center; } .fa-head h1 { margin: 0; }
+.fa-seal { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 700 22px/1 var(--f-body); color: var(--crit); background: var(--crit-soft); border: 2px solid var(--crit); }
+.fa-ladder { list-style: none; margin: 4px 0; padding: 0; display: grid; gap: 4px; }
+.fa-ladder li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-2); }
+.fa-ladder li b { color: var(--ink); } .fa-ladder li em { font-style: normal; font-size: 12px; color: var(--ink-3); }
+.fa-ladder li.past { opacity: .6; } .fa-ladder li.now { border-color: var(--crit); background: var(--crit-soft); } .fa-ladder li.now b { color: var(--crit); }
+.fa-ladder li.auto em { color: var(--warn); }
+.fa-ladder.cmp li { grid-template-columns: 190px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 4px 8px; }
+@media (max-width: 640px) { .fa-ladder.cmp li { grid-template-columns: minmax(0, 1fr); gap: 1px; } }
+.fp-conf { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } .fp-conf select { width: auto; min-width: 0; }
+.fp-stage { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 8px 10px; margin: 6px 0; border: 1px dashed var(--line); border-radius: 10px; } .fp-stage > div:first-child { min-width: 0; flex: 1 1 260px; }
 /* 0.21.69: Walkout-Hintergründe je Motto */
 .wk-theme { position: absolute; inset: 0; overflow: hidden; pointer-events: none; -webkit-mask-image: radial-gradient(150% 110% at 50% 50%, #000 45%, transparent 100%); mask-image: radial-gradient(150% 110% at 50% 50%, #000 45%, transparent 100%); }
 .wk-theme::before, .wk-theme::after { content: ''; position: absolute; inset: 0; }

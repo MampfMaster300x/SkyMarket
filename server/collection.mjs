@@ -122,7 +122,8 @@ export async function handleCollection(req, ctx) {
       }, null);
       if (r0 && r0.value) reg = r0.value;
     }
-    if (shop.daily && (!reg.users[me] || reg.users[me].daily !== today)) {
+    const fs0 = ctx.fairState ? await ctx.fairState() : null, packBan = !!(fs0 && fs0.pack && fs0.pack.until > Date.now());   // 0.21.75: Pack-Sperre (Fair Play)
+    if (shop.daily && !packBan && (!reg.users[me] || reg.users[me].daily !== today)) {
       const r = await updateJson(store, KEY.reg, (cur) => {
         cur = cur || emptyReg(); const u = userOf(cur, me, user.name);
         if (u.daily === today) return undefined;
@@ -315,6 +316,7 @@ export async function handleCollection(req, ctx) {
   if (path === '/shop/config' && method === 'GET') return json(await shopConfig(store));
   if (path === '/shop/request' && method === 'POST') {
     const sc = await shopConfig(store); if (!sc.enabled) return fail(503, 'Anfragen sind noch nicht freigeschaltet.');
+    { const fs1 = ctx.fairState ? await ctx.fairState() : null; if (fs1 && fs1.pack && fs1.pack.until > Date.now()) return fail(403, `Die Luftfahrtaufsicht hat Pack-Anfragen für Ihr Konto bis ${new Date(fs1.pack.until).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} Uhr gesperrt.`); }
     const b = await readJson(req), cfg = (await store.get(KEY.cfg, { type: 'json' })) || null, of = offersOf(cfg).find((o) => o.key === String(b.offer || '') && o.active !== false);
     if (!of) return fail(400, 'Unbekanntes Angebot.');
     let made = null, err = null;

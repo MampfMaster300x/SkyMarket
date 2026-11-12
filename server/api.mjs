@@ -1,5 +1,6 @@
 // SKYMARKET Online-API: Konten, Spiele (bis 4 Airlines), Zeitfortschritt und Aktionen.
 // Der Server ist maßgeblich: Er hält den Spielstand und rechnet die Tage mit derselben Engine wie der Browser.
+import { fairNew, fairRecord, fairScore, fairDue, fairCalm, fairRebase, FAIR, FAIR_LABEL } from './fairplay.mjs';
 import { scryptSync, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import SM from '../shared/engine.cjs';
@@ -94,7 +95,7 @@ const isAdmin = (user) => !!user && ADMINS.has(user.key);
 
 const K = {
   user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, view: (id) => `games/${id}/view`, presence: (id) => `games/${id}/presence`, chat: (id) => `games/${id}/chat`,
-  code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`, diag: 'diag/client',
+  code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`, diag: 'diag/client', fair: (k) => `fair/${k}`, fairConf: 'fairconf',
 };
 async function updateJson(store, key, fn, init = null, tries = 6) {
   for (let i = 0; i < tries; i++) {
@@ -143,7 +144,7 @@ async function stateView(store, id, etag, buf) {
 }
 /** Kontext für die Aircraft Collection (server/collection.mjs). */
 function collCtx(store, url, path, method, user) {
-  return { store, url, path, method, user, json, fail, readJson, isAdmin, loadMeta,
+  return { store, url, path, method, user, json, fail, readJson, isAdmin, loadMeta, fairState: () => store.get(K.fair(user.key), { type: 'json' }).catch(() => null),
     loadGameView: async (id) => { const r = await mutateState(store, id, null); const vb = await stateView(store, id, r.etag || String(r.md.ver), r.buf); return JSON.parse(gunzipSync(Buffer.from(vb)).toString()); } };
 }
 function packSized(w) {
@@ -351,6 +352,97 @@ function validAirline(a, meta = null) {
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
+const fmtBerlin = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+// 0.21.78 Luftfahrtaufsicht: Für Spielende kommt jede Fair-Play-Maßnahme vom Prüfsystem der Aufsicht – auch wenn ein Admin sie auslöst.
+const AUFSICHT = 'Luftfahrtaufsicht';
+let fairConfCache = null;
+async function fairConf(store) {
+  if (fairConfCache && Date.now() - fairConfCache.at < 60000) return fairConfCache.c;
+  const c = { autoMax: FAIR.autoMax, ...((await store.get(K.fairConf, { type: 'json' }).catch(() => null)) || {}) };
+  fairConfCache = { at: Date.now(), c }; return c;
+}
+const stageList = () => SM.FAIR_STAGES.slice(1).map((S) => ({ n: S.n, label: S.label, what: SM.fairStageWhat(S.n) }));
+/** Text an den Spieler zu Stufe n (ohne Nennung, wer sie ausgelöst hat; ohne Details, woran das Prüfsystem es erkennt). */
+function fairNotice(n, { until = null, packUntil = null, where = [] } = {}) {
+  const S = SM.FAIR_STAGES[n], next = SM.FAIR_STAGES[n + 1];
+  const lead = `Stufe ${n} von 5 – ${S.label}. Das Prüfsystem der Luftfahrtaufsicht hat festgestellt, dass Ihr Leitstand automatisiert gesteuert wurde (Bot, Skript oder KI-Agent, der selbst klickt).`;
+  const what = n === 1 ? 'Diesmal bleibt es bei diesem Hinweis.' : `Maßnahmen${where.length ? ` (${where.join(', ')})` : ''}: ${SM.fairStageWhat(n)}.`;
+  const times = [until ? `Leitstand stillgelegt bis ${fmtBerlin(until)}.` : '', packUntil ? `Keine Packs bis ${fmtBerlin(packUntil)}.` : ''].filter(Boolean).join(' ');
+  return [lead, what, times, next ? `Bei weiteren Verstößen folgt Stufe ${n + 1} (${next.label}). Wer ${FAIR.calmDays} Tage unauffällig spielt, rutscht eine Stufe zurück.` : 'Das ist die höchste Stufe.'].filter(Boolean).join('\n\n');
+}
+/** Stufe n verhängen (Admin oder Prüfsystem). Konto-Teile hier (Sperre, Packs), Spiel-Teile in jedem betroffenen Spiel per fairStageApply. */
+async function fairApplyStage(store, key, n, { by = 'Prüfsystem', auto = false, score = null } = {}) {
+  const S = SM.FAIR_STAGES[n], now = Date.now(); if (!S) return { ok: false, msg: 'Unbekannte Stufe.' };
+  let claimed = false, rec0 = null;   // erst die Stufe für dieses Konto beanspruchen – zwei gleichzeitige Aktionen verhängen sie nur einmal
+  await updateJson(store, K.fair(key), (r) => { if (!r || (r.stage || 0) !== n - 1) return undefined; claimed = true; r.stage = n; r.stageAt = now; fairRebase(r, now); rec0 = r; return r; });
+  if (!claimed) return { ok: false, msg: 'Die Stufe hat sich inzwischen geändert – bitte neu laden.' };
+  // Betroffene Spiele: mit Belegen seit der letzten Stufe, sonst alle mit eigenen Aktionen; Sperre gilt ohnehin für alle
+  const since = Math.max(0, ...(rec0.sanctions || []).filter((x) => x.kind === 'stage').map((x) => x.at));
+  const evG = [...new Set((rec0.ev || []).filter((e) => e.t > since && e.game).map((e) => e.game))];
+  const u = await store.get(K.user(key), { type: 'json' }), all = [...new Set([...Object.keys(rec0.g || {}), ...((u && u.games) || [])])];
+  const target = new Set(evG.length ? evG : Object.keys(rec0.g || {})), until = S.susp ? now + S.susp * 3600e3 : null, packUntil = S.pack ? now + S.pack * 3600e3 : null, where = [], done = [];
+  for (const g of all) { const m = await loadMeta(store, g), p = m && m.players.find((x) => x.u === key); if (!p) continue;
+    const hit = target.has(g); if (!hit && !until) continue;
+    try { const r = await mutateState(store, g, (w) => { const res = hit ? SM.fairStageApply(w, p.airlineId, n) : { ok: true };
+        if (until) SM.adminAutopilot(w, p.airlineId, true, now, hit ? '' : `Luftfahrtaufsicht: Ihr Leitstand ist bis ${fmtBerlin(until)} stillgelegt – die KI führt so lange Ihre Airline.`); return res; });
+      if (hit && r.result && r.result.ok) { where.push(m.main ? 'Hauptwelt' : `„${m.name}“`); done.push(`${m.main ? 'Hauptwelt' : m.name}: ${r.result.msg}`); } } catch (e) { done.push(`${m.main ? 'Hauptwelt' : m.name}: nicht erreicht (${e.message})`); } }
+  const notice = fairNotice(n, { until, packUntil, where }), msg = `Stufe ${n} (${S.label}) für ${rec0.name}${auto ? ' – automatisch' : ''}. ${done.join(' · ') || 'Kein Spiel betroffen.'}`;
+  await updateJson(store, K.fair(key), (r) => { if (!r) return undefined;
+    if (until) r.susp = { until: Math.max(until, (r.susp && r.susp.until) || 0), at: now, by, reason: '', stage: n };
+    if (packUntil) r.pack = { until: Math.max(packUntil, (r.pack && r.pack.until) || 0), at: now, by, reason: '', stage: n };
+    r.sanctions = [...(r.sanctions || []), { at: now, by, kind: 'stage', n, auto, score, msg }].slice(-40);
+    r.warn = { at: now, by, text: notice, seen: null, stage: n };
+    return r; });
+  console.log(`Luftfahrtaufsicht: ${key} → Stufe ${n}${auto ? ' (automatisch)' : ` (${by})`}: ${msg}`);
+  return { ok: true, msg, notice, susp: until ? { until } : null };
+}
+/** 0.21.75 Fair Play: Maßnahmen der Admins. Konto: zeitweise Spielsperre (KI vertritt die Airline), Pack-Sperre. Je Spiel: Geldstrafe, Annullieren, Wertung aberkennen. */
+async function fairSanction(store, user, body) {
+  const key = String(body.key || ''), kind = String(body.kind || ''), now = Date.now();
+  const reason = String(body.reason || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 140);
+  const rec = await store.get(K.fair(key), { type: 'json' });
+  if (!rec) return fail(404, 'Für dieses Konto gibt es noch keine Fair-Play-Daten.');
+  const hours = Math.max(1, Math.min(24 * 90, Math.round(Number(body.hours) || 0)));
+  let msg = '', notice = '', game = null;
+  if (kind === 'suspend' || kind === 'packban') {
+    if (!(Number(body.hours) > 0)) return fail(400, 'Bitte eine Dauer wählen.');
+    const until = now + hours * 3600e3, dur = hours % 24 ? `${hours} Stunden` : `${hours / 24} Tag${hours === 24 ? '' : 'e'}`;
+    if (kind === 'suspend') {
+      // Airline in allen Spielen des Kontos von der KI vertreten lassen, damit nichts liegen bleibt
+      const u = await store.get(K.user(key), { type: 'json' }), games = [...new Set([...Object.keys(rec.g || {}), ...((u && u.games) || [])])], took = [];
+      for (const g of games) { const m = await loadMeta(store, g); const p = m && m.players.find((x) => x.u === key); if (!p) continue;
+        try { await mutateState(store, g, (w) => SM.adminAutopilot(w, p.airlineId, true, now, `Luftfahrtaufsicht: Ihr Leitstand ist bis ${fmtBerlin(until)} stillgelegt${reason ? ` (${reason})` : ''} – die KI führt so lange Ihre Airline.`)); took.push(m.main ? 'Hauptwelt' : m.name); } catch (e) { /* Spiel gerade beschäftigt */ } }
+      msg = `${rec.name} ist bis ${fmtBerlin(until)} gesperrt (${dur}). KI-Vertretung: ${took.join(', ') || 'keine Airline'}.`;
+      notice = `Die Luftfahrtaufsicht hat Ihren Leitstand für ${dur} stillgelegt (bis ${fmtBerlin(until)})${reason ? ` – Grund: ${reason}` : ''}. Sie können zuschauen, aber nicht handeln oder schreiben; die KI führt so lange Ihre Airline.`;
+      await updateJson(store, K.fair(key), (r) => { if (!r) return undefined; r.susp = { until, at: now, by: user.name, reason }; return r; });
+    } else {
+      msg = `${rec.name}: keine Packs bis ${fmtBerlin(until)} (${dur}).`;
+      notice = `Die Luftfahrtaufsicht hat für ${dur} Gratis-Packs und Pack-Anfragen Ihres Kontos gesperrt (bis ${fmtBerlin(until)})${reason ? ` – Grund: ${reason}` : ''}.`;
+      await updateJson(store, K.fair(key), (r) => { if (!r) return undefined; r.pack = { until, at: now, by: user.name, reason }; return r; });
+    }
+  } else if (kind === 'unsuspend' || kind === 'unpackban') {
+    await updateJson(store, K.fair(key), (r) => { if (!r) return undefined; delete r[kind === 'unsuspend' ? 'susp' : 'pack']; return r; });
+    msg = kind === 'unsuspend' ? `Sperre für ${rec.name} aufgehoben.` : `Pack-Sperre für ${rec.name} aufgehoben.`;
+    notice = kind === 'unsuspend' ? 'Die Luftfahrtaufsicht hat die Stilllegung Ihres Leitstands aufgehoben – Sie können wieder selbst spielen.' : '';
+  } else if (['fine', 'annul', 'dq', 'undq'].includes(kind)) {
+    game = String(body.game || ''); const m = await loadMeta(store, game), p = m && m.players.find((x) => x.u === key);
+    if (!p) return fail(404, 'Das Konto spielt in diesem Spiel keine Airline (mehr).');
+    const opt = { kind, reason, amount: Number(body.amount) * 1e6, days: Number(body.days), profits: body.profits !== false, milestones: body.milestones !== false };
+    const r = await mutateState(store, game, (w) => SM.adminPenalty(w, p.airlineId, opt, AUFSICHT));
+    const res = r.result || { ok: false }; if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
+    const where = m.main ? 'in der Hauptwelt' : `in „${m.name}“`;
+    msg = res.msg;
+    notice = kind === 'fine' ? `Die Luftfahrtaufsicht hat ${where} ein Bußgeld verhängt: ${res.msg.replace(/^Geldstrafe von /, '').replace(/ gebucht\.$/, '')}${reason ? ` – Grund: ${reason}` : ''}.`
+      : kind === 'annul' ? `Die Luftfahrtaufsicht hat Vorteile ${where} annulliert: ${res.msg.replace(/^Annulliert \([^)]*\): /, '')}${reason ? ` Grund: ${reason}` : ''}`
+      : kind === 'dq' ? `Die Luftfahrtaufsicht hat Ihrer Airline ${where} die Wertung aberkannt: Sie erscheint ohne Punkte am Ende der Rangliste${reason ? ` – Grund: ${reason}` : ''}.` : `Ihre Wertung ${where} gilt wieder.`;
+  } else return fail(400, 'Unbekannte Maßnahme.');
+  await updateJson(store, K.fair(key), (r) => { if (!r) return undefined;
+    r.sanctions = [...(r.sanctions || []), { at: now, by: user.name, kind, game, hours: ['suspend', 'packban'].includes(kind) ? hours : undefined, reason, msg }].slice(-40);
+    if (notice) r.warn = { at: now, by: user.name, text: r.warn && !r.warn.seen && r.warn.at > now - 864e5 ? `${r.warn.text}\n\n${notice}` : notice, seen: null };
+    return r; });
+  console.log(`Fair Play: ${user.key} → ${key}: ${kind} ${msg}`);
+  return json({ ok: true, msg });
+}
 export async function handle(req, { store }) {
   try {
     const url = new URL(req.url);
@@ -385,7 +477,10 @@ export async function handle(req, { store }) {
     if (path === '/me') {
       if (!user) return fail(401, 'Nicht angemeldet.');
       const u = await store.get(K.user(user.key), { type: 'json' });
-      return json(await withPatch(store, u, { name: user.name, key: user.key, admin: isAdmin(user), mustChange: !!(u && u.mustChange) }));
+      const fr = await store.get(K.fair(user.key), { type: 'json' }).catch(() => null);   // 0.21.74: offene Verwarnung der Spielleitung
+      const fairWarn = fr && fr.warn && !fr.warn.seen ? { at: fr.warn.at, text: fr.warn.text, stage: fr.warn.stage || 0, ladder: stageList() } : null, nowMe = Date.now();
+      const susp = fr && fr.susp && fr.susp.until > nowMe ? { until: fr.susp.until, reason: fr.susp.reason || '' } : null, packBan = fr && fr.pack && fr.pack.until > nowMe ? { until: fr.pack.until } : null;
+      return json(await withPatch(store, u, { name: user.name, key: user.key, admin: isAdmin(user), mustChange: !!(u && u.mustChange), fairWarn, susp, packBan }));
     }
     if (!user) return fail(401, 'Bitte zuerst anmelden.');
     if (path.startsWith('/coll') || path.startsWith('/shop')) return await handleCollection(req, collCtx(store, url, path, method, user));
@@ -468,6 +563,61 @@ export async function handle(req, { store }) {
     }
     // ---- Verwaltung (nur Admins) ----
     // ---- Admin: Spielzeit aller Konten (seit Beginn der Erfassung) ----
+    // ---- 0.21.74 Fair-Play-Wächter: Übersicht für Admins, Prüfen/Verwarnen/Zurücksetzen; Spielende bestätigen eine Verwarnung ----
+    if (path === '/fair/seen' && method === 'POST') {
+      await updateJson(store, K.fair(user.key), (r) => { if (!r || !r.warn) return undefined; r.warn.seen = Date.now(); return r; });
+      return json({ ok: true });
+    }
+    if (path === '/admin/fairplay' && method === 'GET') {
+      if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+      const list = await store.list({ prefix: 'fair/' });
+      const R = (await Promise.all(list.blobs.map((b) => store.get(b.key, { type: 'json' })))).filter(Boolean);
+      const gameIds = [...new Set(R.flatMap((r) => Object.keys(r.g || {})))], names = {};
+      for (const g of gameIds) { const m = await loadMeta(store, g); names[g] = m ? (m.main ? 'Hauptwelt' : m.name) : 'gelöschtes Spiel'; }
+      const now = Date.now(), conf = await fairConf(store);
+      const rows = R.map((r) => { const sc = fairScore(r), due = fairDue(r, now, conf.autoMax);
+        const open = !!due || (sc.score >= 35 && !(r.stage > 0) && (!r.review || sc.score >= (r.review.score || 0) + 10));
+        return { key: r.key, name: r.name, admin: ADMINS.has(r.key), n: r.n || 0, first: r.first, last: r.last, online: now - (r.last || 0) < 120000, ...sc, open, stage: r.stage || 0, stageAt: r.stageAt || null, due: due ? { n: due.n, score: due.score, auto: due.auto } : null,
+          sig: r.sig || {}, games: Object.entries(r.g || {}).map(([g, n]) => ({ id: g, name: names[g] || g, n })).sort((a, b) => b.n - a.n),
+          ev: (r.ev || []).slice(-25).reverse().map((e) => ({ ...e, label: FAIR_LABEL[e.k] || e.k, gameName: names[e.game] || e.game })), review: r.review || null, warn: r.warn || null, hours: r.hours || {},
+          susp: r.susp && r.susp.until > now ? r.susp : null, pack: r.pack && r.pack.until > now ? r.pack : null, sanctions: (r.sanctions || []).slice(-15).reverse().map((x) => ({ ...x, gameName: x.game ? names[x.game] || x.game : null })) }; });
+      return json({ now, rules: { noUiGap: FAIR.noUiGap, fastMs: FAIR.fastMs, rateN: FAIR.rateN, rateMs: FAIR.rateMs, stageScore: FAIR.stageScore, stageGapH: FAIR.stageGap / 3600e3, calmDays: FAIR.calmDays }, conf, ladder: stageList(), open: rows.filter((x) => x.open).length, rows: rows.sort((a, b) => b.score - a.score || (b.last || 0) - (a.last || 0)) });
+    }
+    if (path === '/admin/fairplay' && method === 'POST') {
+      if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+      const body = await readJson(req), key = String(body.key || ''), cmd = String(body.cmd || '');
+      if (cmd === 'sanction') return await fairSanction(store, user, body);   // 0.21.75: Sperren, Strafen, Annullieren
+      if (cmd === 'conf') {   // 0.21.78: bis zu welcher Stufe das Prüfsystem selbst verhängt
+        const autoMax = Math.max(0, Math.min(5, Math.round(Number(body.autoMax)))); if (!Number.isFinite(autoMax)) return fail(400, 'Ungültig.');
+        await store.setJSON(K.fairConf, { autoMax, at: Date.now(), by: user.name }); fairConfCache = null;
+        return json({ ok: true, msg: autoMax ? `Das Prüfsystem verhängt jetzt selbst bis Stufe ${autoMax}.` : 'Das Prüfsystem schlägt nur noch vor, verhängt aber nichts selbst.' });
+      }
+      if (cmd === 'stage') {   // nächste Stufe von Hand – für Spielende sieht es aus wie vom Prüfsystem
+        const rec = await store.get(K.fair(key), { type: 'json' }); if (!rec) return fail(404, 'Für dieses Konto gibt es noch keine Fair-Play-Daten.');
+        const n = (rec.stage || 0) + 1; if (n > 5) return fail(400, 'Höchste Stufe schon erreicht.');
+        const r = await fairApplyStage(store, key, n, { by: user.name, score: fairScore(rec).score }); return r.ok ? json(r) : fail(409, r.msg);
+      }
+      if (cmd === 'stageDown') {   // Fehlalarm: eine Stufe zurück, laufende Sperren dieser Stufe aufheben (Geld und Wertung bleiben – dafür die Einzelmaßnahmen)
+        let res = null; const now = Date.now();
+        await updateJson(store, K.fair(key), (r) => { if (!r || !(r.stage > 0)) return undefined; const n = r.stage;
+          r.stage = n - 1; r.stageAt = now; fairRebase(r, now); if (r.susp && r.susp.stage === n) delete r.susp; if (r.pack && r.pack.stage === n) delete r.pack;
+          r.sanctions = [...(r.sanctions || []), { at: now, by: user.name, kind: 'stageDown', n: n - 1, msg: `Stufe ${n} zurückgenommen` }].slice(-40);
+          r.warn = { at: now, by: user.name, text: `Die Luftfahrtaufsicht hat die Maßnahme der Stufe ${n} nach erneuter Prüfung zurückgenommen.${n - 1 ? ` Es gilt wieder Stufe ${n - 1}.` : ''}`, seen: null, stage: n - 1 };
+          res = { n, name: r.name }; return r; });
+        if (!res) return fail(400, 'Keine Stufe zum Zurücknehmen.');
+        return json({ ok: true, msg: `${res.name}: Stufe ${res.n} zurückgenommen. Bußgeld und Annullierung bleiben – bei Bedarf in der Spielverwaltung ausgleichen.` });
+      }
+      if (!['ok', 'warn', 'reset'].includes(cmd)) return fail(400, 'Unbekannter Befehl.');
+      const text = String(body.text || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 400) || 'Das Prüfsystem der Luftfahrtaufsicht hat bei Ihrem Konto Anzeichen für automatisierte Steuerung festgestellt (Bot, Skript oder KI-Agent, der selbst klickt). Bitte spielen Sie selbst – sonst folgen gestufte Maßnahmen bis zum Lizenzentzug.';
+      let found = false;
+      await updateJson(store, K.fair(key), (r) => { if (!r) return undefined; found = true; const now = Date.now();
+        if (cmd === 'ok') { r.review = { at: now, by: user.name, score: fairScore(r).score }; fairRebase(r, now); }   // 0.21.78: geprüfte Belege zählen für die nächste Stufe nicht mehr
+        if (cmd === 'warn') { r.warn = { at: now, by: user.name, text, seen: null }; r.warns = (r.warns || 0) + 1; }
+        if (cmd === 'reset') { r.archive = { at: now, by: user.name, n: r.n, sig: r.sig, score: fairScore(r).score }; Object.assign(r, { sig: {}, ev: [], t: [], hours: {}, review: null, lastG: null }); fairRebase(r, now); }   // Stufe bleibt
+        return r; });
+      if (!found) return fail(404, 'Für dieses Konto gibt es noch keine Fair-Play-Daten.');
+      return json({ ok: true });
+    }
     if (path === '/admin/playtime' && method === 'GET') {
       if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
       const [plays, users] = await Promise.all([store.list({ prefix: 'play/' }), store.list({ prefix: 'users/' })]);
@@ -708,6 +858,7 @@ export async function handle(req, { store }) {
       }
       if (op === 'chat' && method === 'POST') {
         const body = await readJson(req);
+        { const fr = await store.get(K.fair(user.key), { type: 'json' }).catch(() => null); if (fr && fr.susp && fr.susp.until > Date.now() && !isAdmin(user)) return fail(403, `Die Luftfahrtaufsicht hat Ihren Leitstand bis ${fmtBerlin(fr.susp.until)} stillgelegt – auch für den Chat.`); }
         const text = String(body.text || '').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, 500);
         if (!text) return fail(400, 'Die Nachricht ist leer.');
         const to = body.to && meta.players.some((p) => p.airlineId === body.to && p.airlineId !== me.airlineId) ? body.to : null;
@@ -726,9 +877,22 @@ export async function handle(req, { store }) {
         return json({ ok: true, message: pub });
       }
       if (op === 'action' && method === 'POST') {
-        const { action } = await readJson(req);
+        const abody = await readJson(req), { action } = abody;
         if (!action || typeof action !== 'object' || typeof action.type !== 'string') return fail(400, 'Ungültige Aktion.');
         if (action.type === 'setRivals' && !canControl(meta, user) && !isAdmin(user)) return fail(403, 'Die Stärke der Konkurrenz stellt nur die Spielleitung ein.');
+        // 0.21.74 Fair-Play-Wächter: Bedien-Nachweis einordnen, Klickfluten bremsen (gesperrt wird nie automatisch)
+        let fair = null;
+        let susp = null, due = null;
+        try { const conf = isAdmin(user) ? null : await fairConf(store);
+          await updateJson(store, K.fair(user.key), (rec) => { rec = rec || fairNew(user.key, user.name, Date.now()); rec.name = user.name; due = null;
+          if (rec.susp && rec.susp.until > Date.now() && !isAdmin(user)) { susp = rec.susp; return undefined; }   // 0.21.75: zeitweise gesperrt – keine eigenen Aktionen
+          fair = fairRecord(rec, { now: Date.now(), game: id, fp: abody.fp, admin: isAdmin(user), type: action.type });
+          if (conf) { fairCalm(rec, Date.now()); const d = fairDue(rec, Date.now(), conf.autoMax); if (d && d.auto) due = d; }   // 0.21.78: Bewährung, fällige Stufe
+          return rec; }); } catch (e) { /* Wächter darf das Spielen nie blockieren */ }
+        if (susp) return fail(403, `Die Luftfahrtaufsicht hat Ihren Leitstand bis ${fmtBerlin(susp.until)} stillgelegt${susp.reason ? ` (${susp.reason})` : ''}. Bis dahin führt die KI Ihre Airline.`);
+        if (fair && fair.tooFast) return fail(429, 'Zu viele Aktionen in kurzer Zeit – bitte etwas langsamer.');
+        if (due) { try { const st = await fairApplyStage(store, user.key, due.n, { auto: true, score: due.score });   // Prüfsystem verhängt selbst (bis zur eingestellten Stufe)
+          if (st.ok && st.susp) return fail(403, `Die Luftfahrtaufsicht hat Ihren Leitstand bis ${fmtBerlin(st.susp.until)} stillgelegt (Stufe ${due.n}). Bis dahin führt die KI Ihre Airline.`); } catch (e) { console.log('Luftfahrtaufsicht: Stufe nicht verhängt', e.message); } }
         if (!PRESTART_OK.has(action.type)) {
           const st = await store.getMetadata(K.state(id));
           if (st && waiting(st.metadata)) return json({ ok: false, waiting: true, msg: `Das Spiel startet erst am ${fmtStart(st.metadata.startAt)}. Bis dahin können Sie Logo, Name und Heimatbasis festlegen, Pläne vorbereiten und Mitspielende einladen.` });
