@@ -434,11 +434,19 @@ ok(await call('anna', 'POST', `/games/${g.id}/restart`, { force: true, airline: 
   assert.equal((await act('anna', { type: 'acquire', typeId: 'DH8D', mode: 'lease', base: 'BRE' })).ok, true, 'nach dem Start Flugzeug');
   assert.equal((await call('anna', 'POST', '/games/main/rebase', { airline: { name: 'Nordlicht', code: 'NL', base: 'HAM' } })).status, 400, 'mit Flugzeug keine Basisänderung');
   Date.now = real;
+  // 0.21.85: Freitagnachmittag, Start im Wochenend-Tempo – Tempowechsel vor dem Start darf die Uhr nicht anlaufen lassen
+  { const real2 = Date.now, base = real2(), FRI = Date.UTC(2026, 10, 13, 15, 30); Date.now = () => FRI + (real2() - base);
+    try { ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'resetWorld', keep: true, startAt: Date.now() + 2 * 3600e3, speed: 'm20' }), 'Start Freitag 18:30');
+      ok(await call('tim', 'POST', '/games/main/control', { speed: 'm10' }), 'Tempo'); ok(await call('tim', 'POST', '/games/main/control', { speed: 'm20' }), 'Tempo zurück');
+      const off = Date.now(); Date.now = () => off + 3600e3;   // 17:30 – Wochenende hat begonnen, Start ist noch eine Stunde hin
+      assert.equal(ok(await call('tim', 'GET', '/games/main/admin'), 'vor Start').day, 0, 'Uhr steht auch über den Wochenendbeginn');
+    }
+    finally { Date.now = real2; } }
   // Termin verschieben und sofort starten
   ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'resetWorld', keep: true, startAt: Date.now() + 864e5 }), 'Neustart morgen');
   ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'setStart', startAt: null }), 'Jetzt starten');
   assert.equal(ok(await call('tim', 'GET', '/games/main/admin'), 'gestartet').startAt, null, 'läuft sofort');
-  console.log('Starttermin ok: Anmeldung, Logo, Basiswechsel vor dem Start, Uhr steht, danach 3 Tage pro Stunde, Jetzt starten'); }
+  console.log('Starttermin ok: Anmeldung, Logo, Basiswechsel vor dem Start, Uhr steht, danach 3 Tage pro Stunde, Jetzt starten, Wochenendbeginn vor dem Start'); }
 // Kapitalmarkt: Anteile, anteiliger Gewinn, Kapitalerhöhung, Anleihe, Übernahme mit Mehrheit
 { const SMx = (await import('../shared/engine.cjs')).default;
   const wk = SMx.newWorld({ seed: 11 }), a1 = SMx.addHuman(wk, { id: 'P1', name: 'Alpha', code: 'AA', base: 'HAM' }), b1 = SMx.addHuman(wk, { id: 'P2', name: 'Beta', code: 'BB', base: 'MUC' }); wk.playerId = 'P1';
@@ -1978,6 +1986,58 @@ console.log('Hauptwelt ok: 8 Airlines, Tag', w.day, '· Tick', tk.days, 'Tage ·
   assert.ok(fairScore(mix).reasons.find((r) => r.k === 'api').w >= 45, 'verdünnt sich nicht durch spätere normale Aktionen');
   const src = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'); assert.ok(src.split('.click()').length === 2 && /selfClick\(first\)/.test(src), 'eigene Klicks nur über selfClick');
   console.log(`0.21.84 ok: Schnittstelle abgewiesen und mit ${api.w} Punkten bewertet, verdünnt sich nicht; spieleigene Klicks zählen nicht`); }
+// 0.21.85: Spielmechaniken je Spiel ein- und ausschalten (Kartellrecht, Kerosin, Wechselkurs, Konjunktur, Inflation, Arbeitsmarkt, Steuer, Slots, Ereignisse …)
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const mk = () => { const w = SMx.newWorld({ seed: 85 }); SMx.addHuman(w, { id: 'P1', name: 'A', code: 'AA', base: 'HAJ' }); return w; };
+  const w = mk(), on = mk(); assert.ok(SMx.mechState(w).every((x) => x.on) && SMx.MECHS.length >= 12, 'Standard: alles an');
+  for (const m of SMx.MECHS) assert.ok(SMx.setMech(w, m.k, false).ok); assert.equal(SMx.setMech(w, 'quatsch', false).ok, false);
+  const cpi0 = w.macro.cpi; for (let i = 0; i < 400; i++) { w.step(); on.step(); }
+  assert.ok(w.macro.cpi === cpi0 && on.macro.cpi > cpi0, 'Inflation aus'); assert.ok(w.macro.fuelUsd === SMx.P.FUEL_USD_KG && w.macro.fuelIdx === 1 && on.macro.fuelUsd !== SMx.P.FUEL_USD_KG, 'Kerosin fest');
+  assert.ok(w.macro.eurusd === SMx.P.EURUSD && Object.values(w.macro.econ).every((x) => x === 1) && w.macro.laborTight === 1, 'Wechselkurs, Konjunktur, Arbeitsmarkt fest');
+  assert.ok(w.slotsFree('FRA') === Infinity && on.slotsFree('FRA') !== Infinity, 'Slots unbegrenzt'); assert.ok(!(w.airlines.P1.ledger.pnl.tax), 'keine Steuer');
+  const nEv = (x) => x.events.filter((e) => e.start > 5 && e.type !== 'mega').length; assert.ok(nEv(w) === 0 && nEv(on) > 5, `keine Zufallsereignisse (${nEv(w)} statt ${nEv(on)})`);
+  const w2 = SMx.deserialize(JSON.parse(JSON.stringify(SMx.serialize(w)))); assert.ok(w2.mechOff('fuel') && w2.mechOff('antitrust'), 'gespeichert');
+  SMx.setMech(w2, 'fuel', true); assert.ok(!w2.mechOff('fuel') && SMx.mechState(w2).find((x) => x.k === 'fuel').on, 'wieder an');
+  // Kartellrecht aus: kein Verfahren, keine Streckensperre
+  const P = SMx.P, A0 = { ...P.ANTITRUST }; Object.assign(P.ANTITRUST, { share: 0, minDeps: 0, minPax: 0 }); const wa = mk(); wa.airlines.P1.hold('HAJ', 3, 0, true); wa.antitrustCheck(); assert.ok(wa.airlines.P1.antitrust && wa.airlines.P1.antitrust.HAJ, 'an: Verfahren');
+  SMx.setMech(wa, 'antitrust', false); assert.ok(!wa.airlines.P1.antitrust, 'aus: Verfahren endet sofort'); Object.assign(P.ANTITRUST, A0);
+  // Server: nur Admins, wirkt in der Hauptwelt
+  assert.equal((await call('ben', 'POST', '/games/main/admin', { cmd: 'mech', key: 'fuel', on: false })).status, 403);
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'mech', key: 'fuel', on: false }), 'Kerosin aus'); assert.ok(!ok(await call('tim', 'GET', '/games/main/admin'), 'V').mech.find((x) => x.k === 'fuel').on, 'Verwaltung zeigt aus');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'mech', key: 'fuel', on: true }), 'wieder an');
+  console.log(`0.21.85 ok: ${SMx.MECHS.length} Mechaniken schaltbar – Kerosin/Wechselkurs/Konjunktur/Inflation/Arbeitsmarkt fest, Steuer und Slots aus, keine Ereignisse, Kartellrecht endet`); }
+// 0.21.86: Spielstand zurückdrehen – ganze Welt oder eine Airline, Sicherungspunkte stündlich/von Hand/vor dem Zurückdrehen
+{ const SMx = (await import('../shared/engine.cjs')).default; SMx.setFuelX(0);
+  const w = SMx.newWorld({ seed: 86 }), a = SMx.addHuman(w, { name: 'A', code: 'AA', base: 'HAJ', owner: 'u1' }), b = SMx.addHuman(w, { name: 'B', code: 'BB', base: 'MUC', owner: 'u2' }), A = (id, x) => SMx.applyAction(w, id, x);
+  A(a.id, { type: 'acquire', typeId: 'DH8D', base: 'HAJ', mode: 'lease' }); for (let i = 0; i < 20; i++) w.step();
+  const snap = JSON.parse(JSON.stringify(SMx.serialize(w))), cashA = a.ledger.cash, nA = a.fleet.length, d0 = w.day;
+  for (let i = 0; i < 2; i++) A(a.id, { type: 'acquire', typeId: 'DH8D', base: 'HAJ', mode: 'lease' }); A(b.id, { type: 'acquire', typeId: 'DH8D', base: 'MUC', mode: 'lease' });
+  const c = SMx.addHuman(w, { name: 'C', code: 'CC', base: 'FRA', owner: 'u3' }); a.fair = { stage: 2 }; SMx.setMech(w, 'fuel', false);
+  for (let i = 0; i < 40; i++) w.step(); const nB = b.fleet.length;
+  let cur = JSON.parse(JSON.stringify(SMx.serialize(w))); const r1 = SMx.rollbackAirline(cur, snap, a.id); assert.ok(r1.ok, r1.msg);
+  const w1 = SMx.deserialize(cur), a1 = w1.airlines[a.id];
+  assert.ok(a1.ledger.cash === cashA && a1.fleet.length === nA && w1.airlines[b.id].fleet.length === nB && w1.day === w.day, 'nur A zurück, B und Uhr bleiben');
+  assert.ok(a1.fair && a1.fair.stage === 2 && a1.owner === 'u1', 'Akte und Eigentümer bleiben'); for (let i = 0; i < 60; i++) w1.step(); assert.ok(Math.abs(SMx.balanceSheet(a1).check) < 1, 'Bilanz danach');
+  assert.equal(SMx.rollbackAirline(JSON.parse(JSON.stringify(SMx.serialize(w))), snap, c.id).ok, false, 'gab es damals nicht');
+  const r2 = SMx.rollbackWorld(JSON.parse(JSON.stringify(SMx.serialize(w))), snap); assert.ok(r2.ok, r2.msg); const w2 = SMx.deserialize(r2.s);
+  assert.ok(w2.day === d0 && w2.airlines[c.id] && w2.airlines[a.id].fleet.length === nA && w2.mechOff('fuel'), 'Welt zurück, später Beigetretene bleiben, Schalter bleiben');
+  for (let i = 0; i < 30; i++) w2.step(); assert.ok(Math.abs(SMx.balanceSheet(w2.airlines[c.id]).check) < 1, 'läuft weiter');
+  // Server: nur Admins; von Hand sichern, Airline zurück, dann das Zurückdrehen selbst zurücknehmen
+  assert.equal((await call('ben', 'POST', '/games/main/admin', { cmd: 'snap' })).status, 403, 'nur Admins');
+  const g0 = ok(await call('tim', 'GET', '/games/main/admin'), 'Verwaltung'); assert.ok(Array.isArray(g0.snaps) && g0.snaps.length >= 1, 'stündlicher Sicherungspunkt vorhanden');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'snap' }), 'Sicherungspunkt setzen');
+  const g1 = ok(await call('tim', 'GET', '/games/main/admin'), 'V'), man = g1.snaps.find((x) => x.why === 'manual'), pl = g1.players.find((p) => p.status !== 'fehlt' && p.equity !== null); assert.ok(man && pl, 'von Hand gesetzt');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'grant', airlineId: pl.airlineId, amount: 50e6 }), 'Kapital');
+  const eq = (g) => g.players.find((p) => p.airlineId === pl.airlineId).equity;
+  const g2 = ok(await call('tim', 'GET', '/games/main/admin'), 'V'); assert.ok(eq(g2) > eq(g1) + 40e6, 'gebucht');
+  assert.equal((await call('tim', 'POST', '/games/main/admin', { cmd: 'rollback', at: 123, scope: 'world' })).status, 404, 'unbekannter Punkt');
+  const rb = ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'rollback', at: man.at, scope: 'airline', airlineId: pl.airlineId }), 'Airline zurückdrehen');
+  const g3 = ok(await call('tim', 'GET', '/games/main/admin'), 'V'); assert.ok(eq(g3) < eq(g1) + 10e6, 'Buchung zurückgedreht: ' + rb.msg);
+  const pre = g3.snaps.find((x) => x.why === 'pre'); assert.ok(pre, 'Sicherung vor dem Zurückdrehen');
+  ok(await call('tim', 'POST', '/games/main/admin', { cmd: 'rollback', at: pre.at, scope: 'world' }), 'Welt auf Stand davor');
+  const g4 = ok(await call('tim', 'GET', '/games/main/admin'), 'V'); assert.ok(eq(g4) > eq(g1) + 40e6, 'Zurückdrehen zurückgenommen');
+  const st = await call('anna', 'GET', '/games/main/state'); assert.ok(st.status === 200 || st.status === 204 || st.status === 403, 'Stand lädt');
+  console.log(`0.21.86 ok: Zurückdrehen – eine Airline (andere und Uhr bleiben, Bilanz stimmt), ganze Welt (später Beigetretene und Schalter bleiben), Server mit ${g4.snaps.length} Sicherungspunkten`); }
 // 0.21.79: Pack-Verläufe mit eigener ID je Pack (gleiche IDs ließen die Tüte durchsichtig werden, sobald ein verstecktes Pack zuerst im Dokument stand)
 { const src = fs.readFileSync(new URL('../src/collection.js', import.meta.url), 'utf8'), i = src.indexOf('const packSvg = '), body = src.slice(i, src.indexOf('</svg>`', i));
   assert.ok(i > 0 && !/id="pk[a-z]+"|url\(#pk[a-z]+\)/.test(body), 'keine festen Verlaufs-IDs im Pack'); assert.ok(/'pk' \+ \(\+\+packSeq\)/.test(body) && /url\(#\$\{u\}g\)/.test(body), 'IDs je Pack');

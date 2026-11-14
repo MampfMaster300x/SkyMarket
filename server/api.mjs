@@ -95,7 +95,7 @@ const isAdmin = (user) => !!user && ADMINS.has(user.key);
 
 const K = {
   user: (k) => `users/${k}`, meta: (id) => `games/${id}/meta`, state: (id) => `games/${id}/state`, view: (id) => `games/${id}/view`, presence: (id) => `games/${id}/presence`, chat: (id) => `games/${id}/chat`,
-  code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`, diag: 'diag/client', fair: (k) => `fair/${k}`, fairConf: 'fairconf',
+  code: (c) => `codes/${c}`, index: 'index/games', play: (k) => `play/${k}`, diag: 'diag/client', fair: (k) => `fair/${k}`, fairConf: 'fairconf', snap: (id, at) => `games/${id}/snap/${at}`, snaps: (id) => `games/${id}/snaps`,
 };
 async function updateJson(store, key, fn, init = null, tries = 6) {
   for (let i = 0; i < tries; i++) {
@@ -113,6 +113,7 @@ const summary = (meta, extra = {}) => ({ main: !!meta.main, id: meta.id, name: m
 async function deleteGame(store, meta) {
   const id = meta.id;
   await store.delete(K.state(id)); try { await store.delete(K.view(id)); } catch (e) { /* gab es evtl. nicht */ } await store.delete(K.meta(id)); await store.delete(K.code(meta.code)); await store.delete(K.presence(id)); await store.delete(K.chat(id));
+  try { for (const x of (await store.get(K.snaps(id), { type: 'json' })) || []) await store.delete(K.snap(id, x.at)); await store.delete(K.snaps(id)); } catch (e) { /* keine Sicherungspunkte */ }
   await updateJson(store, K.index, (list) => (list || []).filter((g) => g.id !== id), []);
   for (const p of meta.players) await updateJson(store, K.user(p.u), (u) => { if (!u) return undefined; u.games = (u.games || []).filter((g) => g !== id); return u; });
 }
@@ -155,6 +156,30 @@ function packSized(w) {
   if (buf.byteLength > 4.5e6) buf = toArrayBuffer(gzipSync(Buffer.from(JSON.stringify(SM.serialize(w, { compact: true })))));
   return buf;
 }
+// ---------------------------------------------------------------------------
+// 0.21.86: Sicherungspunkte zum Zurückdrehen (nur Spielleitung). Stündlich beim Speichern, dazu von Hand und vor jedem Zurückdrehen.
+// Aufbewahrt: alle der letzten 48 Stunden, danach einer je Tag (30 Tage); von Hand gesetzte und automatische vor dem Zurückdrehen 30 Tage.
+// ---------------------------------------------------------------------------
+const SNAP = { every: 3600e3, recent: 48 * 3600e3, days: 30, max: 120 };
+const SNAP_WHY = { auto: 'stündlich', manual: 'von Hand', pre: 'vor dem Zurückdrehen' };
+function snapPrune(list, now) {
+  const keep = [], del = [], seenDay = new Set();
+  for (const x of [...list].sort((a, b) => b.at - a.at)) {
+    const age = now - x.at;
+    if (age > SNAP.days * 864e5) { del.push(x); continue; }
+    if (age <= SNAP.recent || x.why !== 'auto') { keep.push(x); continue; }
+    const d = berlinDay(x.at); if (seenDay.has(d)) { del.push(x); continue; } seenDay.add(d); keep.push(x);
+  }
+  while (keep.length > SNAP.max) del.push(keep.pop());
+  return { keep, del };
+}
+async function snapSave(store, id, buf, day, at, why = 'auto', by = null) {
+  await store.set(K.snap(id, at), buf, { metadata: { day, why } });
+  let drop = [];
+  await updateJson(store, K.snaps(id), (list) => { const r = snapPrune([...(list || []).filter((x) => x.at !== at), { at, day, why, by: by || undefined, kb: Math.round(buf.byteLength / 1024) }], at); drop = r.del; return r.keep; }, []);
+  for (const x of drop) { try { await store.delete(K.snap(id, x.at)); } catch (e) { /* weg ist weg */ } }
+}
+const rawOf = (buf) => JSON.parse(gunzipSync(Buffer.from(buf)).toString());
 // ---------------------------------------------------------------------------
 // Wochenend-Tempo der Hauptwelt: Freitag 17 Uhr bis Montag 6 Uhr (deutsche Zeit) 1 Spieltag = 1 Stunde.
 // Die Grenzen liegen auf vollen Stunden – auch in UTC –, darum wird stundenweise gerechnet.
@@ -211,6 +236,7 @@ const P_WAIT_MAX = SM.P.WAIT.max;
 // Patch-Hinweise für Spielende NUR, wenn die Spielleitung es ausdrücklich wünscht – dann neue Kennung an PATCH_IDS anhängen.
 const withPatch = async (store, u, out) => { if (!u || u.patchSeen === PATCH_ID) return out; const list = await patchNote(store, u.patchSeen); return list.length ? { ...out, patch: list } : out; };
 function clockDue(md, now, main = false) {
+  if (md && md.startAt && md.startAt > now) return { days: 0, carry: 0 };   // 0.21.85: vor dem Starttermin steht die Uhr immer (auch wenn das Wochenend-Tempo dazwischen beginnt)
   const sp = speedInfo(md.speed);
   if (!sp.ms) return { days: 0, carry: md.carry || 0 };
   if (main && sp.slow) {
@@ -257,13 +283,17 @@ async function mutateState(store, id, fn = null) {
     const w = unpackWorld(cur.data);
     if (due.days > 0 && !waiting(md, now)) { try { await autoFlags(store, w, now); } catch (e) { /* Vertretung ist nicht kritisch */ } }
     for (let d = 0; d < due.days; d++) w.step();
-    if (due.days > 0 || (id === MAIN_ID && effSpeed(md, md.lastTick || now, true).key !== effSpeed(md, now, true).key)) { md.carry = due.carry; md.lastTick = now; }
+    if (!waiting(md, now) && (due.days > 0 || (id === MAIN_ID && effSpeed(md, md.lastTick || now, true).key !== effSpeed(md, now, true).key))) { md.carry = due.carry; md.lastTick = now; }
     let result = null;
     if (fn) result = fn(w, md, now);
     md.day = w.day; md.ver = (md.ver || 0) + 1;
+    const snapNow = !waiting(md, now) && now - (md.snapAt || 0) >= SNAP.every; if (snapNow) md.snapAt = now;
     const buf = packSized(w);
     const res = await store.set(K.state(id), buf, { metadata: md, onlyIfMatch: cur.etag });
-    if (res.modified !== false) return { etag: res.etag, md, buf, changed: true, result, w };
+    if (res.modified !== false) {
+      if (snapNow) { try { await snapSave(store, id, buf, w.day, now, 'auto'); } catch (e) { console.log('Sicherungspunkt fehlgeschlagen', id, e.message); } }
+      return { etag: res.etag, md, buf, changed: true, result, w };
+    }
     // Nur lesen (Abruf des Stands): Ein anderes Gerät hat gerade gespeichert – dessen Stand ist neuer, also einfach den liefern
     if (!fn) { const nx = await store.getWithMetadata(K.state(id), { type: 'arrayBuffer' }); if (nx) return { etag: nx.etag, md: { ...nx.metadata }, buf: nx.data, changed: false }; }
   }
@@ -749,7 +779,7 @@ export async function handle(req, { store, geo = null }) {
           players: meta.players.map((p) => { const al = w.airlines[p.airlineId], bs = al ? SM.balanceSheet(al) : null;
             return { u: p.u, name: p.name, airlineId: p.airlineId, airlineName: p.airlineName, code: p.code, base: p.base, joined: p.joined, host: meta.host === p.u, me: p.u === user.key,
               status: al ? al.status : 'fehlt', equity: bs ? Math.round(bs.equity) : null, fleet: al ? al.fleet.length : 0, routes: al ? al.activeRoutes().length : 0, online: now - (pres[p.u] || 0) < 45000, seen: pres[p.u] || null, auto: al && al.auto ? al.auto : 0, autoForced: !!(al && al.autoForced) }; }),
-          banned: meta.banned || [], events: SM.adminEvents(w), audit: SM.adminAudit(w),
+          banned: meta.banned || [], events: SM.adminEvents(w), audit: SM.adminAudit(w), mech: SM.mechState(w), snaps: isAdmin(user) ? ((await store.get(K.snaps(id), { type: 'json' })) || []).map((x) => ({ ...x, label: SNAP_WHY[x.why] || x.why })) : [],
           fleets: Object.fromEntries(meta.players.map((p) => { const al = w.airlines[p.airlineId]; return [p.airlineId, al ? al.fleet.filter((a) => a.delivery_day <= w.day).slice(0, 300).map((a) => ({ id: a.id, t: SM.P.AIRCRAFT_TYPES[a.type_id].label, aog: a.status === 'aog' })) : []]; })) });   // 0.21.82: für „Ereignis auslösen“
       }
       if (op === 'admin' && method === 'POST') {
@@ -793,6 +823,35 @@ export async function handle(req, { store, geo = null }) {
           if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
           console.log(`${user.key} hat in ${id} eine Nachprüfung angeordnet: ${res.msg}`);
           return json({ ok: true, msg: 'Nachprüfung angeordnet – ' + res.msg, ver: r.etag });
+        }
+        if (cmd === 'snap' || cmd === 'rollback') {   // 0.21.86: Sicherungspunkt setzen / Spielstand zurückdrehen (ganze Welt oder eine Airline)
+          if (!isAdmin(user)) return fail(403, 'Nur für Admins.');
+          await mutateState(store, id, null);   // erst auf heute bringen
+          const cur = await store.getWithMetadata(K.state(id), { type: 'arrayBuffer' }), now = Date.now();
+          if (!cur) return fail(404, 'Spiel nicht gefunden.');
+          if (cmd === 'snap') { await snapSave(store, id, cur.data, cur.metadata.day || 0, now, 'manual', user.name); return json({ ok: true, msg: `Sicherungspunkt gesetzt (Spieltag ${(cur.metadata.day || 0) + 1}).` }); }
+          const at = Number(body.at), scope = body.scope === 'airline' ? 'airline' : 'world';
+          const sb = Number.isFinite(at) ? await store.get(K.snap(id, at), { type: 'arrayBuffer' }) : null;
+          if (!sb) return fail(404, 'Sicherungspunkt nicht gefunden.');
+          const curS = rawOf(cur.data), snapS = rawOf(sb);
+          let res, out;
+          if (scope === 'airline') { res = SM.rollbackAirline(curS, snapS, String(body.airlineId || '')); out = curS; }
+          else { res = SM.rollbackWorld(curS, snapS); out = res.s; }
+          if (!res.ok) return fail(400, res.msg);
+          let w; try { w = SM.deserialize(out); } catch (e) { return fail(500, 'Der Sicherungspunkt passt nicht zur aktuellen Version: ' + e.message); }
+          await snapSave(store, id, cur.data, cur.metadata.day || 0, now, 'pre', user.name);   // damit das Zurückdrehen selbst wieder rückgängig zu machen ist
+          const md = { ...cur.metadata, ver: (cur.metadata.ver || 0) + 1, day: w.day };
+          if (scope === 'world') { md.lastTick = now; md.carry = 0; }
+          const put = await store.set(K.state(id), packSized(w), { metadata: md, onlyIfMatch: cur.etag });
+          if (put.modified === false) return fail(409, 'Gerade wurde gespeichert – bitte noch einmal versuchen.');
+          console.log(`${user.key} hat in ${id} zurückgedreht (${scope}${scope === 'airline' ? ' ' + body.airlineId : ''}) auf ${new Date(at).toISOString()}: ${res.msg}`);
+          return json({ ok: true, msg: res.msg, ver: put.etag });
+        }
+        if (cmd === 'mech') {   // 0.21.85: Spielmechanik ein-/ausschalten (still – keine Meldung an die Spielenden)
+          const r = await mutateState(store, id, (w) => SM.setMech(w, String(body.key || ''), !!body.on, user.name)); const res = r.result || { ok: false };
+          if (!res.ok) return fail(400, res.msg || 'Nicht möglich.');
+          console.log(`${user.key} in ${id}: ${res.msg}`);
+          return json({ ok: true, msg: res.msg, ver: r.etag });
         }
         if (cmd === 'incident') {   // 0.21.82: Ereignis für eine Airline (Unfall, Skandal, Streik …) – im Spiel wie ein gewöhnliches Ereignis
           const r = await mutateState(store, id, (w) => SM.adminIncident(w, String(body.airlineId || ''), { kind: String(body.kind || ''), sev: Number(body.sev), acId: body.acId ? String(body.acId) : null }));

@@ -7029,6 +7029,51 @@ function adminIncidentHtml(d) {
     <div class="row"><button class="btn small danger" data-adm="incident">Ereignis auslösen</button></div>
     <p class="small muted">Für alle sieht das aus wie ein gewöhnliches Ereignis: Logbuch, Nachrichten, Kurs und Ansehen nennen die Spielleitung nicht. Unten unter „Ereignisse“ lässt sich eine Vertrauenskrise annullieren (endet samt Stilllegungen der Untersuchung). Geld, Bußgelder und verlorene Flugzeuge bleiben weg.</p></section>`;
 }
+/** 0.21.85: Übersicht der Spielmechaniken – je Spiel ein- und ausschalten (wirkt sofort, still). */
+function showMech(id, d, onBack) {
+  const groups = [...new Set(d.mech.map((x) => x.group))], off = d.mech.filter((x) => !x.on).length;
+  const m = modal(`<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Mechaniken <small class="muted">${esc(d.name)}</small></h1><button class="btn small" data-mc="back">Zurück</button></div>
+    <p class="small muted">Schalten Sie Spielmechaniken für dieses Spiel ein oder aus. Das wirkt sofort und für alle Airlines, ohne Meldung an die Spielenden. ${off ? `<b>${off} ausgeschaltet.</b>` : 'Alles eingeschaltet (Standard).'}</p>
+    ${groups.map((g) => `<section class="stack mc-g"><h3>${esc(g)}</h3>${d.mech.filter((x) => x.group === g).map((x) => `<label class="mc-row${x.on ? '' : ' off'}"><span class="mc-t"><b>${esc(x.label)}</b><span class="small muted">${esc(x.desc)}</span></span><span class="mc-sw"><input type="checkbox" role="switch" data-mk="${x.k}"${x.on ? ' checked' : ''} aria-label="${esc(x.label)}"><i aria-hidden="true"></i></span></label>`).join('')}</section>`).join('')}
+    <p class="small muted">Großveranstaltungen (Messen, Sportereignisse) und Ereignisse, die Sie selbst auslösen, laufen unabhängig davon.</p></div>`, false);
+  m.onclick = (e) => { if (e.target.closest('[data-mc="back"]')) { m.onclick = null; m.onchange = null; onBack(); } };
+  m.onchange = async (e) => {
+    const t = e.target.closest('[data-mk]'); if (!t) return; t.disabled = true;
+    try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'mech', key: t.dataset.mk, on: t.checked } }); toast(r.msg); const x = d.mech.find((y) => y.k === t.dataset.mk); if (x) x.on = t.checked; t.closest('.mc-row').classList.toggle('off', !t.checked); if (ui.mp && ui.mp.id === id) mpPoll(true).catch(() => {}); }
+    catch (err) { toast(err.message); t.checked = !t.checked; }
+    t.disabled = false;
+  };
+}
+/** 0.21.86: Sicherungspunkte – ganze Welt oder eine Airline auf einen früheren Stand zurückdrehen (nur Admins). */
+function showSnaps(id, d, onBack) {
+  const st = ui.admSnap = ui.admSnap || { scope: 'world' }, list = d.snaps || [];
+  if (st.scope !== 'world' && !d.players.some((p) => p.airlineId === st.scope)) st.scope = 'world';
+  const tm = (t) => new Date(t).toLocaleString('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const who = st.scope === 'world' ? 'die ganze Welt' : (d.players.find((p) => p.airlineId === st.scope) || {}).airlineName;
+  const row = (x) => `<div class="adm-p"><div style="min-width:0"><b>${esc(tm(x.at))}</b> <span class="small muted">· Spieltag ${n0((x.day || 0) + 1)} · ${esc(x.label || '')}${x.by ? ' · ' + esc(x.by) : ''}</span></div>
+    <button class="btn small danger" data-sn="back2" data-at="${x.at}" data-day="${x.day || 0}"${x.day > d.day && st.scope !== 'world' ? ' disabled title="Liegt nach dem heutigen Spieltag"' : ''}>Zurückdrehen</button></div>`;
+  const m = modal(`<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Sicherungspunkte <small class="muted">${esc(d.name)}</small></h1><button class="btn small" data-sn="back">Zurück</button></div>
+    <p class="small muted">Heute: Spieltag ${n0(d.day + 1)}. Gesichert wird stündlich (48 Stunden lang jeder, danach einer je Tag für 30 Tage), außerdem von Hand und automatisch vor jedem Zurückdrehen – so lässt sich auch das Zurückdrehen wieder zurücknehmen.</p>
+    <div class="row"><label class="f" style="flex:1;min-width:200px"><span>Was zurückdrehen?</span><select id="sn-scope"><option value="world"${st.scope === 'world' ? ' selected' : ''}>Ganze Welt (alle Airlines, Markt, Uhr)</option>${d.players.map((p) => `<option value="${esc(p.airlineId)}"${st.scope === p.airlineId ? ' selected' : ''}>Nur ${esc(p.airlineName)}</option>`).join('')}</select></label>
+      <button class="btn small" data-sn="now">Sicherungspunkt jetzt setzen</button></div>
+    <p class="small">${st.scope === 'world' ? '<b>Ganze Welt:</b> Alle Airlines, Kurse, Ereignisse und die Uhr springen auf den gewählten Stand. Airlines, die erst danach beigetreten sind, bleiben wie sie sind. Mechanik-Schalter und die Akten der Luftfahrtaufsicht bleiben.' : `<b>Nur ${esc(who)}:</b> Kasse, Flotte, Strecken, Personal, Slots und Beteiligungen dieser Airline kommen vom gewählten Stand, alle anderen spielen unverändert weiter. Offene Angebote mit ihr verfallen. Was andere inzwischen mit ihr gehandelt haben (gekaufte Flugzeuge, Anteile an ihr), bleibt bei den anderen.`}</p>
+    <section class="stack"><h3>Gesichert <small class="muted">${list.length}</small></h3><div class="adm-list">${list.map(row).join('') || '<p class="small muted">Noch keine Sicherungspunkte – der erste entsteht innerhalb der nächsten Stunde oder jetzt von Hand.</p>'}</div></section>
+    <p class="small muted">Für die Spielenden gibt es keine Meldung. Skins der Aircraft Collection und Fair-Play-Akten liegen außerhalb des Spielstands und bleiben unverändert.</p></div>`, false);
+  m.onchange = (e) => { if (e.target.id === 'sn-scope') { st.scope = e.target.value; showSnaps(id, d, onBack); } };
+  m.onclick = async (e) => {
+    const b = e.target.closest('[data-sn]'); if (!b) return; const c = b.dataset.sn;
+    if (c === 'back') { m.onclick = null; m.onchange = null; onBack(); return; }
+    const reload = async () => { try { const nd = await api(`/games/${id}/admin`); Object.assign(d, nd); } catch (err) { /* alte Liste zeigen */ } showSnaps(id, d, onBack); };
+    if (c === 'now') { b.disabled = true; try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'snap' } }); toast(r.msg); } catch (err) { toast(err.message); } await reload(); return; }
+    if (c === 'back2') {
+      if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = `Wirklich ${who} auf Spieltag ${n0(Number(b.dataset.day) + 1)}?`; return; }
+      b.disabled = true;
+      try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'rollback', at: Number(b.dataset.at), scope: st.scope === 'world' ? 'world' : 'airline', airlineId: st.scope === 'world' ? null : st.scope } }); toast(r.msg);
+        if (ui.mp && ui.mp.id === id) { ui.mpLastDay = null; await mpPoll(true); } } catch (err) { toast(err.message); }
+      await reload();
+    }
+  };
+}
 async function showAdmin(id, onBack) {
   const m = modal('<h1>Verwaltung</h1><p class="small muted">Lade …</p>');
   let d;
@@ -7042,7 +7087,7 @@ async function showAdmin(id, onBack) {
   const when = (e) => (e.cancelled ? 'annulliert' : e.start > day ? `ab ${dateShort(e.start)}` : e.end > day ? `bis ${dateShort(e.end)}` : 'wirkt nach');
   const eRow = (e) => `<div class="adm-e${e.cancelled ? ' off' : ''}"><span class="chip ${e.severity === 'crit' ? 'crit' : e.severity === 'good' ? 'good' : 'warn'}">${esc(EV_TYPE[e.type] || e.type)}</span><div style="min-width:0"><span class="small">${esc(e.text)}</span><div class="small muted">${when(e)}${e.airline ? ' · betrifft ' + esc(alName(e.airline)) : ''}</div></div>
     ${e.cancelled ? '' : `<button class="btn small" data-adm="cancel" data-ev="${esc(e.id)}">Annullieren</button>`}</div>`;
-  m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Verwaltung <small class="muted">${esc(d.name)}</small></h1><button class="btn small" data-adm="close">Schließen</button></div>
+  m.innerHTML = `<div class="dialog wide" role="dialog" aria-modal="true"><div class="spread"><h1>Verwaltung <small class="muted">${esc(d.name)}</small></h1><span class="row" style="gap:6px">${d.mech ? `<button class="btn small" data-adm="mech">Mechaniken${d.mech.some((x) => !x.on) ? ` <span class="chip warn">${d.mech.filter((x) => !x.on).length} aus</span>` : ''}</button>` : ''}${d.admin && d.snaps ? `<button class="btn small" data-adm="snaps">Zurückdrehen</button>` : ''}<button class="btn small" data-adm="close">Schließen</button></span></div>
     <p class="small muted">Spieltag ${n0(day + 1)} · ${d.players.length} Airlines. Alles, was Sie hier tun, sehen alle Mitspielenden als Meldung.</p>
     <section class="stack"><h3>Airlines</h3><div class="adm-list">${d.players.map(pRow).join('') || '<p class="small muted">Niemand spielt mit.</p>'}</div>
       <p class="small muted">„Entfernen“ beendet die Airline sofort: Strecken enden, Leasingflugzeuge gehen zurück, Slots, Gates und offene Angebote verfallen. Die Person kann danach neu beitreten – außer mit „sperren“. Kapital buchen: positiver Betrag schießt zu, negativer zieht ab (z. B. zum Ausgleich eines Fehlers).</p></section>
@@ -7099,6 +7144,8 @@ async function showAdmin(id, onBack) {
     if (cmd === 'reset') { b.disabled = true; const sv = ($('#adm-start') || {}).value, startAt = sv ? new Date(sv).getTime() : 0;
       if (sv && !isFinite(startAt)) { toast('Ungültiger Starttermin.'); b.disabled = false; return; }
       try { const r = await api(`/games/${id}/admin`, { body: { cmd: 'resetWorld', keep: !!(m.querySelector('#adm-keep') || {}).checked, startAt: startAt || null, speed: ($('#adm-speed') || {}).value } }); toast(r.msg || 'Neu gestartet.'); if (ui.mp && ui.mp.id === id) { ui.mpLastDay = null; await mpPoll(true); } } catch (err) { toast(err.message); } showAdmin(id, onBack); return; }
+    if (cmd === 'mech') { showMech(id, d, () => showAdmin(id, onBack)); return; }
+    if (cmd === 'snaps') { showSnaps(id, d, () => showAdmin(id, onBack)); return; }
     if (cmd === 'incident') {
       const st = ui.admInc, K = SM.INCIDENTS[st.kind]; st.ac = (m.querySelector('#adm-iac') || {}).value || '';
       if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = `Wirklich: ${K.label} (${['', 'leicht', 'mittel', 'schwer'][st.sev]}) für ${alName(st.al)}?`; return; }
@@ -7404,7 +7451,7 @@ function applyServerState(s, ver, first, sess = mpState.sess) {
     toast('Ihre Airline fehlt im Spielstand – bitte neu laden.'); return false;
   }
   mpState.noAirline = false;
-  if (prev && nw.day < prev.day - 1) { first = true; prev = null; toast('Die Spielleitung hat die Welt neu gestartet.'); }
+  if (prev && nw.day < prev.day - 1) { first = true; prev = null; if (nw.day < 2) toast('Die Spielleitung hat die Welt neu gestartet.'); }   // 0.21.86: Zurückdrehen bleibt still
   W = nw;
   W.playerId = myId;
   mpState.ver = ver; mpState.isView = isView;

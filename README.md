@@ -183,6 +183,58 @@ npm test             # API-Ablauf prüfen (Konten, Passwort, Einladung, Zeit, Ak
 
 Mit `npx netlify-cli dev` läuft es auch lokal mit dem echten Netlify-Stack, inklusive Blobs-Emulation.
 
+## Neu in 0.21.86: Spielstand zurückdrehen (Verwaltung, nur Admins)
+
+- **Wo:** Verwaltung eines Spiels → Knopf „Zurückdrehen“. Dort sind alle Sicherungspunkte aufgelistet, mit Uhrzeit, Spieltag und Anlass. Es gibt auch den Knopf „Sicherungspunkt jetzt setzen“.
+- **Sicherungspunkte:**
+  - Stündlich beim Speichern. Die Hauptwelt läuft ohnehin stündlich.
+  - Von Hand.
+  - Automatisch vor jedem Zurückdrehen. Damit lässt sich auch das Zurückdrehen wieder zurücknehmen.
+  - Aufbewahrt werden alle Punkte der letzten 48 Stunden. Danach bleibt einer je Tag, 30 Tage lang. Von Hand gesetzte Punkte und solche vor dem Zurückdrehen bleiben 30 Tage. Höchstens 120 Punkte.
+  - Gespeichert unter `games/<id>/snap/<Zeit>`, die Liste unter `games/<id>/snaps`. Beim Löschen eines Spiels werden sie mit entfernt.
+  - Rückwirkend geht es erst ab diesem Update.
+- **Ganze Welt:** Alle Airlines, Markt, Ereignisse und die Uhr springen auf den gewählten Stand. Ab dort läuft die Uhr normal weiter. Bleiben unverändert:
+  - Airlines, die erst später beigetreten sind (samt Wartelisten-Einträgen).
+  - Die Schalter der Spielmechanik.
+  - Die Prüfakte der Luftfahrtaufsicht (`fair`).
+  - Eigentümer und Ausschlüsse.
+- **Eine Airline:** Kasse, Flotte, Strecken, Personal, Slots, Beteiligungen und Logbuch dieser Airline kommen vom gewählten Stand. Alle anderen spielen unverändert weiter, Uhr und Spieltag bleiben. Dazu:
+  - Ihre Wartelisten-Einträge kommen vom alten Stand.
+  - Offene Angebote mit ihr verfallen.
+  - Was andere inzwischen mit ihr gehandelt haben, bleibt bei den anderen.
+- **Still:** Die Spielenden bekommen keine Meldung. Der Hinweis „Die Spielleitung hat die Welt neu gestartet“ erscheint nur noch bei einem echten Neustart.
+- **Nicht betroffen:** Skins der Aircraft Collection und Fair-Play-Akten liegen außerhalb des Spielstands.
+- **Technik:**
+  - `SM.rollbackAirline(cur, snap, id)` und `SM.rollbackWorld(cur, snap)` arbeiten auf gespeicherten Ständen.
+  - Der Server prüft das Ergebnis per `deserialize` und speichert dann. Bei gleichzeitigem Speichern antwortet er mit 409.
+  - Befehle `snap` und `rollback` (`at`, `scope: world|airline`, `airlineId`).
+
+## Neu in 0.21.85: Mechaniken ein- und ausschalten (Verwaltung)
+
+- **Wo:** Verwaltung eines Spiels → Knopf „Mechaniken“ (zeigt, wie viele aus sind). Je Mechanik gibt es einen Schalter mit Erklärung, nach Gruppen geordnet.
+- **Wirkung:** sofort, für alle Airlines und still, also ohne Meldung an die Spielenden. Gespeichert in `w.mech` (nur ausgeschaltete), Standard ist alles an.
+- **Aufsicht:**
+  - Wettbewerbsaufsicht (Kartellrecht). Aus: Laufende Verfahren und Streckensperren enden sofort.
+  - Preisaufsicht. Aus: Tarifdeckel fallen weg.
+  - Wirtschaftsprüfung (Jahresprüfung, Nachprüfungen, Raten).
+- **Wettbewerb:**
+  - Reaktionen der Konkurrenz (Preiskampf, Markteintritt, Gewerkschaftsforderung).
+  - Slot-Begrenzung. Aus: überall unbegrenzt.
+  - Charteranfragen. Aus: keine neuen.
+- **Wirtschaft:**
+  - Kerosinpreis schwankt. Aus: fester Referenzpreis, Ölschocks wirken nicht.
+  - Wechselkurs. Aus: fester Kurs.
+  - Konjunktur. Aus: neutral.
+  - Inflation. Aus: Preisniveau bleibt.
+  - Arbeitsmarkt. Aus: keine Knappheit, Löhne stabil.
+  - Ertragsteuer. Aus: steuerfrei.
+- **Ereignisse:**
+  - Zufallsereignisse (Krisen, Ölschocks, Wetter, Natur, Pandemien). Aus: keine neuen, laufende enden normal.
+  - Betriebsstörungen (zufällige Triebwerksschäden, IT, Krankheit, Streiks). Aus: keine neuen.
+  - Großveranstaltungen und selbst ausgelöste Ereignisse laufen unabhängig davon weiter.
+- **Server:** `POST /games/<id>/admin { cmd: 'mech', key, on }`. Katalog `SM.MECHS`, Stand `SM.mechState`.
+- **Fix geplanter Start:** Lag der Starttermin im Wochenend-Tempo (ab Freitag 17 Uhr), konnte die Uhr vorher schon anlaufen. Der Grund war ein Tempowechsel, der den Takt auf „jetzt“ zurücksetzte. Vor dem Termin steht die Uhr jetzt immer.
+
 ## Neu in 0.21.84: Schnittstellen-Bots abweisen, Fehlalarme vermeiden
 
 - **Aktionen ohne Bedien-Nachweis werden abgewiesen**, also Skripte und Bots, die direkt mit dem Server reden. Die Meldung lautet „Aktionen gehen nur über die Spieloberfläche. Bitte die Seite neu laden.“
